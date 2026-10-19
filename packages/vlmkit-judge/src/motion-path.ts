@@ -7,6 +7,7 @@
  *
  *   target-lost      absent in a frame between frames that show it (clipped, covered, faded out
  *                    and back), measured on presence, not on the box
+ *   target-hidden    shown in no frame at all, rest included: clipped or covered from the start
  *   absent-at-rest   shown during the motion, gone once it stops: clipped, covered or faded out
  *                    for good (an exit the author meant is declared with `exits`)
  *   snap-back        once it stops, back near where it started after travelling: the final
@@ -140,7 +141,14 @@ export interface MotionSample {
    * element's own animation time (0-1, its delay and duration): with it the easing is fitted on
    * that, so staggered siblings in one segment each read their own curve.
    */
-  dom?: { box: MotionBox; opacity: number; scale: number; t?: number | null };
+  dom?: {
+    box: MotionBox;
+    opacity: number;
+    scale: number;
+    t?: number | null;
+    /** What keeps it from being seen, when the page could tell: "clipped by …", "covered by …". */
+    hiddenBy?: string;
+  };
   /** The box may be another element's (it coincides with another target's): left out of geometry. */
   unsure?: boolean;
 }
@@ -181,6 +189,7 @@ export interface MotionPathOptions {
 
 export type MotionRule =
   | "target-lost"
+  | "target-hidden"
   | "absent-at-rest"
   | "snap-back"
   | "jump"
@@ -292,19 +301,47 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
   // Presence: absent between two frames that show it, or gone once it stops. A faint frame whose
   // box is at the viewport's edge is the target coming in or going out, not lost.
   const judged = sorted.filter((s) => seen(s) !== null);
+  // Why a frame does not show it, when the page measured that (clip, cover, stacking context).
+  const why = (s: MotionSample) => (s.dom?.hiddenBy ? ` — ${s.dom.hiddenBy}` : "");
   const firstShown = judged.findIndex(shown);
+  // Never shown in any frame, rest included. Every rule below compares frames that show it, so
+  // without this a card clipped from its first frame to its last passed, with an easing fitted to
+  // an element nobody could see (motion-repair round 1: a clipped notification, a menu under a
+  // banner — both "no fail").
+  if (firstShown < 0 && judged.length > 0) {
+    const rendered = judged.filter((s) => !s.dom || s.dom.opacity >= 0.05);
+    const r = rendered.find(isRest) ?? rendered[rendered.length - 1] ?? judged[judged.length - 1]!;
+    findings.push({
+      rule: "target-hidden",
+      severity: "fail",
+      atMs: r.atMs,
+      message: r.dom
+        ? `never seen in any frame, at rest included (visible ${r.present.toFixed(2)} at ${ms(r.atMs)}, rendered at opacity ${r.dom.opacity.toFixed(2)})${why(r) || ": clipped by an ancestor, covered, or off-screen"}`
+        : `not found in any frame, at rest included (presence ${r.present.toFixed(2)} at ${ms(r.atMs)}): hidden, or the description names something not on the page`,
+    });
+    const skipped = { skipped: "not seen in any frame: nothing about its motion is judged" } as SegmentEasing;
+    return {
+      findings,
+      path: [],
+      segments: segments.map((seg) => ({ ...seg, travelPx: 0, easing: skipped })),
+      travelPx: 0,
+      easing: skipped,
+    };
+  }
   const lastShown = judged.length - 1 - [...judged].reverse().findIndex(shown);
   if (firstShown >= 0) {
     for (let i = firstShown + 1; i < lastShown; i++) {
       const s = judged[i]!;
-      if (!shown(s) && !atEdge(s)) {
+      // Measured, the visible share already leaves out what is off-screen, so a box at the edge is
+      // no excuse: a toast that snaps back off-screen between two frames that show it is lost.
+      if (!shown(s) && (s.dom !== undefined || !atEdge(s))) {
         const before = [...judged.slice(0, i)].reverse().find(shown)!;
         const after = judged.slice(i + 1).find(shown)!;
         findings.push({
           rule: "target-lost",
           severity: "fail",
           atMs: s.atMs,
-          message: `not shown at ${ms(s.atMs)} (presence ${s.present.toFixed(2)}) though ${ms(before.atMs)} and ${ms(after.atMs)} show it: clipped, covered or hidden mid-motion — if it is not on screen yet at ${ms(before.atMs)}, that frame's reading is the wrong one; look at both`,
+          message: `not shown at ${ms(s.atMs)} (presence ${s.present.toFixed(2)}) though ${ms(before.atMs)} and ${ms(after.atMs)} show it${why(s) || ": clipped, covered or hidden mid-motion"}${s.dom ? "" : ` — if it is not on screen yet at ${ms(before.atMs)}, that frame's reading is the wrong one; look at both`}`,
         });
       }
     }
@@ -315,7 +352,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         rule: "absent-at-rest",
         severity: "fail",
         atMs: restSamples[0]!.atMs,
-        message: `shown during the motion, not once it stops (presence ${restSamples[0]!.present.toFixed(2)} at ${ms(restSamples[0]!.atMs)}): clipped, covered or hidden in its end state (an exit is declared with exits)`,
+        message: `shown during the motion, not once it stops (presence ${restSamples[0]!.present.toFixed(2)} at ${ms(restSamples[0]!.atMs)})${why(restSamples[0]!) || ": clipped, covered or hidden in its end state"} (an exit is declared with exits)`,
       });
     }
   }
@@ -503,6 +540,30 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     }
     return { ...seg, travelPx, easing };
   });
+
+  // In a hold between two segments it stays where the first left it: a frame there far from the
+  // segment's last one is the end keyframe not held (an entrance without fill-mode, whose next
+  // animation brings it back).
+  for (let k = 0; k + 1 < segments.length; k++) {
+    const seg = segments[k]!;
+    const next = segments[k + 1]!;
+    const inSeg = geo.filter((p) => p.atMs >= seg.startMs && p.atMs <= seg.endMs);
+    const ended = inSeg[inSeg.length - 1];
+    const held = geo.filter((p) => p.atMs > seg.endMs && p.atMs < next.startMs);
+    const off = ended ? held.find((p) => dist(p, ended) >= floor) : undefined;
+    if (ended && off) {
+      const started = inSeg[0]!;
+      const backHome = dist(off, started) <= Math.max(floor, dist(started, ended) * 0.25);
+      findings.push({
+        rule: backHome ? "snap-back" : "jump",
+        severity: "fail",
+        atMs: off.atMs,
+        message: backHome
+          ? `back near where it started at ${ms(off.atMs)}, in the hold after ${ms(seg.endMs)} (${Math.round(dist(off, ended))}px from where the motion ended): that animation's final keyframe is not held — add animation-fill-mode: forwards (or both)`
+          : `${Math.round(dist(off, ended))}px from where the motion ended (${ms(ended.atMs)}) at ${ms(off.atMs)}, in the hold before ${ms(next.startMs)}: the state between the animations is not the end keyframe`,
+      });
+    }
+  }
 
   // Once it stops: back where it began, or a jump off the last motion frame.
   const lastExpected = expectFor(segments.length - 1);

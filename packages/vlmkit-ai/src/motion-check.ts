@@ -41,6 +41,8 @@ export interface MotionDom {
    * clip, a cover or a stacking mistake leaves of it. What `jev: false` judges presence from.
    */
   visible?: number;
+  /** Why it is not seen, when the page could tell: "clipped by header.topbar (overflow: hidden)…". */
+  hiddenBy?: string;
 }
 
 export interface MotionFrame {

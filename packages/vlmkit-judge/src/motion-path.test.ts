@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import { describe, expect, it } from "vite-plus/test";
 import {
   EASING_NAMES,
@@ -226,5 +227,51 @@ describe("judgeMotionPath", () => {
     });
     const r = judgeMotionPath(s, { startMs: 0, endMs: 495, expectEasing: "ease-out" });
     expect(r.findings).toEqual([]);
+  });
+});
+
+describe("what motion-repair round 1 passed", () => {
+  // Measured samples: the page says where it is and how much of it is topmost (`present`).
+  const measured = (atMs: number, x: number, visible: number, hiddenBy?: string): MotionSample => ({
+    atMs,
+    present: visible,
+    box: box(x),
+    dom: { box: box(x), opacity: 1, scale: 1, ...(hiddenBy ? { hiddenBy } : {}) },
+  });
+
+  it("fails a target never seen in any frame, says why, and fits nothing to it", () => {
+    const why = "clipped by header.topbar (overflow: hidden), which it lies outside of";
+    const r = judgeMotionPath(
+      times.map((t) => measured(t, 100 + t / 10, 0, why)),
+      { startMs: 0, endMs: 900 },
+    );
+    assert.deepEqual(
+      r.findings.map((f) => f.rule),
+      ["target-hidden"],
+    );
+    assert.match(r.findings[0]!.message, /clipped by header\.topbar/);
+    assert.ok("skipped" in r.easing, "no easing for an element nobody saw");
+  });
+
+  it("counts a measured target off-screen between frames that show it as lost, not as leaving", () => {
+    // A toast in over 0-300ms, snapped back off-screen during the hold, brought back at 2000ms.
+    const at = [0, 100, 200, 299, 800, 1300, 1800, 2000, 2100, 2299, 2600];
+    const x = (t: number) => (t < 300 ? 1300 - t * 1.3 : t < 2000 ? 1300 : 910);
+    const samples = at.map((t) =>
+      measured(t, x(t), x(t) >= 1280 ? 0 : 1, x(t) >= 1280 ? "its box is outside the viewport" : undefined),
+    );
+    const r = judgeMotionPath(samples, {
+      startMs: 0,
+      endMs: 2300,
+      segments: [
+        { startMs: 0, endMs: 300 },
+        { startMs: 2000, endMs: 2300 },
+      ],
+      frame: { width: 1280, height: 800 },
+      exits: true,
+    });
+    const found = new Set(r.findings.map((f) => f.rule));
+    assert.ok(found.has("target-lost"), JSON.stringify(r.findings));
+    assert.ok(found.has("snap-back"), "the hold frames are back where the entrance began");
   });
 });

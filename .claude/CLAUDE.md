@@ -301,6 +301,14 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   pointer-events forced on for the probe (a toast is often `pointer-events: none`). On the
   fixtures: 6/7 broken by the expected rule, 7/7 intact pass. The miss is `overlap-rest`, text
   on text, which is a `--forbid` statement (Jev) or `check integrity`'s `text-collision`.
+- **A target never seen is a fail, with its cause** (`target-hidden`; `fixtures/motion-repair/`,
+  `docs/reports/2026-10-19-motion-repair-v1.md`). Round 1's agents repaired all three pages, but
+  `inspect motion` had passed every broken one: each rule compared frames that show the target,
+  so a card clipped from first frame to last read "no fail, follows ease-out exactly". Measured,
+  the line now names the clipping ancestor, or the cover and the stacking context trapping the
+  target (they had found both only by reading the CSS). Holds between segments get three frames,
+  and a measured box off-screen between shown frames is lost, not "leaving": the edge excuse is for
+  a model's boxes only.
 
 ## Generated figures (raster images)
 

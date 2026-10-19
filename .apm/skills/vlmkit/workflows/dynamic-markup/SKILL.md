@@ -240,8 +240,10 @@ vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ea
   geometry is the page's, and Jev only says whether it can be seen (and whether text is printed
   over text).
 - **Read the rule, then the frames.** `snap-back` = the final keyframe is not held
-  (fill-mode); `jump` = a keyframe gap; `target-lost` / `absent-at-rest` = clipped, covered or
-  faded for good (`--exits` when it is meant to leave); `easing-mismatch` = the timing function;
+  (fill-mode; also caught in the hold between an entrance and an exit); `jump` = a keyframe gap;
+  `target-lost` / `absent-at-rest` = clipped, covered or faded for good (`--exits` when it is
+  meant to leave); `target-hidden` = never seen at all — the line names the clipping ancestor, or
+  the cover and the stacking context (a `transform`, `opacity`, `z-index`…) that traps the target; `easing-mismatch` = the timing function;
   `target-static` = nothing about it animates (a dropped rule, a misspelt name). The command
   prints the strip line to look at; open single frames for detail.
 - **What it does not judge**: fps or jank, a target it is not told about, and anything under

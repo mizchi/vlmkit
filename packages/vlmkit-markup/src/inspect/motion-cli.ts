@@ -58,6 +58,7 @@ export async function measureTargets(
         el.setAttribute("data-vlmkit-probe", "");
         let inView = 0;
         let hits = 0;
+        let missed: { x: number; y: number; top: Element | null } | null = null;
         for (let gy = 0; gy < 5; gy++) {
           for (let gx = 0; gx < 5; gx++) {
             const x = r.x + ((gx + 0.5) / 5) * r.width;
@@ -66,11 +67,73 @@ export async function measureTargets(
             inView++;
             const top = document.elementFromPoint(x, y);
             if (top && el.contains(top)) hits++;
+            else missed ??= { x, y, top };
           }
         }
         el.removeAttribute("data-vlmkit-probe");
         const visible = opacity < 0.05 || inView === 0 ? 0 : hits / inView;
-        return { box: { x: r.x, y: r.y, width: r.width, height: r.height }, opacity, scale, t, visible };
+        // Why it is not seen, named for the repair: round 1 of motion-repair found the cause by
+        // reading the CSS (an ancestor's overflow, a transform's stacking context) every time.
+        const name = (e: Element) =>
+          e.tagName.toLowerCase() +
+          (e.id
+            ? `#${e.id}`
+            : typeof e.className === "string" && e.className.trim()
+              ? `.${e.className.trim().split(/\s+/)[0]}`
+              : "");
+        const stacking = (e: Element): string | null => {
+          const s = getComputedStyle(e);
+          if (s.position !== "static" && s.zIndex !== "auto") return `z-index: ${s.zIndex}`;
+          if (s.position === "fixed" || s.position === "sticky") return `position: ${s.position}`;
+          if (Number(s.opacity) < 1) return `opacity: ${s.opacity}`;
+          if (s.transform !== "none") return "a transform";
+          if (s.filter !== "none") return "a filter";
+          if (s.isolation === "isolate") return "isolation: isolate";
+          if (/transform|opacity|filter/.test(s.willChange)) return `will-change: ${s.willChange}`;
+          if (/paint|strict|content/.test(s.contain)) return `contain: ${s.contain}`;
+          if (s.mixBlendMode !== "normal") return `mix-blend-mode: ${s.mixBlendMode}`;
+          return null;
+        };
+        let hiddenBy: string | undefined;
+        if (opacity >= 0.05 && visible < 0.5) {
+          if (inView === 0) hiddenBy = "its box is outside the viewport";
+          else if (missed) {
+            for (let a = el.parentElement; a && !hiddenBy; a = a.parentElement) {
+              const s = getComputedStyle(a);
+              if (s.overflowX === "visible" && s.overflowY === "visible") continue;
+              const b = a.getBoundingClientRect();
+              if (missed.x < b.left || missed.x >= b.right || missed.y < b.top || missed.y >= b.bottom) {
+                hiddenBy = `clipped by ${name(a)} (overflow: ${s.overflowX === s.overflowY ? s.overflowX : `${s.overflowX} ${s.overflowY}`}), which it lies outside of`;
+              }
+            }
+            if (!hiddenBy && missed.top) {
+              const cover = missed.top;
+              hiddenBy = `covered by ${name(cover)}`;
+              // The trap: the outermost stacking context around the target that does not also
+              // hold the cover. A z-index inside it cannot lift the target above the cover.
+              let trap: Element | null = null;
+              let reason: string | null = null;
+              for (let a = el.parentElement; a && !a.contains(cover); a = a.parentElement) {
+                const why = stacking(a);
+                if (why) {
+                  trap = a;
+                  reason = why;
+                }
+              }
+              if (trap) {
+                hiddenBy += `: ${name(trap)} makes a stacking context (${reason}), so the target's own z-index only counts inside it and ${name(trap)} as a whole paints below ${name(cover)}`;
+              }
+            }
+          }
+        }
+        return {
+          box: { x: r.x, y: r.y, width: r.width, height: r.height },
+          opacity,
+          scale,
+          t,
+          visible,
+          ...(hiddenBy ? { hiddenBy } : {}),
+        };
       });
     } finally {
       probe.remove();
@@ -97,7 +160,8 @@ of it is the topmost thing painted (a clip or a cover takes that away). With
 request: where a --target described in words is, whether it is shown, whether
 each forbidden statement is. vlmkit judges the motion from that:
 
-  target-lost      not shown between frames that show it (clipped, covered)
+  target-lost      not shown between frames that show it (clipped, covered, snapped off-screen)
+  target-hidden    shown in no frame at all, rest included (clipped or covered from the start)
   absent-at-rest   shown in motion, gone once it stops (unless --exits says it leaves)
   snap-back        back where it started once it stops (fill-mode missing)
   jump             one step far faster than its neighbours (keyframe gap)
@@ -107,8 +171,10 @@ each forbidden statement is. vlmkit judges the motion from that:
 
 Frames: each span some finite animation runs in is a segment (an entrance, and
 after a hold an exit, are two), shot 11 times from its start to just inside its
-end (fewer each past 5 segments, 60 at most), plus one frame at rest 300ms after
-the last. Easings are fitted, and jumps looked for, inside one segment. Positions
+end (fewer each past 5 segments, 60 at most), three frames in each hold between
+segments (where it must stay put), plus one frame at rest 300ms after the last.
+Without --jev, a target that is not seen says why: the ancestor that clips it,
+or what covers it and the stacking context that traps it. Easings are fitted, and jumps looked for, inside one segment. Positions
 come from frames that surely show the target (presence 0.8+); a box cut by the
 viewport's edge is put back from the target's own size. So "travels" is the
 measured part of the path and can be shorter than the CSS distance; under 60px
@@ -257,7 +323,15 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
         noForbid = true;
         break;
       default:
-        if (a.startsWith("--")) throw new MotionUsageError(`unknown option ${a}`);
+        if (a.startsWith("--")) {
+          // Two of three round-1 agents reached for --out: say where the output goes.
+          const near: Record<string, string> = {
+            "--out": "--frames <dir>",
+            "--output": "--frames <dir>",
+            "--key": "--jev",
+          };
+          throw new MotionUsageError(`unknown option ${a}${near[a] ? ` (did you mean ${near[a]}?)` : ""}`);
+        }
         positional.push(a);
     }
   }
@@ -385,9 +459,16 @@ export function motionPlan(animations: readonly PlannedAnimation[]) {
     else segments.push({ ...s });
   }
   const per = Math.max(5, Math.min(11, Math.floor(MOTION_MAX_FRAMES / Math.max(1, segments.length))));
-  const motion = [...new Set(segments.flatMap((g) => motionInstants(g.startMs, g.endMs, per).motion))].sort(
-    (a, b) => a - b,
-  );
+  // And three frames inside every hold between segments: a toast whose entrance has no fill-mode
+  // is gone for the whole hold, and frames only inside the animations never saw it (round 1).
+  const holds = segments.slice(1).flatMap((g, i) => {
+    const from = segments[i]!.endMs;
+    const gap = g.startMs - from;
+    return gap >= 100 ? [0.25, 0.5, 0.75].map((f) => Math.round(from + gap * f)) : [];
+  });
+  const motion = [
+    ...new Set([...segments.flatMap((g) => motionInstants(g.startMs, g.endMs, per).motion), ...holds]),
+  ].sort((a, b) => a - b);
   const endMs = Math.max(...segments.map((g) => g.endMs));
   return { segments, motion, rest: endMs + 300, startMs: segments[0]?.startMs ?? 0, endMs };
 }

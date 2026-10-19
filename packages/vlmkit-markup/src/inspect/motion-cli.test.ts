@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vite-plus/test";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   DEFAULT_MOTION_FORBID,
   motionInstants,
@@ -189,5 +192,57 @@ describe("inspect motion without --jev", () => {
   it("sees a card moved into a column that clips it", { timeout: 120_000 }, async () => {
     assert.match((await run("clipped--broken.html", ".task")).out, /FAIL absent-at-rest/);
     assert.equal((await run("clipped--intact.html", ".task")).code, 0);
+  });
+});
+
+describe("inspect motion on fixtures/motion-repair (round 1 passed all three broken pages)", () => {
+  const dir = join(import.meta.dirname, "../../../../fixtures/motion-repair");
+  const run = async (file: string, args: string[]) => {
+    const lines: string[] = [];
+    const log = console.log;
+    console.log = (m: string) => lines.push(m);
+    try {
+      const frames = await mkdtemp(join(tmpdir(), "vlmkit-motion-repair-"));
+      return { code: await runMotionCli([join(dir, file), ...args, "--frames", frames]), out: lines.join("\n") };
+    } finally {
+      console.log = log;
+    }
+  };
+  const cases: [string, string[], RegExp][] = [
+    ["notify.html", ["--selector", ".notice"], /FAIL target-hidden .*clipped by header\.topbar \(overflow: hidden\)/],
+    [
+      "menu.html",
+      ["--selector", ".menu"],
+      /FAIL target-hidden .*covered by section\.hero: nav makes a stacking context \(a transform\)/,
+    ],
+    [
+      "toast.html",
+      ["--selector", ".toast", "--exits", "--expect-easing", "ease-out,ease-in"],
+      /FAIL snap-back .*in the hold after 660ms/,
+    ],
+  ];
+  for (const [file, args, expected] of cases) {
+    it(`fails broken/${file} with its cause and passes reference/${file}`, { timeout: 120_000 }, async () => {
+      const broken = await run(`broken/${file}`, args);
+      assert.equal(broken.code, 1, broken.out);
+      assert.match(broken.out, expected);
+      const fixed = await run(`reference/${file}`, args);
+      assert.equal(fixed.code, 0, fixed.out);
+    });
+  }
+
+  it("samples the hold between two segments", () => {
+    const plan = motionPlan([
+      { startMs: 300, durationMs: 360, iterations: 1 },
+      { startMs: 2660, durationMs: 300, iterations: 1 },
+    ]);
+    assert.ok(
+      plan.motion.some((t) => t > 660 && t < 2660),
+      JSON.stringify(plan.motion),
+    );
+  });
+
+  it("points --out at --frames", () => {
+    assert.throws(() => parseMotionArgs(["p.html", "--selector", ".a", "--out", "x"]), /did you mean --frames <dir>/);
   });
 });

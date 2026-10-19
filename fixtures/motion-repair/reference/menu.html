@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Projects</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #fbfaf7; color: #22201c; }
+  nav { display: flex; justify-content: space-between; align-items: center; padding: 16px 40px;
+        border-bottom: 1px solid #e7e2d8; position: relative; z-index: 2; background: #fbfaf7; }
+  .account { position: relative; }
+  .account button { font: inherit; padding: 8px 14px; border: 1px solid #d8d1c3; background: #fff; border-radius: 6px; }
+  .menu { position: absolute; right: 0; top: 46px; width: 220px; margin: 0; padding: 6px; list-style: none;
+          background: #fff; border: 1px solid #d8d1c3; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.12);
+          z-index: 50; transform-origin: top right; animation: open 240ms ease-out 300ms both; }
+  .menu li { padding: 8px 10px; border-radius: 5px; }
+  .menu li:last-child { color: #a3261b; }
+  @keyframes open { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: none; } }
+  .hero { position: relative; z-index: 1; margin: 0; padding: 48px 40px; background: #efe9dc; }
+  .hero h2 { margin: 0 0 8px; font-size: 28px; }
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding: 32px 40px; }
+  .cards div { background: #fff; border: 1px solid #e7e2d8; border-radius: 8px; padding: 20px; min-height: 120px; }
+</style></head>
+<body>
+  <nav>
+    <strong>Fieldnotes</strong>
+    <div class="account">
+      <button type="button" aria-expanded="true">Sam Rivera ▾</button>
+      <ul class="menu" role="menu">
+        <li role="menuitem">Profile</li>
+        <li role="menuitem">Billing</li>
+        <li role="menuitem">Team settings</li>
+        <li role="menuitem">Sign out</li>
+      </ul>
+    </div>
+  </nav>
+  <section class="hero"><h2>Projects</h2><p>Everything your team is working on, in one place.</p></section>
+  <section class="cards"><div>Atlas redesign</div><div>Onboarding v2</div><div>Q4 research</div></section>
+</body></html>
