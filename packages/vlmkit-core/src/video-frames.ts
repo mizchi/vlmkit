@@ -43,6 +43,8 @@ export interface FrameRow {
   /** When it is shown, on the stream's own timeline (a stream that starts 1.25s in has its first frame at 1250). */
   atMs: number;
   key: boolean;
+  /** The GOP it was coded in, counted in decode order (`gopNumbers`), when the table had it. */
+  gop?: number;
   /** Which decoded frame it is (its index in the decoder's output), when that differs from `index`. */
   decoded?: number;
   /** Interlaced: which field of the decoded frame (0 first in time). */
@@ -364,6 +366,8 @@ export interface ProbedFrame {
   height?: number;
   /** How long it is shown, in the stream's time base, when the stream says (a packet duration). */
   durationTicks?: number;
+  /** Where its packet is in the file (`pkt_pos`): packets are stored in decode order. */
+  pos?: number;
 }
 
 /**
@@ -380,6 +384,7 @@ export function parseFrameTable(framesJson: string, file: string): ProbedFrame[]
       duration?: number;
       pkt_duration?: number;
       key_frame?: number;
+      pkt_pos?: number | string;
       interlaced_frame?: number;
       top_field_first?: number;
       width?: number;
@@ -409,8 +414,37 @@ export function parseFrameTable(framesJson: string, file: string): ProbedFrame[]
       ...(f.top_field_first === 1 ? { topFieldFirst: true } : {}),
       ...(f.width && f.height ? { width: f.width, height: f.height } : {}),
       ...((f.duration ?? f.pkt_duration ?? 0) > 0 ? { durationTicks: (f.duration ?? f.pkt_duration)! } : {}),
+      // ffprobe prints pkt_pos as a string, and -1 when it does not know it.
+      ...(f.pkt_pos !== undefined && f.pkt_pos !== "" && Number(f.pkt_pos) >= 0 ? { pos: Number(f.pkt_pos) } : {}),
     };
   });
+}
+
+/**
+ * Each decoded frame's GOP, in the order the frames are shown: counted in decode order, where a
+ * keyframe that follows a predicted frame begins one. Decode order is the packets' order in the
+ * file (`pkt_pos`), when every frame has one; otherwise the order they are shown, which differs
+ * only for an open GOP. There the B-frames shown just before a keyframe are decoded after it and
+ * predicted from it, so they carry its re-quantization (measured on x264 --open-gop: the frame
+ * shown 17ms before the keyframe stepped 42 levels on a still page, the keyframe 18 after it).
+ * A run of keyframes is one GOP: an intra-only codec codes a still picture the same every frame.
+ * Only keyframes shown one after another are a run: x264 --open-gop with a GOP no longer than its
+ * B-frames decodes the IDR and the next keyframe back to back, the B-frames shown between them
+ * after both, and counted as a run that keyframe was in GOP 0 — neither an opening nor a run as
+ * shown, so its re-quantization was a 55-frame transient that swallowed every caret blink in it.
+ */
+export function gopNumbers(frames: readonly ProbedFrame[]): number[] {
+  const order = frames.every((f) => f.pos !== undefined)
+    ? frames.map((_, i) => i).sort((a, b) => frames[a]!.pos! - frames[b]!.pos! || a - b)
+    : frames.map((_, i) => i);
+  const gop = new Array<number>(frames.length).fill(0);
+  let g = 0;
+  order.forEach((i, k) => {
+    const prev = k > 0 ? order[k - 1]! : -1;
+    if (k > 0 && frames[i]!.key && (!frames[prev]!.key || i !== prev + 1)) g++;
+    gop[i] = g;
+  });
+  return gop;
 }
 
 /** What a recording shows, frame by frame, and what was done to the decoder's frames to get it. */
@@ -466,14 +500,23 @@ export function videoTimeline(
   const split = shown.length > 1 ? options.split : undefined;
   let splitFrames = 0;
   const rows: FrameRow[] = [];
+  const gops = gopNumbers(frames);
   for (const [k, { f, at }] of shown.entries()) {
     const fields = split?.(f) === true;
-    rows.push({ index: rows.length, atMs: at, key: f.key, decoded: f.index, ...(fields ? { field: 0 as const } : {}) });
+    const gop = gops[f.index]!;
+    rows.push({
+      index: rows.length,
+      atMs: at,
+      key: f.key,
+      gop,
+      decoded: f.index,
+      ...(fields ? { field: 0 as const } : {}),
+    });
     if (fields) {
       splitFrames++;
       // Halfway to the next frame; the last frame's second field is as far after it as the gap before.
       const gap = k + 1 < shown.length ? shown[k + 1]!.at - at : at - shown[k - 1]!.at;
-      rows.push({ index: rows.length, atMs: at + gap / 2, key: false, decoded: f.index, field: 1 });
+      rows.push({ index: rows.length, atMs: at + gap / 2, key: false, gop, decoded: f.index, field: 1 });
     }
   }
   const last = shown[shown.length - 1]!;

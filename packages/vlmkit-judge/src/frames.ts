@@ -52,6 +52,13 @@ export interface FrameEntry {
   index?: number;
   /** Stream clock only: the decoder marked the frame a keyframe (where a lossy codec re-quantizes). */
   key?: boolean;
+  /**
+   * Stream clock only: which GOP of the recording the frame was coded in, counted in decode order
+   * from 0 — a keyframe that follows a predicted frame begins one, a run of keyframes is one, and
+   * an open GOP's leading frames (shown before its keyframe, decoded after it) are its own. Kept on
+   * every frame, so a selection that skips the keyframe still knows where a GOP begins.
+   */
+  gop?: number;
   /** Stream clock only: which field of an interlaced frame this is (0 first in time), line-doubled. */
   field?: 0 | 1;
 }
@@ -402,6 +409,17 @@ export function parseFramesManifest(text: string): FramesManifest {
         refuse(`frames[${i}].index`, `must be greater than frame ${i - 1}'s`);
       }
       if (frame.key !== undefined && typeof frame.key !== "boolean") refuse(`frames[${i}].key`, "must be a boolean");
+      if (frame.gop !== undefined && (!Number.isSafeInteger(frame.gop) || frame.gop < 0)) {
+        refuse(`frames[${i}].gop`, "must be a whole number >= 0");
+      }
+      if (
+        frame.gop !== undefined &&
+        i > 0 &&
+        manifest.frames![i - 1]!.gop !== undefined &&
+        frame.gop < manifest.frames![i - 1]!.gop!
+      ) {
+        refuse(`frames[${i}].gop`, `must not be below frame ${i - 1}'s`);
+      }
       if (frame.field !== undefined && frame.field !== 0 && frame.field !== 1)
         refuse(`frames[${i}].field`, "must be 0 or 1");
     });
