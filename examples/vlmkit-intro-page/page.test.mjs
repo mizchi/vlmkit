@@ -628,7 +628,7 @@ test("the TypeSafe Jev table names the same four commands as the README", async 
   const [html, readme] = await Promise.all([read("index.html"), readFile(join(exampleDir, "../../README.md"), "utf8")]);
   const table = html.slice(html.indexOf('data-testid="jev-features"'), html.indexOf('class="jev-note"'));
   const commands = [...table.matchAll(/<code>([^<]+)<\/code>/g)].map((m) => m[1]);
-  assert.deepEqual(commands, ["diff png --kind", "inspect locate", "inspect claims", "inspect motion"]);
+  assert.deepEqual(commands, ["diff png --jev", "inspect locate", "inspect claims", "inspect motion --jev"]);
   const section = readme.slice(readme.indexOf("## With a key: TypeSafe Jev"), readme.indexOf("## The workspace"));
   for (const command of commands)
     assert.ok(section.includes(`\`${command}`), `${command} is missing from the README table`);

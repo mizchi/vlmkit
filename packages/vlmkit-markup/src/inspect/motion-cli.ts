@@ -22,9 +22,14 @@ export async function measureTargets(
   page: import("playwright").Page,
   selectors: readonly string[],
 ): Promise<(MotionDom | null)[]> {
-  return page.evaluate(
-    (sels) =>
-      sels.map((sel) => {
+  return page.evaluate((sels) => {
+    // Hit-testing skips pointer-events: none (a toast often is), so the probed element takes
+    // pointer events for the measurement only.
+    const probe = document.createElement("style");
+    probe.textContent = "[data-vlmkit-probe],[data-vlmkit-probe] *{pointer-events:auto!important}";
+    (document.head ?? document.documentElement).append(probe);
+    try {
+      return sels.map((sel) => {
         const el = document.querySelector(sel);
         if (!el) return null;
         const r = el.getBoundingClientRect();
@@ -48,10 +53,29 @@ export async function measureTargets(
           const local = Number(c.localTime) - Number(c.delay ?? 0);
           t = Math.min(1, Math.max(0, local / d));
         }
-        return { box: { x: r.x, y: r.y, width: r.width, height: r.height }, opacity, scale, t };
-      }),
-    selectors,
-  );
+        // What of it is the topmost thing painted, over a 5x5 grid of its box inside the viewport:
+        // a clip (overflow: hidden), a cover (z-index) and leaving the screen all take it away.
+        el.setAttribute("data-vlmkit-probe", "");
+        let inView = 0;
+        let hits = 0;
+        for (let gy = 0; gy < 5; gy++) {
+          for (let gx = 0; gx < 5; gx++) {
+            const x = r.x + ((gx + 0.5) / 5) * r.width;
+            const y = r.y + ((gy + 0.5) / 5) * r.height;
+            if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) continue;
+            inView++;
+            const top = document.elementFromPoint(x, y);
+            if (top && el.contains(top)) hits++;
+          }
+        }
+        el.removeAttribute("data-vlmkit-probe");
+        const visible = opacity < 0.05 || inView === 0 ? 0 : hits / inView;
+        return { box: { x: r.x, y: r.y, width: r.width, height: r.height }, opacity, scale, t, visible };
+      });
+    } finally {
+      probe.remove();
+    }
+  }, selectors);
 }
 
 /**
@@ -62,12 +86,16 @@ export async function measureTargets(
  */
 export const DEFAULT_MOTION_FORBID = "two lines of text printed on top of each other, their letters crossing";
 
-export const MOTION_USAGE = `Usage: vlmkit inspect motion <page.html|url|frames.json> --target "<what moves>"... [--forbid "<statement>"]... [options]
+export const MOTION_USAGE = `Usage: vlmkit inspect motion <page.html|url> --selector <css>... [--target "<name>"]... [options]
+       vlmkit inspect motion <page.html|url|frames.json> --jev --target "<what moves>"... [--selector <css>]... [--forbid "<statement>"]...
 
-Is an animation visually broken? The page's clock is held, the motion shot at
-instants and once at rest, and each frame asked of TypeSafe Jev
-(TYPESAFEAI_API_KEY) in one request: where the target is, whether it is shown,
-whether each forbidden statement is. vlmkit judges the motion from that:
+Is an animation visually broken? The page's clock is held and the motion shot at
+instants and once at rest. Without --jev, no key: each --selector is measured
+from the page at every frame — where it is, its opacity and scale, and how much
+of it is the topmost thing painted (a clip or a cover takes that away). With
+--jev, each frame is also asked of TypeSafe Jev (TYPESAFEAI_API_KEY) in one
+request: where a --target described in words is, whether it is shown, whether
+each forbidden statement is. vlmkit judges the motion from that:
 
   target-lost      not shown between frames that show it (clipped, covered)
   absent-at-rest   shown in motion, gone once it stops (unless --exits says it leaves)
@@ -75,7 +103,7 @@ whether each forbidden statement is. vlmkit judges the motion from that:
   jump             one step far faster than its neighbours (keyframe gap)
   easing-mismatch  the path follows another easing than --expect-easing
   target-static    shown and still from the first frame (warn: not animating?)
-  forbid           a statement seen at rest fails; only mid-motion, warns
+  forbid           a statement seen at rest fails; only mid-motion, warns (--jev)
 
 Frames: each span some finite animation runs in is a segment (an entrance, and
 after a hold an exit, are two), shot 11 times from its start to just inside its
@@ -89,13 +117,17 @@ With --selector every frame is measured from the page, the floor is 6px, and
 opacity (a change of 0.2+) and scale (0.02+) are fitted as well as position:
 an easing is checked on each channel that changes.
 
-  --target <words>        What moves, by what only it shows: "the card labelled Users showing
-                          1,284", not "the Users card" (look-alike cards get swapped)
-  --selector <css>        The element the --target in the same position names (repeat in order):
-                          its position, opacity, scale and own animation time are measured from
-                          the page, and Jev only says whether it can be seen — a "seen" whose box
-                          misses the element is set aside. Use it whenever the page is yours
-  --forbid <statement>    No frame may show it. Default, when none is given:
+  --selector <css>        The element that moves (repeat for each): its position, opacity, scale,
+                          visible share and own animation time are measured from the page. Without
+                          --jev, every target is one. With --jev, it pairs with the --target in the
+                          same position and Jev only says whether it can be seen — a "seen" whose
+                          box misses the element is set aside. Use it whenever the page is yours
+  --target <words>        A name for the --selector in the same position (default: the selector).
+                          With --jev, what moves by what only it shows: "the card labelled Users
+                          showing 1,284", not "the Users card" (look-alike cards get swapped)
+  --jev                   Also ask TypeSafe Jev of every frame (TYPESAFEAI_API_KEY): targets found
+                          by their words, and the --forbid statements
+  --forbid <statement>    No frame may show it (--jev). Default with --jev, when none is given:
                           "${DEFAULT_MOTION_FORBID}"
   --no-forbid             Ask no statement (only the targets' motion)
   --expect-easing <name>  ${EASING_NAMES.join(" | ")}. Given once, for every target; repeated,
@@ -111,7 +143,7 @@ an easing is checked on each channel that changes.
   --threshold <0-1>       A statement is true at or above this (default 0.5)
   --json                  Print the report as JSON
 
-Exit: 0 nothing fails, 1 a fail, 2 usage error. ~$0.00013 and ~0.2s per frame.
+Exit: 0 nothing fails, 1 a fail, 2 usage error. With --jev, ~$0.00013 and ~0.2s per frame.
 Advisory: gate on check animation / check integrity --timeline.
 docs/reports/2026-10-18-jev-motion.md`;
 
@@ -132,6 +164,8 @@ export interface MotionCliOptions {
   frames: string;
   threshold: number;
   json: boolean;
+  /** Ask TypeSafe Jev. Without it every target is a --selector, measured from the page alone. */
+  jev: boolean;
 }
 
 export function parseMotionArgs(argv: string[]): MotionCliOptions {
@@ -149,6 +183,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   let json = false;
   let exits = false;
   let noForbid = false;
+  let jev = false;
   const value = (flag: string, v: string | undefined) => {
     if (v === undefined || v.startsWith("--")) throw new MotionUsageError(`${flag} needs a value`);
     return v;
@@ -215,6 +250,9 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
       case "--exits":
         exits = true;
         break;
+      case "--jev":
+        jev = true;
+        break;
       case "--no-forbid":
         noForbid = true;
         break;
@@ -229,7 +267,25 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
     );
   }
   if (noForbid && forbid.length > 0) throw new MotionUsageError("--no-forbid with --forbid: pick one");
-  if (!noForbid && forbid.length === 0) forbid.push(DEFAULT_MOTION_FORBID);
+  if (/(^|\/)frames\.json$/.test(positional[0]!) && !jev) {
+    throw new MotionUsageError("saved frames have no page to measure: add --jev to ask Jev of them");
+  }
+  if (!jev) {
+    // Without Jev nothing can read a statement or find a target by its words: the page measures
+    // each --selector, and those name the targets when no --target does.
+    if (forbid.length > 0) throw new MotionUsageError("--forbid is a statement Jev reads from the frames: add --jev");
+    if (selectors.length === 0) {
+      throw new MotionUsageError(
+        "give each target a --selector (measured from the page, no key), or add --jev to find --target by its words",
+      );
+    }
+    if (targets.length === 0) targets.push(...selectors);
+    if (targets.length !== selectors.length) {
+      throw new MotionUsageError(
+        `${selectors.length} --selector for ${targets.length} --target: without --jev every target is measured, so each needs one`,
+      );
+    }
+  } else if (!noForbid && forbid.length === 0) forbid.push(DEFAULT_MOTION_FORBID);
   if (targets.length === 0 && noForbid)
     throw new MotionUsageError("nothing to check: give --target, or drop --no-forbid");
   if (expectEasing && targets.length === 0) throw new MotionUsageError("--expect-easing needs a --target to follow");
@@ -266,6 +322,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
     frames,
     threshold,
     json,
+    jev,
   };
 }
 
@@ -530,7 +587,11 @@ export function formatMotionReport(
     }
   }
   lines.push(
-    `  ${fails === 0 ? "no fail" : `${fails} fail`}${warns ? `, ${warns} warn` : ""}; ${r.model}, ${r.calls} requests, $${r.costUsd.toFixed(5)} — ${captured.frames[0]?.dom?.some(Boolean) ? "positions measured from the page; whether it can be seen, and the statements, are a model's reading" : "a model's reading of the pixels, not a measurement"}`,
+    `  ${fails === 0 ? "no fail" : `${fails} fail`}${warns ? `, ${warns} warn` : ""}; ${
+      r.calls === 0
+        ? "measured from the page, no model asked (--jev adds Jev's reading and the --forbid statements)"
+        : `${r.model}, ${r.calls} requests, $${r.costUsd.toFixed(5)} — ${captured.frames[0]?.dom?.some(Boolean) ? "positions measured from the page; whether it can be seen, and the statements, are a model's reading" : "a model's reading of the pixels, not a measurement"}`
+    }`,
   );
   lines.push(
     `  look at the frames: vlmkit snapshot strip --manifest ${captured.manifest} --max-frames 6 --columns 3 --out ${join(dirname(captured.manifest), "strip.png")}`,
@@ -561,8 +622,10 @@ export async function runMotionCli(argv: string[]): Promise<number> {
     return 2;
   }
   // Refused before a browser starts: without a key nothing could answer.
-  if (!process.env.TYPESAFEAI_API_KEY && !process.env.TYPESAFE_API_KEY) {
-    console.error("error: inspect motion asks TypeSafe Jev and needs TYPESAFEAI_API_KEY (console.typesafe.ai/keys).");
+  if (o.jev && !process.env.TYPESAFEAI_API_KEY && !process.env.TYPESAFE_API_KEY) {
+    console.error(
+      "error: --jev asks TypeSafe Jev and needs TYPESAFEAI_API_KEY (console.typesafe.ai/keys). Without --jev, give each target a --selector.",
+    );
     return 2;
   }
   let captured: Captured;
@@ -582,6 +645,7 @@ export async function runMotionCli(argv: string[]): Promise<number> {
     segments: captured.segments,
     threshold: o.threshold,
     exits: o.exits,
+    jev: o.jev,
     ...motionEasingOptions(o.expectEasing),
   });
   const json = {

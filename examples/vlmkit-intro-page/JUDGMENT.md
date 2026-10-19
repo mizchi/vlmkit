@@ -2,7 +2,7 @@
 
 How this product landing page (review) was judged, in order. Rendered from `judgment.sqlite` by `examples/sites/judge.mjs`; the published page, with the screens the log keeps and every gate output, is <https://mizchi.github.io/vlmkit/judgment/>.
 
-**9** rounds · **178** gate runs (1 failing) · **958** screens in 162 shots (353 kept) · **162** looks · defects: **38** by eye, **3** by a gate · 13 gate false positive(s)
+**10** rounds · **183** gate runs (1 failing) · **994** screens in 167 shots (386 kept) · **167** looks · defects: **38** by eye, **3** by a gate · 13 gate false positive(s)
 
 Brief: [`../sites/briefs/landing-review.md`](../sites/briefs/landing-review.md)
 
@@ -762,5 +762,24 @@ Brief: [`../sites/briefs/landing-review.md`](../sites/briefs/landing-review.md)
 - **G177** `vlmkit check a11y contrast 'http://127.0.0.1:4190/?lang=en&theme=dark'` → exit 0 — inspected 285 · failures 0 ([output](https://mizchi.github.io/vlmkit/judgment/#G177))
 - **G178** `vlmkit check composition 'http://127.0.0.1:4190/?lang=ja&theme=light'` → exit 0 — verdict: COMPOSED (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/judgment/#G178))
 - **done**: R9 adds the TypeSafe Jev table to 05 principle: what each of the four Jev-backed tools asks the model, what vlmkit measures, and the bench number, in both languages and both themes. Gates clean before and after the fixes (integrity en/light and ja/dark, copy, composition, design, contrast light and dark, color, breakpoints, scroll). Three defects, all found by eye: the stacked phone layout kept the desktop 24% column (D39), the Japanese heading broke before を (D40), and 1〜6px split (D41); each fixed and verified on a later shot. The skip link painted into tall element shots is the capture (N47), not the page; full walks at 1280, 768 and 375 show nothing of it.
+
+### R10 · jev table: the commands read --jev (Jev is opt-in) and the note says inspect motion works without it (reviewer)
+
+- **G179** `vlmkit check integrity 'http://127.0.0.1:4190/?lang=en&theme=light'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 3 exempted) ([output](https://mizchi.github.io/vlmkit/judgment/#G179))
+- **G180** `vlmkit check integrity 'http://127.0.0.1:4190/?lang=ja&theme=dark'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 3 exempted) ([output](https://mizchi.github.io/vlmkit/judgment/#G180))
+- **G181** `vlmkit check copy http://127.0.0.1:4190 --manifest copy.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 82 · statesExplored 2 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/judgment/#G181))
+- **G182** `vlmkit check a11y contrast 'http://127.0.0.1:4190/?lang=en&theme=light'` → exit 0 — inspected 285 · failures 0 ([output](https://mizchi.github.io/vlmkit/judgment/#G182))
+- **G183** `vlmkit check composition 'http://127.0.0.1:4190/?lang=en&theme=light'` → exit 0 — verdict: COMPOSED (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/judgment/#G183))
+- **S163** http://127.0.0.1:4190/?lang=en&theme=light · 1280×800 · element .jev (screens not kept)
+  - 👁 **L163**: Element shot of .jev, desktop, light, English. The chips now read "diff png --jev" and "inspect motion --jev"; inspect locate and inspect claims unchanged. The note is two lines: "Jev is opt-in: --jev turns it on where a command also works without it, and inspect motion with --selector alone still caught 6 of the 7." then the easing sentence and the key. Rows, header, bold result column as in R9; no new wrap problem.
+- **S164** http://127.0.0.1:4190/?lang=en&theme=light · 375×812 · element .jev (screens not kept)
+  - 👁 **L164**: Element shot of .jev at 375px, light, English. Each chip holds its command on one line, including the longer "inspect motion --jev". The note runs five lines under the last hairline and reads as one paragraph. The skip link painted over the first block is the capture (N47).
+- **S165** http://127.0.0.1:4190/?lang=ja&theme=dark · 1280×800 · element .jev (screens not kept)
+  - 👁 **L165**: Element shot of .jev, desktop, dark, Japanese. Chips "diff png --jev" and "inspect motion --jev" on the dark surface, readable. The note: "Jev はオプションです。Jev なしでも動くコマンドでは --jev で有効になり、inspect motion は --selector だけでも 7 件中 6 件を検出しました。…" in three lines; "6 件を / 検出" breaks at a phrase boundary and "TYPESAFEAI_API_KEY / が必要です。" keeps the key whole. Heading and rows as in R9.
+- **S166** http://127.0.0.1:4190/?lang=en&theme=light · 1280×800 · full page, 14 screen(s) ([screens](https://mizchi.github.io/vlmkit/judgment/#S166))
+  - 👁 **L166**: Full-page walk, desktop 1280, light, English, 14 screens. Everything outside the Jev table is as in R9's S157: hero, 01-04, 05's heading, illustration and cards, 06 with its sticky column, 07 and the footer. In the table (screen 10) the chips read "diff png --jev" and "inspect motion --jev", the longer chip still sits under its feature name without wrapping, and the note is two lines starting "Jev is opt-in: …". The table's height barely changed; the gap to 06 is the same.
+- **S167** http://127.0.0.1:4190/?lang=en&theme=light · 375×812 · full page, 19 screen(s) ([screens](https://mizchi.github.io/vlmkit/judgment/#S167))
+  - 👁 **L167**: Full-page walk, phone 375, light, English, 19 screens to the footer. As R9's S160 everywhere but the table (screens 13-14): "diff png --jev" and "inspect motion --jev" chips on one line each, the note now five lines, still one quiet paragraph above 06. No overlap, no sideways scroll.
+- **done**: R10 changes the Jev table's commands to the --jev switch (diff png --jev, inspect motion --jev) and its note to say Jev is opt-in and that inspect motion with --selector alone caught 6 of the 7. Gates clean (integrity en/light and ja/dark, copy, contrast, composition); full walks at 1280 and 375 and close-ups in both languages show no new defect.
 
 _The 527 screens were taken as JPEG and re-encoded as WebP (quality 0.75) after the round: 22.9 MB → 12.0 MB._

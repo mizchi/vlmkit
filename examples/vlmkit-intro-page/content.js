@@ -146,7 +146,7 @@ export const messages = Object.freeze({
     "jev.motion.asks": "フレームごとに、ターゲットが見えるか、その box、禁止文ごとの はい/いいえ",
     "jev.motion.measures": "時計を止めて撮ったフレーム。飛び・戻り・イージングは box から当てはめ。--selector ではページから位置を測る",
     "jev.motion.result": "壊れた 7/7 を検出、正常な 7/7 が合格。1ページ約 $0.002",
-    "jev.note": "イージングを名前で聞くと当て推量並み(21 件中 7 件)、box から当てはめると 21 件中 21 件。TYPESAFEAI_API_KEY が必要です。このページの他のゲートはキー不要です。",
+    "jev.note": "Jev はオプションです。Jev なしでも動くコマンドでは --jev で有効になり、inspect motion は --selector だけでも 7 件中 6 件を検出しました。イージングを名前で聞くと当て推量並み(21 件中 7 件)、box から当てはめると 21 件中 21 件。TYPESAFEAI_API_KEY が必要です。",
     "skills.line1": "一度入れたら、",
     "skills.line2": "あとは自然に頼むだけ。",
     "skills.lead":
@@ -341,7 +341,7 @@ export const messages = Object.freeze({
     "jev.motion.asks": "Per frame: is each target shown, its box, and a yes/no per forbidden statement",
     "jev.motion.measures": "Frames on the held clock; jumps, snap-backs and easing fitted from the boxes; with --selector, geometry from the page",
     "jev.motion.result": "7/7 broken caught, 7/7 intact passed; about $0.002 a page",
-    "jev.note": "Asked to name an easing, Jev was at chance (7 of 21); fitted from its boxes, 21 of 21. Needs TYPESAFEAI_API_KEY—every other gate on this page needs no key.",
+    "jev.note": "Jev is opt-in: --jev turns it on where a command also works without it, and inspect motion with --selector alone still caught 6 of the 7. Asked to name an easing, Jev was at chance (7 of 21); fitted from its boxes, 21 of 21. Needs TYPESAFEAI_API_KEY.",
     "skills.line1": "Install once.",
     "skills.line2": "Ask naturally.",
     "skills.lead":

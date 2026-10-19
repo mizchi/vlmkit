@@ -418,7 +418,7 @@
               </thead>
               <tbody>
               <tr>
-                <th scope="row"><span data-i18n="jev.kind.feature">Classify each diff region</span><code>diff png --kind</code></th>
+                <th scope="row"><span data-i18n="jev.kind.feature">Classify each diff region</span><code>diff png --jev</code></th>
                 <td><span class="jev-cell-label" data-i18n="jev.colAsks">Jev answers</span><span data-i18n="jev.kind.asks">A choice per region: text, colour, position or presence</span></td>
                 <td><span class="jev-cell-label" data-i18n="jev.colMeasures">vlmkit measures</span><span data-i18n="jev.kind.measures">The regions themselves, from the pixel diff</span></td>
                 <td><span class="jev-cell-label" data-i18n="jev.colResult">Measured</span><span data-i18n="jev.kind.result">Text 14/14, colour 18/18, presence 17/17; 1–6px shifts 11/16, every miss marked unsure</span></td>
@@ -436,7 +436,7 @@
                 <td><span class="jev-cell-label" data-i18n="jev.colResult">Measured</span><span data-i18n="jev.claims.result">54 of 55 planted problems caught; 0 false alarms on 43 clean pages</span></td>
               </tr>
               <tr>
-                <th scope="row"><span data-i18n="jev.motion.feature">Is an animation visibly broken?</span><code>inspect motion</code></th>
+                <th scope="row"><span data-i18n="jev.motion.feature">Is an animation visibly broken?</span><code>inspect motion --jev</code></th>
                 <td><span class="jev-cell-label" data-i18n="jev.colAsks">Jev answers</span><span data-i18n="jev.motion.asks">Per frame: is each target shown, its box, and a yes/no per forbidden statement</span></td>
                 <td><span class="jev-cell-label" data-i18n="jev.colMeasures">vlmkit measures</span><span data-i18n="jev.motion.measures">Frames on the held clock; jumps, snap-backs and easing fitted from the boxes; with --selector, geometry from the page</span></td>
                 <td><span class="jev-cell-label" data-i18n="jev.colResult">Measured</span><span data-i18n="jev.motion.result">7/7 broken caught, 7/7 intact passed; about $0.002 a page</span></td>
@@ -444,7 +444,7 @@
               </tbody>
             </table>
           </div>
-          <p class="jev-note" data-i18n="jev.note">Asked to name an easing, Jev was at chance (7 of 21); fitted from its boxes, 21 of 21. Needs TYPESAFEAI_API_KEY—every other gate on this page needs no key.</p>
+          <p class="jev-note" data-i18n="jev.note">Jev is opt-in: --jev turns it on where a command also works without it, and inspect motion with --selector alone still caught 6 of the 7. Asked to name an easing, Jev was at chance (7 of 21); fitted from its boxes, 21 of 21. Needs TYPESAFEAI_API_KEY.</p>
         </div>
       </section>
 

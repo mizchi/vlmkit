@@ -36,6 +36,11 @@ export interface MotionDom {
   scale: number;
   /** Its own animation's progress in time, 0-1 (delay and duration its own), when it has one. */
   t?: number | null;
+  /**
+   * Share of its box, within the viewport, where it is the topmost thing painted (0-1): what a
+   * clip, a cover or a stacking mistake leaves of it. What `jev: false` judges presence from.
+   */
+  visible?: number;
 }
 
 export interface MotionFrame {
@@ -66,6 +71,11 @@ export interface MotionCheckOptions {
   /** Within this of the threshold an answer is `uncertain` (default 0.3). */
   uncertainBand?: number;
   model?: string;
+  /**
+   * Ask Jev (default true). False judges from the page alone: every frame must carry every
+   * target's `dom` (`--selector`), presence is its `visible` share, and no statement is asked.
+   */
+  jev?: boolean;
   ask?: JevAsk;
   client?: JevClientOptions;
   /**
@@ -146,51 +156,75 @@ export async function checkMotionFrames(
   let frameSize: { width: number; height: number } | undefined;
   let calls = 0;
 
-  const answers = await pool(frames, options.concurrency ?? 4, async (frame): Promise<MotionFrameAnswer> => {
-    const img = decodeImage(Buffer.from(frame.png));
-    frameSize ??= { width: img.width, height: img.height };
-    const scale = firstLookScale(img.width, img.height);
-    if (scale === null) {
-      throw new Error(
-        `a ${img.width}x${img.height} frame cannot be shown within Jev's ${JEV_IMAGE_LIMITS.minEdge}-${JEV_IMAGE_LIMITS.maxEdge}px edges`,
-      );
-    }
-    const shown =
-      scale === 1
-        ? frame.png
-        : encodePngImage(
-            resample(img, { width: Math.round(img.width * scale), height: Math.round(img.height * scale) }),
-          );
-    const questions: Record<string, JevQuestion> = {};
-    options.targets.forEach((t, i) => {
-      questions[`p${i}`] = { type: "noul", instructions: claimInstruction(t) };
-      questions[`b${i}`] = { type: "box", instructions: `${t.trim().replace(/[.\s]+$/, "")} in \`screenshot\`` };
+  if (options.jev === false) {
+    if (forbid.length > 0) throw new Error("a forbidden statement can only be asked of Jev (jev: true)");
+    const missing = options.targets.findIndex((_, i) => !frames.every((f) => f.dom?.[i]));
+    if (missing >= 0)
+      throw new Error(`without Jev every target needs the page's measurement: ${options.targets[missing]}`);
+  }
+  const answers =
+    options.jev === false
+      ? frames.map((frame): MotionFrameAnswer => {
+          const img = decodeImage(Buffer.from(frame.png));
+          frameSize ??= { width: img.width, height: img.height };
+          return {
+            atMs: frame.atMs,
+            rest: frame.atMs > options.endMs,
+            targets: options.targets.map((_, i) => {
+              const d = frame.dom![i]!;
+              return { present: d.opacity < 0.05 ? 0 : (d.visible ?? 1), box: d.box };
+            }),
+            forbid: [],
+          };
+        })
+      : await askFrames();
+  async function askFrames() {
+    return pool(frames, options.concurrency ?? 4, async (frame): Promise<MotionFrameAnswer> => {
+      const img = decodeImage(Buffer.from(frame.png));
+      frameSize ??= { width: img.width, height: img.height };
+      const scale = firstLookScale(img.width, img.height);
+      if (scale === null) {
+        throw new Error(
+          `a ${img.width}x${img.height} frame cannot be shown within Jev's ${JEV_IMAGE_LIMITS.minEdge}-${JEV_IMAGE_LIMITS.maxEdge}px edges`,
+        );
+      }
+      const shown =
+        scale === 1
+          ? frame.png
+          : encodePngImage(
+              resample(img, { width: Math.round(img.width * scale), height: Math.round(img.height * scale) }),
+            );
+      const questions: Record<string, JevQuestion> = {};
+      options.targets.forEach((t, i) => {
+        questions[`p${i}`] = { type: "noul", instructions: claimInstruction(t) };
+        questions[`b${i}`] = { type: "box", instructions: `${t.trim().replace(/[.\s]+$/, "")} in \`screenshot\`` };
+      });
+      forbid.forEach((f, i) => {
+        questions[`f${i}`] = { type: "noul", instructions: claimInstruction(f) };
+      });
+      const r = await ask({ model, state: { screenshot: "SHOT" }, assets: { SHOT: pngImage(shown) }, questions });
+      calls++;
+      costUsd += r.costUsd;
+      inputTokens += r.usage.input_tokens;
+      served = r.model;
+      const a = r.answers as Record<string, JevAnswer>;
+      const noul = (k: string) => (a[k] as Extract<JevAnswer, { type: "noul" }>).noul;
+      return {
+        atMs: frame.atMs,
+        rest: frame.atMs > options.endMs,
+        targets: options.targets.map((_, i) => {
+          // Edges are fractions of the image, so the original's size maps them back.
+          const b = jevBoxToPixels((a[`b${i}`] as Extract<JevAnswer, { type: "box" }>).box, img.width, img.height);
+          return { present: noul(`p${i}`), box: { x: b.x1, y: b.y1, width: b.x2 - b.x1, height: b.y2 - b.y1 } };
+        }),
+        forbid: forbid.map((_, i) => noul(`f${i}`)),
+      };
     });
-    forbid.forEach((f, i) => {
-      questions[`f${i}`] = { type: "noul", instructions: claimInstruction(f) };
-    });
-    const r = await ask({ model, state: { screenshot: "SHOT" }, assets: { SHOT: pngImage(shown) }, questions });
-    calls++;
-    costUsd += r.costUsd;
-    inputTokens += r.usage.input_tokens;
-    served = r.model;
-    const a = r.answers as Record<string, JevAnswer>;
-    const noul = (k: string) => (a[k] as Extract<JevAnswer, { type: "noul" }>).noul;
-    return {
-      atMs: frame.atMs,
-      rest: frame.atMs > options.endMs,
-      targets: options.targets.map((_, i) => {
-        // Edges are fractions of the image, so the original's size maps them back.
-        const b = jevBoxToPixels((a[`b${i}`] as Extract<JevAnswer, { type: "box" }>).box, img.width, img.height);
-        return { present: noul(`p${i}`), box: { x: b.x1, y: b.y1, width: b.x2 - b.x1, height: b.y2 - b.y1 } };
-      }),
-      forbid: forbid.map((_, i) => noul(`f${i}`)),
-    };
-  });
+  }
 
   // Second look: each target's box again, on the region it moves through, cut from the original
   // and magnified. The same window for every frame, so positions stay on one grid.
-  if (options.refine !== false && frameSize) {
+  if (options.jev !== false && options.refine !== false && frameSize) {
     const size = frameSize;
     for (const [i, target] of options.targets.entries()) {
       if (frames.every((f) => f.dom?.[i])) continue;
@@ -285,5 +319,14 @@ export async function checkMotionFrames(
   const passed =
     targets.every((t) => t.findings.every((f) => f.severity !== "fail")) &&
     forbidden.every((f) => f.severity !== "fail");
-  return { frames: answers, targets, forbidden, passed, model: served, calls, costUsd, inputTokens };
+  return {
+    frames: answers,
+    targets,
+    forbidden,
+    passed,
+    model: options.jev === false ? "none (measured from the page)" : served,
+    calls,
+    costUsd,
+    inputTokens,
+  };
 }

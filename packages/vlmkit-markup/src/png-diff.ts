@@ -118,7 +118,7 @@ Options:
                         the cause. Lower it for small frames with fine detail.
   --elements-top <N>    Report the top N attribution candidates per region
                         (default 1) instead of only the winner
-  --kind                Name what changed in each region: text, color, position
+  --jev                 Name what changed in each region (also --kind): text, color, position
                         or presence. One TypeSafe Jev call per region on its
                         magnified crop (TYPESAFEAI_API_KEY; ~$0.0003 and ~0.2s a
                         region). The region, shift and colours stay measured;
@@ -126,7 +126,7 @@ Options:
                         confidence are marked uncertain — 1-2px shifts read as
                         color are the usual case, so check region.shift
   --kind-limit <N>      Label at most N regions, largest first (default 12)
-  --kind-model <id>     Jev model for --kind (default jev-1.14.0)
+  --kind-model <id>     Jev model for --jev (default jev-1.14.0)
   --ignore-region "<x>,<y>,<w>x<h>"
                         Never measure this rectangle. Repeatable. For areas that
                         are non-deterministic by construction (particles, noise,
@@ -171,6 +171,8 @@ export function parsePngDiffArgs(args: string[]): PngDiffCliOptions {
         }
         break;
       }
+      // --jev turns on every use of TypeSafe Jev a command has; here that is the region labels.
+      case "--jev":
       case "--kind":
         kind = true;
         break;
@@ -270,13 +272,13 @@ export function parsePngDiffArgs(args: string[]): PngDiffCliOptions {
   }
 
   if ((kindModel || kindLimit !== undefined) && !kind) {
-    throw new PngDiffCliError("--kind-model / --kind-limit have no effect without --kind", 2);
+    throw new PngDiffCliError("--kind-model / --kind-limit have no effect without --jev", 2);
   }
   // Refused before anything is measured: a run that silently left out the labels it was
   // asked for would read as "no region could be named".
   if (kind && !process.env.TYPESAFEAI_API_KEY && !process.env.TYPESAFE_API_KEY) {
     throw new PngDiffCliError(
-      "--kind needs TYPESAFEAI_API_KEY (a TypeSafe key, console.typesafe.ai/keys). Without one, --crop-regions writes the crops for you to look at.",
+      "--jev needs TYPESAFEAI_API_KEY (a TypeSafe key, console.typesafe.ai/keys). Without one, --crop-regions writes the crops for you to look at.",
       2,
     );
   }

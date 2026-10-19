@@ -213,7 +213,11 @@ asked as a `choice`, Jev named 7/21 from 11 frames and 4/21 from a contact sheet
 with confidence no higher when right. A `box` per frame and `fitEasing` on the centres got 21/21
 (6 frames too). Never ask Jev for an easing name: take positions from it and fit them.
 
-**Shipped as `diff png --kind`** (`@mizchi/vlmkit-ai/region-kind.ts`, `attachRegionKinds` in
+**Jev is opt-in.** Where a command works without it, `--jev` turns it on and nothing asks Jev
+otherwise (`diff png --jev`, `--kind` kept as its alias; `inspect motion --jev`). Commands with no
+other engine (`inspect locate`, `inspect claims`, a `describe` click) need only the key.
+
+**Shipped as `diff png --kind`** (now `--jev`; `@mizchi/vlmkit-ai/region-kind.ts`, `attachRegionKinds` in
 `png-diff.ts`). It puts `regions[].kind = {label: text|color|position|presence, confidence,
 uncertain, model}` on the regions the pixel diff found, one request per region, largest first up
 to `--kind-limit` (12). Without a key it exits 2 before measuring anything. End-to-end round on real
@@ -292,6 +296,11 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   their letters crossing" (`DEFAULT_MOTION_FORBID`) caught the claims round's planted overlaps 9/9
   with 0/36 cross-plant alarms (the broad one 10/36), on screenshots it was not chosen on.
 - Positions from frames shown at ≥0.8 only: a fade's faint frames got boxes 40px off.
+- **Without `--jev` it asks nothing** (no key): every target is a `--selector`, and presence is
+  the share of a 5x5 hit-test of its box (inside the viewport) where it is topmost, with
+  pointer-events forced on for the probe (a toast is often `pointer-events: none`). On the
+  fixtures: 6/7 broken by the expected rule, 7/7 intact pass. The miss is `overlap-rest`, text
+  on text, which is a `--forbid` statement (Jev) or `check integrity`'s `text-collision`.
 
 ## Generated figures (raster images)
 

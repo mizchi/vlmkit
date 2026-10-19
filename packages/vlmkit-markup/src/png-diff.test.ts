@@ -501,6 +501,7 @@ describe("png-diff --kind", () => {
       }
     };
     withKey(undefined, () => assert.equal(exitOf(["a.png", "b.png", "--kind"]), 2));
+    withKey(undefined, () => assert.equal(exitOf(["a.png", "b.png", "--jev"]), 2));
     withKey("k", () => {
       assert.deepEqual(
         { ...parsePngDiffArgs(["a.png", "b.png", "--kind", "--kind-limit", "3", "--kind-model", "jev-preview"]) },
@@ -510,6 +511,11 @@ describe("png-diff --kind", () => {
           kindLimit: 3,
           kindModel: "jev-preview",
         },
+      );
+      // --jev is the switch; --kind stays its alias.
+      assert.deepEqual(
+        { ...parsePngDiffArgs(["a.png", "b.png", "--jev"]) },
+        { ...parsePngDiffArgs(["a.png", "b.png", "--kind"]) },
       );
       assert.equal(exitOf(["a.png", "b.png", "--kind-limit", "3"]), 2);
       assert.equal(exitOf(["a.png", "b.png", "--kind", "--kind-limit", "0"]), 2);
