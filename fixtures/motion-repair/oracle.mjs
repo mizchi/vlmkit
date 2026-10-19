@@ -1,5 +1,5 @@
 // Hidden from the agents: judges a repaired page against its brief.
-// node fixtures/motion-repair/oracle.mjs <notify|menu|toast> <page.html>
+// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger> <page.html>
 import { chromium } from "playwright";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
@@ -80,6 +80,49 @@ if (kind === "notify") {
   const a1 = await probe(".toast");
   const frac = (a0.x - a1.x) / (a0.x - held.x);
   ok("entrance decelerates (ease-out: >60% of travel at half time)", frac > 0.6, { frac });
+} else if (kind === "drawer") {
+  await at(2000);
+  const d = await probe(".drawer");
+  ok("drawer fully visible at rest (2000ms)", d && d.visible >= 0.96 && d.opacity > 0.95, d);
+  ok("drawer at the left edge under the header, 280px wide", d && Math.abs(d.x) <= 1 && Math.abs(d.y - 56) <= 1 && Math.abs(d.w - 280) <= 1, d);
+  const f = await probe(".file");
+  ok("file list visible at rest", f && f.visible >= 0.96 && f.opacity > 0.95, f);
+  ok("main column unchanged", JSON.stringify(await rect("main")) === JSON.stringify([280, 56, 1000, (await rect("main"))[3]]), await rect("main"));
+  await at(200);
+  const fade = await probe(".file");
+  ok("page mid-fade at 200ms", fade && fade.opacity > 0.3 && fade.opacity < 0.98, fade);
+  await at(300);
+  const before = await probe(".drawer");
+  ok("drawer still off-screen before 400ms", before && before.right <= 1, before);
+  await at(400 + 190);
+  const mid = await probe(".drawer");
+  const frac = mid ? (mid.x + 280) / 280 : 0;
+  ok("slide decelerates (ease-out: >60% of travel at half time)", frac > 0.6 && frac < 0.99, { frac });
+} else if (kind === "popover") {
+  await at(2000);
+  const r = await probe(".pop");
+  ok("popover fully visible at rest", r && r.visible >= 0.96 && r.opacity > 0.95, r);
+  ok("popover just above the button at the left (rest box unchanged)", r && Math.abs(r.x - 32) <= 1 && Math.abs(r.bottom - 716) <= 1 && Math.abs(r.w - 260) <= 1, r);
+  await at(300 + 60);
+  const mid = await probe(".pop");
+  ok("mid-open: scaled down", mid && mid.w < r.w * 0.95, mid);
+  ok("grows from its bottom-left corner (that corner stays put)", mid && Math.abs(mid.x - r.x) <= 2 && Math.abs(mid.bottom - r.bottom) <= 2, { mid, rest: r });
+} else if (kind === "stagger") {
+  await at(2000);
+  const rest = [];
+  for (let i = 1; i <= 4; i++) rest.push(await probe(`li.a${i}`));
+  ok("all four entries visible at rest", rest.every((e) => e && e.visible >= 0.96 && e.opacity > 0.95), rest);
+  const op = async (t) => { await at(t); const o = []; for (let i = 1; i <= 4; i++) o.push((await probe(`li.a${i}`)).opacity); return o; };
+  for (const [i, start] of [[1, 200], [2, 280], [3, 360], [4, 440]]) {
+    const pre = await op(start - 20), post = await op(start + 60);
+    ok(`entry ${i} starts at ${start}ms`, pre[i - 1] < 0.02 && post[i - 1] > 0.05, { pre, post });
+  }
+  const end = await op(440 + 320 + 10);
+  ok("the last entry is done by 770ms (320ms each)", end[3] > 0.98, end);
+  await at(200 + 160);
+  const m = await probe("li.a1");
+  const frac = 1 - (m.y - rest[0].y) / 16;
+  ok("rise decelerates (ease-out: >60% of travel at half time)", frac > 0.6 && frac < 0.99, { frac });
 }
 await browser.close();
 const failed = checks.filter((c) => !c.pass);

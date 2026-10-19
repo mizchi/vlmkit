@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Activity</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #fafafa; color: #1d1d1f; }
+  main { max-width: 640px; margin: 48px auto; padding: 0 24px; }
+  ol { list-style: none; margin: 0; padding: 0; }
+  li { background: #fff; border: 1px solid #e5e5e5; border-radius: 8px; padding: 14px 18px; margin-bottom: 10px;
+       animation: rise 320ms cubic-bezier(0, 0, 0.58, 1) 200ms both; }
+  li:nth-child(2) { animation-delay: 200ms; }
+  li:nth-child(3) { animation-delay: 200ms; }
+  li:nth-child(4) { animation-delay: 200ms; }
+  @keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+</style></head>
+<body>
+  <main>
+    <h1>Activity</h1>
+    <ol>
+      <li class="a1">Priya merged “Fix login redirect”</li>
+      <li class="a2">Tom commented on “Dark mode”</li>
+      <li class="a3">CI passed on main</li>
+      <li class="a4">You were assigned “Onboarding copy”</li>
+    </ol>
+  </main>
+</body></html>
