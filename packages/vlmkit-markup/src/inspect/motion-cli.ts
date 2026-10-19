@@ -562,8 +562,12 @@ export function motionPlan(animations: readonly PlannedAnimation[]) {
     const gap = g.startMs - from;
     return gap >= 100 ? [0.25, 0.5, 0.75].map((f) => Math.round(from + gap * f)) : [];
   });
+  // And three before the first, when it waits 300ms or more: chips held unseen for 1200ms were
+  // only ever shot from 1200ms on, so no frame of the tool's own showed the wait (round 5).
+  const first = segments[0]?.startMs ?? 0;
+  const lead = first >= 300 ? [0, 1 / 3, 2 / 3].map((f) => Math.round(first * f)) : [];
   const motion = [
-    ...new Set([...segments.flatMap((g) => motionInstants(g.startMs, g.endMs, per).motion), ...holds]),
+    ...new Set([...lead, ...segments.flatMap((g) => motionInstants(g.startMs, g.endMs, per).motion), ...holds]),
   ].sort((a, b) => a - b);
   const endMs = Math.max(...segments.map((g) => g.endMs));
   return { segments, motion, rest: endMs + 300, startMs: segments[0]?.startMs ?? 0, endMs };
@@ -703,7 +707,7 @@ export function formatMotionReport(
   const lines: string[] = [];
   const restCount = captured.frames.filter((f) => f.atMs > captured.endMs).length;
   lines.push(
-    `inspect motion: ${source} — ${captured.frames.length - restCount} frames over ${Math.round(captured.startMs)}..${Math.round(captured.endMs)}ms + ${restCount} at rest (${captured.manifest})`,
+    `inspect motion: ${source} — ${captured.frames.length - restCount} frames over ${Math.round(Math.min(captured.startMs, captured.frames[0]?.atMs ?? captured.startMs))}..${Math.round(captured.endMs)}ms${(captured.frames[0]?.atMs ?? captured.startMs) < captured.startMs ? ` (motion from ${Math.round(captured.startMs)}ms; the frames before it show the wait)` : ""} + ${restCount} at rest (${captured.manifest})`,
   );
   let fails = 0;
   let warns = 0;
@@ -753,11 +757,15 @@ export function formatMotionReport(
     // What was read per frame: presence, and the position judged (· = not shown, ~ = put back from the edge).
     const pos = new Map(t.path.map((p) => [p.atMs, p]));
     lines.push(
-      `    frames (time, share of it seen, centre): ${r.frames
+      `    frames (time, share of it seen [op = opacity, when partial], centre): ${r.frames
         .map((f) => {
           const p = pos.get(f.atMs);
           const pr = f.targets[i]!.present.toFixed(2);
-          return `${Math.round(f.atMs)}ms ${pr}${p ? ` (${Math.round(p.x)},${Math.round(p.y)})${p.edge ? "~" : ""}` : " ·"}`;
+          // The share seen is a hit-test, blind to a fade: say the opacity beside it when it is
+          // partial, or "1.00" at 20% opacity read as fully visible (round 5).
+          const op = captured.frames.find((c) => c.atMs === f.atMs)?.dom?.[i]?.opacity;
+          const faded = op !== undefined && op < 0.95 && op >= 0.05 ? ` op ${op.toFixed(2)}` : "";
+          return `${Math.round(f.atMs)}ms ${pr}${faded}${p ? ` (${Math.round(p.x)},${Math.round(p.y)})${p.edge ? "~" : ""}` : " ·"}`;
         })
         .join(", ")}`,
     );
@@ -828,11 +836,15 @@ export function formatMotionReport(
   // A thinned strip can skip the frame a finding is about (six of a toast's frames had none in
   // its 2s hold, round 2): name that frame's own file.
   const firstFail = r.targets
-    .flatMap((t) => t.findings)
+    .flatMap((t) => t.findings.map((f) => ({ ...f, target: t.target })))
     .filter((f) => f.severity === "fail")
     .sort((a, b) => a.atMs - b.atMs)[0];
   const file = firstFail ? captured.files?.get(firstFail.atMs) : undefined;
-  if (file) lines.push(`  the first fail's own frame (${Math.round(firstFail!.atMs)}ms): ${file}`);
+  // Named by its target: the earliest fail is not always the first one listed (round 5).
+  if (file)
+    lines.push(
+      `  the first fail's own frame (${Math.round(firstFail!.atMs)}ms, ${firstFail!.target} ${firstFail!.rule}): ${file}`,
+    );
   return lines.join("\n");
 }
 

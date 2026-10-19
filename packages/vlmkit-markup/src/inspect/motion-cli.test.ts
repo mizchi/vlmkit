@@ -375,7 +375,7 @@ describe("inspect motion after motion-repair round 2", () => {
       }
       const out = lines.join("\n");
       assert.match(out, /300\.\.660ms: travels \d+px, follows ease-in/, out);
-      assert.match(out, /the first fail's own frame \(1160ms\): .*0\d{3}-t001160\.png/);
+      assert.match(out, /the first fail's own frame \(1160ms, [^)]*\): .*0\d{3}-t001160\.png/);
     },
   );
 });

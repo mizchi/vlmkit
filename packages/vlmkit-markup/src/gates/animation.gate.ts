@@ -97,6 +97,12 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       docs: "Its motion region covered under a quarter of the element's own box at rest, so most of the element is likely clipped (an ancestor's overflow) or covered (a stacking context). `inspect motion --selector` names which.",
     },
     {
+      id: "delayed-entrance",
+      title: "An element is held unseen through a long animation-delay",
+      severity: "warn",
+      docs: "Its first keyframe hides it (opacity 0, visibility hidden), its fill is backwards or both, and its delay is 1000ms or more: the page is on screen and it is not. Intended for a late toast; a lag for anything meant to appear with the page.",
+    },
+    {
       id: "clock-motion-unsettled",
       title: "Script-driven motion still changing at the end of the virtual-time window",
       severity: "warn",

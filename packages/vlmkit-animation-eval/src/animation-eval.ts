@@ -76,6 +76,10 @@ export interface AnimationTimingSample {
   palindromic: boolean;
   /** The properties its keyframes animate (camelCase, as getKeyframes names them). */
   properties?: string[];
+  /** animation-fill-mode as computed: none / forwards / backwards / both / auto. */
+  fill?: string;
+  /** Its first keyframe leaves the element unseen (opacity 0 or visibility hidden). */
+  startsHidden?: boolean;
 }
 
 export interface OscillationInfo {
@@ -205,7 +209,8 @@ export type AnimationEvalIssueKind =
   | "seek-ineffective"
   | "clock-motion-unsettled"
   | "undefined-keyframes"
-  | "motion-mostly-hidden";
+  | "motion-mostly-hidden"
+  | "delayed-entrance";
 
 export interface AnimationEvalIssue {
   kind: AnimationEvalIssueKind;
@@ -440,6 +445,9 @@ export interface DeriveIssuesInput {
   undefinedKeyframes?: { selector: string; name: string; reducedMotion: boolean }[];
 }
 
+/** A delay this long (ms) at least, with the element held unseen through it, is a `delayed-entrance`. */
+export const DELAYED_ENTRANCE_MS = 1000;
+
 export function deriveAnimationIssues(
   input: DeriveIssuesInput,
   options: { settleThresholdMs?: number; reducedMotionDurationFloorMs?: number } = {},
@@ -461,6 +469,24 @@ export function deriveAnimationIssues(
           ? " — whatever that rule was meant to do for reduced-motion users (hide, settle) does not happen."
           : "."),
     });
+  }
+
+  // Held unseen through a long delay by a backwards fill: the page is there and this is not.
+  // Chips that should fade in "straight away" waited 1200ms, and every gate passed them
+  // (motion-repair round 5). A warn: a toast that appears after a second does this on purpose.
+  for (const anim of input.evaluated) {
+    if (
+      anim.startsHidden &&
+      anim.delayMs >= DELAYED_ENTRANCE_MS &&
+      (anim.fill === "backwards" || anim.fill === "both")
+    ) {
+      issues.push({
+        kind: "delayed-entrance",
+        severity: "warn",
+        selector: anim.selector,
+        message: `${anim.selector} is held unseen for the first ${Math.round(anim.delayMs)}ms: \`${anim.name}\` waits ${Math.round(anim.delayMs)}ms (animation-delay) and its fill (${anim.fill}) keeps its first, hidden keyframe until then. If it should appear with the page, drop the delay; if the wait is meant, this is its design.`,
+      });
+    }
   }
 
   for (const anim of input.evaluated) {
@@ -628,7 +654,7 @@ const ANIMATION_HELPERS_JS = `
   ${STABLE_SELECTOR_JS}
 
   function describeTiming(anim) {
-    let timing = { duration: 0, delay: 0, iterations: 1, direction: "normal", easing: "linear" };
+    let timing = { duration: 0, delay: 0, iterations: 1, direction: "normal", easing: "linear", fill: "none", startsHidden: false };
     try {
       const computed = anim.effect && anim.effect.getComputedTiming ? anim.effect.getComputedTiming() : null;
       if (computed) {
@@ -642,6 +668,14 @@ const ANIMATION_HELPERS_JS = `
           iterations: computed.iterations,
           direction: computed.direction || "normal",
           easing: computed.easing && computed.easing !== "linear" ? computed.easing : keyed.join(" / ") || "linear",
+          fill: computed.fill || "none",
+          // Its first keyframe leaves it unseen (opacity 0 or visibility hidden): held there
+          // through a delay by a backwards fill, the element is not on screen until it starts.
+          startsHidden: (() => {
+            const first = anim.effect.getKeyframes ? anim.effect.getKeyframes()[0] : null;
+            if (!first) return false;
+            return (first.opacity !== undefined && Number(first.opacity) <= 0.05) || first.visibility === "hidden";
+          })(),
         };
       }
     } catch {}
@@ -778,6 +812,8 @@ ${ANIMATION_HELPERS_JS}
       durationMs: timing.duration,
       delayMs: timing.delay,
       easing: timing.easing,
+      fill: timing.fill,
+      startsHidden: timing.startsHidden,
       iterations: Number.isFinite(timing.iterations) ? timing.iterations : null,
       playState,
       currentTimeMs,

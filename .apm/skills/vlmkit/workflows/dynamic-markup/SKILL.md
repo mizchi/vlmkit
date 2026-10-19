@@ -264,7 +264,13 @@ vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ea
   `--selector` per entry in order and `--expect-stagger 80` (or `--expect-start 200,280,360,440`);
   the `begins:` line says when siblings start together. Without an
   expectation both are facts under "no fail", never a fail: map the
-  brief's "from its corner" / "one after another" to the flag yourself. In motion-repair round 3 a wrong
+  brief's words to the flag yourself: "grows from / hangs from / unfolds
+  out of X" is `--expect-origin` (one-axis drop-downs keep an edge:
+  `top`); "one after another", "a wave across the row", "each a beat
+  later" is one `--selector` per element in the brief's order plus
+  `--expect-stagger`; "straight away", "with no wait", "as the page
+  appears" is `--expect-start 0`. Round 5's briefs used those words and
+  never the flags' names, and all six agents mapped them. In motion-repair round 3 a wrong
   `transform-origin` and a stagger that was not one both read "follows ease-out exactly, no fail"
   until these existed.
 - **What it does not judge**: fps or jank, a target it is not told about, and anything under

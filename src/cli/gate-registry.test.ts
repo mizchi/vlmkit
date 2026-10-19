@@ -253,8 +253,10 @@ describe("composed built-in registry", () => {
     //       while the toast it was meant to hide never left (a dynamic-markup run).
     // 218 → 219: `check animation` / `motion-mostly-hidden` (warn) — a clipped card and a covered
     //       menu were listed "visible" on a sliver of motion (motion-repair rounds 1 and 2).
+    // 219 → 220: `check animation` / `delayed-entrance` (warn) — chips meant to fade in with the
+    //       page waited 1200ms at opacity 0 and every gate passed them (motion-repair round 5).
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 219);
+    assert.equal(total, 220);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {

@@ -1017,3 +1017,17 @@ test(
     );
   },
 );
+
+test("an element held unseen through a long delay raises delayed-entrance (warn); a short or visible one does not", () => {
+  const issues = (over: Parameters<typeof evaluated>[0]) =>
+    deriveAnimationIssues({ evaluated: [evaluated(over)], settleMs: 1400, infinite: [] }).filter(
+      (i) => i.kind === "delayed-entrance",
+    );
+  const held = issues({ delayMs: 1200, fill: "both", startsHidden: true });
+  assert.equal(held.length, 1);
+  assert.equal(held[0]!.severity, "warn");
+  assert.match(held[0]!.message, /held unseen for the first 1200ms/);
+  assert.equal(issues({ delayMs: 400, fill: "both", startsHidden: true }).length, 0);
+  assert.equal(issues({ delayMs: 1200, fill: "forwards", startsHidden: true }).length, 0);
+  assert.equal(issues({ delayMs: 1200, fill: "both", startsHidden: false }).length, 0);
+});
