@@ -309,6 +309,14 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   target (they had found both only by reading the CSS). Holds between segments get three frames,
   and a measured box off-screen between shown frames is lost, not "leaving": the edge excuse is for
   a model's boxes only.
+- **Where and when are measured, and fail only against an expectation** (round 3,
+  `docs/reports/2026-10-19-motion-repair-v3.md`): a popover growing from the wrong corner and four
+  entries "cascading" at one delay both passed every rule. Each line now names when the target's
+  own animation begins (frame time less `elapsedMs`, the active time of its longest animation)
+  and the point of its box a scale keeps in place (`o = (box - k B) / (1 - k)` against the
+  largest-scale frame, median over frames scaled 10%+). `--expect-origin`, `--expect-start` and
+  `--expect-stagger` turn them into `origin-mismatch` / `start-mismatch`. A transparent target
+  names the ancestor whose opacity does it, and whether anything animates it.
 
 ## Generated figures (raster images)
 

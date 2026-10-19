@@ -38,6 +38,26 @@ describe("fitEasing", () => {
 });
 
 describe("judgeMotionPath", () => {
+  it("names the point a measured scale grows from, and when its own animation begins", () => {
+    // A 200x100 box at (100,100) at full size, scaled about its top-right corner (300,100).
+    const at = (atMs: number, k: number, elapsedMs: number, t: number) => {
+      const box = { x: 300 - 200 * k, y: 100, width: 200 * k, height: 100 * k };
+      return { atMs, present: 1, box, dom: { box, opacity: 1, scale: k, elapsedMs, t } };
+    };
+    const samples = [
+      at(300, 0.6, 0, 0),
+      at(330, 0.75, 30, 0.3),
+      at(360, 0.9, 60, 0.6),
+      at(390, 1, 90, 0.99),
+      at(700, 1, 400, 1),
+    ];
+    const r = judgeMotionPath(samples, { startMs: 300, endMs: 400, expectOrigin: "bottom-left", expectStartMs: 280 });
+    expect(r.segments[0]!.origin).toMatchObject({ name: "top-right" });
+    expect(r.startsAtMs).toBe(300);
+    expect(r.findings.map((f) => f.rule).sort()).toEqual(["origin-mismatch", "start-mismatch"]);
+    const ok = judgeMotionPath(samples, { startMs: 300, endMs: 400, expectOrigin: "top-right", expectStartMs: 300 });
+    expect(ok.findings).toEqual([]);
+  });
   it("passes every intact easing, and names it", () => {
     for (const e of EASING_NAMES) {
       const s = run((t) => 40 + 480 * easingAt(e, t));

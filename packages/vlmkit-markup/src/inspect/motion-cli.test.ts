@@ -220,6 +220,49 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
       ["--selector", ".toast", "--exits", "--expect-easing", "ease-out,ease-in"],
       /FAIL snap-back .*in the hold after 660ms/,
     ],
+    // Round 3: an ancestor's opacity 0 named, a scale's fixed point, and a stagger that is not one.
+    [
+      "drawer.html",
+      ["--selector", ".drawer"],
+      /FAIL target-hidden .*transparent: div\.shell renders at opacity 0\.00, and nothing animates it/,
+    ],
+    [
+      "popover.html",
+      ["--selector", ".pop", "--expect-origin", "left bottom"],
+      /FAIL origin-mismatch .*grows from its top-right corner .*transform-origin: bottom left/,
+    ],
+    [
+      "stagger.html",
+      [
+        "--selector",
+        "li.a1",
+        "--selector",
+        "li.a2",
+        "--selector",
+        "li.a3",
+        "--selector",
+        "li.a4",
+        "--expect-stagger",
+        "80",
+      ],
+      /FAIL start-mismatch .*begins at 200ms, not 280ms[\s\S]*begins: li\.a1 200ms, li\.a2 200ms, li\.a3 200ms, li\.a4 200ms — all within one frame/,
+    ],
+    [
+      "stagger.html",
+      [
+        "--selector",
+        "li.a1",
+        "--selector",
+        "li.a2",
+        "--selector",
+        "li.a3",
+        "--selector",
+        "li.a4",
+        "--expect-start",
+        "200,280,360,440",
+      ],
+      /FAIL start-mismatch .*begins at 200ms, not 440ms/,
+    ],
   ];
   for (const [file, args, expected] of cases) {
     it(`fails broken/${file} with its cause and passes reference/${file}`, { timeout: 120_000 }, async () => {
@@ -244,6 +287,23 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
 
   it("points --out at --frames", () => {
     assert.throws(() => parseMotionArgs(["p.html", "--selector", ".a", "--out", "x"]), /did you mean --frames <dir>/);
+  });
+});
+
+describe("inspect motion after motion-repair round 3", () => {
+  it("parses --expect-origin in either word order, and checks the counts", () => {
+    assert.deepEqual(parseMotionArgs(["p.html", "--selector", ".t", "--expect-origin", "left bottom"]).expectOrigin, [
+      "bottom-left",
+    ]);
+    assert.deepEqual(parseMotionArgs(["p.html", "--selector", ".t", "--expect-origin", "centre"]).expectOrigin, [
+      "center",
+    ]);
+    assert.throws(() => parseMotionArgs(["p.html", "--selector", ".t", "--expect-origin", "middle"]), MotionUsageError);
+    assert.throws(() => parseMotionArgs(["p.html", "--selector", ".t", "--expect-stagger", "80"]), MotionUsageError);
+    assert.throws(
+      () => parseMotionArgs(["p.html", "--selector", ".t", "--expect-start", "200,280"]),
+      /2 --expect-start times for 1 targets/,
+    );
   });
 });
 

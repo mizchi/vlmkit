@@ -1042,7 +1042,7 @@ vlmkit inspect claims   <html|url|shot.png> --forbid "an error message" --expect
   # 1 one does not / 2 usage. --claims file.json, --viewport WxH, --save out.png, --threshold,
   # --json. Answers within 0.3 of the threshold are marked uncertain. Gate on the
   # deterministic checks; this is a model's reading of the pixels.
-vlmkit inspect motion   <html|url> --selector .toast [--target "the green Saved toast"] [--jev] [--expect-easing ease-out,ease-in] [--exits]
+vlmkit inspect motion   <html|url> --selector .toast [--target "the green Saved toast"] [--jev] [--expect-easing ease-out,ease-in] [--expect-origin bottom-left] [--expect-stagger 80] [--exits]
   # Is a CSS animation visually broken? Frames on the held clock (11 per span of motion + rest).
   # Without --jev, no key: each --selector measured from the page per frame (box, opacity, scale,
   # own animation time, and the share of it that is topmost — a clip or a cover). With --jev,

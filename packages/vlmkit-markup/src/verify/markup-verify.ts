@@ -542,8 +542,8 @@ export async function runMarkupVerify(options: MarkupVerifyOptions): Promise<Mar
       targetsPassed: currentPoint.targetsPassed,
       targetsTotal: targets.length,
       residuals: currentPoint.residuals,
-      gateSuspects: currentPoint.gateSuspects,
-      pixelDiff: currentPoint.pixelDiff,
+      gateSuspects: currentPoint.gateSuspects ?? null,
+      pixelDiff: currentPoint.pixelDiff ?? null,
     },
   });
   return { attempt: options.attempt, targets, gates, done, ...(trend ? { trend } : {}), kickback };

@@ -17,6 +17,7 @@
 import {
   judgeMotionPath,
   type EasingName,
+  type OriginName,
   type MotionPathReport,
   type MotionSample,
   type MotionSegment,
@@ -43,6 +44,8 @@ export interface MotionDom {
   visible?: number;
   /** Why it is not seen, when the page could tell: "clipped by header.topbar (overflow: hidden)…". */
   hiddenBy?: string;
+  /** How long its own animation has been active (ms, negative in its delay): when it begins. */
+  elapsedMs?: number | null;
 }
 
 export interface MotionFrame {
@@ -68,6 +71,15 @@ export interface MotionCheckOptions {
   expectEasing?: EasingName | readonly EasingName[];
   /** Per target, in order, overriding `expectEasing` for that target (cards ease-out, a bar ease-in-out). */
   targetEasing?: readonly (EasingName | readonly EasingName[] | undefined)[];
+  /** The point a scale grows from: every target's, or per target in order. */
+  expectOrigin?: OriginName | readonly (OriginName | undefined)[];
+  /** When each target's own animation begins (page ms), per target in order. */
+  expectStartMs?: readonly (number | undefined)[];
+  /**
+   * Consecutive targets begin this far apart (ms), in the order given: each one's start is the
+   * first target's (or its --expect-start) plus k times this.
+   */
+  expectStaggerMs?: number;
   /** A statement is true at or above this (default 0.5). */
   threshold?: number;
   /** Within this of the threshold an answer is `uncertain` (default 0.3). */
@@ -284,6 +296,16 @@ export async function checkMotionFrames(
   }
   const domAt = new Map(frames.map((f) => [f.atMs, f.dom]));
 
+  const originFor = (i: number) =>
+    typeof options.expectOrigin === "string" ? options.expectOrigin : options.expectOrigin?.[i];
+  // A stagger is relative to the first target: its own expected start if given, else where it
+  // was measured to begin (judged once the first target is).
+  let staggerFrom: number | undefined = options.expectStartMs?.[0];
+  const startFor = (i: number) =>
+    options.expectStartMs?.[i] ??
+    (options.expectStaggerMs !== undefined && i > 0 && staggerFrom !== undefined
+      ? staggerFrom + i * options.expectStaggerMs
+      : undefined);
   const targets = options.targets.map((target, i) => {
     const measured = frames.every((f) => f.dom?.[i]);
     const samples: MotionSample[] = answers.map((f) => ({
@@ -292,7 +314,7 @@ export async function checkMotionFrames(
       box: f.targets[i]!.box,
       ...(measured ? { dom: domAt.get(f.atMs)![i]! } : f.targets[i]!.unsure ? { unsure: true } : {}),
     }));
-    return {
+    const judged = {
       target,
       ...judgeMotionPath(samples, {
         startMs: options.startMs,
@@ -304,8 +326,12 @@ export async function checkMotionFrames(
         ...((options.targetEasing?.[i] ?? options.expectEasing)
           ? { expectEasing: (options.targetEasing?.[i] ?? options.expectEasing)! }
           : {}),
+        ...(originFor(i) ? { expectOrigin: originFor(i)! } : {}),
+        ...(startFor(i) !== undefined ? { expectStartMs: startFor(i)! } : {}),
       }),
     };
+    if (i === 0) staggerFrom ??= judged.startsAtMs;
+    return judged;
   });
 
   const forbidden: ForbidFinding[] = [];

@@ -148,10 +148,38 @@ export interface MotionSample {
     t?: number | null;
     /** What keeps it from being seen, when the page could tell: "clipped by …", "covered by …". */
     hiddenBy?: string;
+    /**
+     * How long its own animation has been in its active phase (ms; negative in its delay). The
+     * frame's time less this is when that animation begins: what a stagger is made of.
+     */
+    elapsedMs?: number | null;
   };
   /** The box may be another element's (it coincides with another target's): left out of geometry. */
   unsure?: boolean;
 }
+
+/** Where a scale grows from: a corner, an edge's middle or the centre of the element's box. */
+export const ORIGIN_NAMES = [
+  "top-left",
+  "top",
+  "top-right",
+  "left",
+  "center",
+  "right",
+  "bottom-left",
+  "bottom",
+  "bottom-right",
+] as const;
+export type OriginName = (typeof ORIGIN_NAMES)[number];
+const originAt = (name: OriginName) => ({
+  fx: name.endsWith("left") ? 0 : name.endsWith("right") ? 1 : 0.5,
+  fy: name.startsWith("top") ? 0 : name.startsWith("bottom") ? 1 : 0.5,
+});
+const originCss = (name: OriginName) => (name === "center" ? "center" : name.replace("-", " "));
+/** The fixed point named when it is within this (a fraction of the box) of one. */
+const ORIGIN_SNAP = 0.15;
+/** A start this far (ms) from the expected one is a mismatch: one 60fps frame. */
+const START_TOLERANCE_MS = 17;
 
 export interface MotionSegment {
   startMs: number;
@@ -185,6 +213,10 @@ export interface MotionPathOptions {
   exits?: boolean;
   /** Below this travel (px) a segment is too short to fit an easing to (default 60). */
   minFitTravelPx?: number;
+  /** The point a scale must grow from (or shrink to): measured, the point of its box that stays put. */
+  expectOrigin?: OriginName;
+  /** When its own animation must begin (page ms): measured from the element's animation time. */
+  expectStartMs?: number;
 }
 
 export type MotionRule =
@@ -196,7 +228,11 @@ export type MotionRule =
   | "easing-mismatch"
   | "easing-unchecked"
   | "target-static"
-  | "locate-unsure";
+  | "locate-unsure"
+  | "origin-mismatch"
+  | "origin-unchecked"
+  | "start-mismatch"
+  | "start-unchecked";
 
 export interface MotionFinding {
   rule: MotionRule;
@@ -216,12 +252,28 @@ export type SegmentEasing =
   | (EasingFit & { expected?: EasingName; channel?: EasingChannel; channels?: ChannelFit[] })
   | { skipped: string; expected?: EasingName };
 
+/** The point of the box a scale keeps in place, as fractions of the box at full size; named when near one. */
+export interface ScaleOrigin {
+  fx: number;
+  fy: number;
+  name: OriginName | null;
+}
+
+/** "its top-right corner", "its centre", "the point 30% across and 80% down its box". */
+export function describeOrigin(o: ScaleOrigin): string {
+  if (!o.name) return `the point ${Math.round(o.fx * 100)}% across and ${Math.round(o.fy * 100)}% down its box`;
+  if (o.name === "center") return "its centre";
+  return o.name.includes("-") ? `its ${o.name} corner` : `the middle of its ${o.name} edge`;
+}
+
 export interface MotionPathReport {
   findings: MotionFinding[];
   /** Positions of the frames the target is shown in, motion and rest; `edge` = put back from a clipped box. */
   path: { atMs: number; x: number; y: number; rest: boolean; edge: boolean }[];
   /** Per segment: its span, how far the target travels in it, the fit or why there is none. */
-  segments: (MotionSegment & { travelPx: number; easing: SegmentEasing })[];
+  segments: (MotionSegment & { travelPx: number; easing: SegmentEasing; origin?: ScaleOrigin })[];
+  /** When its own animation begins (page ms), measured: absent without --selector or an animation. */
+  startsAtMs?: number;
   /** The first segment's travel and fit (the whole motion when there is one segment). */
   travelPx: number;
   easing: SegmentEasing;
@@ -316,7 +368,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       severity: "fail",
       atMs: r.atMs,
       message: r.dom
-        ? `never seen in any frame, at rest included: at most ${Math.round(Math.max(...judged.map((s) => s.present)) * 100)}% of it visible in any frame (${Math.round(r.present * 100)}% at ${ms(r.atMs)}, rendered at opacity ${r.dom.opacity.toFixed(2)})${why(r) || ": clipped by an ancestor, covered, or off-screen"}`
+        ? `never seen in any frame, at rest included: at most ${Math.round(Math.max(...judged.map((s) => s.present)) * 100)}% of it visible in any frame (${Math.round(r.present * 100)}% at ${ms(r.atMs)}, rendered at opacity ${r.dom.opacity.toFixed(2)})${why(r) || ": clipped by an ancestor, covered, transparent, or off-screen"}`
         : `not found in any frame, at rest included (presence ${r.present.toFixed(2)} at ${ms(r.atMs)}): hidden, or the description names something not on the page`,
     });
     const skipped = { skipped: "not seen in any frame: nothing about its motion is judged" } as SegmentEasing;
@@ -538,8 +590,54 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         }
       });
     }
-    return { ...seg, travelPx, easing };
+    const origin = exact ? scaleOrigin(sorted, seg, last ? sorted.filter(isRest) : []) : null;
+    if (options.expectOrigin && origin) {
+      const want = originAt(options.expectOrigin);
+      if (Math.abs(origin.fx - want.fx) > ORIGIN_SNAP || Math.abs(origin.fy - want.fy) > ORIGIN_SNAP) {
+        findings.push({
+          rule: "origin-mismatch",
+          severity: "fail",
+          atMs: seg.startMs,
+          message: `the scale${tag} grows from ${describeOrigin(origin)} (that point of its box stays put), not ${describeOrigin({ ...want, name: options.expectOrigin })}: transform-origin: ${originCss(options.expectOrigin)}`,
+        });
+      }
+    }
+    return { ...seg, travelPx, easing, ...(origin ? { origin } : {}) };
   });
+  if (options.expectOrigin && !reports.some((x) => x.origin)) {
+    findings.push({
+      rule: "origin-unchecked",
+      severity: "warn",
+      atMs: segments[0]!.startMs,
+      message: `${options.expectOrigin} was expected but not checked: ${exact ? "its scale changes by less than 10% in every segment" : "only an element measured from the page (--selector) has a scale to read"}`,
+    });
+  }
+
+  // When its own animation begins: the frame's time less how long it has been active, over the
+  // frames inside its active phase. Four entries that "cascade" all at 200ms passed every rule
+  // above: each one's own curve was right (motion-repair round 3).
+  const starts = sorted
+    .filter((x) => !isRest(x) && typeof x.dom?.elapsedMs === "number" && typeof x.dom.t === "number")
+    .filter((x) => x.dom!.t! > 0 && x.dom!.t! < 1)
+    .map((x) => x.atMs - x.dom!.elapsedMs!);
+  const startsAtMs = starts.length > 0 ? median(starts) : undefined;
+  if (options.expectStartMs !== undefined) {
+    if (startsAtMs === undefined) {
+      findings.push({
+        rule: "start-unchecked",
+        severity: "warn",
+        atMs: segments[0]!.startMs,
+        message: `a start at ${ms(options.expectStartMs)} was expected but not checked: ${exact ? "no frame falls inside its own animation" : "only an element measured from the page (--selector) has an animation time to read"}`,
+      });
+    } else if (Math.abs(startsAtMs - options.expectStartMs) > START_TOLERANCE_MS) {
+      findings.push({
+        rule: "start-mismatch",
+        severity: "fail",
+        atMs: startsAtMs,
+        message: `its animation begins at ${ms(startsAtMs)}, not ${ms(options.expectStartMs)}: ${startsAtMs < options.expectStartMs ? "early" : "late"} by ${ms(Math.abs(startsAtMs - options.expectStartMs))} — its animation-delay (or when the animation is added) decides it`,
+      });
+    }
+  }
 
   // In a hold between two segments it stays where the first left it: a frame there far from the
   // segment's last one is the end keyframe not held (an entrance without fill-mode, whose next
@@ -622,5 +720,48 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
 
   findings.sort((a, b) => a.atMs - b.atMs);
   const first = reports.find((x) => "best" in x.easing) ?? reports[0]!;
-  return { findings, path, segments: reports, travelPx: first.travelPx, easing: first.easing };
+  return {
+    findings,
+    path,
+    segments: reports,
+    travelPx: first.travelPx,
+    easing: first.easing,
+    ...(startsAtMs !== undefined ? { startsAtMs } : {}),
+  };
+}
+
+/**
+ * The point of the box a scale keeps in place. Box = o + k (B - o) for the full-size box B and
+ * relative scale k, so o = (box - k B) / (1 - k) on each axis; the median over every frame scaled
+ * 10% or more from the largest. Full size is the largest scale in the segment (and its rest, for
+ * the last): an entrance grows to it, an exit shrinks from it. A translate in the same keyframes
+ * moves the point with it — it is then what the motion reads as, not the CSS property.
+ */
+function scaleOrigin(
+  sorted: readonly MotionSample[],
+  seg: MotionSegment,
+  rest: readonly MotionSample[],
+): ScaleOrigin | null {
+  const xs = [...sorted.filter((x) => x.dom && x.atMs >= seg.startMs && x.atMs <= seg.endMs), ...rest].filter(
+    (x) => x.dom && x.dom.scale > 0 && x.dom.box.width > 0 && x.dom.box.height > 0,
+  );
+  if (xs.length < 2) return null;
+  const ref = xs.reduce((a, b) => (b.dom!.scale > a.dom!.scale ? b : a));
+  const R = ref.dom!.box;
+  const fx: number[] = [];
+  const fy: number[] = [];
+  for (const x of xs) {
+    const k = x.dom!.scale / ref.dom!.scale;
+    if (k > 0.9) continue;
+    const b = x.dom!.box;
+    fx.push(((b.x - k * R.x) / (1 - k) - R.x) / R.width);
+    fy.push(((b.y - k * R.y) / (1 - k) - R.y) / R.height);
+  }
+  if (fx.length === 0) return null;
+  const o = { fx: median(fx), fy: median(fy) };
+  const name =
+    ORIGIN_NAMES.find(
+      (n) => Math.abs(originAt(n).fx - o.fx) <= ORIGIN_SNAP && Math.abs(originAt(n).fy - o.fy) <= ORIGIN_SNAP,
+    ) ?? null;
+  return { ...o, name };
 }

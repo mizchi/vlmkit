@@ -13,7 +13,13 @@ import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
-import { EASING_NAMES, type EasingName } from "@mizchi/vlmkit-judge/motion-path.ts";
+import {
+  EASING_NAMES,
+  ORIGIN_NAMES,
+  describeOrigin,
+  type EasingName,
+  type OriginName,
+} from "@mizchi/vlmkit-judge/motion-path.ts";
 import { parseFramesManifest, parseInstants } from "@mizchi/vlmkit-judge/frames.ts";
 import type { MotionCheckReport, MotionDom, MotionFrame } from "@mizchi/vlmkit-ai/motion-check.ts";
 
@@ -44,6 +50,7 @@ export async function measureTargets(
         // The element's own animation time (its delay and duration, not the page's): the longest
         // one running on it, as a 0-1 fraction of one iteration. Null when nothing animates it.
         let t: number | null = null;
+        let elapsedMs: number | null = null;
         let longest = 0;
         for (const a of el.getAnimations()) {
           const c = a.effect?.getComputedTiming();
@@ -52,6 +59,7 @@ export async function measureTargets(
           longest = d;
           const local = Number(c.localTime) - Number(c.delay ?? 0);
           t = Math.min(1, Math.max(0, local / d));
+          elapsedMs = local;
         }
         // What of it is the topmost thing painted, over a 5x5 grid of its box inside the viewport:
         // a clip (overflow: hidden), a cover (z-index) and leaving the screen all take it away.
@@ -95,7 +103,26 @@ export async function measureTargets(
           return null;
         };
         let hiddenBy: string | undefined;
-        if (opacity >= 0.05 && visible < 0.5) {
+        if (opacity < 0.05) {
+          // Transparent: name what makes it so. Round 3's whole page sat at an ancestor's
+          // opacity 0, whose animation-name matched no @keyframes, and the line said "clipped,
+          // covered, or off-screen".
+          for (let a: Element | null = el; a && !hiddenBy; a = a.parentElement) {
+            const s = getComputedStyle(a);
+            const own = a === el ? "it" : name(a);
+            if (s.visibility === "hidden" && a === el) hiddenBy = "transparent: it is visibility: hidden";
+            else if (Number(s.opacity) < 0.05) {
+              const running = a.getAnimations().filter((x) => x.effect?.getComputedTiming().progress !== null);
+              hiddenBy = `transparent: ${own} renders at opacity ${Number(s.opacity).toFixed(2)}${
+                a === el
+                  ? ""
+                  : running.length === 0
+                    ? `, and nothing animates it (if it is meant to fade in, its animation is not running: check animation names an animation-name with no @keyframes)`
+                    : ""
+              }`;
+            }
+          }
+        } else if (visible < 0.5) {
           if (inView === 0) hiddenBy = "its box is outside the viewport";
           else if (missed) {
             for (let a = el.parentElement; a && !hiddenBy; a = a.parentElement) {
@@ -132,6 +159,7 @@ export async function measureTargets(
           scale,
           t,
           visible,
+          elapsedMs,
           ...(hiddenBy ? { hiddenBy } : {}),
         };
       });
@@ -167,6 +195,8 @@ each forbidden statement is. vlmkit judges the motion from that:
   jump             one step far faster than its neighbours (keyframe gap)
   easing-mismatch  the path follows another easing than --expect-easing
   target-static    shown and still from the first frame (warn: not animating?)
+  origin-mismatch  a scale grows from another point than --expect-origin (transform-origin)
+  start-mismatch   its animation begins at another time than --expect-start / --expect-stagger
   forbid           a statement seen at rest fails; only mid-motion, warns (--jev)
 
 Frames: each span some finite animation runs in is a segment (an entrance, and
@@ -200,6 +230,14 @@ an easing is checked on each channel that changes.
                           paired with the --target in the same position (cards ease-out, a bar
                           ease-in-out). Comma-separated, one per segment: "ease-out,ease-in" for
                           an entrance and an exit; \`any\` leaves a segment unchecked ("ease-out,any")
+  --expect-origin <name>  ${ORIGIN_NAMES.join(" | ")}: the point a scale grows
+                          from (the point of its box that stays put). Once for every target, or
+                          repeated per target in order. Measured with --selector; every scale's
+                          point is printed with or without it
+  --expect-start <ms>     When its own animation begins (page time). Comma-separated, one per
+                          target in order: "200,280,360,440". Measured with --selector
+  --expect-stagger <ms>   Each target begins this long after the one before it, in the order
+                          given (from the first target's --expect-start, or its measured start)
   --exits                 The targets are meant to leave (gone at rest is their end)
   --at <instants>         Frames to shoot (default: 11 per segment + rest); the segments stay
                           the page's own spans of motion
@@ -222,6 +260,10 @@ export interface MotionCliOptions {
   forbid: string[];
   /** Each --expect-easing given, in order: one for every target, or one per target. */
   expectEasing?: EasingName[][];
+  /** Each --expect-origin given: one for every target, or one per target. */
+  expectOrigin?: OriginName[];
+  expectStartMs?: number[];
+  expectStaggerMs?: number;
   exits: boolean;
   at?: number[];
   startMs?: number;
@@ -240,6 +282,9 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   const selectors: string[] = [];
   const forbid: string[] = [];
   let expectEasing: EasingName[][] | undefined;
+  let expectOrigin: OriginName[] | undefined;
+  let expectStartMs: number[] | undefined;
+  let expectStaggerMs: number | undefined;
   let at: number[] | undefined;
   let startMs: number | undefined;
   let endMs: number | undefined;
@@ -284,6 +329,26 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
         (expectEasing ??= []).push(names.map((e) => (e === "any" ? undefined : e)) as EasingName[]);
         break;
       }
+      case "--expect-origin": {
+        const v = value(a, argv[++i])
+          .trim()
+          .replace(/\s+/g, "-")
+          .replace(/^centre$/, "center");
+        // transform-origin's own word order ("left top") reads the same.
+        const flip = v.split("-").reverse().join("-");
+        const n = (ORIGIN_NAMES as readonly string[]).includes(v) ? v : flip;
+        if (!(ORIGIN_NAMES as readonly string[]).includes(n)) {
+          throw new MotionUsageError(`--expect-origin takes ${ORIGIN_NAMES.join(", ")}; got ${argv[i]}`);
+        }
+        (expectOrigin ??= []).push(n as OriginName);
+        break;
+      }
+      case "--expect-start":
+        (expectStartMs ??= []).push(...parseInstants(value(a, argv[++i]), a));
+        break;
+      case "--expect-stagger":
+        expectStaggerMs = one(a, value(a, argv[++i]));
+        break;
       case "--selector":
         selectors.push(value(a, argv[++i]).trim());
         break;
@@ -370,6 +435,18 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
       `${expectEasing.length} --expect-easing for ${targets.length} --target: give one for every target, or one per target in order`,
     );
   }
+  if (expectOrigin && expectOrigin.length > 1 && expectOrigin.length !== targets.length) {
+    throw new MotionUsageError(
+      `${expectOrigin.length} --expect-origin for ${targets.length} --target: give one for every target, or one per target in order`,
+    );
+  }
+  if (expectStartMs && expectStartMs.length > targets.length) {
+    throw new MotionUsageError(
+      `${expectStartMs.length} --expect-start times for ${targets.length} targets: one per target, in order`,
+    );
+  }
+  if (expectStaggerMs !== undefined && targets.length < 2)
+    throw new MotionUsageError("--expect-stagger compares targets: give two or more, in the order they begin");
   const fromFrames = /(^|\/)frames\.json$/.test(positional[0]!);
   if (selectors.length > targets.length) {
     throw new MotionUsageError(
@@ -390,6 +467,9 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
     selectors,
     forbid,
     ...(expectEasing ? { expectEasing } : {}),
+    ...(expectOrigin ? { expectOrigin } : {}),
+    ...(expectStartMs ? { expectStartMs } : {}),
+    ...(expectStaggerMs !== undefined ? { expectStaggerMs } : {}),
     exits,
     ...(at ? { at } : {}),
     ...(startMs !== undefined ? { startMs } : {}),
@@ -511,6 +591,8 @@ interface Captured {
   manifest: string;
   /** Each frame's file, by its instant. */
   files?: Map<number, string>;
+  /** The frames' size in CSS px, when they were shot here. */
+  viewport?: { width: number; height: number };
 }
 
 async function captureMotion(o: MotionCliOptions): Promise<Captured> {
@@ -577,7 +659,7 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
         frames.push(frame);
       }
       const written = await writer.finish();
-      return { frames, startMs, endMs, segments, manifest: written.manifest, files };
+      return { frames, startMs, endMs, segments, manifest: written.manifest, files, viewport: o.viewport };
     } finally {
       await page.close();
     }
@@ -627,14 +709,21 @@ export function formatMotionReport(
     const channels = (e.channels ?? [e]) as Fit[];
     return channels.map(oneFit).join("; ");
   };
+  // Where a scale grows from, and when the target's own animation begins: printed whether or
+  // not they were expected, since round 3's wrong transform-origin and missing stagger each
+  // passed "follows ease-out exactly" with nothing on screen that said where or when.
+  const grows = (g: { origin?: Parameters<typeof describeOrigin>[0] }) =>
+    g.origin ? `; the scale grows from ${describeOrigin(g.origin)}` : "";
+  const begins = (t: { startsAtMs?: number }) =>
+    t.startsAtMs !== undefined ? `, begins at ${Math.round(t.startsAtMs)}ms` : "";
   for (const [i, t] of r.targets.entries()) {
     const broken = t.findings.some((f) => f.rule === "jump" || f.rule === "snap-back");
     if (t.segments.length <= 1) {
       lines.push(
-        `  target ${JSON.stringify(t.target)}: travels ${Math.round(t.travelPx)}px over the frames measured, ${fitText(t.easing, broken)}`,
+        `  target ${JSON.stringify(t.target)}${begins(t)}: travels ${Math.round(t.travelPx)}px over the frames measured, ${fitText(t.easing, broken)}${t.segments[0] ? grows(t.segments[0]) : ""}`,
       );
     } else {
-      lines.push(`  target ${JSON.stringify(t.target)}: ${t.segments.length} segments`);
+      lines.push(`  target ${JSON.stringify(t.target)}${begins(t)}: ${t.segments.length} segments`);
       for (const g of t.segments) {
         // Broken is per segment: a snap-back in the hold after an entrance says nothing about the
         // entrance's curve, and calling it "no easing named" beside an easing-mismatch that names
@@ -643,14 +732,14 @@ export function formatMotionReport(
           (f) => (f.rule === "jump" || f.rule === "snap-back") && f.atMs >= g.startMs && f.atMs <= g.endMs,
         );
         lines.push(
-          `    ${Math.round(g.startMs)}..${Math.round(g.endMs)}ms: travels ${Math.round(g.travelPx)}px, ${fitText(g.easing, own)}`,
+          `    ${Math.round(g.startMs)}..${Math.round(g.endMs)}ms: travels ${Math.round(g.travelPx)}px, ${fitText(g.easing, own)}${grows(g)}`,
         );
       }
     }
     // What was read per frame: presence, and the position judged (· = not shown, ~ = put back from the edge).
     const pos = new Map(t.path.map((p) => [p.atMs, p]));
     lines.push(
-      `    frames: ${r.frames
+      `    frames (time, share of it seen, centre): ${r.frames
         .map((f) => {
           const p = pos.get(f.atMs);
           const pr = f.targets[i]!.present.toFixed(2);
@@ -663,6 +752,16 @@ export function formatMotionReport(
       else warns++;
       lines.push(`    ${f.severity === "fail" ? "FAIL" : "warn"} ${f.rule} at ${Math.round(f.atMs)}ms: ${f.message}`);
     }
+  }
+  // Several targets: when each begins, side by side. Four entries meant to cascade that begin
+  // within a frame of each other read "all at once" here, with no rule needing a brief.
+  const timed = r.targets.filter((t) => t.startsAtMs !== undefined);
+  if (timed.length >= 2) {
+    const at = timed.map((t) => t.startsAtMs!);
+    const together = Math.max(...at) - Math.min(...at) <= 17;
+    lines.push(
+      `  begins: ${timed.map((t) => `${t.target} ${Math.round(t.startsAtMs!)}ms`).join(", ")}${together ? " — all within one frame: they start together (a stagger is each one's own animation-delay; --expect-stagger checks it)" : ""}`,
+    );
   }
   for (const f of r.forbidden) {
     if (f.severity === "fail") fails++;
@@ -686,8 +785,24 @@ export function formatMotionReport(
         : `${r.model}, ${r.calls} requests, $${r.costUsd.toFixed(5)} — ${captured.frames[0]?.dom?.some(Boolean) ? "positions measured from the page; whether it can be seen, and the statements, are a model's reading" : "a model's reading of the pixels, not a measurement"}`
     }`,
   );
+  // Cropped to where the targets move when that is a small part of the frame: eleven 1280px
+  // frames on one sheet were too small to read, and round 3's agent cropped them by hand.
+  const boxes = captured.frames.flatMap((f) => (f.dom ?? []).filter((d) => d !== null).map((d) => d!.box));
+  let crop = "";
+  if (boxes.length > 0) {
+    const pad = 24;
+    const x0 = Math.max(0, Math.floor(Math.min(...boxes.map((b) => b.x)) - pad));
+    const y0 = Math.max(0, Math.floor(Math.min(...boxes.map((b) => b.y)) - pad));
+    const x1 = Math.ceil(Math.max(...boxes.map((b) => b.x + b.width)) + pad);
+    const y1 = Math.ceil(Math.max(...boxes.map((b) => b.y + b.height)) + pad);
+    const vw = captured.viewport?.width ?? x1;
+    const vh = captured.viewport?.height ?? y1;
+    const w = Math.min(x1, vw) - x0;
+    const h = Math.min(y1, vh) - y0;
+    if (w > 0 && h > 0 && w * h < 0.5 * vw * vh) crop = ` --crop ${x0},${y0},${w},${h}`;
+  }
   lines.push(
-    `  look at the frames: vlmkit snapshot strip --manifest ${captured.manifest} --max-frames 6 --columns 3 --out ${join(dirname(captured.manifest), "strip.png")}`,
+    `  look at the frames: vlmkit snapshot strip --manifest ${captured.manifest} --max-frames 6 --columns 3${crop} --out ${join(dirname(captured.manifest), "strip.png")}`,
   );
   // A thinned strip can skip the frame a finding is about (six of a toast's frames had none in
   // its 2s hold, round 2): name that frame's own file.
@@ -748,6 +863,9 @@ export async function runMotionCli(argv: string[]): Promise<number> {
     exits: o.exits,
     jev: o.jev,
     ...motionEasingOptions(o.expectEasing),
+    ...(o.expectOrigin ? { expectOrigin: o.expectOrigin.length === 1 ? o.expectOrigin[0]! : o.expectOrigin } : {}),
+    ...(o.expectStartMs ? { expectStartMs: o.expectStartMs } : {}),
+    ...(o.expectStaggerMs !== undefined ? { expectStaggerMs: o.expectStaggerMs } : {}),
   });
   const json = {
     source: o.source,

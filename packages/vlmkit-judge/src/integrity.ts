@@ -346,7 +346,7 @@ export function judgeRender(stats: RenderStats, viewport: number): IntegrityFind
       kind: "degenerate-render",
       severity: "fail",
       viewport,
-      message: `The rendered page contains no visual components and no text (ink ratio ${(inkRatio * 100).toFixed(2)}%) — nothing but background painted. Usual causes: a construction-phase JS error, a failed stylesheet, or content never appended to the DOM.`,
+      message: `The rendered page contains no visual components and no text (ink ratio ${(inkRatio * 100).toFixed(2)}%) — nothing but background painted. Usual causes: a construction-phase JS error, a failed stylesheet, content never appended to the DOM, or the page held at opacity 0 (an entrance fade whose animation never runs: check animation names an animation-name with no @keyframes).`,
       evidence: { componentCount, inkRatio, textBlocks },
     };
   }

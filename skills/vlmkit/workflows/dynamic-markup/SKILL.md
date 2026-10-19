@@ -245,13 +245,22 @@ vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ea
 - **Read the rule, then the frames.** `snap-back` = the final keyframe is not held
   (fill-mode; also caught in the hold between an entrance and an exit); `jump` = a keyframe gap;
   `target-lost` / `absent-at-rest` = clipped, covered or faded for good (`--exits` when it is
-  meant to leave); `target-hidden` = never seen at all — the line names the clipping ancestor, or
-  the cover and the stacking context (a `transform`, `opacity`, `z-index`…) that traps the target;
+  meant to leave); `target-hidden` = never seen at all — the line names the clipping ancestor,
+  the cover and the stacking context (a `transform`, `opacity`, `z-index`…) that traps the target,
+  or the ancestor whose opacity keeps it transparent;
   when the brief names one segment's easing and not another's, write `any` for the other
   (`--expect-easing ease-out,any`) rather than guessing; and open the frame the output names
   as "the first fail's own frame" — a thinned strip can skip it; `easing-mismatch` = the timing function;
   `target-static` = nothing about it animates (a dropped rule, a misspelt name). The command
-  prints the strip line to look at; open single frames for detail.
+  prints the strip line to look at (cropped to where the targets move); open single frames for detail.
+- **Where and when are in the brief too: say them.** Every line names when the target's own
+  animation begins and, for a scale, the point it grows from — but only an expectation fails on
+  them. A popover that must grow out of its button: `--expect-origin bottom-left`
+  (`origin-mismatch` names the `transform-origin` to set). Entries that must cascade: one
+  `--selector` per entry in order and `--expect-stagger 80` (or `--expect-start 200,280,360,440`);
+  the `begins:` line says when siblings start together. In motion-repair round 3 a wrong
+  `transform-origin` and a stagger that was not one both read "follows ease-out exactly, no fail"
+  until these existed.
 - **What it does not judge**: fps or jank, a target it is not told about, and anything under
   the 6px / 0.2-opacity floors with `--selector` (60px for a `--jev` target without one). A pass is "nothing looked
   broken in these frames", not "matches the brief" — compare durations with B3's list.

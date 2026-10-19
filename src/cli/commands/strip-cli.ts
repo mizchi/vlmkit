@@ -26,7 +26,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { composeFilmstrip } from "@mizchi/vlmkit-core/filmstrip.ts";
-import { decodePng, encodePng } from "@mizchi/vlmkit-core/png-utils.ts";
+import { cropRegion, decodePng, encodePng } from "@mizchi/vlmkit-core/png-utils.ts";
 import { encodeWebp, imageFormatForPath } from "@mizchi/vlmkit-core/webp.ts";
 import { encodeApng } from "@mizchi/vlmkit-core/apng.ts";
 import { BOLD, CYAN, DIM, GREEN, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
@@ -55,6 +55,8 @@ function usage(): string {
     "  --manifest <file>   A frames.json (vlmkit-frames/1) instead of frame paths: frames in its order,",
     "                      labelled with the time each shows; --animated plays the real gaps",
     "  --max-frames <n>    With --manifest: at most n frames, evenly spaced, first and last kept",
+    "  --crop <x,y,w,h>    Cut the same region (frame pixels) out of every frame first: eleven",
+    "                      1280px frames on one sheet are too small to read the part that moves",
     "",
     "  A `.webp` output extension encodes WebP (needs the optional @jsquash/webp).",
     "  --animated writes APNG, which needs no extra dependency and plays in browsers and",
@@ -95,6 +97,8 @@ interface StripArgs {
   /** A `vlmkit-frames/1` manifest to read the frames from, instead of `paths`. */
   manifest?: string;
   maxFrames?: number;
+  /** The same region cut from every frame before the sheet is laid out. */
+  crop?: { x: number; y: number; width: number; height: number };
 }
 
 function readNumber(argv: string[], index: number, flag: string): number {
@@ -122,6 +126,7 @@ function parseArgs(argv: string[]): StripArgs {
   let loops: number | undefined;
   let manifest: string | undefined;
   let maxFrames: number | undefined;
+  let crop: StripArgs["crop"];
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
@@ -172,6 +177,13 @@ function parseArgs(argv: string[]): StripArgs {
         if (maxFrames < 1 || !Number.isInteger(maxFrames))
           throw new UsageError("--max-frames expects a whole number >= 1");
         break;
+      case "--crop": {
+        const xs = (argv[++i] ?? "").split(",").map((v) => Number(v.trim()));
+        if (xs.length !== 4 || xs.some((v) => !Number.isInteger(v) || v < 0) || xs[2]! < 1 || xs[3]! < 1)
+          throw new UsageError("--crop expects x,y,w,h in whole frame pixels (w and h at least 1)");
+        crop = { x: xs[0]!, y: xs[1]!, width: xs[2]!, height: xs[3]! };
+        break;
+      }
       case "-h":
       case "--help":
         console.log(usage());
@@ -205,6 +217,7 @@ function parseArgs(argv: string[]): StripArgs {
     ...(loops !== undefined ? { loops } : {}),
     ...(manifest !== undefined ? { manifest } : {}),
     ...(maxFrames !== undefined ? { maxFrames } : {}),
+    ...(crop ? { crop } : {}),
   };
 }
 
@@ -293,7 +306,13 @@ async function main(): Promise<void> {
     console.log(`  names, if the numeric order is the one you meant.${RESET}`);
   }
 
-  const frames = await Promise.all(parsed.paths.map((p) => decodePng(resolve(p))));
+  const decoded = await Promise.all(parsed.paths.map((p) => decodePng(resolve(p))));
+  const c = parsed.crop;
+  if (c && decoded.some((f) => c.x + c.width > f.width || c.y + c.height > f.height)) {
+    const f = decoded.find((d) => c.x + c.width > d.width || c.y + c.height > d.height)!;
+    throw new UsageError(`--crop ${c.x},${c.y},${c.width},${c.height} is outside a ${f.width}x${f.height} frame`);
+  }
+  const frames = c ? decoded.map((f) => cropRegion(f, c.x, c.y, c.width, c.height)) : decoded;
 
   if (parsed.animated) {
     // The other answer to "a numbered sequence in one file". A still sheet is for a reader who
