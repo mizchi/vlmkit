@@ -46,6 +46,7 @@ nothing — failing on a suspect is the default.
 | Animations visibly run, settle, respect reduced-motion | `vlmkit check animation page.html` (`--virtual-time` when motion is script-driven: rAF, GSAP, canvas, a timer carousel) |
 | Nothing flashes more than three times a second (WCAG 2.3.1, Level A, whatever the motion preference) | `vlmkit check flash page.html` — every 60fps frame of page time on the held clock; `motion-flicker` (warn) is moving content, `general-flash` / `red-flash` (suspect) is a strobe; `--strip` writes one still sheet, never an animation |
 | A video or animated GIF the page ships does not flash either (the page sweep pauses a `<video>` and reports it unmeasured) | `vlmkit check flash clip.mp4` (or `.webm`, `.gif`) — decoded with your own ffmpeg / ffprobe (vlmkit ships none), every frame at its own time, a GIF timed and looped as the browser plays it; `--display-width` is how wide it plays |
+| Does the motion LOOK broken? (a toast that vanishes into a clipping column, a menu opening under the next card, a snap-back when fill-mode is missing, a keyframe gap, the wrong easing) | `vlmkit inspect motion page.html --selector .toast [--expect-easing ease-out]` — no key: each `--selector` measured per frame, including how much of it is topmost; read the rule, then the frames it names. Text left on text at rest is `check integrity`'s `text-collision` (or `--jev`, below) |
 | Does anything break WHILE the page moves? (a card sliding over a label, text on a background that has not arrived yet) | `vlmkit check integrity page.html --timeline` — held across instants keeps its severity, a one-instant glimpse is info |
 | SEE the motion: the page at chosen instants, or what an action set moving, as numbered frames to read in order | `vlmkit check animation page.html --at 0..600/100 --frames out/f` (clock held); a `frames` step in an `inspect interact` sequence after the action; `vlmkit snapshot strip --manifest out/f/frames.json` makes one sheet — then Read it |
 | WHAT HAPPENED in a frame sequence: when something appeared, flickered for one frame, came back, settled — with times and boxes, not guesses | `vlmkit snapshot storyboard out/f/frames.json` → `SUMMARY.md` (glitch / transient / change / drift, each timed between two frames, with its box) and `sheet.png`; then Read `narrate/BRIEF.md`'s keyframes and say what each change is. A screen recording: `vlmkit scan video rec.mp4`, then the same on `rec.mp4.frames/frames.json` with `--lossy` (an H.264/VP8/VP9 recording is refused without it) |
@@ -78,6 +79,19 @@ announces and what its pixels show instead:
 **Maintain:** `vlmkit heal selector page.html ".broken"` (selector
 died in a refactor) · `vlmkit diff html a.html b.html` (visual
 equivalence of two pages).
+
+**Optional, with a TypeSafe key (`TYPESAFEAI_API_KEY`):** a model's typed
+reading of the pixels — advisory, never a gate. Where a command works without
+it, add `--jev`; the commands with no other engine need only the key. Jev says
+what and where; the values (shifts, colours, easings) still come from the
+pixels and the page, so never quote a Jev answer as a measurement.
+
+| Question | Command |
+|---|---|
+| What kind of change is each diff region — text, colour, position, presence? | `vlmkit diff png a.png b.png --jev` (labels below 0.6 confidence are `uncertain`: a 1-2px shift read as colour is the usual case, so check `region.shift`) |
+| Does the motion look broken, as a person would see it? (adds text printed over text mid-motion and at rest) | `vlmkit inspect motion page.html --jev --target "the green Saved toast" --selector .toast` |
+| Does the screenshot show X / not show Y? (an error banner, a modal left open, a broken image) | `vlmkit inspect claims page.html --forbid "an error banner" --expect "the Save button"` |
+| Where is the element described in words? (a canvas UI, or to click by description in `inspect interact`) | `vlmkit inspect locate shot.png "the Save button"` (a screenshot, no DOM; in `inspect interact` a click step takes `describe` instead of `selector`) — describe a field by its label, not its placeholder |
 
 ## Done condition
 

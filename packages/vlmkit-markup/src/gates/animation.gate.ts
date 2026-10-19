@@ -46,7 +46,10 @@ page clock and every animation are held for them, with or without
 \`--virtual-time\`. \`--at\` picks the instants, for --frames and for the strip's
 columns: \`--at 0,150,300\`, \`--at 0..1s/100ms\`, \`--at 1.5s\`, \`--at 6f\` (frame
 6 of the 60fps clock). Without it, frames are taken at each animation's start,
-middle and end plus 0/250/500/1000/2000ms.
+middle and end plus 0/250/500/1000/2000ms. The frames are --viewport's size (1280x720 unless
+given): pass the target's, \`--viewport 1280x800\`, before diffing a frame against it.
+\`--frames-reduced-motion\` captures them with prefers-reduced-motion: reduce emulated,
+to look at what that visitor gets.
 
 \`--virtual-time\` holds the page clock — requestAnimationFrame, performance.now,
 Date, setTimeout, setInterval — from document start and advances it itself, so
@@ -88,6 +91,12 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       docs: "Nothing runs under a name with no @keyframes. Checked on the page and under prefers-reduced-motion: reduce, where a misnamed rule meant to hide or settle something silently does nothing (and reduced motion would otherwise read as honoured).",
     },
     {
+      id: "motion-mostly-hidden",
+      title: "An animation moved only a small part of its element",
+      severity: "warn",
+      docs: "Its motion region covered under a quarter of the element's own box at rest, so most of the element is likely clipped (an ancestor's overflow) or covered (a stacking context). `inspect motion --selector` names which.",
+    },
+    {
       id: "clock-motion-unsettled",
       title: "Script-driven motion still changing at the end of the virtual-time window",
       severity: "warn",
@@ -117,6 +126,11 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       kind: "path",
       description:
         "Write the viewport, uncropped, at each instant (--at) as numbered PNGs + frames.json (vlmkit-frames/1), clock and animations held",
+    },
+    {
+      name: "frames-reduced-motion",
+      kind: "boolean",
+      description: "Capture --frames with prefers-reduced-motion: reduce emulated (what that visitor sees)",
     },
     {
       name: "at",
@@ -205,6 +219,10 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
     const stripAnimated = hasFlag(argv, "strip-animated");
     const virtualTime = hasFlag(argv, "virtual-time");
     const clockWindowMs = optionalInt(argv, "clock-window", { min: 1 });
+    const framesReducedMotion = hasFlag(argv, "frames-reduced-motion");
+    if (framesReducedMotion && !framesDir) {
+      throw new UsageError("--frames-reduced-motion sets how --frames are captured; add --frames <dir>.");
+    }
     const at = instantList(argv, "at");
     if (at !== undefined) {
       if (at.length === 0) throw new UsageError("--at names no instant, e.g. --at 0,150,300");
@@ -223,6 +241,7 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       ...(maxAnimations !== undefined ? { maxAnimations } : {}),
       ...(settleThresholdMs !== undefined ? { settleThresholdMs } : {}),
       ...(framesDir ? { framesDir } : {}),
+      ...(framesReducedMotion ? { framesReducedMotion } : {}),
       ...(at ? { at } : {}),
       ...(stripPath ? { stripPath } : {}),
       ...(stripAnimated ? { stripAnimated } : {}),

@@ -223,7 +223,7 @@ vlmkit diff png <baseline.png> <current.png>   # Direct PNG pixel diff + heatmap
   #                      (32 at >=720px short side, 16 at >=480, else 8)
   # --elements-top <N>   report N attribution candidates per region, not just the winner
   # --ignore-region "<x>,<y>,<w>x<h>"   repeatable; area never measured
-  # --kind               name each region text / color / position / presence with
+  # --jev (or --kind)    name each region text / color / position / presence with
   #                      TypeSafe Jev on its magnified crop (TYPESAFEAI_API_KEY,
   #                      ~$0.0003 a region); the only model-made field, marked
   #                      uncertain below 0.6 confidence. --kind-limit <N> (12),
@@ -1042,10 +1042,12 @@ vlmkit inspect claims   <html|url|shot.png> --forbid "an error message" --expect
   # 1 one does not / 2 usage. --claims file.json, --viewport WxH, --save out.png, --threshold,
   # --json. Answers within 0.3 of the threshold are marked uncertain. Gate on the
   # deterministic checks; this is a model's reading of the pixels.
-vlmkit inspect motion   <html|url> --target "the green Saved toast" [--selector .toast] [--expect-easing ease-out,ease-in] [--exits]
-  # Is a CSS animation visually broken? Frames on the held clock (11 per span of motion + rest),
+vlmkit inspect motion   <html|url> --selector .toast [--target "the green Saved toast"] [--jev] [--expect-easing ease-out,ease-in] [--expect-origin bottom-left] [--expect-stagger 80] [--exits]
+  # Is a CSS animation visually broken? Frames on the held clock (11 per span of motion + rest).
+  # Without --jev, no key: each --selector measured from the page per frame (box, opacity, scale,
+  # own animation time, and the share of it that is topmost — a clip or a cover). With --jev,
   # one TypeSafe Jev request each (TYPESAFEAI_API_KEY; ~$0.00013/frame, +1 per frame for the
-  # magnified second look): presence + box per target, a noul per --forbid (default: text printed
+  # magnified second look): presence + box per --target, a noul per --forbid (default: text printed
   # over text). vlmkit judges target-lost, absent-at-rest, snap-back, jump, easing-mismatch,
   # target-static, locate-unsure. --selector takes geometry, opacity, scale and the element's own
   # animation time from the page (use it on your own page). Frames + motion-report.json in

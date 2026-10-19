@@ -107,6 +107,14 @@ vlmkit diff html before.html after.html \
 | `--show-unverified` | Include heuristic fix rows whose value already matches baseline (✗ rows). Default hides them. |
 | `--no-history` | Don't load or persist `.vlmkit/last-diff-for-agent.json` (one-shot mode for CI) |
 
+To name what changed inside each region of a screenshot pair, run
+`vlmkit diff png a.png b.png --elements-html page.html` (selector candidates
+and shift estimates, no key) and, with `TYPESAFEAI_API_KEY`, add `--jev`: each
+region gets `kind` = text / color / position / presence from TypeSafe Jev on
+its magnified crop. The label is the only model-made field; a 1-2px shift is
+often labelled colour, so trust `region.shift` over the label (labels under
+0.6 confidence are marked `uncertain`).
+
 For regression tracking flags (`--previous`, `--persist-summary`,
 `--fail-on-regression`), use `vrt-regression-watch` — the same CLI
 exposes them but the watch skill explains the persistence model.

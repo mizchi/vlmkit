@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Editor</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #f7f7f5; color: #222; min-height: 100vh; }
+  .doc { max-width: 760px; margin: 40px auto; background: #fff; padding: 40px 48px; border-radius: 8px; min-height: 520px; }
+  .toolbar { position: fixed; left: 32px; bottom: 32px; }
+  .toolbar button { font: inherit; padding: 10px 16px; border-radius: 8px; border: 1px solid #ccc; background: #fff; }
+  .pop { position: absolute; left: 0; bottom: 52px; width: 260px; padding: 14px; background: #fff; border: 1px solid #ccc;
+         border-radius: 10px; box-shadow: 0 12px 28px rgba(0,0,0,.15); transform-origin: top right;
+         animation: pop 260ms cubic-bezier(0, 0, 0.58, 1) 300ms both; }
+  .pop p { margin: 0 0 8px; }
+  @keyframes pop { from { transform: scale(0.6); opacity: 0; } to { transform: none; opacity: 1; } }
+</style></head>
+<body>
+  <article class="doc"><h1>Untitled document</h1><p>Start writing here.</p></article>
+  <div class="toolbar">
+    <div class="pop" role="dialog" aria-label="Insert"><p><strong>Insert</strong></p><p>Image</p><p>Table</p><p>Divider</p></div>
+    <button type="button" aria-expanded="true">+ Insert</button>
+  </div>
+</body></html>

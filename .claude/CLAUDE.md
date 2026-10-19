@@ -213,7 +213,11 @@ asked as a `choice`, Jev named 7/21 from 11 frames and 4/21 from a contact sheet
 with confidence no higher when right. A `box` per frame and `fitEasing` on the centres got 21/21
 (6 frames too). Never ask Jev for an easing name: take positions from it and fit them.
 
-**Shipped as `diff png --kind`** (`@mizchi/vlmkit-ai/region-kind.ts`, `attachRegionKinds` in
+**Jev is opt-in.** Where a command works without it, `--jev` turns it on and nothing asks Jev
+otherwise (`diff png --jev`, `--kind` kept as its alias; `inspect motion --jev`). Commands with no
+other engine (`inspect locate`, `inspect claims`, a `describe` click) need only the key.
+
+**Shipped as `diff png --kind`** (now `--jev`; `@mizchi/vlmkit-ai/region-kind.ts`, `attachRegionKinds` in
 `png-diff.ts`). It puts `regions[].kind = {label: text|color|position|presence, confidence,
 uncertain, model}` on the regions the pixel diff found, one request per region, largest first up
 to `--kind-limit` (12). Without a key it exits 2 before measuring anything. End-to-end round on real
@@ -292,6 +296,27 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   their letters crossing" (`DEFAULT_MOTION_FORBID`) caught the claims round's planted overlaps 9/9
   with 0/36 cross-plant alarms (the broad one 10/36), on screenshots it was not chosen on.
 - Positions from frames shown at ≥0.8 only: a fade's faint frames got boxes 40px off.
+- **Without `--jev` it asks nothing** (no key): every target is a `--selector`, and presence is
+  the share of a 5x5 hit-test of its box (inside the viewport) where it is topmost, with
+  pointer-events forced on for the probe (a toast is often `pointer-events: none`). On the
+  fixtures: 6/7 broken by the expected rule, 7/7 intact pass. The miss is `overlap-rest`, text
+  on text, which is a `--forbid` statement (Jev) or `check integrity`'s `text-collision`.
+- **A target never seen is a fail, with its cause** (`target-hidden`; `fixtures/motion-repair/`,
+  `docs/reports/2026-10-19-motion-repair-v1.md`). Round 1's agents repaired all three pages, but
+  `inspect motion` had passed every broken one: each rule compared frames that show the target,
+  so a card clipped from first frame to last read "no fail, follows ease-out exactly". Measured,
+  the line now names the clipping ancestor, or the cover and the stacking context trapping the
+  target (they had found both only by reading the CSS). Holds between segments get three frames,
+  and a measured box off-screen between shown frames is lost, not "leaving": the edge excuse is for
+  a model's boxes only.
+- **Where and when are measured, and fail only against an expectation** (round 3,
+  `docs/reports/2026-10-19-motion-repair-v3.md`): a popover growing from the wrong corner and four
+  entries "cascading" at one delay both passed every rule. Each line now names when the target's
+  own animation begins (frame time less `elapsedMs`, the active time of its longest animation)
+  and the point of its box a scale keeps in place (`o = (box - k B) / (1 - k)` against the
+  largest-scale frame, median over frames scaled 10%+). `--expect-origin`, `--expect-start` and
+  `--expect-stagger` turn them into `origin-mismatch` / `start-mismatch`. A transparent target
+  names the ancestor whose opacity does it, and whether anything animates it.
 
 ## Generated figures (raster images)
 
@@ -1656,7 +1681,7 @@ case at 0.23.0.
 | `docs/reports/2026-08-06-gate-rule-cost-bench.md` | Measured gate/rule execution cost: where a ruleset's time goes, why per-rule cost is attributed rather than isolated, why suppression saves nothing |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
 | `docs/design/package-decomposition.md` | **Splitting vlmkit by layer** (collector / pure judge / driver / loop / diagrams): what was measured, phase 1 (`vlmkit-judge`) and the proposed phases 2-5 |
-| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 35 gates + 218 rules, behavior changes, what is deliberately not a gate |
+| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 35 gates + 219 rules, behavior changes, what is deliberately not a gate |
 | `docs/design/moonbit-boundary.md` | **TS ↔ MoonBit boundary**: what the positional FFI costs (61 commands, 233 args, 2 duplicated dispatch tables), the JSON boundary that replaces it for new logic, how to add a command, and which pure logic belongs in MoonBit versus which deliberately does not |
 | `docs/crater-css-status.md` | Crater CSS rendering verification status |
 | `docs/reset-css-comparison.md` | Reset CSS domain knowledge |

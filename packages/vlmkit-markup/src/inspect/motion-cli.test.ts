@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vite-plus/test";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   DEFAULT_MOTION_FORBID,
   motionInstants,
@@ -12,16 +15,27 @@ import {
 
 describe("inspect motion arguments", () => {
   it("reads targets, statements, the easing and the default forbid", () => {
-    const o = parseMotionArgs(["page.html", "--target", "the blue square", "--expect-easing", "ease-out", "--exits"]);
+    const o = parseMotionArgs([
+      "page.html",
+      "--jev",
+      "--target",
+      "the blue square",
+      "--expect-easing",
+      "ease-out",
+      "--exits",
+    ]);
     assert.deepEqual(o.targets, ["the blue square"]);
     assert.deepEqual(o.forbid, [DEFAULT_MOTION_FORBID]);
     assert.deepEqual(o.expectEasing, [["ease-out"]]);
-    assert.deepEqual(parseMotionArgs(["p.html", "--target", "x", "--expect-easing", "ease-out,ease-in"]).expectEasing, [
-      ["ease-out", "ease-in"],
-    ]);
+    assert.deepEqual(
+      parseMotionArgs(["p.html", "--jev", "--target", "x", "--expect-easing", "ease-out,ease-in"]).expectEasing,
+      [["ease-out", "ease-in"]],
+    );
     assert.equal(o.exits, true);
-    assert.deepEqual(parseMotionArgs(["page.html", "--target", "x", "--forbid", "a spinner"]).forbid, ["a spinner"]);
-    assert.deepEqual(parseMotionArgs(["page.html", "--target", "x", "--no-forbid"]).forbid, []);
+    assert.deepEqual(parseMotionArgs(["page.html", "--jev", "--target", "x", "--forbid", "a spinner"]).forbid, [
+      "a spinner",
+    ]);
+    assert.deepEqual(parseMotionArgs(["page.html", "--jev", "--target", "x", "--no-forbid"]).forbid, []);
   });
 
   it("reads one --expect-easing as every target's and several as the targets' in order", () => {
@@ -30,6 +44,7 @@ describe("inspect motion arguments", () => {
       motionEasingOptions(
         parseMotionArgs([
           "p.html",
+          "--jev",
           "--target",
           "a",
           "--expect-easing",
@@ -43,35 +58,50 @@ describe("inspect motion arguments", () => {
       { targetEasing: ["ease-out", "ease-in-out"] },
     );
     assert.throws(
-      () => parseMotionArgs(["p.html", "--target", "a", "--expect-easing", "linear", "--expect-easing", "ease"]),
+      () =>
+        parseMotionArgs(["p.html", "--jev", "--target", "a", "--expect-easing", "linear", "--expect-easing", "ease"]),
       MotionUsageError,
     );
   });
 
   it("pairs each --selector with the --target in its position", () => {
-    const o = parseMotionArgs(["p.html", "--target", "a", "--selector", ".a", "--target", "b"]);
+    const o = parseMotionArgs(["p.html", "--jev", "--target", "a", "--selector", ".a", "--target", "b"]);
     assert.deepEqual([o.targets, o.selectors], [["a", "b"], [".a"]]);
     assert.throws(
-      () => parseMotionArgs(["p.html", "--target", "a", "--selector", ".a", "--selector", ".b"]),
+      () => parseMotionArgs(["p.html", "--jev", "--target", "a", "--selector", ".a", "--selector", ".b"]),
       MotionUsageError,
     );
     assert.throws(
-      () => parseMotionArgs(["f/frames.json", "--target", "a", "--selector", ".a", "--end", "500"]),
+      () => parseMotionArgs(["f/frames.json", "--jev", "--target", "a", "--selector", ".a", "--end", "500"]),
       MotionUsageError,
     );
   });
 
   it("refuses what cannot be checked", () => {
     const bad: string[][] = [
-      ["page.html", "--no-forbid"],
-      ["page.html", "--expect-easing", "bouncy", "--target", "x"],
-      ["page.html", "--expect-easing", "linear"],
-      ["out/frames.json", "--target", "x"],
-      ["a.html", "b.html", "--target", "x"],
-      ["page.html", "--target", "x", "--forbid", "y", "--no-forbid"],
+      ["page.html", "--jev", "--no-forbid"],
+      ["page.html", "--jev", "--expect-easing", "bouncy", "--target", "x"],
+      ["page.html", "--jev", "--expect-easing", "linear"],
+      ["out/frames.json", "--jev", "--target", "x"],
+      ["a.html", "b.html", "--jev", "--target", "x"],
+      ["page.html", "--jev", "--target", "x", "--forbid", "y", "--no-forbid"],
+      // Without --jev: every target measured, nothing read in words.
+      ["page.html", "--target", "x"],
+      ["page.html", "--selector", ".a", "--forbid", "y"],
+      ["page.html", "--selector", ".a", "--target", "a", "--target", "b"],
+      ["out/frames.json", "--selector", ".a", "--end", "900"],
     ];
     for (const argv of bad) assert.throws(() => parseMotionArgs(argv), MotionUsageError, argv.join(" "));
-    assert.equal(parseMotionArgs(["out/frames.json", "--target", "x", "--end", "900"]).endMs, 900);
+    assert.equal(parseMotionArgs(["out/frames.json", "--jev", "--target", "x", "--end", "900"]).endMs, 900);
+  });
+
+  it("without --jev measures each --selector, names it by itself, and asks nothing", () => {
+    const o = parseMotionArgs(["p.html", "--selector", ".toast", "--selector", ".bar", "--expect-easing", "ease-out"]);
+    assert.deepEqual([o.jev, o.targets, o.selectors, o.forbid], [false, [".toast", ".bar"], [".toast", ".bar"], []]);
+    assert.deepEqual(parseMotionArgs(["p.html", "--target", "the toast", "--selector", ".toast"]).targets, [
+      "the toast",
+    ]);
+    assert.equal(parseMotionArgs(["p.html", "--jev", "--target", "x"]).jev, true);
   });
 
   it("samples 11 instants across the span, the last just inside it, and a rest past it", () => {
@@ -109,7 +139,7 @@ describe("inspect motion arguments", () => {
     assert.equal(plan.motion.filter((t) => t <= 495).length, 11);
   });
 
-  it("is refused without a key before a browser starts", async () => {
+  it("is refused under --jev without a key before a browser starts, and needs none without it", async () => {
     const key = process.env.TYPESAFEAI_API_KEY;
     const alt = process.env.TYPESAFE_API_KEY;
     delete process.env.TYPESAFEAI_API_KEY;
@@ -118,7 +148,7 @@ describe("inspect motion arguments", () => {
     const original = console.error;
     console.error = (m: string) => errors.push(m);
     try {
-      assert.equal(await runMotionCli(["does-not-exist.html", "--target", "x"]), 2);
+      assert.equal(await runMotionCli(["does-not-exist.html", "--jev", "--target", "x"]), 2);
       assert.match(errors.join("\n"), /TYPESAFEAI_API_KEY/);
     } finally {
       console.error = original;
@@ -126,4 +156,182 @@ describe("inspect motion arguments", () => {
       if (alt !== undefined) process.env.TYPESAFE_API_KEY = alt;
     }
   });
+});
+
+describe("inspect motion without --jev", () => {
+  // The page alone, no key: the hit-test is what sees a clip or a cover, which only Jev's
+  // reading of the pixels saw before. fixtures/motion-defects/ holds the known answers.
+  const run = async (file: string, selector: string) => {
+    const lines: string[] = [];
+    const log = console.log;
+    console.log = (m: string) => lines.push(m);
+    try {
+      const { mkdtemp } = await import("node:fs/promises");
+      const { tmpdir } = await import("node:os");
+      const { join } = await import("node:path");
+      const frames = await mkdtemp(join(tmpdir(), "vlmkit-motion-nojev-"));
+      const page = join(import.meta.dirname, "../../../../fixtures/motion-defects", file);
+      return { code: await runMotionCli([page, "--selector", selector, "--frames", frames]), out: lines.join("\n") };
+    } finally {
+      console.log = log;
+    }
+  };
+
+  it(
+    "sees a menu that opens under the next card, and passes the one that opens above it",
+    { timeout: 120_000 },
+    async () => {
+      const broken = await run("covered--broken.html", ".menu");
+      assert.equal(broken.code, 1);
+      assert.match(broken.out, /FAIL absent-at-rest/);
+      assert.match(broken.out, /no model asked/);
+      assert.equal((await run("covered--intact.html", ".menu")).code, 0);
+    },
+  );
+
+  it("sees a card moved into a column that clips it", { timeout: 120_000 }, async () => {
+    assert.match((await run("clipped--broken.html", ".task")).out, /FAIL absent-at-rest/);
+    assert.equal((await run("clipped--intact.html", ".task")).code, 0);
+  });
+});
+
+describe("inspect motion on fixtures/motion-repair (round 1 passed all three broken pages)", () => {
+  const dir = join(import.meta.dirname, "../../../../fixtures/motion-repair");
+  const run = async (file: string, args: string[]) => {
+    const lines: string[] = [];
+    const log = console.log;
+    console.log = (m: string) => lines.push(m);
+    try {
+      const frames = await mkdtemp(join(tmpdir(), "vlmkit-motion-repair-"));
+      return { code: await runMotionCli([join(dir, file), ...args, "--frames", frames]), out: lines.join("\n") };
+    } finally {
+      console.log = log;
+    }
+  };
+  const cases: [string, string[], RegExp][] = [
+    ["notify.html", ["--selector", ".notice"], /FAIL target-hidden .*clipped by header\.topbar \(overflow: hidden\)/],
+    [
+      "menu.html",
+      ["--selector", ".menu"],
+      /FAIL target-hidden .*covered by section\.hero: nav makes a stacking context \(a transform\)/,
+    ],
+    [
+      "toast.html",
+      ["--selector", ".toast", "--exits", "--expect-easing", "ease-out,ease-in"],
+      /FAIL snap-back .*in the hold after 660ms/,
+    ],
+    // Round 3: an ancestor's opacity 0 named, a scale's fixed point, and a stagger that is not one.
+    [
+      "drawer.html",
+      ["--selector", ".drawer"],
+      /FAIL target-hidden .*transparent: div\.shell renders at opacity 0\.00, and nothing animates it/,
+    ],
+    [
+      "popover.html",
+      ["--selector", ".pop", "--expect-origin", "left bottom"],
+      /FAIL origin-mismatch .*grows from its top-right corner .*transform-origin: bottom left/,
+    ],
+    [
+      "stagger.html",
+      [
+        "--selector",
+        "li.a1",
+        "--selector",
+        "li.a2",
+        "--selector",
+        "li.a3",
+        "--selector",
+        "li.a4",
+        "--expect-stagger",
+        "80",
+      ],
+      /FAIL start-mismatch .*begins at 200ms, not 280ms[\s\S]*begins: li\.a1 200ms, li\.a2 200ms, li\.a3 200ms, li\.a4 200ms — all within one frame/,
+    ],
+    [
+      "stagger.html",
+      [
+        "--selector",
+        "li.a1",
+        "--selector",
+        "li.a2",
+        "--selector",
+        "li.a3",
+        "--selector",
+        "li.a4",
+        "--expect-start",
+        "200,280,360,440",
+      ],
+      /FAIL start-mismatch .*begins at 200ms, not 440ms/,
+    ],
+  ];
+  for (const [file, args, expected] of cases) {
+    it(`fails broken/${file} with its cause and passes reference/${file}`, { timeout: 120_000 }, async () => {
+      const broken = await run(`broken/${file}`, args);
+      assert.equal(broken.code, 1, broken.out);
+      assert.match(broken.out, expected);
+      const fixed = await run(`reference/${file}`, args);
+      assert.equal(fixed.code, 0, fixed.out);
+    });
+  }
+
+  it("samples the hold between two segments", () => {
+    const plan = motionPlan([
+      { startMs: 300, durationMs: 360, iterations: 1 },
+      { startMs: 2660, durationMs: 300, iterations: 1 },
+    ]);
+    assert.ok(
+      plan.motion.some((t) => t > 660 && t < 2660),
+      JSON.stringify(plan.motion),
+    );
+  });
+
+  it("points --out at --frames", () => {
+    assert.throws(() => parseMotionArgs(["p.html", "--selector", ".a", "--out", "x"]), /did you mean --frames <dir>/);
+  });
+});
+
+describe("inspect motion after motion-repair round 3", () => {
+  it("parses --expect-origin in either word order, and checks the counts", () => {
+    assert.deepEqual(parseMotionArgs(["p.html", "--selector", ".t", "--expect-origin", "left bottom"]).expectOrigin, [
+      "bottom-left",
+    ]);
+    assert.deepEqual(parseMotionArgs(["p.html", "--selector", ".t", "--expect-origin", "centre"]).expectOrigin, [
+      "center",
+    ]);
+    assert.throws(() => parseMotionArgs(["p.html", "--selector", ".t", "--expect-origin", "middle"]), MotionUsageError);
+    assert.throws(() => parseMotionArgs(["p.html", "--selector", ".t", "--expect-stagger", "80"]), MotionUsageError);
+    assert.throws(
+      () => parseMotionArgs(["p.html", "--selector", ".t", "--expect-start", "200,280"]),
+      /2 --expect-start times for 1 targets/,
+    );
+  });
+});
+
+describe("inspect motion after motion-repair round 2", () => {
+  it("takes any in --expect-easing to leave a segment unchecked", () => {
+    assert.deepEqual(parseMotionArgs(["p.html", "--selector", ".t", "--expect-easing", "ease-out,any"]).expectEasing, [
+      ["ease-out", undefined],
+    ]);
+    assert.throws(() => parseMotionArgs(["p.html", "--selector", ".t", "--expect-easing", "any"]), MotionUsageError);
+  });
+
+  it(
+    "names the entrance's easing when the snap-back is in the hold, and the first fail's frame",
+    { timeout: 120_000 },
+    async () => {
+      const lines: string[] = [];
+      const log = console.log;
+      console.log = (m: string) => lines.push(m);
+      try {
+        const frames = await mkdtemp(join(tmpdir(), "vlmkit-motion-r2-"));
+        const page = join(import.meta.dirname, "../../../../fixtures/motion-repair/broken/toast.html");
+        assert.equal(await runMotionCli([page, "--selector", ".toast", "--exits", "--frames", frames]), 1);
+      } finally {
+        console.log = log;
+      }
+      const out = lines.join("\n");
+      assert.match(out, /300\.\.660ms: travels \d+px, follows ease-in/, out);
+      assert.match(out, /the first fail's own frame \(1160ms\): .*0\d{3}-t001160\.png/);
+    },
+  );
 });

@@ -16,6 +16,12 @@ describe("snapshot strip: argument parsing", () => {
     assert.equal(args.columns, undefined);
   });
 
+  it("takes --crop x,y,w,h and refuses a malformed one", () => {
+    assert.deepEqual(parseArgs(["a.png", "--crop", "10,20,300,200"]).crop, { x: 10, y: 20, width: 300, height: 200 });
+    assert.throws(() => parseArgs(["a.png", "--crop", "10,20,0,200"]), /--crop expects x,y,w,h/);
+    assert.throws(() => parseArgs(["a.png", "--crop", "10,20"]), /--crop expects x,y,w,h/);
+  });
+
   it("reads the layout flags", () => {
     const args = parseArgs([
       "a.png",

@@ -1,6 +1,6 @@
 import { test } from "vite-plus/test";
 import assert from "node:assert/strict";
-import { computeTrend, heightToleranceFor, pixelPresence } from "./markup-verify.ts";
+import { computeTrend, heightToleranceFor, pixelPresence, trendNumbers } from "./markup-verify.ts";
 import { kickbackForComposition } from "./markup-verify-report.ts";
 import type { PageComposition, PageComponent, PageMatch } from "../component/page-compose.ts";
 
@@ -31,6 +31,20 @@ test("computeTrend: more passing targets or fewer residuals is an improvement", 
 
 test("computeTrend: unchanged numbers are flat", () => {
   assert.equal(computeTrend({ targetsPassed: 0, residuals: 4 }, { targetsPassed: 0, residuals: 4 }).direction, "flat");
+});
+
+test("computeTrend: with composition unchanged, gate suspects and then pixel diff decide", () => {
+  // A NOT DONE run (1 gate suspect, 1.2% diff) followed by a DONE one read "residuals 0 -> 0, flat".
+  const before = { targetsPassed: 1, residuals: 0, gateSuspects: 1, pixelDiff: 0.012 };
+  assert.equal(computeTrend(before, { ...before, gateSuspects: 0 }).direction, "improved");
+  assert.equal(computeTrend(before, { ...before, pixelDiff: 0.02 }).direction, "regressed");
+  assert.equal(computeTrend(before, { ...before, pixelDiff: 0.0125 }).direction, "flat", "0.05 points is noise");
+  // An older ledger entry without them compares on composition only.
+  assert.equal(computeTrend({ targetsPassed: 1, residuals: 0 }, before).direction, "flat");
+  assert.equal(
+    trendNumbers(computeTrend(before, { ...before, gateSuspects: 0, pixelDiff: 0.0099 })),
+    "targets passed 1 -> 1, composition residuals 0 -> 0, gate suspects 1 -> 0, worst pixel diff 1.20% -> 0.99%",
+  );
 });
 
 function component(index: number, left: number, top: number, w: number, h: number, hex = "#e2e8f0"): PageComponent {

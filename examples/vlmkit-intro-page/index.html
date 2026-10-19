@@ -398,6 +398,54 @@
             <p data-i18n="principle.shared.description">CLI, Playwright, MCP, or CI: every entry point follows the same exit-code contract.</p>
           </article>
         </div>
+        <!-- What the optional model does, from docs/reports/2026-10-1{6,7,8}-jev-*.md. Every number
+             in this table is a bench result named there; the row order is the order they shipped. -->
+        <div class="jev" data-testid="jev-features">
+          <div class="jev-intro">
+            <p class="skill-manager">WITH A KEY / TYPESAFE JEV</p>
+            <h3><span data-i18n="jev.title1">The model says what and where.</span><br /><span data-i18n="jev.title2">The page gives the values.</span></h3>
+            <p data-i18n="jev.lead">Four tools ask TypeSafe Jev typed questions—a box, a yes/no, a choice—and never ask it to name a measurement.</p>
+          </div>
+          <div class="jev-table-wrap">
+            <table class="jev-table">
+              <thead>
+                <tr>
+                  <th scope="col" data-i18n="jev.colFeature">Feature</th>
+                  <th scope="col" data-i18n="jev.colAsks">Jev answers</th>
+                  <th scope="col" data-i18n="jev.colMeasures">vlmkit measures</th>
+                  <th scope="col" data-i18n="jev.colResult">Measured</th>
+                </tr>
+              </thead>
+              <tbody>
+              <tr>
+                <th scope="row"><span data-i18n="jev.kind.feature">Classify each diff region</span><code>diff png --jev</code></th>
+                <td><span class="jev-cell-label" data-i18n="jev.colAsks">Jev answers</span><span data-i18n="jev.kind.asks">A choice per region: text, colour, position or presence</span></td>
+                <td><span class="jev-cell-label" data-i18n="jev.colMeasures">vlmkit measures</span><span data-i18n="jev.kind.measures">The regions themselves, from the pixel diff</span></td>
+                <td><span class="jev-cell-label" data-i18n="jev.colResult">Measured</span><span data-i18n="jev.kind.result">Text 14/14, colour 18/18, presence 17/17; 1–6px shifts 11/16, every miss marked unsure</span></td>
+              </tr>
+              <tr>
+                <th scope="row"><span data-i18n="jev.locate.feature">Find an element from a description</span><code>inspect locate</code></th>
+                <td><span class="jev-cell-label" data-i18n="jev.colAsks">Jev answers</span><span data-i18n="jev.locate.asks">Is it shown (yes/no), then a box, then a box again on a magnified crop</span></td>
+                <td><span class="jev-cell-label" data-i18n="jev.colMeasures">vlmkit measures</span><span data-i18n="jev.locate.measures">The crop, cut from the original pixels; the point, in click coordinates</span></td>
+                <td><span class="jev-cell-label" data-i18n="jev.colResult">Measured</span><span data-i18n="jev.locate.result">94% of targets hit; 0 of 85 decoys accepted</span></td>
+              </tr>
+              <tr>
+                <th scope="row"><span data-i18n="jev.claims.feature">Check statements about a screen</span><code>inspect claims</code></th>
+                <td><span class="jev-cell-label" data-i18n="jev.colAsks">Jev answers</span><span data-i18n="jev.claims.asks">One yes/no per statement, all in one request</span></td>
+                <td><span class="jev-cell-label" data-i18n="jev.colMeasures">vlmkit measures</span><span data-i18n="jev.claims.measures">Nothing: it advises and never gates</span></td>
+                <td><span class="jev-cell-label" data-i18n="jev.colResult">Measured</span><span data-i18n="jev.claims.result">54 of 55 planted problems caught; 0 false alarms on 43 clean pages</span></td>
+              </tr>
+              <tr>
+                <th scope="row"><span data-i18n="jev.motion.feature">Is an animation visibly broken?</span><code>inspect motion --jev</code></th>
+                <td><span class="jev-cell-label" data-i18n="jev.colAsks">Jev answers</span><span data-i18n="jev.motion.asks">Per frame: is each target shown, its box, and a yes/no per forbidden statement</span></td>
+                <td><span class="jev-cell-label" data-i18n="jev.colMeasures">vlmkit measures</span><span data-i18n="jev.motion.measures">Frames on the held clock; jumps, snap-backs and easing fitted from the boxes; with --selector, geometry from the page</span></td>
+                <td><span class="jev-cell-label" data-i18n="jev.colResult">Measured</span><span data-i18n="jev.motion.result">7/7 broken caught, 7/7 intact passed; about $0.002 a page</span></td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="jev-note" data-i18n="jev.note">Jev is opt-in: --jev turns it on where a command also works without it, and inspect motion with --selector alone still caught 6 of the 7. Asked to name an easing, Jev was at chance (7 of 21); fitted from its boxes, 21 of 21. Needs TYPESAFEAI_API_KEY.</p>
+        </div>
       </section>
 
       <section class="skills section" id="skills" aria-labelledby="skills-title">

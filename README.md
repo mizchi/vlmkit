@@ -160,6 +160,30 @@ marked `[key]`.
 Task-routing recipes and done-condition sets:
 [`docs/markup-assist.md`](./docs/markup-assist.md).
 
+## With a key: TypeSafe Jev
+
+Four tools ask [TypeSafe Jev](https://docs.typesafe.ai) typed questions — a `box`, a yes/no (`noul`),
+a `choice` — with `TYPESAFEAI_API_KEY`. The model says **what** is there and **where**; the
+values come from the pixels and the page. It is never asked to name a measurement.
+
+Jev is opt-in. Where a command works without it, `--jev` turns it on (`diff png --jev`,
+`inspect motion --jev`). `inspect locate`, `inspect claims` and a `describe` click have no other
+engine, so they need the key and nothing else.
+
+| Feature | Command | Jev answers | vlmkit measures | Measured |
+|---|---|---|---|---|
+| Classify each diff region | `diff png --jev` | A `choice` per region: text, colour, position or presence | The regions themselves, from the pixel diff | Text 14/14, colour 18/18, presence 17/17; 1–6px shifts 11/16, every miss marked `uncertain` |
+| Find an element from a description | `inspect locate`, `click` with `describe` | Is it shown (`noul`), a `box`, then a `box` again on a magnified crop | The crop, cut from the original pixels; the point, in click coordinates | 94% of targets hit; 0 of 85 decoys accepted |
+| Check statements about a screen | `inspect claims --forbid/--expect` | One `noul` per statement, all in one request | Nothing: it advises and never gates | 54 of 55 planted problems caught; 0 false alarms on 43 clean pages |
+| Is an animation visibly broken? | `inspect motion --jev` | Per frame: is each target shown, its `box`, a `noul` per forbidden statement | Frames on the held clock; jumps, snap-backs and easing fitted from the boxes; with `--selector`, geometry from the page | 7/7 broken caught, 7/7 intact passed (deterministic gates: 3/7); ~$0.002 a page. Without `--jev`, from `--selector` alone and no key: 6/7 and 7/7 (text left on text needs Jev) |
+
+Asked to name an easing, Jev was at chance (7 of 21); fitted from its boxes, 21 of 21. Reports:
+[region kinds](./docs/reports/2026-10-16-jev-region-kind.md),
+[locate](./docs/reports/2026-10-16-jev-locate.md),
+[claims](./docs/reports/2026-10-17-jev-claims.md),
+[easing](./docs/reports/2026-10-18-jev-easing.md),
+[motion](./docs/reports/2026-10-18-jev-motion.md).
+
 ## The workspace
 
 ```mermaid

@@ -627,6 +627,45 @@ test(
   },
 );
 
+test(
+  "runAnimationEval: --frames-reduced-motion captures what a reduced-motion visitor sees, at --viewport's size",
+  { timeout: 120_000 },
+  async () => {
+    // Found building a toast with dynamic-markup: no vlmkit command captured reduced-motion
+    // frames (the agent wrote a Playwright script), and frames at the default 1280x720 against
+    // a 1280x800 target differed by 11% before anything was wrong.
+    const { readFile } = await import("node:fs/promises");
+    const { PNG } = await import("pngjs");
+    const { parseFramesManifest } = await import("@mizchi/vlmkit-judge/frames.ts");
+    const source = await animPage(
+      `#a { animation: slide 200ms linear 1 forwards; }
+       @media (prefers-reduced-motion: reduce) { #a { animation: none; } }`,
+    );
+    const dir = join(await mkdtemp(join(tmpdir(), "vlmkit-frames-rm-")), "frames");
+    const report = await runAnimationEval({
+      source,
+      framesDir: dir,
+      framesReducedMotion: true,
+      at: [100],
+      viewport: { width: 1280, height: 800 },
+      skipReducedMotion: true,
+    });
+    assert.equal(report.frames?.reducedMotion, true);
+    const manifest = parseFramesManifest(await readFile(join(dir, "frames.json"), "utf8"));
+    assert.equal(manifest.source.reducedMotion, true);
+    assert.deepEqual(manifest.source.viewport, { width: 1280, height: 800 });
+    const png = PNG.sync.read(await readFile(join(dir, "0000-t000100.png")));
+    assert.equal(png.height, 800);
+    const blue = (x: number, y: number) => {
+      const i = (y * png.width + x) * 4;
+      return png.data[i]! < 80 && png.data[i + 2]! > 150;
+    };
+    // Without the emulation #a is 150px along at 100ms; under reduce it never left.
+    assert.ok(blue(25, 50) && !blue(175, 50), "#a has not moved under prefers-reduced-motion: reduce");
+    assert.match(formatAnimationEvalReport(report), /prefers-reduced-motion: reduce\), 1280x800 \(--viewport/);
+  },
+);
+
 test("runAnimationEval: --frames writes a vlmkit-frames/1 sequence", { timeout: 120_000 }, async () => {
   const { mkdtemp, readdir, readFile } = await import("node:fs/promises");
   const { tmpdir } = await import("node:os");
@@ -950,5 +989,31 @@ test(
     );
     assert.deepEqual(missing.undefinedKeyframes, [{ selector: "#a", name: "gone", reducedMotion: true }]);
     assert.ok(missing.issues.some((i) => i.kind === "undefined-keyframes" && i.severity === "suspect"));
+  },
+);
+
+test(
+  "runAnimationEval: an animation that moves only a sliver of a clipped or covered element is motion-mostly-hidden",
+  { timeout: 180_000 },
+  async () => {
+    // fixtures/motion-repair: a card clipped by its header's overflow, a menu under a banner's
+    // stacking context. Both were listed "visible" on 8 and 12px of motion; the references
+    // (and a block heading whose text is a fifth of its width) are not flagged.
+    const dir = join(import.meta.dirname, "../../../fixtures/motion-repair");
+    const kinds = async (file: string) =>
+      (
+        await runAnimationEval({
+          source: join(dir, file),
+          viewport: { width: 1280, height: 800 },
+          skipReducedMotion: true,
+        })
+      ).issues.map((i) => i.kind);
+    assert.ok((await kinds("broken/notify.html")).includes("motion-mostly-hidden"));
+    assert.ok((await kinds("broken/menu.html")).includes("motion-mostly-hidden"));
+    assert.ok(!(await kinds("reference/notify.html")).includes("motion-mostly-hidden"));
+    assert.ok(
+      !(await kinds("../integrity-timeline/fade-in.html")).includes("motion-mostly-hidden"),
+      "a block heading hits across its whole box",
+    );
   },
 );

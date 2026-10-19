@@ -10,7 +10,9 @@
  *
  * Approach: stride-sample the image (every N-th pixel), quantize each
  * sample to a coarse 5-bit-per-channel bucket (32³ = 32 768 bins), then
- * report the top-K most populous bins as the dominant colors. Avoids
+ * report the top-K most populous bins as the dominant colors, each named by
+ * the exact colour most of its pixels have (the bucket centre is not a colour
+ * the page painted: white cards read `#fcfcfc`, `#7c3aed` read `#7c3cec`). Avoids
  * a full k-means pass — for VRT-scale images (≤1 MP), stride sampling +
  * histogram is ~50× faster and gives equivalent top-N output.
  */
@@ -19,13 +21,13 @@ import { readFile } from "node:fs/promises";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 
 export interface PaletteColor {
-  /** Quantized RGB at full 8-bit precision (bucket center). */
+  /** The most common exact RGB among the bucket's samples — a colour the image holds. */
   r: number;
   g: number;
   b: number;
   /** "#RRGGBB". */
   hex: string;
-  /** Fraction of sampled pixels in this bucket (0..1). */
+  /** Fraction of sampled pixels of this colour, plus its bucket's unnamed rest (0..1). */
   share: number;
   /** Raw sample count. */
   count: number;
@@ -71,6 +73,8 @@ export function extractPaletteFromRgba(
   const shift = 8 - bits;
   const bucketCount = 1 << bits;
   const histogram = new Map<number, number>();
+  // Exact colour counts per bucket, so the bucket is named by a colour the image holds.
+  const exact = new Map<number, Map<number, number>>();
   let sampled = 0;
 
   const totalPixels = width * height;
@@ -82,25 +86,31 @@ export function extractPaletteFromRgba(
     const bq = data[i + 2]! >> shift;
     const key = (rq * bucketCount + gq) * bucketCount + bq;
     histogram.set(key, (histogram.get(key) ?? 0) + 1);
+    const rgb = (data[i]! << 16) | (data[i + 1]! << 8) | data[i + 2]!;
+    let counts = exact.get(key);
+    if (!counts) exact.set(key, (counts = new Map()));
+    counts.set(rgb, (counts.get(rgb) ?? 0) + 1);
     sampled++;
   }
   if (sampled === 0) return [];
 
   const entries: PaletteColor[] = [];
-  // Map bucket center to a representative 8-bit value: shift back and
-  // add half-bucket so we land in the bucket center instead of its low
-  // corner.
-  const halfBucket = 1 << (shift - 1);
+  const minCount = minShare * sampled;
   for (const [key, count] of histogram) {
-    const share = count / sampled;
-    if (share < minShare) continue;
-    const bq = key % bucketCount;
-    const gq = Math.floor(key / bucketCount) % bucketCount;
-    const rq = Math.floor(key / (bucketCount * bucketCount));
-    const r = Math.min(255, (rq << shift) + halfBucket);
-    const g = Math.min(255, (gq << shift) + halfBucket);
-    const b = Math.min(255, (bq << shift) + halfBucket);
-    entries.push({ r, g, b, hex: toHex(r, g, b), share, count });
+    if (count < minCount) continue;
+    // Every exact colour that clears the floor on its own is its own entry: white cards on a
+    // `#f8fafc` page share one 5-bit bucket, and named by the bucket they were one colour.
+    // What is left (antialiasing, gradients) goes to the bucket's most common colour.
+    const exacts = [...exact.get(key)!].sort((a, b) => b[1] - a[1] || a[0] - b[0]);
+    const own = exacts.filter(([, n], idx) => idx === 0 || n >= minCount);
+    const rest = count - own.reduce((sum, [, n]) => sum + n, 0);
+    own.forEach(([rgb, n], idx) => {
+      const r = rgb >> 16;
+      const g = (rgb >> 8) & 0xff;
+      const b = rgb & 0xff;
+      const c = idx === 0 ? n + rest : n;
+      entries.push({ r, g, b, hex: toHex(r, g, b), share: c / sampled, count: c });
+    });
   }
   entries.sort((a, b) => b.share - a.share);
   return entries.slice(0, topK);

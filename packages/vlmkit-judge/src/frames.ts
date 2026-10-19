@@ -85,6 +85,8 @@ export interface FramesSource {
   clock: FramesClock;
   /** `scan video`: the recording the frames were decoded from, and how. */
   video?: FramesVideo;
+  /** `prefers-reduced-motion: reduce` was emulated while the frames were captured. */
+  reducedMotion?: boolean;
   /** `inspect interact`: the `frames` step this sequence records. */
   step?: string;
   /**

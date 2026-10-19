@@ -186,37 +186,42 @@ function toHex(r: number, g: number, b: number): string {
   return `#${c(r)}${c(g)}${c(b)}`;
 }
 
-/** Sample a bbox region's dominant color by averaging pixels (cheap; good enough for solid fills). */
-function sampleBboxFill(
-  data: Uint8Array,
-  width: number,
-  bbox: { top: number; left: number; width: number; height: number },
-): { r: number; g: number; b: number } {
-  // Sample a 5×5 grid inside the bbox, avoid edges (anti-aliasing).
+/** The sample points of a bbox: a 5x5-ish grid inside it, off its antialiased edges. */
+function bboxSamplePoints(bbox: { top: number; left: number; width: number; height: number }): [number, number][] {
   const inset = 2;
   const x0 = bbox.left + inset,
     x1 = bbox.left + bbox.width - inset;
   const y0 = bbox.top + inset,
     y1 = bbox.top + bbox.height - inset;
-  if (x1 <= x0 || y1 <= y0) {
-    const i = (bbox.top * width + bbox.left) * 4;
-    return { r: data[i]!, g: data[i + 1]!, b: data[i + 2]! };
-  }
-  let r = 0,
-    g = 0,
-    b = 0,
-    n = 0;
+  if (x1 <= x0 || y1 <= y0) return [[bbox.left, bbox.top]];
+  const points: [number, number][] = [];
   const stepX = Math.max(1, Math.floor((x1 - x0) / 5));
   const stepY = Math.max(1, Math.floor((y1 - y0) / 5));
-  for (let y = y0; y < y1; y += stepY) {
-    for (let x = x0; x < x1; x += stepX) {
-      const i = (y * width + x) * 4;
-      r += data[i]!;
-      g += data[i + 1]!;
-      b += data[i + 2]!;
-      n++;
-    }
+  for (let y = y0; y < y1; y += stepY) for (let x = x0; x < x1; x += stepX) points.push([x, y]);
+  return points;
+}
+
+function pixelAt(data: Uint8Array, width: number, [x, y]: [number, number]): { r: number; g: number; b: number } {
+  const i = (y * width + x) * 4;
+  return { r: data[i]!, g: data[i + 1]!, b: data[i + 2]! };
+}
+
+/** A bbox's mean colour over its sample points (cheap; good enough to name a solid fill). */
+function sampleBboxFill(
+  data: Uint8Array,
+  width: number,
+  points: readonly [number, number][],
+): { r: number; g: number; b: number } {
+  let r = 0,
+    g = 0,
+    b = 0;
+  for (const p of points) {
+    const c = pixelAt(data, width, p);
+    r += c.r;
+    g += c.g;
+    b += c.b;
   }
+  const n = points.length;
   return { r: Math.round(r / n), g: Math.round(g / n), b: Math.round(b / n) };
 }
 
@@ -322,9 +327,17 @@ export async function runThemeParity(options: ThemeParityOptions): Promise<Theme
     for (let i = 0; i < lightBboxes.length; i++) {
       const bbox = lightBboxes[i]!;
       totalMatched++;
-      const lightFill = sampleBboxFill(lightPng.data, lightPng.width, bbox);
-      const darkFill = sampleBboxFill(darkPng.data, darkPng.width, bbox);
-      const delta = dist(lightFill, darkFill);
+      const points = bboxSamplePoints(bbox);
+      const lightFill = sampleBboxFill(lightPng.data, lightPng.width, points);
+      const darkFill = sampleBboxFill(darkPng.data, darkPng.width, points);
+      // Mean distance of the same pixels, not distance of the means. A glyph's box is ink and
+      // paper: dark-on-white and light-on-dark both average to grey, so the heading of a fully
+      // themed page read as two unthemed components ("#868686" vs "#80838a", delta 7.8).
+      const delta =
+        points.reduce(
+          (sum, p) => sum + dist(pixelAt(lightPng.data, lightPng.width, p), pixelAt(darkPng.data, darkPng.width, p)),
+          0,
+        ) / points.length;
       if (delta < unchangedThreshold) {
         unthemed.push({
           rank: i,

@@ -37,6 +37,39 @@ describe("extractPaletteFromRgba", () => {
     assert.equal(palette[0]!.share > 0.7, true);
   });
 
+  it("names each colour by a hex the image holds, not its bucket's centre", () => {
+    // Bucket centres read these as #fcfcfc and #7c3cec; neither is on the page.
+    const data = fillRgba(100, 100, [
+      { y0: 0, y1: 60, r: 255, g: 255, b: 255 },
+      { y0: 60, y1: 90, r: 0x7c, g: 0x3a, b: 0xed },
+      { y0: 90, y1: 100, r: 0x7d, g: 0x3b, b: 0xec }, // same bucket, under the floor on its own
+    ]);
+    const palette = extractPaletteFromRgba(data, 100, 100, { stride: 1, minShare: 0.15 });
+    assert.deepEqual(
+      palette.map((c) => [c.hex, Math.round(c.share * 100)]),
+      [
+        ["#ffffff", 60],
+        ["#7c3aed", 40],
+      ],
+    );
+  });
+
+  it("keeps two colours apart that share a bucket", () => {
+    // White cards on a #f8fafc page: one 5-bit bucket, which used to print as #fcfcfc.
+    const data = fillRgba(100, 100, [
+      { y0: 0, y1: 70, r: 0xf8, g: 0xfa, b: 0xfc },
+      { y0: 70, y1: 100, r: 255, g: 255, b: 255 },
+    ]);
+    const palette = extractPaletteFromRgba(data, 100, 100, { stride: 1 });
+    assert.deepEqual(
+      palette.map((c) => [c.hex, Math.round(c.share * 100)]),
+      [
+        ["#f8fafc", 70],
+        ["#ffffff", 30],
+      ],
+    );
+  });
+
   it("drops buckets below minShare", () => {
     const data = fillRgba(100, 100, [
       { y0: 0, y1: 99, r: 255, g: 255, b: 255 },

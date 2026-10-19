@@ -169,6 +169,17 @@ Evaluates every authored animation by rendered frames:
   one-frame glitch, a transient that comes back, a change and where it settles,
   each timed between two frames with its box — and `--at 0..1s/1f` gives it
   every frame to read.
+- **`check animation` lists an animation `visible` when any pixel moved.** A
+  `motion-mostly-hidden` warn says only a sliver of the element did (a clipped card moved
+  320x8 of its 320x104 box): run `inspect motion --selector` on it for the cause.
+- **Frames are `--viewport`'s size, 1280x720 unless given.** Pass the
+  target's (`--viewport 1280x800`) before diffing a frame against it: at
+  the default, a toast's 1500ms frame differed from its 1280x800 target by
+  11% with nothing wrong. A target drawn mid-motion (the toast in its hold)
+  is compared this way, not with `verify markup`, whose pixel diff is of
+  the rest pose. `--frames-reduced-motion` captures the same frames with
+  `prefers-reduced-motion: reduce` emulated, so the reduced-motion brief is
+  checked by looking, not by a hand-written Playwright script.
 - **Defects that exist only mid-motion** are `check integrity`'s, not this
   gate's: `vlmkit check integrity page.html --timeline` judges the layout at
   instants of the entrance with the clock and animations held. A finding held
@@ -208,29 +219,50 @@ SMIL, iframes, shadow roots) and counts transitions at each pixel:
 - `--strip worst.png` is one still image of the worst window. Never make an
   animated preview of a failing window: it would strobe for whoever opens it.
 
-### B3c. `inspect motion attempt.html` — does the motion look right? (optional, `TYPESAFEAI_API_KEY`)
+### B3c. `inspect motion attempt.html` — does the motion look right? (no key; `--jev` optional)
 
 The gates above measure that animations run and settle; none says the motion *looks* wrong. In
 the 2026-10-18 round (`docs/reports/2026-10-18-jev-motion.md`) `check animation` exited 0 on
-all seven broken animations, and `check integrity --timeline` named only three of them. With a
-key, judge your own motion before calling it done:
+all seven broken animations, and `check integrity --timeline` named only three of them. Judge
+your own motion before calling it done:
 
 ```bash
-vlmkit inspect motion attempt.html --target "the green Saved toast" --selector .toast \
-  --expect-easing ease-out,ease-in --exits        # one --target (+ --selector) per element that moves
+vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ease-in --exits
+#   one --selector per element that moves; no key. Add --jev (TYPESAFEAI_API_KEY) to also ask
+#   TypeSafe Jev of each frame, with --target "the green Saved toast" naming what it should see.
 ```
 
-- **Always pass `--selector` on your own page.** Without it a model boxes the target, and
-  look-alike siblings (three stat cards) get swapped between frames; with it position, opacity,
-  scale and the element's own animation time come from the page, and Jev only says whether it
-  can be seen (and whether text is printed over text).
+- **Without `--jev` the page measures everything**: position, opacity, scale, the element's own
+  animation time, and how much of it is the topmost thing painted (a 5x5 hit-test of its box),
+  which is what sees a clip or a cover. On `fixtures/motion-defects/` that caught 6 of the 7
+  broken pages by the expected rule, with all 7 intact pages passing. The one it cannot see is
+  text left lying on other text (`overlap-rest`): that is `check integrity`'s `text-collision`,
+  or `--jev`, whose default `--forbid` statement asks it.
+- **With `--jev`, still pass `--selector` on your own page.** Without it a model boxes the
+  target, and look-alike siblings (three stat cards) get swapped between frames; with it the
+  geometry is the page's, and Jev only says whether it can be seen (and whether text is printed
+  over text).
 - **Read the rule, then the frames.** `snap-back` = the final keyframe is not held
-  (fill-mode); `jump` = a keyframe gap; `target-lost` / `absent-at-rest` = clipped, covered or
-  faded for good (`--exits` when it is meant to leave); `easing-mismatch` = the timing function;
+  (fill-mode; also caught in the hold between an entrance and an exit); `jump` = a keyframe gap;
+  `target-lost` / `absent-at-rest` = clipped, covered or faded for good (`--exits` when it is
+  meant to leave); `target-hidden` = never seen at all — the line names the clipping ancestor,
+  the cover and the stacking context (a `transform`, `opacity`, `z-index`…) that traps the target,
+  or the ancestor whose opacity keeps it transparent;
+  when the brief names one segment's easing and not another's, write `any` for the other
+  (`--expect-easing ease-out,any`) rather than guessing; and open the frame the output names
+  as "the first fail's own frame" — a thinned strip can skip it; `easing-mismatch` = the timing function;
   `target-static` = nothing about it animates (a dropped rule, a misspelt name). The command
-  prints the strip line to look at; open single frames for detail.
+  prints the strip line to look at (cropped to where the targets move); open single frames for detail.
+- **Where and when are in the brief too: say them.** Every line names when the target's own
+  animation begins and, for a scale, the point it grows from — but only an expectation fails on
+  them. A popover that must grow out of its button: `--expect-origin bottom-left`
+  (`origin-mismatch` names the `transform-origin` to set). Entries that must cascade: one
+  `--selector` per entry in order and `--expect-stagger 80` (or `--expect-start 200,280,360,440`);
+  the `begins:` line says when siblings start together. In motion-repair round 3 a wrong
+  `transform-origin` and a stagger that was not one both read "follows ease-out exactly, no fail"
+  until these existed.
 - **What it does not judge**: fps or jank, a target it is not told about, and anything under
-  the 6px / 0.2-opacity floors with `--selector` (60px without it). A pass is "nothing looked
+  the 6px / 0.2-opacity floors with `--selector` (60px for a `--jev` target without one). A pass is "nothing looked
   broken in these frames", not "matches the brief" — compare durations with B3's list.
 
 ### B4. `check motion attempt.html`
@@ -408,6 +440,13 @@ round — it is the machine-checkable form of the brief's layout section.
   DONE at 1280 — turned out to overflow 67px at 375 (`div.plans`),
   invisible to every reference-full gate because no 375 target existed.
   Multi-viewport integrity is exactly the net for that class.
+- **A brief with one viewport still has to pass 768 and 375.** Pages
+  are opened on phones whatever size the target was drawn at, and what
+  the sweep finds there is real (S8 above; the 2026-10-18 stat-cards
+  agent's 123px overflow at 375 was a fixed three-column grid). Narrow
+  it with `--viewports 1280` only when the brief rules other widths out
+  in so many words — a fixed-size embed, a kiosk — and say so in the
+  report.
 
 ## Budget & stopping
 
