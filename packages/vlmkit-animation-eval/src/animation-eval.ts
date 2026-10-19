@@ -122,6 +122,8 @@ export interface EvaluatedAnimation extends AnimationTimingSample {
   visible: boolean;
   /** Union of all frame bboxes; null when the animation never moved. */
   motionBbox: { x: number; y: number; width: number; height: number } | null;
+  /** The animated element's own border box at rest, when its selector still matches. */
+  elementBox?: { x: number; y: number; width: number; height: number; topmost?: number };
   totalChangedPixels: number;
   maxFrameRatio: number;
   /**
@@ -202,7 +204,8 @@ export type AnimationEvalIssueKind =
   | "uncontrolled-motion"
   | "seek-ineffective"
   | "clock-motion-unsettled"
-  | "undefined-keyframes";
+  | "undefined-keyframes"
+  | "motion-mostly-hidden";
 
 export interface AnimationEvalIssue {
   kind: AnimationEvalIssueKind;
@@ -480,6 +483,23 @@ export function deriveAnimationIssues(
       });
       continue;
     }
+    // Visible, but only a sliver of the element ever changed: the rest is clipped or covered.
+    // A notification clipped by its header moved 320x7px of a 320x104 card, and a menu under a
+    // banner 220x12 of 220x168; both were listed "visible" and agents read that as fine (rounds 1
+    // and 2 of motion-repair).
+    if (anim.visible && anim.motionBbox && anim.elementBox) {
+      const box = anim.elementBox;
+      const seen = anim.motionBbox.width * anim.motionBbox.height;
+      const area = box.width * box.height;
+      if (area >= 400 && seen < area * 0.25 && (box.topmost ?? 0) < 0.5) {
+        issues.push({
+          kind: "motion-mostly-hidden",
+          severity: "warn",
+          selector: anim.selector,
+          message: `${anim.selector} \`${anim.name}\` moved pixels in only ${anim.motionBbox.width}x${anim.motionBbox.height} of its ${box.width}x${box.height} box (${Math.round((seen / area) * 100)}%), and it is the topmost thing painted on ${Math.round((box.topmost ?? 0) * 100)}% of that box at rest: most of it is clipped or covered — \`vlmkit inspect motion <page> --selector ${anim.selector}\` names the clip or the cover.`,
+        });
+      }
+    }
     if (!anim.visible) {
       issues.push({
         kind: "no-visible-effect",
@@ -573,6 +593,9 @@ export function deriveAnimationIssues(
         ` — motion is not reduced for users who requested it.` +
         ` Add \`@media (prefers-reduced-motion: reduce)\` and either set \`animation: none\` on them` +
         ` or shorten each duration below ${durationFloor}ms.` +
+        // A toast parked off-screen and brought in by its entrance: `animation: none` alone left it
+        // never shown (round 2 of motion-repair caught the hint before following it).
+        ` If an element only reaches its place through an animation (an entrance from off-screen or from opacity 0), give it that end state in the same rule — \`animation: none\` alone leaves it where the animation started.` +
         (input.reducedMotion.remaining.some((r) => r.selector.startsWith("(script-driven"))
           ? ` For the script-driven motion, read \`matchMedia("(prefers-reduced-motion: reduce)")\` and skip or shorten the loop.`
           : ""),
@@ -1106,12 +1129,48 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       }
       await seek(timing.index, restTimeForAnimation(timing));
       for (const sib of siblings) await seek(sib.index, restTimeForAnimation(sib));
+      const elementBox = (await page
+        .evaluate((sel) => {
+          const el = document.querySelector(sel);
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          // Where it is the topmost thing hit, over a 5x5 grid of its box inside the viewport. A
+          // block heading whose text is a fifth of its width still hits everywhere; a clipped or
+          // covered element hits almost nowhere. Hit-testing skips pointer-events: none, so the
+          // element takes them for the probe.
+          const probe = document.createElement("style");
+          probe.textContent = "[data-vlmkit-probe],[data-vlmkit-probe] *{pointer-events:auto!important}";
+          (document.head ?? document.documentElement).append(probe);
+          el.setAttribute("data-vlmkit-probe", "");
+          let inView = 0;
+          let hits = 0;
+          for (let gy = 0; gy < 5; gy++)
+            for (let gx = 0; gx < 5; gx++) {
+              const x = r.x + ((gx + 0.5) / 5) * r.width;
+              const y = r.y + ((gy + 0.5) / 5) * r.height;
+              if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) continue;
+              inView++;
+              const top = document.elementFromPoint(x, y);
+              if (top && el.contains(top)) hits++;
+            }
+          el.removeAttribute("data-vlmkit-probe");
+          probe.remove();
+          return {
+            x: Math.round(r.x),
+            y: Math.round(r.y),
+            width: Math.round(r.width),
+            height: Math.round(r.height),
+            topmost: inView === 0 ? 0 : hits / inView,
+          };
+        }, timing.selector)
+        .catch(() => null)) as EvaluatedAnimation["elementBox"] | null;
       if (options.stripPath && rowFrames.length > 0) stripRows.push(rowFrames);
       evaluated.push({
         ...timing,
         frames,
         visible: frames.some((f) => f.changedPixels >= minChangedPixels),
         motionBbox,
+        ...(elementBox ? { elementBox } : {}),
         totalChangedPixels,
         maxFrameRatio: Number(maxFrameRatio.toFixed(4)),
         ...(seekIneffective ? { seekIneffective } : {}),

@@ -169,6 +169,9 @@ Evaluates every authored animation by rendered frames:
   one-frame glitch, a transient that comes back, a change and where it settles,
   each timed between two frames with its box — and `--at 0..1s/1f` gives it
   every frame to read.
+- **`check animation` lists an animation `visible` when any pixel moved.** A
+  `motion-mostly-hidden` warn says only a sliver of the element did (a clipped card moved
+  320x8 of its 320x104 box): run `inspect motion --selector` on it for the cause.
 - **Frames are `--viewport`'s size, 1280x720 unless given.** Pass the
   target's (`--viewport 1280x800`) before diffing a frame against it: at
   the default, a toast's 1500ms frame differed from its 1280x800 target by
@@ -243,7 +246,10 @@ vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ea
   (fill-mode; also caught in the hold between an entrance and an exit); `jump` = a keyframe gap;
   `target-lost` / `absent-at-rest` = clipped, covered or faded for good (`--exits` when it is
   meant to leave); `target-hidden` = never seen at all — the line names the clipping ancestor, or
-  the cover and the stacking context (a `transform`, `opacity`, `z-index`…) that traps the target; `easing-mismatch` = the timing function;
+  the cover and the stacking context (a `transform`, `opacity`, `z-index`…) that traps the target;
+  when the brief names one segment's easing and not another's, write `any` for the other
+  (`--expect-easing ease-out,any`) rather than guessing; and open the frame the output names
+  as "the first fail's own frame" — a thinned strip can skip it; `easing-mismatch` = the timing function;
   `target-static` = nothing about it animates (a dropped rule, a misspelt name). The command
   prints the strip line to look at; open single frames for detail.
 - **What it does not judge**: fps or jank, a target it is not told about, and anything under

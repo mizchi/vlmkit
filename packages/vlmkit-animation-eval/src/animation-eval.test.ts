@@ -991,3 +991,29 @@ test(
     assert.ok(missing.issues.some((i) => i.kind === "undefined-keyframes" && i.severity === "suspect"));
   },
 );
+
+test(
+  "runAnimationEval: an animation that moves only a sliver of a clipped or covered element is motion-mostly-hidden",
+  { timeout: 180_000 },
+  async () => {
+    // fixtures/motion-repair: a card clipped by its header's overflow, a menu under a banner's
+    // stacking context. Both were listed "visible" on 8 and 12px of motion; the references
+    // (and a block heading whose text is a fifth of its width) are not flagged.
+    const dir = join(import.meta.dirname, "../../../fixtures/motion-repair");
+    const kinds = async (file: string) =>
+      (
+        await runAnimationEval({
+          source: join(dir, file),
+          viewport: { width: 1280, height: 800 },
+          skipReducedMotion: true,
+        })
+      ).issues.map((i) => i.kind);
+    assert.ok((await kinds("broken/notify.html")).includes("motion-mostly-hidden"));
+    assert.ok((await kinds("broken/menu.html")).includes("motion-mostly-hidden"));
+    assert.ok(!(await kinds("reference/notify.html")).includes("motion-mostly-hidden"));
+    assert.ok(
+      !(await kinds("../integrity-timeline/fade-in.html")).includes("motion-mostly-hidden"),
+      "a block heading hits across its whole box",
+    );
+  },
+);

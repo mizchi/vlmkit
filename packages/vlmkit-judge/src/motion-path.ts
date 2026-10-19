@@ -316,7 +316,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       severity: "fail",
       atMs: r.atMs,
       message: r.dom
-        ? `never seen in any frame, at rest included (visible ${r.present.toFixed(2)} at ${ms(r.atMs)}, rendered at opacity ${r.dom.opacity.toFixed(2)})${why(r) || ": clipped by an ancestor, covered, or off-screen"}`
+        ? `never seen in any frame, at rest included: at most ${Math.round(Math.max(...judged.map((s) => s.present)) * 100)}% of it visible in any frame (${Math.round(r.present * 100)}% at ${ms(r.atMs)}, rendered at opacity ${r.dom.opacity.toFixed(2)})${why(r) || ": clipped by an ancestor, covered, or off-screen"}`
         : `not found in any frame, at rest included (presence ${r.present.toFixed(2)} at ${ms(r.atMs)}): hidden, or the description names something not on the page`,
     });
     const skipped = { skipped: "not seen in any frame: nothing about its motion is judged" } as SegmentEasing;
@@ -352,7 +352,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         rule: "absent-at-rest",
         severity: "fail",
         atMs: restSamples[0]!.atMs,
-        message: `shown during the motion, not once it stops (presence ${restSamples[0]!.present.toFixed(2)} at ${ms(restSamples[0]!.atMs)})${why(restSamples[0]!) || ": clipped, covered or hidden in its end state"} (an exit is declared with exits)`,
+        message: `shown during the motion, not once it stops (presence ${restSamples[0]!.present.toFixed(2)} at ${ms(restSamples[0]!.atMs)})${why(restSamples[0]!) || ": clipped, covered or hidden in its end state"} — if it is meant to leave (a toast, a dismissed banner), that is its end: declare it with --exits`,
       });
     }
   }

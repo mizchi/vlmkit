@@ -246,3 +246,32 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
     assert.throws(() => parseMotionArgs(["p.html", "--selector", ".a", "--out", "x"]), /did you mean --frames <dir>/);
   });
 });
+
+describe("inspect motion after motion-repair round 2", () => {
+  it("takes any in --expect-easing to leave a segment unchecked", () => {
+    assert.deepEqual(parseMotionArgs(["p.html", "--selector", ".t", "--expect-easing", "ease-out,any"]).expectEasing, [
+      ["ease-out", undefined],
+    ]);
+    assert.throws(() => parseMotionArgs(["p.html", "--selector", ".t", "--expect-easing", "any"]), MotionUsageError);
+  });
+
+  it(
+    "names the entrance's easing when the snap-back is in the hold, and the first fail's frame",
+    { timeout: 120_000 },
+    async () => {
+      const lines: string[] = [];
+      const log = console.log;
+      console.log = (m: string) => lines.push(m);
+      try {
+        const frames = await mkdtemp(join(tmpdir(), "vlmkit-motion-r2-"));
+        const page = join(import.meta.dirname, "../../../../fixtures/motion-repair/broken/toast.html");
+        assert.equal(await runMotionCli([page, "--selector", ".toast", "--exits", "--frames", frames]), 1);
+      } finally {
+        console.log = log;
+      }
+      const out = lines.join("\n");
+      assert.match(out, /300\.\.660ms: travels \d+px, follows ease-in/, out);
+      assert.match(out, /the first fail's own frame \(1160ms\): .*0\d{3}-t001160\.png/);
+    },
+  );
+});

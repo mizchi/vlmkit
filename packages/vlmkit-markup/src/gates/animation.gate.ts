@@ -91,6 +91,12 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       docs: "Nothing runs under a name with no @keyframes. Checked on the page and under prefers-reduced-motion: reduce, where a misnamed rule meant to hide or settle something silently does nothing (and reduced motion would otherwise read as honoured).",
     },
     {
+      id: "motion-mostly-hidden",
+      title: "An animation moved only a small part of its element",
+      severity: "warn",
+      docs: "Its motion region covered under a quarter of the element's own box at rest, so most of the element is likely clipped (an ancestor's overflow) or covered (a stacking context). `inspect motion --selector` names which.",
+    },
+    {
       id: "clock-motion-unsettled",
       title: "Script-driven motion still changing at the end of the virtual-time window",
       severity: "warn",

@@ -199,7 +199,7 @@ an easing is checked on each channel that changes.
   --expect-easing <name>  ${EASING_NAMES.join(" | ")}. Given once, for every target; repeated,
                           paired with the --target in the same position (cards ease-out, a bar
                           ease-in-out). Comma-separated, one per segment: "ease-out,ease-in" for
-                          an entrance and an exit
+                          an entrance and an exit; \`any\` leaves a segment unchecked ("ease-out,any")
   --exits                 The targets are meant to leave (gone at rest is their end)
   --at <instants>         Frames to shoot (default: 11 per segment + rest); the segments stay
                           the page's own spans of motion
@@ -273,13 +273,15 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
         const names = value(a, argv[++i])
           .split(",")
           .map((x) => x.trim());
-        const bad = names.filter((e) => !(EASING_NAMES as string[]).includes(e));
-        if (bad.length > 0 || names.length === 0) {
+        // `any` leaves that segment unchecked: a brief that names the entrance's easing and not
+        // the fade's had an agent guess `linear` and fail a correct page (round 2).
+        const bad = names.filter((e) => e !== "any" && !(EASING_NAMES as string[]).includes(e));
+        if (bad.length > 0 || names.length === 0 || names.every((e) => e === "any")) {
           throw new MotionUsageError(
             `--expect-easing takes ${EASING_NAMES.join(", ")} (comma-separated per segment); got ${bad.join(", ")}`,
           );
         }
-        (expectEasing ??= []).push(names as EasingName[]);
+        (expectEasing ??= []).push(names.map((e) => (e === "any" ? undefined : e)) as EasingName[]);
         break;
       }
       case "--selector":
@@ -507,6 +509,8 @@ interface Captured {
   endMs: number;
   segments: { startMs: number; endMs: number }[];
   manifest: string;
+  /** Each frame's file, by its instant. */
+  files?: Map<number, string>;
 }
 
 async function captureMotion(o: MotionCliOptions): Promise<Captured> {
@@ -555,11 +559,12 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
         ...(await frameSourceFacts(page)),
         clock: "held",
       });
+      const files = new Map<number, string>();
       const frames: Captured["frames"] = [];
       for (const atMs of instants) {
         await timeline.at(atMs);
         const { png, stable } = await captureStable(page);
-        await writer.add(png, { atMs, stable, ...(atMs > endMs ? { label: "rest" } : {}) });
+        files.set(atMs, await writer.add(png, { atMs, stable, ...(atMs > endMs ? { label: "rest" } : {}) }));
         const frame: MotionFrame = { atMs, png: new Uint8Array(png) };
         if (o.selectors.length > 0) {
           const dom = await measureTargets(page, o.selectors);
@@ -572,7 +577,7 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
         frames.push(frame);
       }
       const written = await writer.finish();
-      return { frames, startMs, endMs, segments, manifest: written.manifest };
+      return { frames, startMs, endMs, segments, manifest: written.manifest, files };
     } finally {
       await page.close();
     }
@@ -589,7 +594,8 @@ async function readFrames(o: MotionCliOptions): Promise<Captured> {
     })),
   );
   const startMs = o.startMs ?? frames[0]?.atMs ?? 0;
-  return { frames, startMs, endMs: o.endMs!, segments: [{ startMs, endMs: o.endMs! }], manifest: path };
+  const files = new Map(manifest.frames.map((f) => [f.atMs, join(dirname(path), f.file)]));
+  return { frames, startMs, endMs: o.endMs!, segments: [{ startMs, endMs: o.endMs! }], manifest: path, files };
 }
 
 export function formatMotionReport(
@@ -630,8 +636,14 @@ export function formatMotionReport(
     } else {
       lines.push(`  target ${JSON.stringify(t.target)}: ${t.segments.length} segments`);
       for (const g of t.segments) {
+        // Broken is per segment: a snap-back in the hold after an entrance says nothing about the
+        // entrance's curve, and calling it "no easing named" beside an easing-mismatch that names
+        // one read as a contradiction (round 2).
+        const own = t.findings.some(
+          (f) => (f.rule === "jump" || f.rule === "snap-back") && f.atMs >= g.startMs && f.atMs <= g.endMs,
+        );
         lines.push(
-          `    ${Math.round(g.startMs)}..${Math.round(g.endMs)}ms: travels ${Math.round(g.travelPx)}px, ${fitText(g.easing, broken)}`,
+          `    ${Math.round(g.startMs)}..${Math.round(g.endMs)}ms: travels ${Math.round(g.travelPx)}px, ${fitText(g.easing, own)}`,
         );
       }
     }
@@ -677,6 +689,14 @@ export function formatMotionReport(
   lines.push(
     `  look at the frames: vlmkit snapshot strip --manifest ${captured.manifest} --max-frames 6 --columns 3 --out ${join(dirname(captured.manifest), "strip.png")}`,
   );
+  // A thinned strip can skip the frame a finding is about (six of a toast's frames had none in
+  // its 2s hold, round 2): name that frame's own file.
+  const firstFail = r.targets
+    .flatMap((t) => t.findings)
+    .filter((f) => f.severity === "fail")
+    .sort((a, b) => a.atMs - b.atMs)[0];
+  const file = firstFail ? captured.files?.get(firstFail.atMs) : undefined;
+  if (file) lines.push(`  the first fail's own frame (${Math.round(firstFail!.atMs)}ms): ${file}`);
   return lines.join("\n");
 }
 
