@@ -249,7 +249,7 @@ an easing is checked on each channel that changes.
 
 Exit: 0 nothing fails, 1 a fail, 2 usage error. With --jev, ~$0.00013 and ~0.2s per frame.
 Advisory: gate on check animation / check integrity --timeline.
-docs/reports/2026-10-18-jev-motion.md`;
+Measured: https://github.com/mizchi/vlmkit/blob/main/docs/reports/2026-10-18-jev-motion.md`;
 
 export class MotionUsageError extends Error {}
 
@@ -344,7 +344,13 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
         break;
       }
       case "--expect-start":
-        (expectStartMs ??= []).push(...parseInstants(value(a, argv[++i]), a));
+        // One time per target, in the order given: parseInstants sorts and dedupes, which paired
+        // "400,0" with the targets as "0,400" (round 4).
+        (expectStartMs ??= []).push(
+          ...value(a, argv[++i])
+            .split(",")
+            .map((x) => one(a, x.trim())),
+        );
         break;
       case "--expect-stagger":
         expectStaggerMs = one(a, value(a, argv[++i]));
@@ -790,11 +796,18 @@ export function formatMotionReport(
   const boxes = captured.frames.flatMap((f) => (f.dom ?? []).filter((d) => d !== null).map((d) => d!.box));
   let crop = "";
   if (boxes.length > 0) {
-    const pad = 24;
-    const x0 = Math.max(0, Math.floor(Math.min(...boxes.map((b) => b.x)) - pad));
-    const y0 = Math.max(0, Math.floor(Math.min(...boxes.map((b) => b.y)) - pad));
-    const x1 = Math.ceil(Math.max(...boxes.map((b) => b.x + b.width)) + pad);
-    const y1 = Math.ceil(Math.max(...boxes.map((b) => b.y + b.height)) + pad);
+    // Padded by a quarter of the region (48px at least): what it moves out of or next to, a
+    // popover's button, is the reference a person judges it by, and 24px cut it in half (round 4).
+    const bx0 = Math.min(...boxes.map((b) => b.x));
+    const by0 = Math.min(...boxes.map((b) => b.y));
+    const bx1 = Math.max(...boxes.map((b) => b.x + b.width));
+    const by1 = Math.max(...boxes.map((b) => b.y + b.height));
+    const padX = Math.max(48, (bx1 - bx0) / 4);
+    const padY = Math.max(48, (by1 - by0) / 4);
+    const x0 = Math.max(0, Math.floor(bx0 - padX));
+    const y0 = Math.max(0, Math.floor(by0 - padY));
+    const x1 = Math.ceil(bx1 + padX);
+    const y1 = Math.ceil(by1 + padY);
     const vw = captured.viewport?.width ?? x1;
     const vh = captured.viewport?.height ?? y1;
     const w = Math.min(x1, vw) - x0;
@@ -834,7 +847,9 @@ export async function runMotionCli(argv: string[]): Promise<number> {
     o = parseMotionArgs(argv);
   } catch (e) {
     if (!(e instanceof MotionUsageError) && !(e instanceof Error && e.name === "UsageError")) throw e;
-    console.error(`error: ${(e as Error).message}\n\n${MOTION_USAGE}`);
+    // The error last: printed above an 80-line help, it scrolled off and read as "printed only
+    // the help" (round 4).
+    console.error(`${MOTION_USAGE}\n\nerror: ${(e as Error).message}`);
     return 2;
   }
   // Refused before a browser starts: without a key nothing could answer.

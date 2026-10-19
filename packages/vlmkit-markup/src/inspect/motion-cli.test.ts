@@ -300,6 +300,21 @@ describe("inspect motion after motion-repair round 3", () => {
     ]);
     assert.throws(() => parseMotionArgs(["p.html", "--selector", ".t", "--expect-origin", "middle"]), MotionUsageError);
     assert.throws(() => parseMotionArgs(["p.html", "--selector", ".t", "--expect-stagger", "80"]), MotionUsageError);
+    // In the order given, duplicates kept: parseInstants sorted "400,0" into "0,400" (round 4).
+    assert.deepEqual(
+      parseMotionArgs([
+        "p.html",
+        "--selector",
+        ".a",
+        "--selector",
+        ".b",
+        "--selector",
+        ".c",
+        "--expect-start",
+        "400,0,0",
+      ]).expectStartMs,
+      [400, 0, 0],
+    );
     assert.throws(
       () => parseMotionArgs(["p.html", "--selector", ".t", "--expect-start", "200,280"]),
       /2 --expect-start times for 1 targets/,

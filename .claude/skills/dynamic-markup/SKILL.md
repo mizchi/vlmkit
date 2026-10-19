@@ -147,7 +147,11 @@ Evaluates every authored animation by rendered frames:
 - **`reduced-motion-ignored` (suspect)** — the brief's reduced-motion
   clause is not honored: add the `@media (prefers-reduced-motion:
   reduce)` override (auto-markup keeps colors in variables; keep
-  motion behind this media the same way).
+  motion behind this media the same way). When the brief has **no**
+  reduced-motion clause, it is not a defect of the repair: say so in
+  the report, and run the proof with `--rule reduced-motion-ignored=off`
+  rather than adding behaviour nobody asked for (every agent of four
+  motion-repair rounds met this, and split between the two).
 - **`infinite-animation` (warn)** — expected when the brief says
   "forever": confirm the selector matches the brief, note the
   suggested `--mask`, and carry it into Phase C.
@@ -258,7 +262,9 @@ vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ea
   them. A popover that must grow out of its button: `--expect-origin bottom-left`
   (`origin-mismatch` names the `transform-origin` to set). Entries that must cascade: one
   `--selector` per entry in order and `--expect-stagger 80` (or `--expect-start 200,280,360,440`);
-  the `begins:` line says when siblings start together. In motion-repair round 3 a wrong
+  the `begins:` line says when siblings start together. Without an
+  expectation both are facts under "no fail", never a fail: map the
+  brief's "from its corner" / "one after another" to the flag yourself. In motion-repair round 3 a wrong
   `transform-origin` and a stagger that was not one both read "follows ease-out exactly, no fail"
   until these existed.
 - **What it does not judge**: fps or jank, a target it is not told about, and anything under

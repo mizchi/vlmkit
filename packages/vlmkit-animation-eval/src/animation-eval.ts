@@ -598,7 +598,10 @@ export function deriveAnimationIssues(
         ` If an element only reaches its place through an animation (an entrance from off-screen or from opacity 0), give it that end state in the same rule — \`animation: none\` alone leaves it where the animation started.` +
         (input.reducedMotion.remaining.some((r) => r.selector.startsWith("(script-driven"))
           ? ` For the script-driven motion, read \`matchMedia("(prefers-reduced-motion: reduce)")\` and skip or shorten the loop.`
-          : ""),
+          : "") +
+        // Every agent of four motion-repair rounds met this on a brief that says nothing about
+        // reduced motion, and none could reach exit 0 without adding behaviour nobody asked for.
+        ` When the task's brief sets no reduced-motion policy, this is WCAG 2.3.3 (AAA) advice rather than a defect of the repair: say so and judge the rest with \`--rule reduced-motion-ignored=off\`.`,
     });
   }
 

@@ -257,10 +257,12 @@ export interface ScaleOrigin {
   fx: number;
   fy: number;
   name: OriginName | null;
+  /** The frame it is best seen in: the most opaque one scaled 10% or more from full size. */
+  atMs: number;
 }
 
 /** "its top-right corner", "its centre", "the point 30% across and 80% down its box". */
-export function describeOrigin(o: ScaleOrigin): string {
+export function describeOrigin(o: Pick<ScaleOrigin, "fx" | "fy" | "name">): string {
   if (!o.name) return `the point ${Math.round(o.fx * 100)}% across and ${Math.round(o.fy * 100)}% down its box`;
   if (o.name === "center") return "its centre";
   return o.name.includes("-") ? `its ${o.name} corner` : `the middle of its ${o.name} edge`;
@@ -597,7 +599,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         findings.push({
           rule: "origin-mismatch",
           severity: "fail",
-          atMs: seg.startMs,
+          atMs: origin.atMs,
           message: `the scale${tag} grows from ${describeOrigin(origin)} (that point of its box stays put), not ${describeOrigin({ ...want, name: options.expectOrigin })}: transform-origin: ${originCss(options.expectOrigin)}`,
         });
       }
@@ -758,7 +760,12 @@ function scaleOrigin(
     fy.push(((b.y - k * R.y) / (1 - k) - R.y) / R.height);
   }
   if (fx.length === 0) return null;
-  const o = { fx: median(fx), fy: median(fy) };
+  // The frame to look at: the most opaque of the scaled ones (at the segment's start a fade-in is
+  // at opacity 0, and "the first fail's own frame" showed nothing, round 4).
+  const shownAt = xs
+    .filter((x) => x.dom!.scale / ref.dom!.scale <= 0.9)
+    .reduce((a, b) => (b.dom!.opacity > a.dom!.opacity ? b : a)).atMs;
+  const o = { fx: median(fx), fy: median(fy), atMs: shownAt };
   const name =
     ORIGIN_NAMES.find(
       (n) => Math.abs(originAt(n).fx - o.fx) <= ORIGIN_SNAP && Math.abs(originAt(n).fy - o.fy) <= ORIGIN_SNAP,
