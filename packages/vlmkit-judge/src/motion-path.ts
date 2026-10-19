@@ -153,6 +153,9 @@ export interface MotionSample {
      * frame's time less this is when that animation begins: what a stagger is made of.
      */
     elapsedMs?: number | null;
+    /** Each axis's scale, when it differs: a scaleY drop-down has scaleX 1. */
+    scaleX?: number;
+    scaleY?: number;
   };
   /** The box may be another element's (it coincides with another target's): left out of geometry. */
   unsure?: boolean;
@@ -254,8 +257,9 @@ export type SegmentEasing =
 
 /** The point of the box a scale keeps in place, as fractions of the box at full size; named when near one. */
 export interface ScaleOrigin {
-  fx: number;
-  fy: number;
+  /** Null on an axis it does not scale along (a scaleY drop-down has no point across). */
+  fx: number | null;
+  fy: number | null;
   name: OriginName | null;
   /** The frame it is best seen in: the most opaque one scaled 10% or more from full size. */
   atMs: number;
@@ -263,6 +267,27 @@ export interface ScaleOrigin {
 
 /** "its top-right corner", "its centre", "the point 30% across and 80% down its box". */
 export function describeOrigin(o: Pick<ScaleOrigin, "fx" | "fy" | "name">): string {
+  if (o.fx === null || o.fy === null) {
+    // One axis: an edge (or the line through its middle) stays put, not a point.
+    const across = o.fy === null;
+    const v = (across ? o.fx : o.fy) ?? 0.5;
+    const side =
+      Math.abs(v) <= ORIGIN_SNAP
+        ? across
+          ? "left"
+          : "top"
+        : Math.abs(v - 1) <= ORIGIN_SNAP
+          ? across
+            ? "right"
+            : "bottom"
+          : Math.abs(v - 0.5) <= ORIGIN_SNAP
+            ? "middle"
+            : null;
+    if (!side) return `the line ${Math.round(v * 100)}% ${across ? "across" : "down"} its box`;
+    return side === "middle"
+      ? `the line through its middle (it scales ${across ? "across" : "up and down"} only)`
+      : `its ${side} edge`;
+  }
   if (!o.name) return `the point ${Math.round(o.fx * 100)}% across and ${Math.round(o.fy * 100)}% down its box`;
   if (o.name === "center") return "its centre";
   return o.name.includes("-") ? `its ${o.name} corner` : `the middle of its ${o.name} edge`;
@@ -595,12 +620,14 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     const origin = exact ? scaleOrigin(sorted, seg, last ? sorted.filter(isRest) : []) : null;
     if (options.expectOrigin && origin) {
       const want = originAt(options.expectOrigin);
-      if (Math.abs(origin.fx - want.fx) > ORIGIN_SNAP || Math.abs(origin.fy - want.fy) > ORIGIN_SNAP) {
+      // Only the axes it scales along: "top-left" is met by a scaleY whose top edge stays put.
+      const off = (got: number | null, w: number) => got !== null && Math.abs(got - w) > ORIGIN_SNAP;
+      if (off(origin.fx, want.fx) || off(origin.fy, want.fy)) {
         findings.push({
           rule: "origin-mismatch",
           severity: "fail",
           atMs: origin.atMs,
-          message: `the scale${tag} grows from ${describeOrigin(origin)} (that point of its box stays put), not ${describeOrigin({ ...want, name: options.expectOrigin })}: transform-origin: ${originCss(options.expectOrigin)}`,
+          message: `the scale${tag} grows from ${describeOrigin(origin)} (that ${origin.fx === null || origin.fy === null ? "edge" : "point"} of its box stays put), not ${describeOrigin({ fx: origin.fx === null ? null : want.fx, fy: origin.fy === null ? null : want.fy, name: options.expectOrigin })}: transform-origin: ${originCss(options.expectOrigin)}`,
         });
       }
     }
@@ -748,27 +775,39 @@ function scaleOrigin(
     (x) => x.dom && x.dom.scale > 0 && x.dom.box.width > 0 && x.dom.box.height > 0,
   );
   if (xs.length < 2) return null;
-  const ref = xs.reduce((a, b) => (b.dom!.scale > a.dom!.scale ? b : a));
-  const R = ref.dom!.box;
-  const fx: number[] = [];
-  const fy: number[] = [];
-  for (const x of xs) {
-    const k = x.dom!.scale / ref.dom!.scale;
-    if (k > 0.9) continue;
-    const b = x.dom!.box;
-    fx.push(((b.x - k * R.x) / (1 - k) - R.x) / R.width);
-    fy.push(((b.y - k * R.y) / (1 - k) - R.y) / R.height);
-  }
-  if (fx.length === 0) return null;
+  // Each axis on its own: a scaleY(0.2) drop-down read scale 1 from the matrix's first column,
+  // and no origin at all (motion-repair round 5).
+  const sx = (x: MotionSample) => x.dom!.scaleX ?? x.dom!.scale;
+  const sy = (x: MotionSample) => x.dom!.scaleY ?? x.dom!.scale;
+  const axis = (k: (x: MotionSample) => number, pos: "x" | "y", size: "width" | "height") => {
+    const ref = xs.reduce((a, b) => (k(b) > k(a) ? b : a));
+    const R = ref.dom!.box;
+    const out: number[] = [];
+    const used: MotionSample[] = [];
+    for (const x of xs) {
+      const r = k(x) / k(ref);
+      if (r > 0.9) continue;
+      const b = x.dom!.box;
+      out.push(((b[pos] - r * R[pos]) / (1 - r) - R[pos]) / R[size]);
+      used.push(x);
+    }
+    return { f: out.length > 0 ? median(out) : null, used };
+  };
+  const ax = axis(sx, "x", "width");
+  const ay = axis(sy, "y", "height");
+  if (ax.f === null && ay.f === null) return null;
   // The frame to look at: the most opaque of the scaled ones (at the segment's start a fade-in is
   // at opacity 0, and "the first fail's own frame" showed nothing, round 4).
-  const shownAt = xs
-    .filter((x) => x.dom!.scale / ref.dom!.scale <= 0.9)
-    .reduce((a, b) => (b.dom!.opacity > a.dom!.opacity ? b : a)).atMs;
-  const o = { fx: median(fx), fy: median(fy), atMs: shownAt };
+  const shownAt = [...ax.used, ...ay.used].reduce((a, b) => (b.dom!.opacity > a.dom!.opacity ? b : a)).atMs;
+  const near = (got: number | null, w: number) => got === null || Math.abs(got - w) <= ORIGIN_SNAP;
+  // On one axis the name is its edge's ("top"), the other axis taken as the middle.
   const name =
     ORIGIN_NAMES.find(
-      (n) => Math.abs(originAt(n).fx - o.fx) <= ORIGIN_SNAP && Math.abs(originAt(n).fy - o.fy) <= ORIGIN_SNAP,
+      (n) =>
+        near(ax.f, originAt(n).fx) &&
+        near(ay.f, originAt(n).fy) &&
+        (ax.f !== null || originAt(n).fx === 0.5) &&
+        (ay.f !== null || originAt(n).fy === 0.5),
     ) ?? null;
-  return { ...o, name };
+  return { fx: ax.f, fy: ay.f, atMs: shownAt, name };
 }

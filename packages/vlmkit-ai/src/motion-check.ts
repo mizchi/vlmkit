@@ -46,6 +46,8 @@ export interface MotionDom {
   hiddenBy?: string;
   /** How long its own animation has been active (ms, negative in its delay): when it begins. */
   elapsedMs?: number | null;
+  scaleX?: number;
+  scaleY?: number;
 }
 
 export interface MotionFrame {

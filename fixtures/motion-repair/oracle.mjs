@@ -1,5 +1,5 @@
 // Hidden from the agents: judges a repaired page against its brief.
-// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger> <page.html>
+// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips> <page.html>
 import { chromium } from "playwright";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
@@ -123,6 +123,42 @@ if (kind === "notify") {
   const m = await probe("li.a1");
   const frac = 1 - (m.y - rest[0].y) / 16;
   ok("rise decelerates (ease-out: >60% of travel at half time)", frac > 0.6 && frac < 0.99, { frac });
+} else if (kind === "tooltip") {
+  await at(2000);
+  const r = await probe(".tip");
+  ok("hint fully visible at rest", r && r.visible >= 0.96 && r.opacity > 0.95, r);
+  const btn = await rect(".filter button");
+  ok("hint hangs 6px under the Filter button, left-aligned (rest box unchanged)", r && Math.abs(r.x - btn[0]) <= 1 && Math.abs(r.y - (btn[1] + btn[3] + 6)) <= 1.5 && Math.abs(r.w - 300) <= 1, { r, btn });
+  await at(350 + 60);
+  const mid = await probe(".tip");
+  ok("mid-unfold: shorter than at rest", mid && mid.h < r.h * 0.95, mid);
+  ok("unfolds downward: its top edge stays put", mid && Math.abs(mid.y - r.y) <= 1.5, { mid, rest: r });
+} else if (kind === "tiles") {
+  await at(2000);
+  const rest = [];
+  for (let i = 1; i <= 4; i++) rest.push(await probe(`.t${i}`));
+  ok("all four tiles visible at rest", rest.every((e) => e && e.visible >= 0.96 && e.opacity > 0.95), rest);
+  const op = async (t) => { await at(t); const o = []; for (let i = 1; i <= 4; i++) o.push((await probe(`.t${i}`)).opacity); return o; };
+  for (const [i, start] of [[1, 240], [2, 300], [3, 360], [4, 420]]) {
+    const pre = await op(start - 20), post = await op(start + 40);
+    ok(`tile ${i} starts at ${start}ms`, pre[i - 1] < 0.02 && post[i - 1] > 0.05, { pre, post });
+  }
+  const end = await op(420 + 300 + 10);
+  ok("the last tile is done by 730ms (300ms each)", end[3] > 0.98, end);
+  await at(240 + 150);
+  const m = await probe(".t1");
+  const frac = 1 - (m.y - rest[0].y) / 12;
+  ok("lift decelerates (ease-out: >60% of travel at half time)", frac > 0.6 && frac < 0.99, { frac });
+} else if (kind === "chips") {
+  await at(2000);
+  const r = await probe(".chips");
+  ok("chips fully visible at rest", r && r.visible >= 0.96 && r.opacity > 0.95, r);
+  await at(100);
+  const mid = await probe(".chips");
+  ok("mid-fade at 100ms: the fade starts at load", mid && mid.opacity > 0.3 && mid.opacity < 0.98, mid);
+  await at(260);
+  const done = await probe(".chips");
+  ok("fully in by 260ms (200ms fade)", done && done.opacity > 0.98, done);
 }
 await browser.close();
 const failed = checks.filter((c) => !c.pass);

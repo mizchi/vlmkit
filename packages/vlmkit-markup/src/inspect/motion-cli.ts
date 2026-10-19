@@ -43,9 +43,14 @@ export async function measureTargets(
         for (let n: Element | null = el; n; n = n.parentElement) opacity *= Number(getComputedStyle(n).opacity);
         const transform = getComputedStyle(el).transform;
         let scale = 1;
+        let scaleX = 1;
+        let scaleY = 1;
         if (transform && transform !== "none") {
           const m = new DOMMatrixReadOnly(transform);
-          scale = Math.hypot(m.a, m.b);
+          scaleX = Math.hypot(m.a, m.b);
+          scaleY = Math.hypot(m.c, m.d);
+          // The scale fitted is the axis that changes more: a scaleY drop-down read 1 (round 5).
+          scale = Math.abs(scaleY - 1) > Math.abs(scaleX - 1) ? scaleY : scaleX;
         }
         // The element's own animation time (its delay and duration, not the page's): the longest
         // one running on it, as a 0-1 fraction of one iteration. Null when nothing animates it.
@@ -157,6 +162,7 @@ export async function measureTargets(
           box: { x: r.x, y: r.y, width: r.width, height: r.height },
           opacity,
           scale,
+          ...(Math.abs(scaleX - scaleY) > 1e-6 ? { scaleX, scaleY } : {}),
           t,
           visible,
           elapsedMs,
@@ -232,8 +238,10 @@ an easing is checked on each channel that changes.
                           an entrance and an exit; \`any\` leaves a segment unchecked ("ease-out,any")
   --expect-origin <name>  ${ORIGIN_NAMES.join(" | ")}: the point a scale grows
                           from (the point of its box that stays put). Once for every target, or
-                          repeated per target in order. Measured with --selector; every scale's
-                          point is printed with or without it
+                          repeated per target in order. A scale along one axis (scaleY, a
+                          drop-down) keeps an edge: top | bottom (left | right for scaleX).
+                          Measured with --selector; every scale's point or edge is printed
+                          with or without it
   --expect-start <ms>     When its own animation begins (page time). Comma-separated, one per
                           target in order: "200,280,360,440". Measured with --selector
   --expect-stagger <ms>   Each target begins this long after the one before it, in the order

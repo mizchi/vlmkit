@@ -58,6 +58,22 @@ describe("judgeMotionPath", () => {
     const ok = judgeMotionPath(samples, { startMs: 300, endMs: 400, expectOrigin: "top-right", expectStartMs: 300 });
     expect(ok.findings).toEqual([]);
   });
+
+  it("names the edge a one-axis scale keeps, and checks only that axis", () => {
+    // A 300x60 box hanging from y = 100: scaleY about its bottom edge (y = 160).
+    const at = (atMs: number, k: number) => {
+      const box = { x: 100, y: 160 - 60 * k, width: 300, height: 60 * k };
+      return { atMs, present: 1, box, dom: { box, opacity: 1, scale: k, scaleX: 1, scaleY: k } };
+    };
+    const samples = [at(300, 0.2), at(330, 0.5), at(360, 0.8), at(390, 1), at(700, 1)];
+    const r = judgeMotionPath(samples, { startMs: 300, endMs: 400, expectOrigin: "top" });
+    expect(r.segments[0]!.origin).toMatchObject({ fx: null, name: "bottom" });
+    expect(r.findings.map((f) => f.message)).toEqual([
+      expect.stringMatching(/grows from its bottom edge .*not its top edge/),
+    ]);
+    // "bottom-left" asks the bottom edge along y; across, it does not scale, so nothing to check.
+    expect(judgeMotionPath(samples, { startMs: 300, endMs: 400, expectOrigin: "bottom-left" }).findings).toEqual([]);
+  });
   it("passes every intact easing, and names it", () => {
     for (const e of EASING_NAMES) {
       const s = run((t) => 40 + 480 * easingAt(e, t));

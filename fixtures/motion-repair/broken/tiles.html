@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Overview</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #f6f7f9; color: #1c2128; }
+  main { max-width: 1100px; margin: 40px auto; padding: 0 24px; }
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .tile { background: #fff; border: 1px solid #e2e5ea; border-radius: 10px; padding: 18px; min-height: 110px;
+          animation: lift 300ms cubic-bezier(0, 0, 0.58, 1) both; }
+  .tile b { display: block; font-size: 26px; }
+  .t1 { animation-delay: 420ms; } .t2 { animation-delay: 360ms; } .t3 { animation-delay: 300ms; } .t4 { animation-delay: 240ms; }
+  @keyframes lift { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+</style></head>
+<body>
+  <main>
+    <h1>Overview</h1>
+    <div class="tiles">
+      <div class="tile t1">Visitors<b>18,240</b></div>
+      <div class="tile t2">Sign-ups<b>1,032</b></div>
+      <div class="tile t3">Revenue<b>$42.1k</b></div>
+      <div class="tile t4">Churn<b>2.4%</b></div>
+    </div>
+  </main>
+</body></html>

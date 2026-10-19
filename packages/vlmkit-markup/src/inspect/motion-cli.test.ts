@@ -220,6 +220,35 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
       ["--selector", ".toast", "--exits", "--expect-easing", "ease-out,ease-in"],
       /FAIL snap-back .*in the hold after 660ms/,
     ],
+    // Round 5: a scaleY drop-down (one axis), a wave in reverse, and a start held back.
+    [
+      "tooltip.html",
+      ["--selector", ".tip", "--expect-origin", "top"],
+      /FAIL origin-mismatch .*grows from its bottom edge .*transform-origin: top/,
+    ],
+    [
+      "tiles.html",
+      [
+        "--selector",
+        ".t1",
+        "--selector",
+        ".t2",
+        "--selector",
+        ".t3",
+        "--selector",
+        ".t4",
+        "--expect-start",
+        "240",
+        "--expect-stagger",
+        "60",
+      ],
+      /FAIL start-mismatch .*begins at 420ms, not 240ms/,
+    ],
+    [
+      "chips.html",
+      ["--selector", ".chips", "--expect-start", "0"],
+      /FAIL start-mismatch .*begins at 1200ms, not 0ms: late by 1200ms/,
+    ],
     // Round 3: an ancestor's opacity 0 named, a scale's fixed point, and a stagger that is not one.
     [
       "drawer.html",
