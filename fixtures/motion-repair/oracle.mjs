@@ -1,5 +1,5 @@
 // Hidden from the agents: judges a repaired page against its brief.
-// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips> <page.html>
+// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet> <page.html>
 import { chromium } from "playwright";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
@@ -159,6 +159,50 @@ if (kind === "notify") {
   await at(260);
   const done = await probe(".chips");
   ok("fully in by 260ms (200ms fade)", done && done.opacity > 0.98, done);
+} else if (kind === "banner") {
+  await at(1000);
+  const shown = await probe(".banner");
+  ok("banner fully visible at the top before it leaves (1000ms)", shown && shown.visible >= 0.96 && Math.abs(shown.y) <= 1, shown);
+  await at(2000 + 150);
+  const mid = await probe(".banner");
+  const frac = mid ? -mid.y / 48 : 0;
+  ok("leaving at 2150ms, accelerating (ease-in: under 40% of the way at half time)", frac > 0.02 && frac < 0.4, { frac });
+  for (const t of [2400, 3000, 6000]) {
+    await at(t);
+    const g = await probe(".banner");
+    ok(`gone at ${t}ms`, g && (g.visible === 0 || g.bottom <= 1), g);
+  }
+  ok("inbox unchanged", JSON.stringify(await rect("main")) === JSON.stringify([280, 80, 720, (await rect("main"))[3]]), await rect("main"));
+} else if (kind === "badge") {
+  const scale = () => page.evaluate(() => { const m = new DOMMatrixReadOnly(getComputedStyle(document.querySelector(".badge")).transform); return Math.hypot(m.a, m.b); });
+  await at(300);
+  ok("still before it starts (300ms)", Math.abs((await scale()) - 1) < 0.01, await scale());
+  for (const [n, t] of [[1, 800], [2, 1400], [3, 2000]]) {
+    await at(t);
+    const sc = await scale();
+    ok(`throb ${n} swells (${t}ms)`, sc > 1.25, sc);
+  }
+  for (const t of [2600, 3650, 8000]) {
+    await at(t);
+    const sc = await scale();
+    ok(`still at ${t}ms, after three throbs`, Math.abs(sc - 1) < 0.01, sc);
+  }
+  const b = await probe(".badge");
+  ok("badge visible at rest (its rounded corners miss the hit-test)", b && b.visible >= 0.8 && b.opacity > 0.95, b);
+} else if (kind === "sheet") {
+  await at(2000);
+  const r = await probe(".sheet");
+  ok("sheet fully up at rest, its place unchanged", r && r.visible >= 0.96 && Math.abs(r.bottom - 800) <= 1 && Math.abs(r.y - 520) <= 1, r);
+  await at(200 + 280 + 10);
+  const up = await probe(".sheet");
+  ok("fully up by 490ms (280ms rise)", up && Math.abs(up.y - 520) <= 1, up);
+  await at(200 + 140);
+  const mid = await probe(".sheet");
+  const frac = mid ? (800 - mid.y) / 280 : 0;
+  ok("mid-rise at 340ms, decelerating (ease-out: over 60% up at half time)", frac > 0.6 && frac < 0.99, { frac });
+  await at(150);
+  const before = await probe(".sheet");
+  ok("below the screen before 200ms", before && before.y >= 799, before);
 }
 await browser.close();
 const failed = checks.filter((c) => !c.pass);

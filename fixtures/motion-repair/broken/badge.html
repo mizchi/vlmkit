@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Team</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #fff; color: #1b1f24; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 16px 32px; border-bottom: 1px solid #e3e6ea; }
+  .bell { position: relative; font-size: 22px; }
+  .badge { position: absolute; top: -6px; right: -10px; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px;
+           background: #e5484d; color: #fff; font-size: 12px; line-height: 20px; text-align: center;
+           animation: pulse 600ms ease-in-out 500ms infinite; }
+  @keyframes pulse { 0%, 100% { transform: none; } 50% { transform: scale(1.35); } }
+  main { padding: 32px; }
+</style></head>
+<body>
+  <header><strong>Team</strong><span class="bell" aria-label="Notifications">🔔<span class="badge">3</span></span></header>
+  <main><h1>Members</h1><p>12 people in this workspace.</p></main>
+</body></html>
