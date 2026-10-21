@@ -1,5 +1,5 @@
 // Hidden from the agents: judges a repaired page against its brief.
-// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet> <page.html>
+// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet|slidein|progress|accordion> <page.html>
 import { chromium } from "playwright";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
@@ -203,6 +203,60 @@ if (kind === "notify") {
   await at(150);
   const before = await probe(".sheet");
   ok("below the screen before 200ms", before && before.y >= 799, before);
+} else if (kind === "slidein") {
+  await at(2000);
+  const r = await probe(".panel");
+  ok("panel docked at the right at rest", r && r.visible >= 0.96 && Math.abs(r.x - 920) <= 1 && Math.abs(r.right - 1280) <= 1, r);
+  await at(100);
+  const before = await probe(".panel");
+  ok("outside the right edge before 250ms", before && before.x >= 1279, before);
+  await at(250 + 160);
+  const mid = await probe(".panel");
+  const frac = mid ? (1280 - mid.x) / 360 : 0;
+  ok("mid-slide at 410ms: right of its place, moving leftwards, decelerating (>60% in at half time)", mid && mid.x > 921 && frac > 0.6 && frac < 0.99, { mid, frac });
+} else if (kind === "progress") {
+  await page.waitForFunction(() => document.querySelector("main")?.classList.contains("loaded"));
+  const t = await page.evaluate(() => {
+    const bar = document.querySelector(".bar");
+    const tr = bar.getAnimations().find((a) => a.transitionProperty === "width");
+    if (!tr) return null;
+    tr.pause();
+    const track = document.querySelector(".track").getBoundingClientRect().width;
+    tr.currentTime = 300;
+    const mid = bar.getBoundingClientRect().width / track;
+    tr.finish();
+    return { mid, end: bar.getBoundingClientRect().width / track };
+  });
+  ok("a width transition runs when the page is marked loaded", t !== null, t);
+  ok("half way through (300ms) the bar is past half of its 70% (ease-out) and not there yet", t && t.mid > 0.7 * 0.6 && t.mid < 0.7 * 0.98, t);
+  ok("it ends at 70%", t && Math.abs(t.end - 0.7) < 0.01, t);
+} else if (kind === "accordion") {
+  const closed = await rect(".panel");
+  ok("closed at load", closed[3] === 0, closed);
+  const afterTop = (await rect(".after"))[1];
+  await page.click(".toggle");
+  const t = await page.evaluate(() => {
+    const panel = document.querySelector(".panel");
+    const tr = panel.getAnimations().find((a) => a.transitionProperty === "height");
+    if (!tr) return null;
+    tr.pause();
+    tr.currentTime = 125;
+    const mid = panel.getBoundingClientRect().height;
+    tr.finish();
+    return { mid, full: panel.getBoundingClientRect().height };
+  });
+  ok("clicking it starts a height transition", t !== null, t);
+  ok("half way (125ms) it is part open, more than half (ease-out)", t && t.mid > t.full * 0.6 && t.mid < t.full * 0.98, t);
+  ok("fully open shows all three lines", t && t.full > 90, t);
+  ok("the total moved down by the panel's height", Math.abs((await rect(".after"))[1] - afterTop - (t?.full ?? 0)) <= 2, await rect(".after"));
+  await page.click(".toggle");
+  const back = await page.evaluate(() => {
+    const tr = document.querySelector(".panel").getAnimations().find((a) => a.transitionProperty === "height");
+    if (!tr) return null;
+    tr.finish();
+    return document.querySelector(".panel").getBoundingClientRect().height;
+  });
+  ok("clicking again closes it with a transition, back to 0", back === 0, back);
 }
 await browser.close();
 const failed = checks.filter((c) => !c.pass);

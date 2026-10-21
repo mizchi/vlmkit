@@ -758,10 +758,28 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
     await import("@mizchi/vlmkit-animation-eval/frames-capture.ts");
   const url = sourceToUrl(o.source);
   return withBrowser(async (browser) => {
-    const page = await browser.newPage({ viewport: o.viewport, deviceScaleFactor: 1 });
+    let page = await browser.newPage({ viewport: o.viewport, deviceScaleFactor: 1 });
     try {
-      const timeline = await openHeldTimeline(page, url);
-      const held = await timeline.animations();
+      let timeline = await openHeldTimeline(page, url);
+      let held = await timeline.animations();
+      // Nothing animates at load, but timers are due: run the held clock to each one and look
+      // again. A bar a script marks loaded at 100ms gets its transition then, and the page read
+      // "no animation on the page" (round 7). Found, the page is opened afresh to shoot from 0.
+      let ranTo: number | null = null;
+      if (held.length === 0 && o.endMs === undefined) {
+        for (let guard = 0; guard < 20 && held.length === 0; guard++) {
+          const due = await timeline.pending();
+          if (due.timers === 0 || due.latestTimerMs === null || due.latestTimerMs > 10_000) break;
+          await timeline.at(due.latestTimerMs + 20);
+          ranTo = due.latestTimerMs + 20;
+          held = await timeline.animations();
+        }
+        if (held.length > 0) {
+          await page.close();
+          page = await browser.newPage({ viewport: o.viewport, deviceScaleFactor: 1 });
+          timeline = await openHeldTimeline(page, url);
+        }
+      }
       const holds = await keyframeHolds(page).catch(() => []);
       const plan = motionPlan(
         held.map((a) => {
@@ -779,7 +797,9 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
       let forever: { startMs: number; endMs: number } | null = null;
       if (o.endMs === undefined && plan.segments.length === 0) {
         if (infinite.length === 0) {
-          throw new MotionUsageError("no animation on the page to sample: give --at and --end");
+          throw new MotionUsageError(
+            `no animation or transition on the page${ranTo !== null ? `, at load or after its timers ran (to ${ranTo}ms)` : " at load"}: nothing to sample. If one should run, it never starts — check animation lists what does; a misspelt transition-property or animation-name, or a class added in the same frame as the style it transitions from, are the usual causes. Give --at and --end to shoot the page anyway`,
+          );
         }
         const s0 = Math.min(...infinite.map((a) => a.startMs));
         forever = { startMs: s0, endMs: s0 + Math.min(4000, 3 * Math.max(...infinite.map((a) => a.durationMs))) };

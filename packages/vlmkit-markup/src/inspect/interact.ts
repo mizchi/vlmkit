@@ -972,7 +972,15 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
   await mkdir(outputDir, { recursive: true });
 
   const sequenceText = await readFile(resolve(options.sequencePath), "utf-8");
-  const sequence: Sequence = JSON.parse(sequenceText);
+  // A bare array of steps is a sequence too: given one, `sequence.steps` was undefined and the
+  // run died in a TypeError (motion-repair round 7). Anything else names the schema.
+  const parsed = JSON.parse(sequenceText) as Sequence | Sequence["steps"];
+  const sequence: Sequence = Array.isArray(parsed) ? { steps: parsed } : parsed;
+  if (!sequence || !Array.isArray(sequence.steps)) {
+    throw new Error(
+      `${options.sequencePath}: a sequence is { "steps": [ … ] } (or a bare array of steps); see --help for the step schema`,
+    );
+  }
   const viewport = sequence.viewport ?? { width: 1280, height: 720 };
   const threshold = options.threshold ?? 0.03;
 
