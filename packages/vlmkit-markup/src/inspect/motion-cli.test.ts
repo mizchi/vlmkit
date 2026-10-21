@@ -220,6 +220,19 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
       ["--selector", ".toast", "--exits", "--expect-easing", "ease-out,ease-in"],
       /FAIL snap-back .*in the hold after 660ms/,
     ],
+    // Round 8: a keyframe transform replacing the centring, a :hover-only transition, a reveal
+    // whose observer never fires for a section taller than the screen.
+    [
+      "dialog.html",
+      ["--click", ".delete", "--selector", ".dialog", "--expect-still", "--expect-origin", "center"],
+      /FAIL still-mismatch [\s\S]*FAIL origin-mismatch .*no point of its box \(it moves as well as it scales\), not its centre[\s\S]*FAIL jump .*sits 223px off where it rests .*translate\(-50%, -50%\)/,
+    ],
+    [
+      "hover.html",
+      ["--selector", "#c2", "--hover", "#c2", "--leave", "--expect-duration", "150", "--expect-easing", "ease-out"],
+      /after --hover #c2, --leave, no animation[\s\S]*FAIL snapped: #c2: .*a transition declared only in the :hover rule/,
+    ],
+    ["reveal.html", ["--selector", ".studio", "--scroll", ".studio"], /FAIL target-hidden .*rendered at opacity 0\.00/],
     // Round 7: a panel from the wrong side, and a click that snaps a panel open.
     [
       "slidein.html",

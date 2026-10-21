@@ -96,6 +96,8 @@ export interface MotionCheckOptions {
   expectIterations?: readonly (number | null)[];
   /** Which way each target's first segment moves: one for all, or per target. */
   expectDirection?: readonly MotionDirection[];
+  /** Every target's centre must not move: only its size and opacity change. */
+  expectStill?: boolean;
   /** A statement is true at or above this (default 0.5). */
   threshold?: number;
   /** Within this of the threshold an answer is `uncertain` (default 0.3). */
@@ -356,6 +358,7 @@ export async function checkMotionFrames(
         ...(perTarget(options.expectIterations, i) !== undefined
           ? { expectIterations: perTarget(options.expectIterations, i)! }
           : {}),
+        ...(options.expectStill ? { expectStill: true } : {}),
       }),
     };
     if (i === 0) staggerFrom ??= judged.startsAtMs;

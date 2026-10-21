@@ -232,7 +232,8 @@ each forbidden statement is. vlmkit judges the motion from that:
   duration-mismatch one run takes another time than --expect-duration
   iterations-mismatch it runs another number of times than --expect-iterations
   direction-mismatch it moves another way than --expect-direction
-  snapped          after --click a --selector target changed with no animation at all
+  still-mismatch   its centre moves though --expect-still says only size and opacity change
+  snapped          after an action a --selector target changed with no animation at all
   forbid           a statement seen at rest fails; only mid-motion, warns (--jev)
 
 Frames: each span some finite animation runs in is a segment (an entrance, and
@@ -245,8 +246,8 @@ come from frames that surely show the target (presence 0.8+); a box cut by the
 viewport's edge is put back from the target's own size. So "travels" is the
 measured part of the path and can be shorter than the CSS distance; under 60px
 an easing is not fitted, and an --expect-easing there is a warn, not a pass.
-With --selector every frame is measured from the page, the floor is 6px, and
-opacity (a change of 0.2+) and scale (0.02+) are fitted as well as position:
+With --selector every frame is measured from the page, a jump's floor is 6px
+(an easing is fitted from 2px, a target is static under 1px), and opacity (a change of 0.2+) and scale (0.02+) are fitted as well as position:
 an easing is checked on each channel that changes.
 
   --selector <css>        The element that moves (repeat for each): its position, opacity, scale,
@@ -282,9 +283,15 @@ an easing is checked on each channel that changes.
                           from the right edge" moves left. Once for every target, or per target
   --expect-iterations <n> How many times it runs: 3, or infinite. Once for every target, or
                           comma-separated per target. --selector
-  --click <css>           Click this first, on the held page (repeat for several, in order): the
-                          motion a click starts is sampled from it. Nothing animating while a
-                          --selector target changes is \`snapped\` (fail)
+  --expect-still          Its centre must not move: only its size and opacity change (a dialog
+                          that stays centred while it grows in). --selector
+  --click <css>           Actions on the held page before any frame, in the order given: the
+  --hover <css>           motion the LAST one starts is sampled, and each one before it first
+  --leave                 runs to its end. --hover puts the pointer over an element, --leave
+  --scroll <css|px>       takes it off every element ("--hover .card --leave" samples the card
+                          settling back), --scroll brings an element's top to the viewport's
+                          top (or scrolls to a y in px) — what a scroll-triggered reveal needs.
+                          Nothing animating while a --selector target changes is \`snapped\`
   --exits                 The targets are meant to leave (gone at rest is their end)
   --at <instants>         Frames to shoot (default: 11 per segment + rest); the segments stay
                           the page's own spans of motion
@@ -334,9 +341,24 @@ export interface MotionCliOptions {
   json: boolean;
   /** Ask TypeSafe Jev. Without it every target is a --selector, measured from the page alone. */
   jev: boolean;
-  /** Elements clicked, in order, on the held page before any frame is shot. */
-  clicks: string[];
+  /**
+   * What is done on the held page before any frame is shot, in order: the motion the last one
+   * starts is sampled, and each one before it is first let run to its end.
+   */
+  actions: MotionAction[];
+  /** Each target's centre must not move (only size and opacity change). */
+  expectStill: boolean;
 }
+
+/** One thing done on the held page: a click, the pointer over or off an element, a scroll. */
+export type MotionAction =
+  | { kind: "click" | "hover"; selector: string }
+  | { kind: "leave" }
+  | { kind: "scroll"; selector: string }
+  | { kind: "scroll"; y: number };
+
+export const describeAction = (a: MotionAction): string =>
+  a.kind === "leave" ? "--leave" : "selector" in a ? `--${a.kind} ${a.selector}` : `--scroll ${a.y}`;
 
 export function parseMotionArgs(argv: string[]): MotionCliOptions {
   const positional: string[] = [];
@@ -360,7 +382,8 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   let exits = false;
   let noForbid = false;
   let jev = false;
-  const clicks: string[] = [];
+  const actions: MotionAction[] = [];
+  let expectStill = false;
   const value = (flag: string, v: string | undefined) => {
     if (v === undefined || v.startsWith("--")) throw new MotionUsageError(`${flag} needs a value`);
     return v;
@@ -458,7 +481,19 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
         selectors.push(value(a, argv[++i]).trim());
         break;
       case "--click":
-        clicks.push(value(a, argv[++i]).trim());
+      case "--hover":
+        actions.push({ kind: a === "--click" ? "click" : "hover", selector: value(a, argv[++i]).trim() });
+        break;
+      case "--leave":
+        actions.push({ kind: "leave" });
+        break;
+      case "--scroll": {
+        const v = value(a, argv[++i]).trim();
+        actions.push(/^\d+(px)?$/.test(v) ? { kind: "scroll", y: parseInt(v, 10) } : { kind: "scroll", selector: v });
+        break;
+      }
+      case "--expect-still":
+        expectStill = true;
         break;
       case "--at":
         at = parseInstants(value(a, argv[++i]), a);
@@ -607,7 +642,8 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
     threshold,
     json,
     jev,
-    clicks,
+    actions,
+    expectStill,
   };
 }
 
@@ -799,6 +835,26 @@ interface Captured {
   textLines?: { x: number; y: number; width: number; height: number }[];
 }
 
+/** Do one action on the held page; an element it cannot reach is the user's error, named. */
+async function runAction(page: import("playwright").Page, act: MotionAction): Promise<void> {
+  try {
+    if (act.kind === "click") await page.click(act.selector, { timeout: 5000 });
+    else if (act.kind === "hover") await page.hover(act.selector, { timeout: 5000 });
+    // Off every element that could take :hover: the page's top-left corner is the html element.
+    else if (act.kind === "leave") await page.mouse.move(0, 0);
+    else if ("selector" in act) {
+      const found = await page.evaluate((sel) => {
+        const el = document.querySelector(sel);
+        el?.scrollIntoView({ block: "start", behavior: "instant" as ScrollBehavior });
+        return el !== null;
+      }, act.selector);
+      if (!found) throw new Error(`matches nothing on the page`);
+    } else await page.evaluate((y) => window.scrollTo({ top: y, behavior: "instant" as ScrollBehavior }), act.y);
+  } catch (e) {
+    throw new MotionUsageError(`${describeAction(act)}: ${(e as Error).message.split("\n")[0]}`);
+  }
+}
+
 async function captureMotion(o: MotionCliOptions): Promise<Captured> {
   const { withBrowser } = await import("@mizchi/vlmkit-core/browser-launch.ts");
   const { sourceToUrl } = await import("@mizchi/vlmkit-core/page-open.ts");
@@ -816,32 +872,61 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
       let ranTo: number | null = null;
       // The clock's time once the --click actions ran: nothing before it can be shot again.
       let clockNow = 0;
-      if (o.clicks.length > 0) {
-        const beforeClick = o.selectors.length > 0 ? await measureTargets(page, o.selectors) : [];
-        const heldBefore = held.length;
-        // Each --click on the held page, in order, then one frame so the styles they change are
-        // computed and their transitions exist. A panel opened by a click was out of reach: only
-        // frames.json from inspect interact with --jev could judge it (round 7).
-        for (const sel of o.clicks) {
-          try {
-            await page.click(sel, { timeout: 5000 });
-          } catch (e) {
-            throw new MotionUsageError(`--click ${sel}: ${(e as Error).message.split("\n")[0]}`);
+      // Animations held before the last action: what it starts comes after them.
+      let heldBefore = held.length;
+      if (o.actions.length > 0) {
+        let beforeClick: Awaited<ReturnType<typeof measureTargets>> = [];
+        const scrolled = () => page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }));
+        let scrollBefore = { x: 0, y: 0 };
+        // Each action on the held page, in order. Before the next one, the motion it started runs
+        // to its end: a hover's lift must be finished before --leave lets it settle back, and two
+        // --click on one page sampled only the last with the first never run (round 8).
+        for (const [k, act] of o.actions.entries()) {
+          if (k === o.actions.length - 1) {
+            beforeClick = o.selectors.length > 0 ? await measureTargets(page, o.selectors) : [];
+            scrollBefore = await scrolled();
+            heldBefore = held.length;
+          }
+          await runAction(page, act);
+          clockNow += frameTimeMs(1);
+          await timeline.at(clockNow);
+          // A scroll's IntersectionObserver callbacks and a hover's style change are delivered
+          // with the next rendering, which is real: let one happen, then step the clock again.
+          await page.waitForTimeout(50);
+          clockNow += frameTimeMs(1);
+          await timeline.at(clockNow);
+          held = await timeline.animations();
+          if (k < o.actions.length - 1) {
+            const ends = held
+              .filter((h) => h.iterations !== null)
+              .map((h) => h.startMs + h.durationMs * (h.iterations ?? 1));
+            const end = Math.max(clockNow, ...ends);
+            clockNow = Math.min(end, clockNow + 10_000) + frameTimeMs(1);
+            await timeline.at(clockNow);
           }
         }
-        clockNow = frameTimeMs(1);
-        await timeline.at(clockNow);
-        held = await timeline.animations();
+        // The plan's clock starts where the actions left it.
+        clockNow = Math.max(0, clockNow - frameTimeMs(1));
+        // Nothing new, but something earlier still runs (a reveal begun at load that a scroll
+        // only brings into view): that is the motion to sample, not a snap.
+        const running = held.some(
+          (h) => h.iterations === null || h.startMs + h.durationMs * (h.iterations ?? 1) > clockNow,
+        );
+        if (held.length === heldBefore && running) heldBefore = 0;
         if (held.length === heldBefore && o.endMs === undefined) {
-          // Nothing animates after the click: if a target changed, it changed in one frame.
+          // Nothing animates after the action: if a target changed, it changed in one frame.
           const afterClick = o.selectors.length > 0 ? await measureTargets(page, o.selectors) : [];
+          // In the page's own coordinates: a scroll moves every box, and that is not a change.
+          const after = await scrolled();
+          const dx = after.x - scrollBefore.x;
+          const dy = after.y - scrollBefore.y;
           const changed = o.selectors.flatMap((sel, i) => {
             const a = beforeClick[i];
             const b = afterClick[i];
             if (!a || !b) return [];
             const d = Math.max(
-              Math.abs(a.box.x - b.box.x),
-              Math.abs(a.box.y - b.box.y),
+              Math.abs(a.box.x - (b.box.x + dx)),
+              Math.abs(a.box.y - (b.box.y + dy)),
               Math.abs(a.box.width - b.box.width),
               Math.abs(a.box.height - b.box.height),
             );
@@ -873,8 +958,10 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
         }
       }
       const holds = await keyframeHolds(page).catch(() => []);
+      // After actions, the motion the last one started; what ran before it is not this sampling's.
+      const planned = o.actions.length > 0 ? held.slice(heldBefore) : held;
       const plan = motionPlan(
-        held.map((a) => {
+        planned.map((a) => {
           const k = holds.find(
             (h) =>
               Math.abs(h.durationMs - a.durationMs) < 1 && Math.abs(h.delayMs - a.startMs) < 1 && h.holds.length > 0,
@@ -1238,16 +1325,23 @@ export async function runMotionCli(argv: string[]): Promise<number> {
     if (e instanceof SnappedError) {
       if (e.changed.length === 0) {
         console.error(
-          `error: nothing animated after --click ${o.clicks.join(", ")}, and no --selector target changed: check the click reaches the control (and that --selector names what it opens)`,
+          `error: nothing animated after ${o.actions.map(describeAction).join(", ")}, and no --selector target changed: check the action reaches the control (and that --selector names what it changes)`,
         );
         return 2;
       }
       console.log(
-        `inspect motion: ${o.source} — after --click ${o.clicks.join(", ")}, no animation or transition started`,
+        `inspect motion: ${o.source} — after ${o.actions.map(describeAction).join(", ")}, no animation or transition started`,
       );
+      const last = o.actions[o.actions.length - 1]!;
+      // The pointer leaving: the transition in force is the element's own, not the :hover rule's.
+      const pointer =
+        last.kind === "leave" ||
+        (last.kind === "hover" && o.actions.some((a, k) => k < o.actions.length - 1 && a.kind === "hover"))
+          ? "a transition declared only in the :hover rule runs on the way in and not on the way out — declare it on the element itself; "
+          : "";
       for (const c of e.changed) {
         console.log(
-          `    FAIL snapped: ${c} in one frame. If it should animate, its transition never starts: a transition to or from an intrinsic size (height: auto) does not run without interpolate-size: allow-keywords (Chromium only so far; grid-template-rows 0fr → 1fr runs in every engine); a misspelt transition-property and a property the transition does not list are the other usual causes`,
+          `    FAIL snapped: ${c} in one frame. If it should animate, its transition never starts: ${pointer}a transition to or from an intrinsic size (height: auto) does not run without interpolate-size: allow-keywords (Chromium only so far; grid-template-rows 0fr → 1fr runs in every engine); a misspelt transition-property and a property the transition does not list are the other usual causes`,
         );
       }
       console.log(`  ${e.changed.length} fail; measured from the page, no model asked`);
@@ -1274,6 +1368,7 @@ export async function runMotionCli(argv: string[]): Promise<number> {
     ...(o.expectDurationMs ? { expectDurationMs: o.expectDurationMs } : {}),
     ...(o.expectIterations ? { expectIterations: o.expectIterations } : {}),
     ...(o.expectDirection ? { expectDirection: o.expectDirection } : {}),
+    ...(o.expectStill ? { expectStill: true } : {}),
   });
   const json = {
     source: o.source,

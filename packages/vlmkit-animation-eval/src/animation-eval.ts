@@ -1763,6 +1763,11 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
   } else if (note === undefined) {
     lines.push("");
     lines.push(`${GREEN}No animation issues detected.${RESET}`);
+    // Round 8: a dialog a click opens, a card's :hover exit and a scroll reveal each passed here
+    // with "animations: 0", and every agent had to find out why.
+    lines.push(
+      `${DIM}Only motion that runs from load is evaluated: a transition or animation started by a click, a :hover or a scroll is not — \`vlmkit inspect motion <page> --selector <el> --click/--hover/--leave/--scroll <css>\` samples it.${RESET}`,
+    );
   }
   if (note) {
     lines.push("");

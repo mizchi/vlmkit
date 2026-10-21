@@ -59,6 +59,55 @@ describe("judgeMotionPath", () => {
     expect(ok.findings).toEqual([]);
   });
 
+  // Round 8 of motion-repair.
+  it("solves the point of a 96% → 100% scale, and fits a 4px lift instead of calling it static", () => {
+    // A 400x200 dialog centred on (640,400), growing about its centre.
+    const dlg = (atMs: number, k: number) => {
+      const box = { x: 640 - 200 * k, y: 400 - 100 * k, width: 400 * k, height: 200 * k };
+      return { atMs, present: 1, box, dom: { box, opacity: 1, scale: k } };
+    };
+    const grow = [0, 0.25, 0.5, 0.75, 1].map((t, i) => dlg(i * 50, 0.96 + 0.04 * easingAt("ease-out", t)));
+    const g = judgeMotionPath([...grow, dlg(500, 1)], {
+      startMs: 0,
+      endMs: 200,
+      expectOrigin: "center",
+      expectStill: true,
+    });
+    expect(g.segments[0]!.origin).toMatchObject({ name: "center" });
+    expect(g.findings).toEqual([]);
+    // A card lifting 4px with ease-out: a path, not "moves under 6px … not applying".
+    const lift = Array.from({ length: 11 }, (_, i) => {
+      const b = box(300, 105 - 4 * easingAt("ease-out", i / 10));
+      return { atMs: i * 15, present: 1, box: b, dom: { box: b, opacity: 1, scale: 1 } };
+    });
+    const rest = { ...lift[10]!, atMs: 450 };
+    const l = judgeMotionPath([...lift, rest], { startMs: 0, endMs: 150, expectEasing: "ease-out" });
+    expect(l.findings).toEqual([]);
+    expect(l.segments[0]!.direction?.way).toBe("up");
+  });
+
+  it("names a keyframe transform that replaces the element's placement", () => {
+    // Off by (200,98) through the whole opening, at its place only once it stops.
+    const at = (atMs: number, dx: number, op: number) => {
+      const b = { x: 440 + dx, y: 300 + 98 * Math.sign(dx), width: 400, height: 200 };
+      return { atMs, present: 1, box: b, dom: { box: b, opacity: op, scale: 1 } };
+    };
+    const samples = [
+      at(0, 200, 0.2),
+      at(50, 200, 0.5),
+      at(100, 200, 0.7),
+      at(150, 200, 0.9),
+      at(199, 200, 1),
+      at(500, 0, 1),
+    ];
+    const r = judgeMotionPath(samples, { startMs: 0, endMs: 200, expectStill: true });
+    expect(r.findings.map((f) => f.rule).sort()).toEqual(["jump", "still-mismatch"]);
+    expect(r.findings.find((f) => f.rule === "jump")!.message).toMatch(
+      /sits 223px off where it rests .*translate\(-50%, -50%\)/,
+    );
+    expect(r.segments[0]!.direction).toBeUndefined();
+  });
+
   it("names the edge a one-axis scale keeps, and checks only that axis", () => {
     // A 300x60 box hanging from y = 100: scaleY about its bottom edge (y = 160).
     const at = (atMs: number, k: number) => {

@@ -286,11 +286,20 @@ vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ea
   if nothing animates and a `--selector` target changes anyway, that
   is `snapped` — the usual cause is a transition to `height: auto`,
   which needs `interpolate-size: allow-keywords` (Chromium only; `grid-template-rows:
-  0fr → 1fr` runs in every engine). In motion-repair round 3 a wrong
+  0fr → 1fr` runs in every engine). Motion a pointer or a scroll starts: `--hover <css>`,
+  `--leave` and `--scroll <css>` are actions too, run in order, each one before the last let
+  run to its end — "settles back when the pointer moves off" is `--hover .card --leave`
+  (`snapped` there names a transition declared only in the `:hover` rule), and "fades up as it
+  scrolls into view" is `--scroll .section`. `check animation` evaluates motion that runs from
+  load only: it passes a page whose motion all waits for a click, a hover or a scroll. "Stays
+  dead centre", "only its size and opacity change" is `--expect-still`; a target that sits off
+  its place through the whole motion and jumps there at the end is a keyframe `transform`
+  replacing the element's own (a `translate(-50%, -50%)` centring). In motion-repair round 3 a wrong
   `transform-origin` and a stagger that was not one both read "follows ease-out exactly, no fail"
   until these existed.
 - **What it does not judge**: fps or jank, a target it is not told about, and anything under
-  the 6px / 0.2-opacity floors with `--selector` (60px for a `--jev` target without one). A pass is "nothing looked
+  the floors with `--selector` — a jump under 6px, a path under 2px, an opacity change under 0.2,
+  a scale under 2% (60px for a `--jev` target without one). A pass is "nothing looked
   broken in these frames", not "matches the brief" — compare durations with B3's list.
 
 ### B4. `check motion attempt.html`

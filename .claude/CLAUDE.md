@@ -314,7 +314,7 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   entries "cascading" at one delay both passed every rule. Each line now names when the target's
   own animation begins (frame time less `elapsedMs`, the active time of its longest animation)
   and the point of its box a scale keeps in place (`o = (box - k B) / (1 - k)` against the
-  largest-scale frame, median over frames scaled 10%+). `--expect-origin`, `--expect-start` and
+  largest-scale frame, median over frames scaled 2%+). `--expect-origin`, `--expect-start` and
   `--expect-stagger` turn them into `origin-mismatch` / `start-mismatch`. A transparent target
   names the ancestor whose opacity does it, and whether anything animates it.
 - **Briefs never name the flag, and agents map them anyway** (round 5,
@@ -337,6 +337,15 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   `snapped`; timers are run to find a transition a script starts, its start put on the frame after
   the timer; `check animation`'s `unknown-transition-property` (suspect) names a property CSS does
   not know.
+- **What a pointer or a scroll starts, and a placement the animation replaces** (round 8,
+  `docs/reports/2026-10-21-motion-repair-v8.md`): a dialog whose keyframe `transform` dropped its
+  `translate(-50%, -50%)`, a card whose transition was declared only on `:hover`, and a reveal whose
+  `threshold: 1` never fires for a section taller than the screen. `check animation` passed all three
+  (it sees motion from load only, and now says so). `--hover` / `--leave` / `--scroll` are actions
+  beside `--click`, in order, each before the last run to its end; a jump from a target held still
+  off its place names the replaced transform; `--expect-still` fails a centre that moves. With
+  `--selector` an easing is fitted from 2px (a 4px lift read "static") and a scale's point is solved
+  from 2% (a 96% dialog read "not checked").
 
 ## Generated figures (raster images)
 

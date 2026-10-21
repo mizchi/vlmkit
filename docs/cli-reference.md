@@ -1053,7 +1053,9 @@ vlmkit inspect motion   <html|url> --selector .toast [--target "the green Saved 
   # animation time from the page (use it on your own page). Frames + motion-report.json in
   # --frames (default test-results/inspect-motion/<page>). Exit 0 / 1 fail / 2 usage: an inspect
   # leaf, not a registered gate, but its exit is a verdict. Expectations: --expect-easing, -origin,
-  # -start, -stagger, -duration, -iterations, -direction; --click drives the page first.
+  # -start, -stagger, -duration, -iterations, -direction, --expect-still. Actions on the held page
+  # first, in order (each before the last run to its end): --click, --hover, --leave, --scroll <css|px>.
+  # "--hover .card --leave" samples a card settling back; "--scroll .section" a scroll reveal.
 # Checks.
 vlmkit check motion <html|url>                 # CSS motion / reduced-motion detection (declarations)
 vlmkit check animation <html|url>              # Frame-sampled animation evaluation: pause + seek each
@@ -1062,6 +1064,8 @@ vlmkit check animation <html|url>              # Frame-sampled animation evaluat
                                                # report motion bbox, settle time, infinite animations (VRT
                                                # mask hints), behavioral prefers-reduced-motion parity, and
                                                # uncontrolled motion (rAF/video/GIF) that WAAPI can't pause
+                                               # Motion from load only: what a click, a :hover or a scroll
+                                               # starts is inspect motion's (--click/--hover/--scroll)
 vlmkit check flash <html|url|frames.json|video>  # WCAG 2.3.1 Three Flashes: every 60fps frame of page time on
                                                # the held clock, per-pixel transitions (ΔL ≥ 0.1, darker
                                                # < 0.8; saturated red), >6 in 1s over >21,824 CSS px² of a

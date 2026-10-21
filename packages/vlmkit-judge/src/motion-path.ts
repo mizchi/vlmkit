@@ -237,6 +237,8 @@ export interface MotionPathOptions {
   /** How long one run must take (ms), and how many runs (null: infinite). */
   expectDurationMs?: number;
   expectIterations?: number | null;
+  /** Its centre must not move: only its size, opacity or colour change (a dialog that stays centred). */
+  expectStill?: boolean;
 }
 
 export type MotionRule =
@@ -255,7 +257,8 @@ export type MotionRule =
   | "start-unchecked"
   | "duration-mismatch"
   | "iterations-mismatch"
-  | "direction-mismatch";
+  | "direction-mismatch"
+  | "still-mismatch";
 
 export interface MotionFinding {
   rule: MotionRule;
@@ -281,12 +284,16 @@ export interface ScaleOrigin {
   fx: number | null;
   fy: number | null;
   name: OriginName | null;
-  /** The frame it is best seen in: the most opaque one scaled 10% or more from full size. */
+  /** The frame it is best seen in: the most opaque one scaled 2% or more from full size. */
   atMs: number;
 }
 
 /** "its top-right corner", "its centre", "the point 30% across and 80% down its box". */
 export function describeOrigin(o: Pick<ScaleOrigin, "fx" | "fy" | "name">): string {
+  // A point far outside the box is no transform-origin: the box moves as well as it scales (a
+  // keyframe transform replacing a centring translate read "the point 1857% across", round 8).
+  const outside = (v: number | null) => v !== null && (v < -0.5 || v > 1.5);
+  if (outside(o.fx) || outside(o.fy)) return "no point of its box (it moves as well as it scales)";
   if (o.fx === null || o.fy === null) {
     // One axis: an edge (or the line through its middle) stays put, not a point.
     const across = o.fy === null;
@@ -349,7 +356,10 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
   const exact = samples.length > 0 && samples.every((x) => x.dom !== undefined);
   const floor = options.jumpFloorPx ?? (exact ? 6 : 24);
   const ratio = options.jumpRatio ?? 3;
-  const minTravel = options.minFitTravelPx ?? (exact ? 6 : 60);
+  // Measured, a 4px card lift is a real path: under 6px it read "too short to fit" and
+  // "moves under 6px … its animation is not applying" (motion-repair round 8).
+  const minTravel = options.minFitTravelPx ?? (exact ? 2 : 60);
+  const still = exact ? 1 : floor;
   const segments = options.segments?.length
     ? [...options.segments]
     : [{ startMs: options.startMs, endMs: options.endMs }];
@@ -667,7 +677,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
           rule: "origin-mismatch",
           severity: "fail",
           atMs: origin.atMs,
-          message: `the scale${tag} grows from ${describeOrigin(origin)} (that ${origin.fx === null || origin.fy === null ? "edge" : "point"} of its box stays put), not ${describeOrigin({ fx: origin.fx === null ? null : want.fx, fy: origin.fy === null ? null : want.fy, name: options.expectOrigin })}: transform-origin: ${originCss(options.expectOrigin)}`,
+          message: `the scale${tag} grows from ${describeOrigin(origin)}${describeOrigin(origin).startsWith("no point") ? "" : ` (that ${origin.fx === null || origin.fy === null ? "edge" : "point"} of its box stays put)`}, not ${describeOrigin({ fx: origin.fx === null ? null : want.fx, fy: origin.fy === null ? null : want.fy, name: options.expectOrigin })}: transform-origin: ${originCss(options.expectOrigin)}`,
         });
       }
     }
@@ -679,7 +689,8 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       const a = frames[0]!;
       const restHere = last ? geoRest[0] : undefined;
       const z = restHere && dist(restHere, a) > floor ? restHere : frames[frames.length - 1]!;
-      if (dist(a, z) >= floor) {
+      // Not from a target that holds still and jumps at the end: "travels 0px leftwards" (round 8).
+      if (travelPx >= Math.min(floor, minTravel) && dist(a, z) >= Math.min(floor, minTravel)) {
         direction = { way: directionOf(z.x - a.x, z.y - a.y), from: { x: a.x, y: a.y }, to: { x: z.x, y: z.y } };
       }
     }
@@ -698,7 +709,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       rule: "origin-unchecked",
       severity: "warn",
       atMs: segments[0]!.startMs,
-      message: `${options.expectOrigin} was expected but not checked: ${exact ? "its scale changes by less than 10% in every segment" : "only an element measured from the page (--selector) has a scale to read"}`,
+      message: `${options.expectOrigin} was expected but not checked: ${exact ? "its scale changes by less than 2% in every segment" : "only an element measured from the page (--selector) has a scale to read"}`,
     });
   }
 
@@ -772,13 +783,36 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
               atMs: r.atMs,
               message: `ends near where it started (${Math.round(dist(r, geo[0]!))}px from it, ${Math.round(off)}px from the last motion frame): the final keyframe is not held — add animation-fill-mode: forwards (or both), or give the element its end state`,
             }
-          : {
-              rule: "jump",
-              severity: "fail",
-              atMs: r.atMs,
-              message: `jumps ${Math.round(off)}px when the motion ends (${ms(last.atMs)} → ${ms(r.atMs)}): the end state differs from the last keyframe`,
-            },
+          : travel < floor
+            ? {
+                // Held still off its place the whole time, then put there: the animation sets what
+                // places the element. The dialog of round 8 read "the end state differs from the
+                // last keyframe", and both agents found the overridden translate in the CSS.
+                rule: "jump",
+                severity: "fail",
+                atMs: r.atMs,
+                message: `sits ${Math.round(off)}px off where it rests (${Math.round(r.x - last.x)},${Math.round(r.y - last.y)}) through the whole motion, and jumps there when it ends: the animation overrides what places the element — most often a keyframe \`transform\` that replaces the element's own (a \`translate(-50%, -50%)\` centring): repeat that translate in every keyframe, or animate \`scale\` / \`translate\` (the separate properties) instead`,
+              }
+            : {
+                rule: "jump",
+                severity: "fail",
+                atMs: r.atMs,
+                message: `jumps ${Math.round(off)}px when the motion ends (${ms(last.atMs)} → ${ms(r.atMs)}): the end state differs from the last keyframe`,
+              },
       );
+    }
+  }
+
+  if (options.expectStill && geo.length > 0) {
+    const anchor = geoRest[0] ?? geo[geo.length - 1]!;
+    const far = [...geo, ...geoRest].reduce((a, b) => (dist(b, anchor) > dist(a, anchor) ? b : a));
+    if (dist(far, anchor) >= Math.max(2, still)) {
+      findings.push({
+        rule: "still-mismatch",
+        severity: "fail",
+        atMs: far.atMs,
+        message: `its centre is at ${Math.round(far.x)},${Math.round(far.y)} at ${ms(far.atMs)}, ${Math.round(dist(far, anchor))}px from ${Math.round(anchor.x)},${Math.round(anchor.y)} where it rests, though only its size and opacity may change: a keyframe \`transform\` that replaces the element's own placement, or a scale whose transform-origin is not its centre`,
+      });
     }
   }
 
@@ -789,7 +823,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     firstMotion.present >= sure &&
     sorted.every((s) => shown(s)) &&
     geo.length >= 2 &&
-    Math.max(...geo.map((p) => dist(p, geo[0]!))) < floor &&
+    Math.max(...geo.map((p) => dist(p, geo[0]!))) < still &&
     !(
       exact &&
       sorted.some(
@@ -803,7 +837,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       rule: "target-static",
       severity: "warn",
       atMs: firstMotion.atMs,
-      message: `fully shown from ${ms(firstMotion.atMs)} and moves under ${floor}px in every frame: if it is meant to animate, its animation is not applying (a dropped rule, a misspelt animation-name)`,
+      message: `fully shown from ${ms(firstMotion.atMs)} and moves under ${still}px in every frame: if it is meant to animate, its animation is not applying (a dropped rule, a misspelt animation-name)`,
     });
   }
 
@@ -849,7 +883,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
 /**
  * The point of the box a scale keeps in place. Box = o + k (B - o) for the full-size box B and
  * relative scale k, so o = (box - k B) / (1 - k) on each axis; the median over every frame scaled
- * 10% or more from the largest. Full size is the largest scale in the segment (and its rest, for
+ * 2% or more from the largest. Full size is the largest scale in the segment (and its rest, for
  * the last): an entrance grows to it, an exit shrinks from it. A translate in the same keyframes
  * moves the point with it — it is then what the motion reads as, not the CSS property.
  */
@@ -873,7 +907,9 @@ function scaleOrigin(
     const used: MotionSample[] = [];
     for (const x of xs) {
       const r = k(x) / k(ref);
-      if (r > 0.9) continue;
+      // 2% is the floor: a dialog growing 96% → 100% is the common case and read "less than 10%,
+      // not checked" (round 8). Measured boxes are exact enough to solve it.
+      if (r > 0.98) continue;
       const b = x.dom!.box;
       out.push(((b[pos] - r * R[pos]) / (1 - r) - R[pos]) / R[size]);
       used.push(x);
