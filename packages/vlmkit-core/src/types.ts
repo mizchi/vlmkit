@@ -140,6 +140,17 @@ export interface DiffRegion {
   kind?: DiffRegionKind;
   /** Why --kind left this region unlabelled (over --kind-limit, a size Jev rejects, an API error). */
   kindSkipped?: string;
+  /**
+   * The largest per-channel difference of any pixel in the region (0-255). A few levels is
+   * antialiasing or compositing, not a change of content.
+   */
+  maxChannelDelta?: number;
+  /**
+   * Only glyph and edge rendering differs: a 5x5 average removes most of the difference and it
+   * lightens as much as it darkens (antialiasing, a layer composited differently), with no
+   * measured shift. Not a change of content.
+   */
+  edgeOnly?: boolean;
 }
 
 export interface DiffRegionKind {
@@ -535,7 +546,8 @@ export type VisualChangeType =
   | "reflow"
   | "element-added"
   | "element-removed"
-  | "icon-change";
+  | "icon-change"
+  | "render-noise";
 
 export interface VisualSemanticChange {
   type: VisualChangeType;

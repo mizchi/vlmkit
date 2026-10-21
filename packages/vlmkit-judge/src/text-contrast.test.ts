@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vite-plus/test";
-import { TEXT_CONTRAST_MAX_CANDIDATES, textContrastCandidates, type TextContrastSample } from "./integrity.ts";
+import { describe, expect, it } from "vite-plus/test";
+import {
+  TEXT_CONTRAST_MAX_CANDIDATES,
+  judgeTextContrast,
+  textContrastCandidates,
+  type TextContrastSample,
+} from "./integrity.ts";
 
 /**
  * The loop `COLLECT_TEXT_CONTRAST` used to run inside the page, now over its samples.
@@ -51,5 +56,26 @@ describe("textContrastCandidates", () => {
     const [c] = textContrastCandidates([grey(1, { disabled: true, shadowed: true })]).candidates;
     assert.equal(c!.disabled, true);
     assert.equal(c!.shadowed, true);
+  });
+});
+
+describe("text composited away by a transparent ancestor", () => {
+  it("names its own colour and the ancestor, not the composited white on white (motion-repair round 3)", () => {
+    const { candidates, skippedComposite } = textContrastCandidates([
+      {
+        selector: "div.shell > main > div",
+        text: "Quarterly report.pdf",
+        color: [27, 36, 48, 1],
+        backgrounds: [[255, 255, 255, 1]],
+        opacity: 0,
+        transparentBy: "div.shell",
+      },
+    ]);
+    const { findings } = judgeTextContrast(candidates, skippedComposite, 1280);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.kind).toBe("invisible-text");
+    expect(findings[0]!.message).toMatch(
+      /"Quarterly report\.pdf" \(rgb\(27, 36, 48\)\) at opacity 0\.00 because div\.shell is transparent — nothing of it is painted/,
+    );
   });
 });

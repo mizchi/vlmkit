@@ -48,6 +48,10 @@ export interface MotionDom {
   elapsedMs?: number | null;
   scaleX?: number;
   scaleY?: number;
+  /** Its own opacity, before its ancestors': unchanged while it fades, the fade is theirs. */
+  ownOpacity?: number;
+  /** The ancestor with the lowest opacity under 1 at this frame. */
+  fadeBy?: string;
 }
 
 export interface MotionFrame {

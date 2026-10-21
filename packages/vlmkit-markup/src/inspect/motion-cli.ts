@@ -40,7 +40,19 @@ export async function measureTargets(
         if (!el) return null;
         const r = el.getBoundingClientRect();
         let opacity = getComputedStyle(el).visibility === "hidden" ? 0 : 1;
-        for (let n: Element | null = el; n; n = n.parentElement) opacity *= Number(getComputedStyle(n).opacity);
+        // Which ancestor's opacity is lowest: a drawer "followed ease-out in its opacity" for its
+        // parent's fade (round 4), so the fit names whose fade it is.
+        let fadeBy: Element | null = null;
+        let fadeLow = 0.999;
+        for (let n: Element | null = el; n; n = n.parentElement) {
+          const o = Number(getComputedStyle(n).opacity);
+          opacity *= o;
+          if (n !== el && o < fadeLow) {
+            fadeLow = o;
+            fadeBy = n;
+          }
+        }
+        const ownOpacity = Number(getComputedStyle(el).opacity);
         const transform = getComputedStyle(el).transform;
         let scale = 1;
         let scaleX = 1;
@@ -166,6 +178,8 @@ export async function measureTargets(
           t,
           visible,
           elapsedMs,
+          ownOpacity,
+          ...(fadeBy ? { fadeBy: name(fadeBy) } : {}),
           ...(hiddenBy ? { hiddenBy } : {}),
         };
       });
@@ -601,6 +615,65 @@ async function keyframeHolds(page: import("playwright").Page) {
   );
 }
 
+/**
+ * The declaration that sets each target's animation-delay, as the cascade picked it: read
+ * through the DevTools protocol (a linked sheet on a file: page is cross-origin to the CSSOM).
+ * `li:nth-child(2) { animation-delay: 200ms }` overriding a stagger was found by reading the
+ * CSS in round 4; a start-mismatch now quotes it.
+ */
+async function delaySources(page: import("playwright").Page, selectors: readonly string[]): Promise<(string | null)[]> {
+  type Prop = { name: string; value: string; range?: unknown; important?: boolean; disabled?: boolean };
+  type Match = { rule: { origin: string; selectorList: { text: string }; style: { cssProperties: Prop[] } } };
+  let session: import("playwright").CDPSession;
+  try {
+    session = await page.context().newCDPSession(page);
+  } catch {
+    return selectors.map(() => null);
+  }
+  try {
+    await session.send("DOM.enable");
+    await session.send("CSS.enable");
+    const { root } = (await session.send("DOM.getDocument", { depth: 0 })) as { root: { nodeId: number } };
+    const out: (string | null)[] = [];
+    for (const sel of selectors) {
+      try {
+        const { nodeId } = (await session.send("DOM.querySelector", { nodeId: root.nodeId, selector: sel })) as {
+          nodeId: number;
+        };
+        if (!nodeId) {
+          out.push(null);
+          continue;
+        }
+        const m = (await session.send("CSS.getMatchedStylesForNode", { nodeId })) as {
+          matchedCSSRules?: Match[];
+          inlineStyle?: { cssProperties: Prop[] };
+        };
+        // Cascade order, lowest first: the last declaration wins, an !important one over any
+        // that is not. Shorthands only carry a range, so `animation: … 200ms` counts too.
+        let win: { important: boolean; text: string } | null = null;
+        const consider = (p: Prop, where: string) => {
+          if (p.range === undefined || p.disabled) return;
+          if (p.name !== "animation-delay" && p.name !== "animation") return;
+          const important = p.important === true;
+          if (win && win.important && !important) return;
+          win = { important, text: `${where} { ${p.name}: ${p.value.trim()} }` };
+        };
+        for (const r of m.matchedCSSRules ?? []) {
+          if (r.rule.origin !== "regular") continue;
+          for (const p of r.rule.style.cssProperties) consider(p, r.rule.selectorList.text);
+        }
+        for (const p of m.inlineStyle?.cssProperties ?? []) consider(p, "style attribute");
+        out.push(win ? (win as { text: string }).text : null);
+      } catch {
+        out.push(null);
+      }
+    }
+    return out;
+  } finally {
+    await session.detach().catch(() => {});
+  }
+}
+
 interface Captured {
   frames: MotionFrame[];
   startMs: number;
@@ -611,6 +684,10 @@ interface Captured {
   files?: Map<number, string>;
   /** The frames' size in CSS px, when they were shot here. */
   viewport?: { width: number; height: number };
+  /** Per --selector, the declaration its animation-delay comes from. */
+  delays?: (string | null)[];
+  /** Every line of text on the page at rest, so a suggested crop does not cut one in half. */
+  textLines?: { x: number; y: number; width: number; height: number }[];
 }
 
 async function captureMotion(o: MotionCliOptions): Promise<Captured> {
@@ -677,7 +754,34 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
         frames.push(frame);
       }
       const written = await writer.finish();
-      return { frames, startMs, endMs, segments, manifest: written.manifest, files, viewport: o.viewport };
+      const delays = o.selectors.length > 0 ? await delaySources(page, o.selectors) : undefined;
+      // The page is at its rest instant now (the last one shot).
+      const textLines = await page
+        .evaluate(() => {
+          const out: { x: number; y: number; width: number; height: number }[] = [];
+          const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+          for (let n = walk.nextNode(); n && out.length < 2000; n = walk.nextNode()) {
+            if (!(n.nodeValue ?? "").trim()) continue;
+            const range = document.createRange();
+            range.selectNodeContents(n);
+            for (const r of range.getClientRects()) {
+              if (r.width > 0 && r.height > 0) out.push({ x: r.x, y: r.y, width: r.width, height: r.height });
+            }
+          }
+          return out;
+        })
+        .catch(() => []);
+      return {
+        frames,
+        startMs,
+        endMs,
+        segments,
+        manifest: written.manifest,
+        files,
+        viewport: o.viewport,
+        textLines,
+        ...(delays ? { delays } : {}),
+      };
     } finally {
       await page.close();
     }
@@ -712,11 +816,16 @@ export function formatMotionReport(
   let fails = 0;
   let warns = 0;
   type Fit = { best: string; margin: number; errors: Record<string, number>; channel?: string };
+  // The ancestor whose fade the target's opacity follows, when its own opacity never changes.
+  let fadeOwner: string | undefined;
   const oneFit = (e: Fit) => {
     const next = Object.keys(e.errors)
       .filter((k) => k !== e.best)
       .sort((a, b) => e.errors[a]! - e.errors[b]!)[0];
-    const on = e.channel && e.channel !== "position" ? ` in its ${e.channel}` : "";
+    const on =
+      e.channel && e.channel !== "position"
+        ? ` in its ${e.channel}${e.channel === "opacity" && fadeOwner ? ` (${fadeOwner}'s fade: its own opacity does not change)` : ""}`
+        : "";
     if (!Number.isFinite(e.margin) || e.margin >= 1000)
       return `follows ${e.best}${on} exactly (measured: no other curve comes close)`;
     return `follows ${e.best}${on} (it fits ${e.margin.toFixed(1)}x better than the next-best curve, ${next})`;
@@ -735,6 +844,12 @@ export function formatMotionReport(
   const begins = (t: { startsAtMs?: number }) =>
     t.startsAtMs !== undefined ? `, begins at ${Math.round(t.startsAtMs)}ms` : "";
   for (const [i, t] of r.targets.entries()) {
+    const doms = captured.frames.map((f) => f.dom?.[i]).filter((d) => d !== null && d !== undefined);
+    const own = doms.map((d) => d!.ownOpacity).filter((o): o is number => typeof o === "number");
+    fadeOwner =
+      own.length > 1 && Math.max(...own) - Math.min(...own) < 0.02
+        ? doms.map((d) => d!.fadeBy).find((x): x is string => typeof x === "string")
+        : undefined;
     const broken = t.findings.some((f) => f.rule === "jump" || f.rule === "snap-back");
     if (t.segments.length <= 1) {
       lines.push(
@@ -772,7 +887,10 @@ export function formatMotionReport(
     for (const f of t.findings) {
       if (f.severity === "fail") fails++;
       else warns++;
-      lines.push(`    ${f.severity === "fail" ? "FAIL" : "warn"} ${f.rule} at ${Math.round(f.atMs)}ms: ${f.message}`);
+      const from = f.rule === "start-mismatch" ? captured.delays?.[i] : null;
+      lines.push(
+        `    ${f.severity === "fail" ? "FAIL" : "warn"} ${f.rule} at ${Math.round(f.atMs)}ms: ${f.message}${from ? `; set by \`${from}\`` : ""}`,
+      );
     }
   }
   // Several targets: when each begins, side by side. Four entries meant to cascade that begin
@@ -826,9 +944,23 @@ export function formatMotionReport(
     const y1 = Math.ceil(by1 + padY);
     const vw = captured.viewport?.width ?? x1;
     const vh = captured.viewport?.height ?? y1;
-    const w = Math.min(x1, vw) - x0;
-    const h = Math.min(y1, vh) - y0;
-    if (w > 0 && h > 0 && w * h < 0.5 * vw * vh) crop = ` --crop ${x0},${y0},${w},${h}`;
+    // Edges moved off any line of text they cut (a crop through "Overview" left half a heading
+    // under the strip's labels, round 5), out to the line's far side, twice for lines that a
+    // first move brings in.
+    let [cx0, cy0, cx1, cy1] = [x0, y0, Math.min(x1, vw), Math.min(y1, vh)];
+    for (let pass = 0; pass < 2; pass++) {
+      for (const t of captured.textLines ?? []) {
+        const across = t.x < cx1 && t.x + t.width > cx0;
+        const down = t.y < cy1 && t.y + t.height > cy0;
+        if (across && t.y < cy0 && t.y + t.height > cy0) cy0 = Math.max(0, Math.floor(t.y - 4));
+        if (across && t.y < cy1 && t.y + t.height > cy1) cy1 = Math.min(vh, Math.ceil(t.y + t.height + 4));
+        if (down && t.x < cx0 && t.x + t.width > cx0) cx0 = Math.max(0, Math.floor(t.x - 4));
+        if (down && t.x < cx1 && t.x + t.width > cx1) cx1 = Math.min(vw, Math.ceil(t.x + t.width + 4));
+      }
+    }
+    const w = cx1 - cx0;
+    const h = cy1 - cy0;
+    if (w > 0 && h > 0 && w * h < 0.5 * vw * vh) crop = ` --crop ${cx0},${cy0},${w},${h}`;
   }
   lines.push(
     `  look at the frames: vlmkit snapshot strip --manifest ${captured.manifest} --max-frames 6 --columns 3${crop} --out ${join(dirname(captured.manifest), "strip.png")}`,

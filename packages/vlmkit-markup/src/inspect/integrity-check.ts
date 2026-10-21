@@ -567,6 +567,17 @@ export const COLLECT_TEXT_CONTRAST = `(() => {
       color: parseColor(style.color) || [0, 0, 0, 1],
       backgrounds: resolved.layers,
       opacity: inheritedOpacity(el),
+      // The outermost ancestor that is itself (nearly) transparent: under it the text is
+      // composited away, and the colours read "white on white" for text declared #1b2430
+      // (motion-repair round 3). Named so the finding points at the opacity, not the colours.
+      ...(() => {
+        let by = null;
+        for (let p = el.parentElement; p && p !== document.documentElement; p = p.parentElement) {
+          const po = parseFloat(getComputedStyle(p).opacity);
+          if (Number.isFinite(po) && po < 0.05) by = p;
+        }
+        return by ? { transparentBy: stableSelector(by) } : {};
+      })(),
       fontSizePx: parseFloat(style.fontSize) || 16,
       fontWeight: parseFloat(style.fontWeight) || (/bold/i.test(style.fontWeight) ? 700 : 400),
       disabled: el.closest("[disabled], [aria-disabled='true']") != null,

@@ -46,8 +46,8 @@ page clock and every animation are held for them, with or without
 \`--virtual-time\`. \`--at\` picks the instants, for --frames and for the strip's
 columns: \`--at 0,150,300\`, \`--at 0..1s/100ms\`, \`--at 1.5s\`, \`--at 6f\` (frame
 6 of the 60fps clock). Without it, frames are taken at each animation's start,
-middle and end plus 0/250/500/1000/2000ms. The frames are --viewport's size (1280x720 unless
-given): pass the target's, \`--viewport 1280x800\`, before diffing a frame against it.
+middle and end plus 0/250/500/1000/2000ms. The frames are --viewport's size (1280x800 unless
+given, as check integrity and inspect motion): pass the target's before diffing a frame against it.
 \`--frames-reduced-motion\` captures them with prefers-reduced-motion: reduce emulated,
 to look at what that visitor gets.
 
@@ -118,7 +118,7 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       positional: 0,
       required: true,
     },
-    { name: "viewport", placeholder: "WxH", kind: "string", description: "Viewport", defaultDescription: "1280x720" },
+    { name: "viewport", placeholder: "WxH", kind: "string", description: "Viewport", defaultDescription: "1280x800" },
     { name: "samples", kind: "number", description: "Sample points per animation", defaultDescription: "4" },
     {
       name: "max-animations",

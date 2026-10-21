@@ -176,10 +176,11 @@ Evaluates every authored animation by rendered frames:
 - **`check animation` lists an animation `visible` when any pixel moved.** A
   `motion-mostly-hidden` warn says only a sliver of the element did (a clipped card moved
   320x8 of its 320x104 box): run `inspect motion --selector` on it for the cause.
-- **Frames are `--viewport`'s size, 1280x720 unless given.** Pass the
-  target's (`--viewport 1280x800`) before diffing a frame against it: at
-  the default, a toast's 1500ms frame differed from its 1280x800 target by
-  11% with nothing wrong. A target drawn mid-motion (the toast in its hold)
+- **Frames are `--viewport`'s size, 1280x800 unless given** (as
+  `check integrity` and `inspect motion`; it was 1280x720, and a toast's
+  1500ms frame differed from its 1280x800 target by 11% with nothing
+  wrong). Pass the target's size when it is another before diffing a
+  frame against it. A target drawn mid-motion (the toast in its hold)
   is compared this way, not with `verify markup`, whose pixel diff is of
   the rest pose. `--frames-reduced-motion` captures the same frames with
   `prefers-reduced-motion: reduce` emulated, so the reduced-motion brief is

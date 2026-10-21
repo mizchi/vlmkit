@@ -680,7 +680,8 @@ test("runAnimationEval: --frames writes a vlmkit-frames/1 sequence", { timeout: 
   const manifest = parseFramesManifest(await readFile(join(dir, "frames.json"), "utf8"));
   assert.equal(manifest.source.tool, "check animation");
   assert.equal(manifest.source.clock, "held");
-  assert.deepEqual(manifest.source.viewport, { width: 1280, height: 720 });
+  // The default is 1280x800, the size check integrity and inspect motion use (motion-repair).
+  assert.deepEqual(manifest.source.viewport, { width: 1280, height: 800 });
   assert.equal(manifest.source.deviceScaleFactor, 1);
   assert.match(manifest.source.browser ?? "", /^chromium \d+\./);
   assert.deepEqual(

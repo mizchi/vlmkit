@@ -274,7 +274,7 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
         "--expect-stagger",
         "80",
       ],
-      /FAIL start-mismatch .*begins at 200ms, not 280ms[\s\S]*begins: li\.a1 200ms, li\.a2 200ms, li\.a3 200ms, li\.a4 200ms — all within one frame/,
+      /FAIL start-mismatch .*begins at 200ms, not 280ms.*; set by `li:nth-child\(2\) \{ animation-delay: 200ms \}`[\s\S]*begins: li\.a1 200ms, li\.a2 200ms, li\.a3 200ms, li\.a4 200ms — all within one frame/,
     ],
     [
       "stagger.html",
@@ -320,6 +320,24 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
 });
 
 describe("inspect motion after motion-repair round 3", () => {
+  it(
+    "names whose fade a target's opacity follows when its own never changes (round 4)",
+    { timeout: 120_000 },
+    async () => {
+      const lines: string[] = [];
+      const log = console.log;
+      console.log = (m: string) => lines.push(m);
+      try {
+        const frames = await mkdtemp(join(tmpdir(), "vlmkit-motion-fade-"));
+        const page = join(import.meta.dirname, "../../../../fixtures/motion-repair/reference/drawer.html");
+        assert.equal(await runMotionCli([page, "--selector", ".drawer", "--frames", frames]), 0);
+      } finally {
+        console.log = log;
+      }
+      assert.match(lines.join("\n"), /in its opacity \(div\.shell's fade: its own opacity does not change\)/);
+    },
+  );
+
   it("parses --expect-origin in either word order, and checks the counts", () => {
     assert.deepEqual(parseMotionArgs(["p.html", "--selector", ".t", "--expect-origin", "left bottom"]).expectOrigin, [
       "bottom-left",

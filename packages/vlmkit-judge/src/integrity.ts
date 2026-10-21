@@ -950,6 +950,11 @@ export interface ContrastCandidate {
   large?: boolean;
   /** The applicable floor: 3 for large text, 4.5 otherwise. */
   floor?: number;
+  /**
+   * Present when the text is composited away by an ancestor's opacity: its own colour before
+   * compositing, the opacity it renders at, and the ancestor that makes it transparent.
+   */
+  transparent?: { declared: string; opacity: number; by?: string };
 }
 
 /**
@@ -968,6 +973,8 @@ export interface TextContrastSample {
   backgrounds?: Rgba[];
   /** Product of the element's and its ancestors' opacity. */
   opacity?: number;
+  /** The outermost ancestor whose own opacity is under 0.05, when one is: what hides the text. */
+  transparentBy?: string;
   fontSizePx?: number;
   fontWeight?: number;
   disabled?: boolean;
@@ -1014,6 +1021,15 @@ export function textContrastCandidates(samples: readonly TextContrastSample[]): 
       fontSizePx: Math.round(m.fontSizePx * 10) / 10,
       large: m.large,
       floor: m.floor,
+      ...((sample.opacity ?? 1) < 0.05
+        ? {
+            transparent: {
+              declared: formatRgb((sample.color ?? [0, 0, 0, 1]).slice(0, 3) as [number, number, number]),
+              opacity: Math.round((sample.opacity ?? 0) * 100) / 100,
+              ...(sample.transparentBy ? { by: sample.transparentBy } : {}),
+            },
+          }
+        : {}),
     });
   }
   return { candidates, skippedComposite };
@@ -1069,8 +1085,10 @@ export function judgeTextContrast(
         severity: "fail",
         viewport,
         selector: c.selector,
-        message: `${c.selector} renders "${clip(c.text)}" in ${c.fg} on ${c.bg} (contrast ${c.ratio.toFixed(2)}:1) — the text is effectively invisible.`,
-        evidence: { ratio: c.ratio, fg: c.fg, bg: c.bg },
+        message: c.transparent
+          ? `${c.selector} renders "${clip(c.text)}" (${c.transparent.declared}) at opacity ${c.transparent.opacity.toFixed(2)}${c.transparent.by ? ` because ${c.transparent.by} is transparent` : ""} — nothing of it is painted; its colours are not the cause.`
+          : `${c.selector} renders "${clip(c.text)}" in ${c.fg} on ${c.bg} (contrast ${c.ratio.toFixed(2)}:1) — the text is effectively invisible.`,
+        evidence: { ratio: c.ratio, fg: c.fg, bg: c.bg, ...(c.transparent ? { transparent: c.transparent } : {}) },
       });
       continue;
     }

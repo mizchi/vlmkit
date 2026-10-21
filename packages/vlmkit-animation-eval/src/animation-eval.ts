@@ -962,7 +962,9 @@ async function sampleClock(
 }
 
 export async function runAnimationEval(options: AnimationEvalOptions): Promise<AnimationEvalReport> {
-  const viewport = options.viewport ?? { width: 1280, height: 720 };
+  // 1280x800, as check integrity and inspect motion: five motion-repair rounds of agents met
+  // 1280x720 here beside 1280x800 there, and a brief at 800 compared with frames at 720.
+  const viewport = options.viewport ?? { width: 1280, height: 800 };
   const samples = Math.max(1, options.samples ?? 4);
   const maxAnimations = options.maxAnimations ?? 8;
   const tolerance = options.tolerance ?? 8;
@@ -1681,7 +1683,7 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
         ? f.instants.map(formatInstant).join("/")
         : `${formatInstant(f.instants[0]!)}–${formatInstant(f.instants.at(-1)!)}`;
     // The viewport is named because it is easy to miss: a target at 1280x800 compared with
-    // frames at the default 1280x720 differed by 11% before anything else was looked at.
+    // frames at the old default 1280x720 differed by 11% before anything else was looked at.
     lines.push(
       `Frames: ${f.count} written to ${f.dir} at ${at}ms of page time` +
         ` (clock and animations held${f.reducedMotion ? ", prefers-reduced-motion: reduce" : ""}),` +

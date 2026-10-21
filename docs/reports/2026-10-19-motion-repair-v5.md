@@ -67,7 +67,7 @@ the cause, though several opened it to confirm.
   from / unfolds out of" maps to `--expect-origin`. "A wave across the row" and "each a beat later"
   map to `--expect-stagger`. "Straight away" and "with no wait" map to `--expect-start 0`.
 
-## Deferred
+## Deferred (all fixed since, below)
 
 - `diff png` labels antialiasing noise between two rest captures as `4 element-added, 1 icon-change`
   (0.03%; seen by two agents).
@@ -76,6 +76,30 @@ the cause, though several opened it to confirm.
 - The suggested strip crop can cut through a heading, and the time labels are drawn over it.
 - `check integrity` at 375px reports the overflow of a 4-column grid and a 300px tooltip. That was
   already true of the originals and lies outside the briefs.
+
+## The deferred items, fixed (2026-10-21)
+
+Every item deferred in rounds 3-5 that is a tool's, re-measured on the pages that showed it:
+
+- **`diff png` and antialiasing.** Two rest captures of tiles (a layer composited differently, up
+  to 111 levels on glyph edges) read `4 element-added, 1 icon-change`; now `5 render-noise`. A
+  region is edge-only when a 5x5 average removes most of its difference (blurred max under 0.4 of
+  the raw one) and it lightens as much as it darkens (|signed| / |sum| under 0.5), with no shift.
+  Measured against real changes on the same page: a recoloured block (0.95, +1.00), a changed digit
+  (0.80) and a recoloured 1px border (0.21, but −1.00) all keep their labels. `regions[].edgeOnly`
+  and `maxChannelDelta` are in the JSON.
+- **`check animation` at 1280x720.** The default is 1280x800 now, as `check integrity` and
+  `inspect motion`.
+- **The crop through a heading.** The suggested `--crop` edges move off any line of text they cut.
+- **White on white under a transparent ancestor.** `invisible-text` now reads `renders "Files"
+  (rgb(27, 36, 48)) at opacity 0.00 because div.shell is transparent — nothing of it is painted;
+  its colours are not the cause.`
+- **An ancestor's fade read as the target's.** `follows ease-out in its opacity (div.shell's fade:
+  its own opacity does not change)`.
+- **Which rule sets the delay.** `start-mismatch` quotes the declaration the cascade picked, read
+  through the DevTools protocol: `; set by \`li:nth-child(2) { animation-delay: 200ms }\``.
+
+The 375px overflows are the pages', outside their briefs, and stay.
 
 ## Where the loop stands
 
