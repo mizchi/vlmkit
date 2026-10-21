@@ -1247,7 +1247,7 @@ export async function runMotionCli(argv: string[]): Promise<number> {
       );
       for (const c of e.changed) {
         console.log(
-          `    FAIL snapped: ${c} in one frame. If it should animate, its transition never starts: a transition to or from an intrinsic size (height: auto) does not run without interpolate-size: allow-keywords (or grid-template-rows 0fr → 1fr); a misspelt transition-property and a property the transition does not list are the other usual causes`,
+          `    FAIL snapped: ${c} in one frame. If it should animate, its transition never starts: a transition to or from an intrinsic size (height: auto) does not run without interpolate-size: allow-keywords (Chromium only so far; grid-template-rows 0fr → 1fr runs in every engine); a misspelt transition-property and a property the transition does not list are the other usual causes`,
         );
       }
       console.log(`  ${e.changed.length} fail; measured from the page, no model asked`);

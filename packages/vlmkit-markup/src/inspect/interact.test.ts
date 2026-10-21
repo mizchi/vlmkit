@@ -433,6 +433,9 @@ describe("runInteract frames steps", () => {
     for (const f of manifest.frames) {
       assert.ok(f.shotMs >= f.atMs, `frame at ${f.atMs}ms shot at ${f.shotMs}ms: never before its offset`);
     }
+    // How far a timer's frames can be trusted is said, from the frames' own lag.
+    const lag = Math.max(...manifest.frames.map((f: { atMs: number; shotMs: number }) => f.shotMs - f.atMs));
+    assert.equal(seq!.maxLagMs, lag);
     // The snapshots are the page at rest either side of the motion.
     assert.equal(blueWidth(report.snapshots[0]!.screenshotPath), 200);
     assert.equal(blueWidth(report.snapshots[1]!.screenshotPath), 0);

@@ -50,13 +50,13 @@ import {
 function usage(): string {
   return [
     "Usage:",
-    "  vlmkit snapshot storyboard <frames.json> [--out dir] [--ignore x,y,w,h ...] [--max-events N] [--lossy] [--json]",
+    "  vlmkit snapshot storyboard <frames.json> [--out dir] [--ignore x,y,w,h ...] [--floor N] [--max-events N] [--lossy] [--json]",
     "",
     "Segments a vlmkit-frames/1 sequence into still states and events, from the pixels alone:",
     "  glitch     one frame off the state, then back",
     "  transient  more than one frame off, back within 5000 ms (whatever it held in between)",
     "  change     not back within 5000 ms; ends at the first 100 ms of identical frames (the next state)",
-    "  drift      a change no frame-to-frame step of which, inside its box, moves a channel by more than 8 of 255",
+    "  drift      a change no frame-to-frame step of which, inside its box, moves a channel by more than the floor",
     "",
     "Writes story.json, SUMMARY.md, sheet.png and narrate/BRIEF.md (keyframes and a magnified crop",
     "of each event's box, for your own vision to say what changed). Exits 0: it reports, it does not judge.",
@@ -65,6 +65,9 @@ function usage(): string {
     "  --out <dir>          Where to write (default: storyboard/ beside frames.json)",
     "  --ignore <x,y,w,h>   A box, in the frames' pixels, no comparison looks at — a video, a clock the",
     "                       capture cannot hold. Repeatable",
+    "  --floor <n>          A pixel differs when a channel moves by more than n of 255 (default 8). Lower it",
+    "                       for a change between two near colours: white on #f7f7f8 moves 8 and reads as",
+    "                       no change at the default; --floor 2 sees it. 0 compares exactly",
     "  --max-events <n>     Events on the sheet and in the brief (default 20); SUMMARY.md has them all",
     "  --lossy              Segment frames decoded from a lossy recording anyway (scan video): codec",
     "                       noise is then events too, most of all at keyframes, which SUMMARY.md names",
@@ -84,6 +87,7 @@ export interface StoryboardArgs {
   manifest: string;
   out?: string;
   ignore: Box[];
+  floor?: number;
   maxEvents: number;
   lossy: boolean;
   json: boolean;
@@ -113,6 +117,7 @@ export function parseArgs(argv: string[]): StoryboardArgs {
   let out: string | undefined;
   const ignore: Box[] = [];
   let maxEvents = 20;
+  let floor: number | undefined;
   let lossy = false;
   let json = false;
   for (let i = 0; i < argv.length; i++) {
@@ -126,6 +131,12 @@ export function parseArgs(argv: string[]): StoryboardArgs {
       case "--ignore":
         ignore.push(parseBox(argv[++i]));
         break;
+      case "--floor": {
+        const raw = argv[++i];
+        floor = whole(raw) ?? -1;
+        if (floor < 0 || floor > 254) throw new UsageError(`--floor expects a whole number 0-254, got "${raw ?? ""}"`);
+        break;
+      }
       case "--max-events": {
         const raw = argv[++i];
         maxEvents = whole(raw) ?? 0;
@@ -152,7 +163,15 @@ export function parseArgs(argv: string[]): StoryboardArgs {
     }
   }
   if (manifest === undefined) throw new UsageError(`no frames.json given.\n\n${usage()}`);
-  return { manifest, ...(out !== undefined ? { out } : {}), ignore, maxEvents, lossy, json };
+  return {
+    manifest,
+    ...(out !== undefined ? { out } : {}),
+    ignore,
+    ...(floor !== undefined ? { floor } : {}),
+    maxEvents,
+    lossy,
+    json,
+  };
 }
 
 /** pngjs's sync reader, because the segmentation reads frames from inside a pure, synchronous loop. */
@@ -293,7 +312,7 @@ export interface StoryboardWritten {
 /** Segment `manifestPath`'s sequence and write the four outputs. */
 export async function writeStoryboard(
   manifestPath: string,
-  options: { out?: string; ignore?: Box[]; maxEvents?: number; lossy?: boolean } = {},
+  options: { out?: string; ignore?: Box[]; floor?: number; maxEvents?: number; lossy?: boolean } = {},
 ): Promise<StoryboardWritten> {
   const manifestFile = resolve(manifestPath);
   if (!existsSync(manifestFile)) throw new UsageError(`no such frames.json: ${manifestPath}`);
@@ -309,7 +328,10 @@ export async function writeStoryboard(
   const dir = dirname(manifestFile);
   const paths = manifest.frames.map((f) => resolve(dir, f.file));
   const pixels = framesOnDisk(paths);
-  const story = buildStoryboard(manifest.frames, pixels, { ignore: options.ignore ?? [] });
+  const story = buildStoryboard(manifest.frames, pixels, {
+    ignore: options.ignore ?? [],
+    ...(options.floor !== undefined ? { floor: options.floor } : {}),
+  });
   const outDir = resolve(options.out ?? join(dir, "storyboard"));
   await mkdir(join(outDir, "narrate"), { recursive: true });
   await clearPrevious(outDir);
@@ -446,6 +468,7 @@ async function main(): Promise<void> {
   const written = await writeStoryboard(args.manifest, {
     ...(args.out !== undefined ? { out: args.out } : {}),
     ignore: args.ignore,
+    ...(args.floor !== undefined ? { floor: args.floor } : {}),
     maxEvents: args.maxEvents,
     lossy: args.lossy,
   });

@@ -690,7 +690,12 @@ export function storyboardSummary(
     "",
   ];
   if (story.events.length === 0) {
-    lines.push(`None: every frame is within the floor of frame 0 (${story.states[0]!.id}).`);
+    lines.push(
+      `None: every frame is within the floor of frame 0 (${story.states[0]!.id}).` +
+        (r.channelFloor >= 8
+          ? ` A change between two near colours can sit under it (white on #f7f7f8 moves 8): \`--floor 2\` sees it.`
+          : ""),
+    );
   } else {
     lines.push(
       "| Event | Kind | Began (ms) | Ended (ms) | Frames | Box (px) | Peak | States |",

@@ -285,7 +285,8 @@ vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ea
   `--click <css>` (repeat for several) clicks on the held page first;
   if nothing animates and a `--selector` target changes anyway, that
   is `snapped` — the usual cause is a transition to `height: auto`,
-  which needs `interpolate-size: allow-keywords`. In motion-repair round 3 a wrong
+  which needs `interpolate-size: allow-keywords` (Chromium only; `grid-template-rows:
+  0fr → 1fr` runs in every engine). In motion-repair round 3 a wrong
   `transform-origin` and a stagger that was not one both read "follows ease-out exactly, no fail"
   until these existed.
 - **What it does not judge**: fps or jank, a target it is not told about, and anything under

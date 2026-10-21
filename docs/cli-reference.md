@@ -1520,6 +1520,7 @@ fires `transitionend`, so the page's own handler runs between frames.
 vlmkit check animation page.html --at 0..1s/1f --frames out/f   # every frame of the first second
 vlmkit snapshot storyboard out/f/frames.json                     # → out/f/storyboard/
 vlmkit snapshot storyboard out/f/frames.json --ignore 960,40,320,180 --out story   # a video in that box
+vlmkit snapshot storyboard out/f/frames.json --floor 2          # count channel moves over 2, not 8 (white → #f7f7f8 is 8)
 ```
 
 Reads any `vlmkit-frames/1` sequence and says, from the pixels alone, where the

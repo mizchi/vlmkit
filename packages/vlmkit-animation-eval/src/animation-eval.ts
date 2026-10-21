@@ -180,6 +180,22 @@ export interface ClockMotion {
   settledAtMs: number | null;
   /** Exceptions thrown by page callbacks while the clock advanced (they do not stop it). */
   errors: string[];
+  /**
+   * CSS transitions and animations that came into being while the clock advanced — begun by a
+   * timer or a script, so the sweep's motion may be theirs and not a requestAnimationFrame loop.
+   */
+  started?: Array<{ selector: string; name: string; kind: "transition" | "animation"; atMs: number }>;
+}
+
+/** Pure: what a clock sweep's motion is, named as far as the page let it be. */
+export function clockMotionSource(clock: Pick<ClockMotion, "started">): string {
+  const started = clock.started ?? [];
+  if (started.length === 0) return "requestAnimationFrame / timers";
+  const named = started
+    .slice(0, 3)
+    .map((s) => `${s.kind} \`${s.name}\` on ${s.selector} (begun at ${s.atMs}ms)`)
+    .join(", ");
+  return `a timer started ${named}${started.length > 3 ? ` and ${started.length - 3} more` : ""}`;
 }
 
 /** Pure: the settle instant of a clock sweep — null when its last interval still moved. */
@@ -577,7 +593,7 @@ export function deriveAnimationIssues(
       severity: "warn",
       message:
         `Script-driven motion at (${b.x},${b.y}) ${b.width}x${b.height} is still changing at ${clock.windowMs}ms of virtual time` +
-        ` — a requestAnimationFrame / timer loop that never stops, so the page never settles.` +
+        ` — ${(clock.started ?? []).length > 0 ? `${clockMotionSource(clock)}, and it` : "a requestAnimationFrame / timer loop that"} never stops, so the page never settles.` +
         ` Stop the loop once its work is done, and check \`matchMedia("(prefers-reduced-motion: reduce)")\` in the script;` +
         ` if it is meant to run forever, mask the region in captures.`,
     });
@@ -636,6 +652,9 @@ export function deriveAnimationIssues(
         ` If an element only reaches its place through an animation (an entrance from off-screen or from opacity 0), give it that end state in the same rule — \`animation: none\` alone leaves it where the animation started.` +
         (input.reducedMotion.remaining.some((r) => r.selector.startsWith("(script-driven"))
           ? ` For the script-driven motion, read \`matchMedia("(prefers-reduced-motion: reduce)")\` and skip or shorten the loop.`
+          : "") +
+        (input.reducedMotion.remaining.some((r) => r.selector.includes(" a transition a timer started"))
+          ? ` For a transition a timer started, \`transition: none\` on it in that rule reduces it too.`
           : "") +
         // Every agent of four motion-repair rounds met this on a brief that says nothing about
         // reduced motion, and none could reach exit 0 without adding behaviour nobody asked for.
@@ -974,8 +993,27 @@ async function sampleClock(
   const frames: FrameDeltaStat[] = [];
   let previous = baseline;
   let motionBbox: ClockMotion["motionBbox"] = null;
+  // Every animation present at virtual 0 is held; one that appears while the clock runs was
+  // begun by a timer or a script (round 7: a setTimeout adding a class read "script-driven").
+  const listStarted = () =>
+    page.evaluate(`(() => {
+      ${STABLE_SELECTOR_JS}
+      return document.getAnimations().map((a) => {
+        const el = a.effect && a.effect.target;
+        const kind = typeof a.transitionProperty === "string" ? "transition" : "animation";
+        const name = kind === "transition" ? a.transitionProperty : (a.animationName || a.id || "(el.animate)");
+        return { key: (el ? stableSelector(el) : "(no target)") + "\\u0000" + kind + "\\u0000" + name, selector: el ? stableSelector(el) : "(no target)", name, kind };
+      });
+    })()`) as Promise<Array<{ key: string; selector: string; name: string; kind: "transition" | "animation" }>>;
+  const known = new Set((await listStarted().catch(() => [])).map((a) => a.key));
+  const started: NonNullable<ClockMotion["started"]> = [];
   for (const t of times) {
     await advanceClock(page, t);
+    for (const a of await listStarted().catch(() => [])) {
+      if (known.has(a.key)) continue;
+      known.add(a.key);
+      started.push({ selector: a.selector, name: a.name, kind: a.kind, atMs: t });
+    }
     const frame = await shot(`${label}-${t}ms`);
     const delta = frameDelta(previous, frame, tolerance);
     frames.push(delta);
@@ -993,6 +1031,7 @@ async function sampleClock(
     visible: frames.some((f) => f.changedPixels >= minChangedPixels),
     settledAtMs: clockSettledAt(times, frames, minChangedPixels),
     errors: errors.slice(0, 5),
+    ...(started.length > 0 ? { started } : {}),
   };
 }
 
@@ -1554,7 +1593,16 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       if (rmClock?.visible && rmClock.motionBbox) {
         const b = rmClock.motionBbox;
         const lasted = rmClock.settledAtMs ?? rmClock.windowMs;
-        if (lasted >= durationFloor) {
+        if (lasted >= durationFloor && (rmClock.started ?? []).length > 0) {
+          // A transition a timer began is CSS motion, and `transition: none` reduces it: naming
+          // it "requestAnimationFrame / timers" sent round 7's agents looking for a loop.
+          for (const st of rmClock.started!)
+            remaining.push({
+              selector: `${st.selector} (a ${st.kind} a timer started at ${st.atMs}ms)`,
+              name: st.name,
+              durationMs: lasted,
+            });
+        } else if (lasted >= durationFloor) {
           remaining.push({
             selector: `(script-driven motion at ${b.x},${b.y} ${b.width}x${b.height})`,
             name: "requestAnimationFrame / timers",
@@ -1670,6 +1718,8 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
           ? `script-driven motion${where}: still moving at ${c.windowMs}ms of virtual time${ruleTag("clock-motion-unsettled")}`
           : `script-driven motion${where}: settles by ${c.settledAtMs}ms of virtual time${ruleTag("long-settle")}`,
     );
+    if (c.visible && (c.started ?? []).length > 0)
+      lines.push(`${DIM}  not a requestAnimationFrame loop: ${clockMotionSource(c)}${RESET}`);
     if (c.errors.length > 0)
       lines.push(`${DIM}  page callbacks threw while the clock advanced: ${c.errors.join(" | ")}${RESET}`);
   }

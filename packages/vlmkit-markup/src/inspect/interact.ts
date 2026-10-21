@@ -214,6 +214,11 @@ export interface FrameSequenceEntry extends FramesWritten {
    * to the real one.
    */
   cancelled: number;
+  /**
+   * The longest any frame was shot after its offset, in ms. A timer's or a script's work runs on
+   * the real clock, so its frames place it to within this; held CSS motion is exact regardless.
+   */
+  maxLagMs?: number;
 }
 
 /** Where a `click` with `describe` landed, so the run says what it clicked. */
@@ -776,7 +781,7 @@ async function settleMotion(page: Page): Promise<void> {
 async function recordFrames(
   page: Page,
   options: { dir: string; armedDoc: string; offsets: readonly number[]; source: FramesSource },
-): Promise<FramesWritten & { navigatedAtMs?: number; cancelled: number; error?: string }> {
+): Promise<FramesWritten & { navigatedAtMs?: number; cancelled: number; error?: string; maxLagMs?: number }> {
   await ensureHold(page);
   const start = await liveEval(
     page,
@@ -808,6 +813,7 @@ async function recordFrames(
   let docId = start.docId;
   let navigatedAtMs: number | undefined = docId !== options.armedDoc ? 0 : undefined;
   let cancelled = 0;
+  let maxLagMs: number | undefined;
   const writer = await frameWriter(options.dir, options.source);
   const clock = () => liveEval(page, (a) => (window as unknown as InteractWindow).__vlmkitInteract!.now() - a, anchor);
   // A new document (a link, a reload, a redirect): armed, so its motion is held on the same clock.
@@ -841,6 +847,7 @@ async function recordFrames(
     ...(navigatedAtMs !== undefined ? { navigatedAtMs } : {}),
     cancelled,
     ...(error !== undefined ? { error } : {}),
+    ...(maxLagMs !== undefined ? { maxLagMs } : {}),
   };
 
   async function frameAt(atMs: number): Promise<void> {
@@ -862,6 +869,7 @@ async function recordFrames(
     cancelled = Math.max(cancelled, result.cancelled);
     const { png, stable, at } = await captureStable(page, { clock });
     await writer.add(png, { atMs, stable, shotMs: Math.round(at ?? 0) });
+    if (at !== undefined) maxLagMs = Math.max(maxLagMs ?? 0, Math.round(at - atMs));
     // A document that committed while this frame was shot: say so from this offset on.
     await checkDocument(atMs);
   }
@@ -1286,6 +1294,12 @@ function frameSequenceNotes(f: FrameSequenceEntry): string[] {
     ...(f.unstable > 0
       ? [
           `${f.unstable} frame(s) never captured the same twice: something moved that the step did not hold (script-driven motion on the real clock, or CSS in an iframe)`,
+        ]
+      : []),
+    // Round 7: an agent could not tell how far a timer's frames could be trusted.
+    ...(f.maxLagMs !== undefined && f.count > 0
+      ? [
+          `CSS motion is seeked, so exact; a timer's or a script's work runs on the real clock, and these frames were shot up to ${f.maxLagMs}ms after their offsets (\`shotMs\` in frames.json): place such work to within that`,
         ]
       : []),
     ...(f.navigatedAtMs !== undefined

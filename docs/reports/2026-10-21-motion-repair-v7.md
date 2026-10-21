@@ -95,3 +95,27 @@ All six repairs were right, each in one round. No rule fired on any of the three
   times can be trusted.
 - `interpolate-size` is Chromium-only. Both accordion agents said so, and neither could test
   another engine.
+
+## The deferred items, fixed
+
+- **A timer-started transition is named.** While `--virtual-time` advances the held clock, every
+  CSS transition or animation that appears is recorded with its element and the instant it began.
+  On the progress reference page, the clock line is now followed by `not a requestAnimationFrame
+  loop: a timer started transition \`width\` on div.bar (begun at 250ms)`.
+  `reduced-motion-ignored` names `div.bar (a transition a timer started at 250ms) \`width\``, and
+  its remedy adds "`transition: none` on it in that rule reduces it too". A real rAF loop still
+  reads `requestAnimationFrame / timers`. The broken page's misspelt `widht` starts no transition,
+  so its motion keeps that label.
+- **The storyboard's floor is an option.** `snapshot storyboard --floor N` (0-254, default 8). A
+  panel going from white to #f7f7f8 moves each channel by 8: at the default it is no event, and
+  with `--floor 2` it is a `change`. When a sequence has no events, SUMMARY.md now says that a
+  change between near colours can sit under the floor, and that `--floor 2` sees it.
+- **`inspect interact` says how far its frames can be trusted.** Each frames step reports the
+  longest lag of a shot after its offset: "CSS motion is seeked, so exact; a timer's or a script's
+  work runs on the real clock, and these frames were shot up to Nms after their offsets". The
+  value is `maxLagMs` in the report's JSON.
+- **`interpolate-size` is Chromium-only**, and the `snapped` message and the skill now say so. They
+  name `grid-template-rows: 0fr → 1fr` as the form that runs in every engine.
+
+`reduced-motion-ignored` is still a suspect: the project decides that.
+

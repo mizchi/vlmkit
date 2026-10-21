@@ -53,28 +53,32 @@ describe("snapshot storyboard args", () => {
     for (const bad of ["0", "1e1", "0x10", "", "2.5", "1".repeat(310)]) {
       assert.throws(() => parseArgs(["f.json", "--max-events", bad]), /--max-events/, bad);
     }
+    for (const bad of ["-1", "255", "2.5", ""]) {
+      assert.throws(() => parseArgs(["f.json", "--floor", bad]), /--floor expects/, bad);
+    }
+    assert.equal(parseArgs(["f.json", "--floor", "0"]).floor, 0);
     assert.throws(() => parseArgs(["f.json", "--frobnicate"]), /unknown option/);
   });
 });
 
-/** A W x H white PNG with a black box, written to `path`. */
-async function writeFrame(path: string, width: number, height: number, box?: Box) {
+/** A W x H white PNG with a box of grey `ink` (black by default), written to `path`. */
+async function writeFrame(path: string, width: number, height: number, box?: Box, ink = 0) {
   const png = new PNG({ width, height });
   png.data.fill(255);
   if (box) {
     for (let y = box.y; y < box.y + box.height; y++) {
-      for (let x = box.x; x < box.x + box.width; x++) png.data.fill(0, (y * width + x) * 4, (y * width + x) * 4 + 3);
+      for (let x = box.x; x < box.x + box.width; x++) png.data.fill(ink, (y * width + x) * 4, (y * width + x) * 4 + 3);
     }
   }
   await writeFile(path, PNG.sync.write(png));
 }
 
 /** A hand-written sequence: frames `boxes[i]` at 60fps, and its manifest. */
-async function writeSequence(dir: string, boxes: (Box | undefined)[], size = { width: 32, height: 24 }) {
+async function writeSequence(dir: string, boxes: (Box | undefined)[], size = { width: 32, height: 24 }, ink = 0) {
   const frames = [];
   for (const [n, box] of boxes.entries()) {
     const file = frameFileName(n, frameTimeMs(n));
-    await writeFrame(join(dir, file), size.width, size.height, box);
+    await writeFrame(join(dir, file), size.width, size.height, box, ink);
     frames.push({ n, file, atMs: frameTimeMs(n), stable: true });
   }
   const source = { tool: "test", url: "file:///x.html", viewport: size, deviceScaleFactor: 1, clock: "held" };
@@ -83,6 +87,24 @@ async function writeSequence(dir: string, boxes: (Box | undefined)[], size = { w
 }
 
 describe("writeStoryboard", () => {
+  // Round 7 of motion-repair: a panel going from white to #f7f7f8 moves each channel by 8, which
+  // the default floor does not count, and the summary said nothing about why.
+  test("a change between two near colours needs --floor, and the summary says so", async () => {
+    const boxes: (Box | undefined)[] = Array.from({ length: 30 }, (_, n) =>
+      n >= 12 ? { x: 4, y: 4, width: 20, height: 12 } : undefined,
+    );
+    const dir = await mkdtemp(join(tmpdir(), "vlmkit-storyboard-floor-"));
+    const manifest = await writeSequence(dir, boxes, undefined, 247);
+    const atDefault = await writeStoryboard(manifest);
+    assert.equal(atDefault.story.events.length, 0);
+    assert.match(await readFile(join(atDefault.outDir, "SUMMARY.md"), "utf8"), /`--floor 2` sees it/);
+    const lowered = await writeStoryboard(manifest, { floor: 2 });
+    assert.deepEqual(
+      lowered.story.events.map((e) => [e.kind, e.first.n]),
+      [["change", 12]],
+    );
+  });
+
   test("frames of two sizes are refused, naming the frame", async () => {
     const dir = await mkdtemp(join(tmpdir(), "vlmkit-storyboard-size-"));
     const manifest = await writeSequence(dir, [undefined, undefined]);
