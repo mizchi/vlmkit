@@ -78,4 +78,22 @@ describe("text composited away by a transparent ancestor", () => {
       /"Quarterly report\.pdf" \(rgb\(27, 36, 48\)\) at opacity 0\.00 because div\.shell is transparent — nothing of it is painted/,
     );
   });
+
+  it("exempts a section below the fold that is set to fade in: a scroll reveal (round 8)", () => {
+    const sample = {
+      selector: "section.reveal.team > h2",
+      text: "Team",
+      color: [29, 31, 34, 1] as [number, number, number, number],
+      backgrounds: [[251, 251, 250, 1] as [number, number, number, number]],
+      opacity: 0,
+      transparentBy: "section.reveal.team",
+    };
+    const waiting = textContrastCandidates([{ ...sample, revealPending: true }]);
+    const r = judgeTextContrast(waiting.candidates, waiting.skippedComposite, 1280);
+    expect(r.findings).toEqual([]);
+    expect(r.exempted[0]!.reason).toMatch(/scroll reveal .*--scroll section\.reveal\.team/);
+    // On screen and still transparent is the defect itself.
+    const shown = textContrastCandidates([sample]);
+    expect(judgeTextContrast(shown.candidates, shown.skippedComposite, 1280).findings).toHaveLength(1);
+  });
 });

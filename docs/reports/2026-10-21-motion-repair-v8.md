@@ -97,3 +97,30 @@ reduced-motion rule to the hover page that the brief did not ask for, after `che
   transform shrinks the page's overflow, the page scrolls with it. `.team` measured `travels 1px`.
   That is what the screen shows, so it is reported as is.
 - The skill names Node v24; the sandbox runs v22. (Raised by one agent.)
+
+## The deferred items, fixed
+
+- **`check integrity` and a scroll reveal.** A transparent element now counts as a scroll reveal
+  waiting for its scroll when three things hold: what hides it lies wholly below the fold, it is
+  set to fade (an opacity transition or an animation), and its opacity is still 0. Such an
+  element is exempted, not failed: `below the fold, transparent and set to fade: a scroll reveal
+  waiting for its scroll — vlmkit inspect motion <page> --selector section.reveal.team --scroll
+  section.reveal.team judges whether it arrives`. What is on screen and still transparent stays a
+  fail.
+  - The broken page still fails on "Our studio" at 1280 and 768, where its top is on screen.
+  - The reference page's one remaining fail is its 375px horizontal overflow, which is outside
+    the brief.
+- **`inspect interact`'s ✓.** The rows between snapshots are now headed `pixels changed between
+  snapshots (a measurement, not a verdict)` and marked `Δ` (changed) or `=` (unchanged).
+- **The scroll clamp.** When the page's scroll position moves while `inspect motion` shoots its
+  frames, the report says so: `the page scrolled from y=1259 to y=1244 while the frames were shot
+  (at the end of a page the scroll is clamped, and follows its overflow): positions are on screen,
+  so a path moved with the scroll reads shorter`.
+- **The late frames after a scroll** were not a fault. Re-run on the small model's fixed page,
+  `inspect interact`'s frames show the studio fading in from 0ms to 400ms, held and seeked. The
+  lag (up to 1628ms) is the real time each shot takes, and the note under the frames already says
+  that it bounds only a script's own work. The frame the agent saw as fully opaque at 0ms came
+  from its first try, `threshold: 0.1`, which revealed the studio at load.
+- **Node v24** is the project's declared engine (`"node": ">=24"`). The sandbox's v22 is the
+  environment's, not something for the tool to change.
+

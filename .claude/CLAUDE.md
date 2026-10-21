@@ -345,7 +345,8 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   beside `--click`, in order, each before the last run to its end; a jump from a target held still
   off its place names the replaced transform; `--expect-still` fails a centre that moves. With
   `--selector` an easing is fitted from 2px (a 4px lift read "static") and a scale's point is solved
-  from 2% (a 96% dialog read "not checked").
+  from 2% (a 96% dialog read "not checked"). `check integrity` exempts text hidden by an element wholly below the fold
+  that is set to fade (a scroll reveal waiting for its scroll); on screen and transparent stays a fail.
 
 ## Generated figures (raster images)
 

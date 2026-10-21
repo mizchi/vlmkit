@@ -954,7 +954,7 @@ export interface ContrastCandidate {
    * Present when the text is composited away by an ancestor's opacity: its own colour before
    * compositing, the opacity it renders at, and the ancestor that makes it transparent.
    */
-  transparent?: { declared: string; opacity: number; by?: string };
+  transparent?: { declared: string; opacity: number; by?: string; revealPending?: boolean };
 }
 
 /**
@@ -975,6 +975,11 @@ export interface TextContrastSample {
   opacity?: number;
   /** The outermost ancestor whose own opacity is under 0.05, when one is: what hides the text. */
   transparentBy?: string;
+  /**
+   * What hides it lies wholly below the fold and is set to fade (an opacity transition, or an
+   * animation): a scroll reveal still waiting for its scroll, not text that is never shown.
+   */
+  revealPending?: boolean;
   fontSizePx?: number;
   fontWeight?: number;
   disabled?: boolean;
@@ -1027,6 +1032,7 @@ export function textContrastCandidates(samples: readonly TextContrastSample[]): 
               declared: formatRgb((sample.color ?? [0, 0, 0, 1]).slice(0, 3) as [number, number, number]),
               opacity: Math.round((sample.opacity ?? 0) * 100) / 100,
               ...(sample.transparentBy ? { by: sample.transparentBy } : {}),
+              ...(sample.revealPending ? { revealPending: true } : {}),
             },
           }
         : {}),
@@ -1073,6 +1079,16 @@ export function judgeTextContrast(
         selector: c.selector,
         reason:
           "text-shadow present — the shadow may carry the contrast the fill lacks (not measurable deterministically)",
+      });
+      continue;
+    }
+    if (c.ratio < 1.15 && c.transparent?.revealPending) {
+      const who = c.transparent.by ?? c.selector;
+      exempted.push({
+        kind: "invisible-text",
+        viewport,
+        selector: c.selector,
+        reason: `below the fold, transparent and set to fade: a scroll reveal waiting for its scroll — \`vlmkit inspect motion <page> --selector ${who} --scroll ${who}\` judges whether it arrives`,
       });
       continue;
     }

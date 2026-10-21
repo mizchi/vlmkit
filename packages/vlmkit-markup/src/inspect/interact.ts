@@ -1257,9 +1257,13 @@ export function formatInteractReport(
       );
     }
   }
+  // How much each step changed the page, not whether it was right: a ✓ beside every scroll of a
+  // broken reveal read as a pass (motion-repair round 8). Nothing here is a verdict.
+  if (report.transitions.length > 0)
+    lines.push(`  ${DIM}pixels changed between snapshots (a measurement, not a verdict):${RESET}`);
   for (const t of report.transitions) {
     const pct = (t.diffRatio * 100).toFixed(2);
-    const icon = t.diffRatio === 0 ? `${YELLOW}~${RESET}` : `${GREEN}✓${RESET}`;
+    const icon = t.diffRatio === 0 ? `${YELLOW}=${RESET}` : `${CYAN}Δ${RESET}`;
     const summary = t.actions.map(summarizeAction).join(", ");
     lines.push(`  ${icon} ${t.from} → ${t.to}  ${pct.padStart(6)}%  ${DIM}${summary}${RESET}`);
   }

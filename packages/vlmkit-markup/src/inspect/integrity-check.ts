@@ -576,7 +576,19 @@ export const COLLECT_TEXT_CONTRAST = `(() => {
           const po = parseFloat(getComputedStyle(p).opacity);
           if (Number.isFinite(po) && po < 0.05) by = p;
         }
-        return by ? { transparentBy: stableSelector(by) } : {};
+        // Wholly below the fold, transparent, and set to fade: a scroll reveal still waiting for
+        // its scroll. A correct reveal page failed here on every section (motion-repair round 8).
+        const owner = by || (parseFloat(getComputedStyle(el).opacity) < 0.05 ? el : null);
+        let revealPending = false;
+        if (owner) {
+          const os = getComputedStyle(owner);
+          const r = owner.getBoundingClientRect();
+          const props = os.transitionProperty.split(",").map((x) => x.trim());
+          const durs = os.transitionDuration.split(",").map((x) => parseFloat(x) || 0);
+          const fades = props.some((x, i) => (x === "opacity" || x === "all") && (durs[i % durs.length] || 0) > 0);
+          revealPending = r.top >= innerHeight && (fades || os.animationName !== "none");
+        }
+        return { ...(by ? { transparentBy: stableSelector(by) } : {}), ...(revealPending ? { revealPending: true } : {}) };
       })(),
       fontSizePx: parseFloat(style.fontSize) || 16,
       fontWeight: parseFloat(style.fontWeight) || (/bold/i.test(style.fontWeight) ? 700 : 400),

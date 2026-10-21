@@ -825,6 +825,8 @@ interface Captured {
   delays?: (string | null)[];
   /** Only infinite animations ran: the first runs were sampled and nothing rests. */
   forever?: boolean;
+  /** The page's scroll position across the frames shot, when it moved (a clamp at the page's end). */
+  scrolled?: { from: number; to: number };
   /**
    * Each target's parent box at rest, when it is at most six times the target's area: what it
    * fills or sits in (a bar's track), which the crop keeps. A crop around the bar alone cut its
@@ -1009,8 +1011,10 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
       });
       const files = new Map<number, string>();
       const frames: Captured["frames"] = [];
+      const scrollYs: number[] = [];
       for (const atMs of instants) {
         await timeline.at(atMs);
+        scrollYs.push(await page.evaluate(() => window.scrollY).catch(() => 0));
         const { png, stable } = await captureStable(page);
         files.set(atMs, await writer.add(png, { atMs, stable, ...(atMs > endMs ? { label: "rest" } : {}) }));
         const frame: MotionFrame = { atMs, png: new Uint8Array(png) };
@@ -1069,6 +1073,9 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
         context,
         ...(delays ? { delays } : {}),
         ...(forever ? { forever: true } : {}),
+        ...(scrollYs.length > 1 && Math.max(...scrollYs) - Math.min(...scrollYs) >= 1
+          ? { scrolled: { from: scrollYs[0]!, to: scrollYs[scrollYs.length - 1]! } }
+          : {}),
       };
     } finally {
       await page.close();
@@ -1101,6 +1108,12 @@ export function formatMotionReport(
   lines.push(
     `inspect motion: ${source} — ${captured.forever ? "every animation repeats forever, so the first runs are sampled and nothing rests; " : ""}${captured.frames.length - restCount} frames over ${Math.round(Math.min(captured.startMs, captured.frames[0]?.atMs ?? captured.startMs))}..${Math.round(captured.endMs)}ms${(captured.frames[0]?.atMs ?? captured.startMs) < captured.startMs ? ` (motion from ${Math.round(captured.startMs)}ms; the frames before it show the wait)` : ""} + ${restCount} at rest (${captured.manifest})`,
   );
+  // Near a page's end the scroll is clamped, and it moves as a reveal's transform shrinks the
+  // overflow: a 16px rise read "travels 1px" with nothing to say why (round 8).
+  if (captured.scrolled)
+    lines.push(
+      `  the page scrolled from y=${Math.round(captured.scrolled.from)} to y=${Math.round(captured.scrolled.to)} while the frames were shot (at the end of a page the scroll is clamped, and follows its overflow): positions are on screen, so a path moved with the scroll reads shorter`,
+    );
   let fails = 0;
   let warns = 0;
   type Fit = { best: string; margin: number; errors: Record<string, number>; channel?: string };
