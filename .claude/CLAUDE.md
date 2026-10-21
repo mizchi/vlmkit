@@ -324,6 +324,12 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   column and had no origin; one axis names an edge and is checked on that axis only. What needs
   no brief is a rule: `check animation`'s `delayed-entrance` (warn) — first keyframe hidden,
   backwards fill, delay ≥1000ms.
+- **How long and how often** (round 6, `docs/reports/2026-10-21-motion-repair-v6.md`): a sheet
+  rising in 1400ms for 280ms and a badge throbbing forever for three times passed every rule.
+  The element's own timing gives `runs Nms` / `xN` / `repeats forever`; `--expect-duration` and
+  `--expect-iterations` fail on them. A page whose animations are all infinite is sampled over
+  its first three runs (4s at most) with no rest frame, instead of refused. With `--exits`, frames
+  from the last segment on are leaving, not lost.
 
 ## Generated figures (raster images)
 

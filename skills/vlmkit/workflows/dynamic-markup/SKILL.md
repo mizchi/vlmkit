@@ -271,7 +271,13 @@ vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ea
   later" is one `--selector` per element in the brief's order plus
   `--expect-stagger`; "straight away", "with no wait", "as the page
   appears" is `--expect-start 0`. Round 5's briefs used those words and
-  never the flags' names, and all six agents mapped them. In motion-repair round 3 a wrong
+  never the flags' names, and all six agents mapped them. How long and how
+  often are the same: "within about a quarter of a second", "snappy",
+  "crawls" is `--expect-duration 280ms`; "three times, then it sits
+  still" is `--expect-iterations 3` (an infinite animation is now sampled
+  over its first runs instead of refused); "gone for good" is `--exits`,
+  and a snap-back after it is the fail. Without the flag, each target's
+  line still says `begins at …, runs …ms x3` / `and repeats forever`. In motion-repair round 3 a wrong
   `transform-origin` and a stagger that was not one both read "follows ease-out exactly, no fail"
   until these existed.
 - **What it does not judge**: fps or jank, a target it is not told about, and anything under
