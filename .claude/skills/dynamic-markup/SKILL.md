@@ -139,11 +139,13 @@ Evaluates every authored animation by rendered frames:
   line by line: count, target selector, duration, iterations
   (`x1` vs `x∞`), and — for oscillating animations — the **leg time**
   must all match. The report annotates oscillation as `(alternate,
-  leg 1200ms)` or `(palindromic keyframes, leg 600ms)`: a brief saying
-  "1.2s per leg" is satisfied by `alternate` at 1.2s but NOT by a
-  palindromic 0%/50%/100% cycle at 1.2s (that runs each leg in 600ms —
-  double speed, identical duration). The brief is the spec; the report
-  is the measurement.
+  leg 1200ms)` or `(palindromic keyframes: each 1200ms run goes out and
+  back, 600ms each way)`: a brief saying "1.2s per leg" is satisfied by
+  `alternate` at 1.2s but NOT by a palindromic 0%/50%/100% cycle at 1.2s
+  (that runs each leg in 600ms — double speed, identical duration). A
+  brief that gives one throb or one pulse its length ("each throb
+  600ms") means the whole out-and-back run, so a palindromic 600ms is
+  right. The brief is the spec; the report is the measurement.
 - **`reduced-motion-ignored` (suspect)** — the brief's reduced-motion
   clause is not honored: add the `@media (prefers-reduced-motion:
   reduce)` override (auto-markup keeps colors in variables; keep

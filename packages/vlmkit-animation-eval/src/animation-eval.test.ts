@@ -176,7 +176,7 @@ test("formatAnimationEvalReport annotates oscillating animations with the leg ti
   };
   const text = formatAnimationEvalReport(report);
   assert.match(text, /`pulse` 1200ms x∞ \(alternate, leg 1200ms\)/);
-  assert.match(text, /`blink` 1200ms x∞ \(palindromic keyframes, leg 600ms\)/);
+  assert.match(text, /`blink` 1200ms x∞ \(palindromic keyframes: each 1200ms run goes out and back, 600ms each way\)/);
 });
 
 test("a visually dead animation raises no-visible-effect", () => {

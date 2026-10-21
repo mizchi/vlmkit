@@ -950,3 +950,28 @@ S0 0–33.33 · E1 50 · S0 66.67–316.67 · E2 333.33–383.33 · S1 383.33–
 - E3: the hold it settled in is the sequence's last 33.33 ms, shorter than 100 ms; it may still have been moving.
 - E3: only 50 ms followed its first frame; a return later than that is not in the sequence.
 `;
+
+describe("a change that is only edge rendering", () => {
+  // Stems one pixel wide, re-rendered half a pixel over: each lightens one column as much as it
+  // darkens the next. A recoloured stem is the control.
+  const stems = (cols: readonly number[], v: number): Paint[] =>
+    cols.map((x) => ({ x, y: 5, w: 1, h: 20, rgb: [v, v, v] }));
+  const hold = (f: Uint8Array, n: number) => Array.from({ length: n }, () => f);
+  test("is marked edgeOnly and noted, and a recolour is not", () => {
+    const before = frame(stems([10, 20, 30], 0));
+    const after = frame([...stems([10, 11, 20, 21, 30, 31], 128)]);
+    const s = sequence([...hold(before, 4), ...hold(after, 12)]);
+    const b = buildStoryboard(s.entries, s.pixels);
+    assert.equal(b.events.length, 1);
+    assert.equal(b.events[0]!.kind, "change");
+    assert.equal(b.events[0]!.edgeOnly, true);
+    const md = storyboardSummary(
+      b,
+      { tool: "t", url: "u", viewport: { width: W, height: H }, deviceScaleFactor: 1, clock: "held" },
+      s.entries,
+    );
+    assert.match(md, /E1: between S0's frame and S1's, only edge rendering differs/);
+    const recolour = story([...hold(before, 4), ...hold(frame(stems([10, 20, 30], 100)), 12)]);
+    assert.equal(recolour.events[0]!.edgeOnly, undefined);
+  });
+});

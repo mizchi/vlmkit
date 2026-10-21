@@ -31,6 +31,7 @@
  * decoded from a lossy codec are refused unless asked for (`--lossy`), and then segmented without
  * one, their keyframe-aligned events named.
  */
+import { edgeOnlyDelta } from "./edge-noise.ts";
 import { formatInstant, frameTimeMs, type FrameEntry, type FramesSource } from "./frames.ts";
 import { UsageError } from "./errors.ts";
 
@@ -239,6 +240,13 @@ export interface StoryEvent {
   maxStepDelta: number;
   /** Its frames whose capture never agreed: motion the capture did not hold. */
   unstable: number;
+  /**
+   * change / drift: between the state it left and the state it settled in, only edge rendering
+   * differs inside its box (antialiasing, a layer composited differently): not a change of
+   * content. A badge drawn on its own layer during an animation's delay read as a change into a
+   * new state at its start (motion-repair round 6).
+   */
+  edgeOnly?: true;
 }
 
 export interface StoryState {
@@ -571,6 +579,12 @@ export function buildStoryboard(
     j = settled + 1;
   }
   if (spanStart !== -1) timeline.push({ state, from: ref(spanStart), to: ref(count - 1) });
+  for (const e of events) {
+    if (!e.settled || (e.kind !== "change" && e.kind !== "drift")) continue;
+    const fromFrame = states.find((st) => st.id === e.from)!.frame.n;
+    const img = (n: number) => ({ width, height, data: pixels.pixels(n) });
+    if (edgeOnlyDelta(img(fromFrame), img(e.settled.n), e.box).edgeOnly) e.edgeOnly = true;
+  }
 
   return {
     format: STORYBOARD_FORMAT,
@@ -729,6 +743,11 @@ export function storyboardSummary(
         by.length > 0
           ? `${e.id}: its pixels were last exactly ${e.from}'s at ${ms(e.movedAfter.atMs)} ms, before ${by.map((x) => x.id).join(", ")} moved them.`
           : `${e.id}: its pixels were last exactly ${e.from}'s at ${ms(e.movedAfter.atMs)} ms, and moved below the floor until it showed.`,
+      );
+    }
+    if (e.edgeOnly) {
+      notes.push(
+        `${e.id}: between ${e.from}'s frame and ${e.to}'s, only edge rendering differs inside its box (a 5x5 average removes most of it, and it lightens as much as it darkens) — antialiasing or a layer composited differently, not a change of content.`,
       );
     }
     if (e.noHold) {

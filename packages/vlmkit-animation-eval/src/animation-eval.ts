@@ -1650,7 +1650,11 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
       // checkable — duration alone hides a 2x frequency difference between
       // `alternate` and palindromic-keyframe implementations.
       const oscLabel = osc.oscillating
-        ? ` (${anim.direction.startsWith("alternate") ? anim.direction : "palindromic keyframes"}, leg ${Math.round(osc.legMs)}ms)`
+        ? anim.direction.startsWith("alternate")
+          ? ` (${anim.direction}, leg ${Math.round(osc.legMs)}ms)`
+          : // One run goes out and back: say so, or a brief giving one throb's length (600ms)
+            // read the 300ms leg as the thing to fix (motion-repair round 6).
+            ` (palindromic keyframes: each ${Math.round(anim.durationMs)}ms run goes out and back, ${Math.round(osc.legMs)}ms each way)`
         : "";
       lines.push(
         `  - ${anim.selector} \`${anim.name}\` ${Math.round(anim.durationMs)}ms${anim.delayMs ? ` after ${Math.round(anim.delayMs)}ms` : ""}${anim.easing ? ` ${anim.easing}` : ""} x${anim.iterations ?? "∞"}${oscLabel}: ${visibility}, motion region ${bbox}, peak frame delta ${(anim.maxFrameRatio * 100).toFixed(2)}%`,

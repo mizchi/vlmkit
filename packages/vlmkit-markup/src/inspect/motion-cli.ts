@@ -278,7 +278,8 @@ an easing is checked on each channel that changes.
                           the page's own spans of motion
   --start <ms> --end <ms> The motion's span (needed for frames.json): one segment
   --viewport <WxH>        Default 1280x800
-  --frames <dir>          Where the frames go (default test-results/inspect-motion)
+  --frames <dir>          Where the frames go (default test-results/inspect-motion/<page name>, so
+                          two pages, or check animation's frames, do not overwrite each other)
   --threshold <0-1>       A statement is true at or above this (default 0.5)
   --json                  Print the report as JSON
 
@@ -330,7 +331,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   let startMs: number | undefined;
   let endMs: number | undefined;
   let viewport = { width: 1280, height: 800 };
-  let frames = "test-results/inspect-motion";
+  let frames: string | undefined;
   let threshold = 0.5;
   let json = false;
   let exits = false;
@@ -554,7 +555,14 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
     ...(startMs !== undefined ? { startMs } : {}),
     ...(endMs !== undefined ? { endMs } : {}),
     viewport,
-    frames,
+    // Named by the page: a second page, or a frames.json read back, kept its own frames apart.
+    frames:
+      frames ??
+      join(
+        "test-results/inspect-motion",
+        (positional[0]!.split(/[?#]/)[0]!.replace(/\/+$/, "").split("/").pop() || "page").replace(/\.[^.]*$/, "") ||
+          "page",
+      ),
     threshold,
     json,
     jev,

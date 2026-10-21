@@ -59,6 +59,23 @@ to read the duration in the list and compare it with the brief themselves.
 - **The skill:** "within about a quarter of a second" maps to `--expect-duration`, "three times,
   then it sits still" maps to `--expect-iterations`, and "gone for good" maps to `--exits`.
 
+## The deferred items, fixed
+
+- **The `leg` note.** `check animation` now prints `(palindromic keyframes: each 600ms run goes out
+  and back, 300ms each way)`, and the skill says that a brief giving one throb or pulse its length
+  means the whole run.
+- **Shared output directory.** `inspect motion` writes to `test-results/inspect-motion/<page name>`
+  by default, so two pages no longer overwrite each other.
+- **A storyboard change that is only edge rendering.** The edge-only test behind `diff png`'s
+  `render-noise` is now pure, in `@mizchi/vlmkit-judge/edge-noise.ts`, and `diff png` and the
+  storyboard share it. A change between two states that differ only in edge rendering is marked
+  `edgeOnly` and noted in SUMMARY.md. The badge's own case is **not** caught: measured, its
+  45 differing pixels move one way (signed ratio 0.86), the way a recolour does, because a layer's
+  antialiasing lightens the glyph overall. Pixels alone cannot tell it from a 1px border
+  recoloured (−1.00), and the test is not loosened to pretend they can.
+- **`reduced-motion-ignored` stays a suspect.** That is a policy question for the project (WCAG 2.3.3
+  is AAA), not something to fix in the tool.
+
 ## Deferred, or not the tool's to change
 
 - **`reduced-motion-ignored` is a suspect, so it exits 1.** Every agent in all six rounds met it.
