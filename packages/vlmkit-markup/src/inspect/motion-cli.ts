@@ -68,6 +68,8 @@ export async function measureTargets(
         // one running on it, as a 0-1 fraction of one iteration. Null when nothing animates it.
         let t: number | null = null;
         let elapsedMs: number | null = null;
+        let durationMs: number | null = null;
+        let iterations: number | null | undefined;
         let longest = 0;
         for (const a of el.getAnimations()) {
           const c = a.effect?.getComputedTiming();
@@ -77,6 +79,10 @@ export async function measureTargets(
           const local = Number(c.localTime) - Number(c.delay ?? 0);
           t = Math.min(1, Math.max(0, local / d));
           elapsedMs = local;
+          // How long one run takes and how many there are: a sheet that "crawls up" at 1400ms and a
+          // badge that never stops throbbing passed every rule (motion-repair round 6).
+          durationMs = d;
+          iterations = Number.isFinite(Number(c.iterations)) ? Number(c.iterations) : null;
         }
         // What of it is the topmost thing painted, over a 5x5 grid of its box inside the viewport:
         // a clip (overflow: hidden), a cover (z-index) and leaving the screen all take it away.
@@ -178,6 +184,7 @@ export async function measureTargets(
           t,
           visible,
           elapsedMs,
+          ...(durationMs !== null ? { durationMs, iterations: iterations ?? null } : {}),
           ownOpacity,
           ...(fadeBy ? { fadeBy: name(fadeBy) } : {}),
           ...(hiddenBy ? { hiddenBy } : {}),
@@ -217,6 +224,8 @@ each forbidden statement is. vlmkit judges the motion from that:
   target-static    shown and still from the first frame (warn: not animating?)
   origin-mismatch  a scale grows from another point than --expect-origin (transform-origin)
   start-mismatch   its animation begins at another time than --expect-start / --expect-stagger
+  duration-mismatch one run takes another time than --expect-duration
+  iterations-mismatch it runs another number of times than --expect-iterations
   forbid           a statement seen at rest fails; only mid-motion, warns (--jev)
 
 Frames: each span some finite animation runs in is a segment (an entrance, and
@@ -260,6 +269,10 @@ an easing is checked on each channel that changes.
                           target in order: "200,280,360,440". Measured with --selector
   --expect-stagger <ms>   Each target begins this long after the one before it, in the order
                           given (from the first target's --expect-start, or its measured start)
+  --expect-duration <ms>  How long one run of its own animation takes ("280ms", "1.2s").
+                          Once for every target, or comma-separated per target. --selector
+  --expect-iterations <n> How many times it runs: 3, or infinite. Once for every target, or
+                          comma-separated per target. --selector
   --exits                 The targets are meant to leave (gone at rest is their end)
   --at <instants>         Frames to shoot (default: 11 per segment + rest); the segments stay
                           the page's own spans of motion
@@ -286,6 +299,10 @@ export interface MotionCliOptions {
   expectOrigin?: OriginName[];
   expectStartMs?: number[];
   expectStaggerMs?: number;
+  /** How long one run of each target's own animation takes (ms), per target in order. */
+  expectDurationMs?: number[];
+  /** How many times it runs (null: infinite), per target in order. */
+  expectIterations?: (number | null)[];
   exits: boolean;
   at?: number[];
   startMs?: number;
@@ -307,6 +324,8 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   let expectOrigin: OriginName[] | undefined;
   let expectStartMs: number[] | undefined;
   let expectStaggerMs: number | undefined;
+  let expectDurationMs: number[] | undefined;
+  let expectIterations: (number | null)[] | undefined;
   let at: number[] | undefined;
   let startMs: number | undefined;
   let endMs: number | undefined;
@@ -372,6 +391,27 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
           ...value(a, argv[++i])
             .split(",")
             .map((x) => one(a, x.trim())),
+        );
+        break;
+      case "--expect-duration":
+        (expectDurationMs ??= []).push(
+          ...value(a, argv[++i])
+            .split(",")
+            .map((x) => one(a, x.trim())),
+        );
+        break;
+      case "--expect-iterations":
+        (expectIterations ??= []).push(
+          ...value(a, argv[++i])
+            .split(",")
+            .map((x) => {
+              const v = x.trim();
+              if (v === "infinite") return null;
+              const n = Number(v);
+              if (!Number.isInteger(n) || n < 1)
+                throw new MotionUsageError(`--expect-iterations takes whole numbers or infinite, got ${v}`);
+              return n;
+            }),
         );
         break;
       case "--expect-stagger":
@@ -473,6 +513,15 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
       `${expectStartMs.length} --expect-start times for ${targets.length} targets: one per target, in order`,
     );
   }
+  for (const [flag, xs] of [
+    ["--expect-duration", expectDurationMs],
+    ["--expect-iterations", expectIterations],
+  ] as const) {
+    if (xs && xs.length > 1 && xs.length !== targets.length)
+      throw new MotionUsageError(
+        `${xs.length} ${flag} values for ${targets.length} targets: one for all, or one per target`,
+      );
+  }
   if (expectStaggerMs !== undefined && targets.length < 2)
     throw new MotionUsageError("--expect-stagger compares targets: give two or more, in the order they begin");
   const fromFrames = /(^|\/)frames\.json$/.test(positional[0]!);
@@ -498,6 +547,8 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
     ...(expectOrigin ? { expectOrigin } : {}),
     ...(expectStartMs ? { expectStartMs } : {}),
     ...(expectStaggerMs !== undefined ? { expectStaggerMs } : {}),
+    ...(expectDurationMs ? { expectDurationMs } : {}),
+    ...(expectIterations ? { expectIterations } : {}),
     exits,
     ...(at ? { at } : {}),
     ...(startMs !== undefined ? { startMs } : {}),
@@ -686,6 +737,8 @@ interface Captured {
   viewport?: { width: number; height: number };
   /** Per --selector, the declaration its animation-delay comes from. */
   delays?: (string | null)[];
+  /** Only infinite animations ran: the first runs were sampled and nothing rests. */
+  forever?: boolean;
   /** Every line of text on the page at rest, so a suggested crop does not cut one in half. */
   textLines?: { x: number; y: number; width: number; height: number }[];
 }
@@ -711,16 +764,23 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
           return k ? { ...a, holds: k.holds } : a;
         }),
       );
+      // Only infinite animations: sample their first three runs (4s at most), with no rest frame,
+      // since nothing rests. It refused before, and a badge that never stops throbbing is exactly
+      // what an agent brings it (round 6).
+      const infinite = held.filter((a) => a.iterations === null && a.durationMs > 0);
+      let forever: { startMs: number; endMs: number } | null = null;
       if (o.endMs === undefined && plan.segments.length === 0) {
-        throw new MotionUsageError(
-          "no finite animation on the page to sample: give --at and --end (an infinite one never rests)",
-        );
+        if (infinite.length === 0) {
+          throw new MotionUsageError("no animation on the page to sample: give --at and --end");
+        }
+        const s0 = Math.min(...infinite.map((a) => a.startMs));
+        forever = { startMs: s0, endMs: s0 + Math.min(4000, 3 * Math.max(...infinite.map((a) => a.durationMs))) };
       }
       const given = o.endMs !== undefined;
-      const endMs = o.endMs ?? plan.endMs;
-      const startMs = o.startMs ?? (given ? 0 : plan.startMs);
+      const endMs = o.endMs ?? forever?.endMs ?? plan.endMs;
+      const startMs = o.startMs ?? (given ? 0 : (forever?.startMs ?? plan.startMs));
       // --at chooses the frames; the segments are still the page's own spans of motion.
-      const segments = given ? [{ startMs, endMs }] : plan.segments;
+      const segments = given || forever ? [{ startMs, endMs }] : plan.segments;
       const instants = o.at
         ? [...new Set(o.at)].sort((a, b) => a - b)
         : given
@@ -728,7 +788,9 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
               const m = motionInstants(startMs, endMs);
               return [...m.motion, m.rest];
             })()
-          : [...plan.motion, plan.rest];
+          : forever
+            ? motionInstants(startMs, endMs, 31).motion
+            : [...plan.motion, plan.rest];
       const writer = await frameWriter(resolve(o.frames), {
         tool: "inspect motion",
         url,
@@ -781,6 +843,7 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
         viewport: o.viewport,
         textLines,
         ...(delays ? { delays } : {}),
+        ...(forever ? { forever: true } : {}),
       };
     } finally {
       await page.close();
@@ -811,7 +874,7 @@ export function formatMotionReport(
   const lines: string[] = [];
   const restCount = captured.frames.filter((f) => f.atMs > captured.endMs).length;
   lines.push(
-    `inspect motion: ${source} — ${captured.frames.length - restCount} frames over ${Math.round(Math.min(captured.startMs, captured.frames[0]?.atMs ?? captured.startMs))}..${Math.round(captured.endMs)}ms${(captured.frames[0]?.atMs ?? captured.startMs) < captured.startMs ? ` (motion from ${Math.round(captured.startMs)}ms; the frames before it show the wait)` : ""} + ${restCount} at rest (${captured.manifest})`,
+    `inspect motion: ${source} — ${captured.forever ? "every animation repeats forever, so the first runs are sampled and nothing rests; " : ""}${captured.frames.length - restCount} frames over ${Math.round(Math.min(captured.startMs, captured.frames[0]?.atMs ?? captured.startMs))}..${Math.round(captured.endMs)}ms${(captured.frames[0]?.atMs ?? captured.startMs) < captured.startMs ? ` (motion from ${Math.round(captured.startMs)}ms; the frames before it show the wait)` : ""} + ${restCount} at rest (${captured.manifest})`,
   );
   let fails = 0;
   let warns = 0;
@@ -841,8 +904,14 @@ export function formatMotionReport(
   // passed "follows ease-out exactly" with nothing on screen that said where or when.
   const grows = (g: { origin?: Parameters<typeof describeOrigin>[0] }) =>
     g.origin ? `; the scale grows from ${describeOrigin(g.origin)}` : "";
-  const begins = (t: { startsAtMs?: number }) =>
-    t.startsAtMs !== undefined ? `, begins at ${Math.round(t.startsAtMs)}ms` : "";
+  const begins = (t: { startsAtMs?: number; durationMs?: number; iterations?: number | null }) =>
+    (t.startsAtMs !== undefined ? `, begins at ${Math.round(t.startsAtMs)}ms` : "") +
+    (t.durationMs !== undefined ? `, runs ${Math.round(t.durationMs)}ms` : "") +
+    (t.iterations === null
+      ? " and repeats forever"
+      : t.iterations !== undefined && t.iterations !== 1
+        ? ` x${t.iterations}`
+        : "");
   for (const [i, t] of r.targets.entries()) {
     const doms = captured.frames.map((f) => f.dom?.[i]).filter((d) => d !== null && d !== undefined);
     const own = doms.map((d) => d!.ownOpacity).filter((o): o is number => typeof o === "number");
@@ -850,7 +919,13 @@ export function formatMotionReport(
       own.length > 1 && Math.max(...own) - Math.min(...own) < 0.02
         ? doms.map((d) => d!.fadeBy).find((x): x is string => typeof x === "string")
         : undefined;
-    const broken = t.findings.some((f) => f.rule === "jump" || f.rule === "snap-back");
+    // A jump or snap-back inside the motion voids its fit; one at rest (an exit not held) says
+    // nothing about the curve, which read "the path has a jump" beside a clean ease-in (round 6).
+    const seg0 = t.segments[0];
+    const broken = t.findings.some(
+      (f) =>
+        (f.rule === "jump" || f.rule === "snap-back") && (!seg0 || (f.atMs >= seg0.startMs && f.atMs <= seg0.endMs)),
+    );
     if (t.segments.length <= 1) {
       lines.push(
         `  target ${JSON.stringify(t.target)}${begins(t)}: travels ${Math.round(t.travelPx)}px over the frames measured, ${fitText(t.easing, broken)}${t.segments[0] ? grows(t.segments[0]) : ""}`,
@@ -1033,6 +1108,8 @@ export async function runMotionCli(argv: string[]): Promise<number> {
     ...(o.expectOrigin ? { expectOrigin: o.expectOrigin.length === 1 ? o.expectOrigin[0]! : o.expectOrigin } : {}),
     ...(o.expectStartMs ? { expectStartMs: o.expectStartMs } : {}),
     ...(o.expectStaggerMs !== undefined ? { expectStaggerMs: o.expectStaggerMs } : {}),
+    ...(o.expectDurationMs ? { expectDurationMs: o.expectDurationMs } : {}),
+    ...(o.expectIterations ? { expectIterations: o.expectIterations } : {}),
   });
   const json = {
     source: o.source,

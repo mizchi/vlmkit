@@ -153,6 +153,9 @@ export interface MotionSample {
      * frame's time less this is when that animation begins: what a stagger is made of.
      */
     elapsedMs?: number | null;
+    /** One run of its own longest animation (ms), and how many runs (null: infinite). */
+    durationMs?: number;
+    iterations?: number | null;
     /** Each axis's scale, when it differs: a scaleY drop-down has scaleX 1. */
     scaleX?: number;
     scaleY?: number;
@@ -220,6 +223,9 @@ export interface MotionPathOptions {
   expectOrigin?: OriginName;
   /** When its own animation must begin (page ms): measured from the element's animation time. */
   expectStartMs?: number;
+  /** How long one run must take (ms), and how many runs (null: infinite). */
+  expectDurationMs?: number;
+  expectIterations?: number | null;
 }
 
 export type MotionRule =
@@ -235,7 +241,9 @@ export type MotionRule =
   | "origin-mismatch"
   | "origin-unchecked"
   | "start-mismatch"
-  | "start-unchecked";
+  | "start-unchecked"
+  | "duration-mismatch"
+  | "iterations-mismatch";
 
 export interface MotionFinding {
   rule: MotionRule;
@@ -301,6 +309,9 @@ export interface MotionPathReport {
   segments: (MotionSegment & { travelPx: number; easing: SegmentEasing; origin?: ScaleOrigin })[];
   /** When its own animation begins (page ms), measured: absent without --selector or an animation. */
   startsAtMs?: number;
+  /** One run of its own animation (ms) and how many runs (null: infinite), measured. */
+  durationMs?: number;
+  iterations?: number | null;
   /** The first segment's travel and fit (the whole motion when there is one segment). */
   travelPx: number;
   easing: SegmentEasing;
@@ -413,7 +424,11 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       const s = judged[i]!;
       // Measured, the visible share already leaves out what is off-screen, so a box at the edge is
       // no excuse: a toast that snaps back off-screen between two frames that show it is lost.
-      if (!shown(s) && (s.dom !== undefined || !atEdge(s))) {
+      // Meant to leave: not shown from the last segment on is the exit working, even when a
+      // later frame shows it back (that return is the snap-back, judged below). A banner that
+      // slid away and snapped back read as lost too, beside the snap-back (round 6).
+      const leaving = options.exits && s.atMs >= segments[segments.length - 1]!.startMs;
+      if (!shown(s) && !leaving && (s.dom !== undefined || !atEdge(s))) {
         const before = [...judged.slice(0, i)].reverse().find(shown)!;
         const after = judged.slice(i + 1).find(shown)!;
         findings.push({
@@ -747,8 +762,33 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     });
   }
 
-  findings.sort((a, b) => a.atMs - b.atMs);
   const first = reports.find((x) => "best" in x.easing) ?? reports[0]!;
+  // How long a run takes and how many there are, from the element's own timing.
+  const timed = sorted.filter((x) => typeof x.dom?.durationMs === "number");
+  const durationMs = timed.length > 0 ? median(timed.map((x) => x.dom!.durationMs!)) : undefined;
+  const iterations = timed.find((x) => x.dom!.iterations !== undefined)?.dom!.iterations;
+  if (options.expectDurationMs !== undefined && durationMs !== undefined) {
+    const off = Math.abs(durationMs - options.expectDurationMs);
+    if (off > Math.max(START_TOLERANCE_MS, options.expectDurationMs * 0.05)) {
+      findings.push({
+        rule: "duration-mismatch",
+        severity: "fail",
+        atMs: segments[0]!.startMs,
+        message: `one run takes ${ms(durationMs)}, not ${ms(options.expectDurationMs)} (${(durationMs / options.expectDurationMs).toFixed(1)}x): its animation-duration decides it`,
+      });
+    }
+  }
+  if (options.expectIterations !== undefined && iterations !== undefined && iterations !== options.expectIterations) {
+    const say = (n: number | null) => (n === null ? "forever" : `${n} time${n === 1 ? "" : "s"}`);
+    findings.push({
+      rule: "iterations-mismatch",
+      severity: "fail",
+      atMs: segments[0]!.startMs,
+      message: `it runs ${say(iterations)}, not ${say(options.expectIterations)}: animation-iteration-count: ${options.expectIterations === null ? "infinite" : options.expectIterations}`,
+    });
+  }
+  findings.sort((a, b) => a.atMs - b.atMs);
+
   return {
     findings,
     path,
@@ -756,6 +796,8 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     travelPx: first.travelPx,
     easing: first.easing,
     ...(startsAtMs !== undefined ? { startsAtMs } : {}),
+    ...(durationMs !== undefined ? { durationMs } : {}),
+    ...(iterations !== undefined ? { iterations } : {}),
   };
 }
 

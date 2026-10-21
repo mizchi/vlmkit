@@ -48,6 +48,8 @@ export interface MotionDom {
   elapsedMs?: number | null;
   scaleX?: number;
   scaleY?: number;
+  durationMs?: number;
+  iterations?: number | null;
   /** Its own opacity, before its ancestors': unchanged while it fades, the fade is theirs. */
   ownOpacity?: number;
   /** The ancestor with the lowest opacity under 1 at this frame. */
@@ -86,6 +88,9 @@ export interface MotionCheckOptions {
    * first target's (or its --expect-start) plus k times this.
    */
   expectStaggerMs?: number;
+  /** How long one run takes (ms) and how many runs (null: infinite): one for all, or per target. */
+  expectDurationMs?: readonly number[];
+  expectIterations?: readonly (number | null)[];
   /** A statement is true at or above this (default 0.5). */
   threshold?: number;
   /** Within this of the threshold an answer is `uncertain` (default 0.3). */
@@ -302,6 +307,9 @@ export async function checkMotionFrames(
   }
   const domAt = new Map(frames.map((f) => [f.atMs, f.dom]));
 
+  // One value is every target's; several are the targets' in order.
+  const perTarget = <T>(xs: readonly T[] | undefined, i: number): T | undefined =>
+    xs === undefined ? undefined : xs.length === 1 ? xs[0] : xs[i];
   const originFor = (i: number) =>
     typeof options.expectOrigin === "string" ? options.expectOrigin : options.expectOrigin?.[i];
   // A stagger is relative to the first target: its own expected start if given, else where it
@@ -334,6 +342,12 @@ export async function checkMotionFrames(
           : {}),
         ...(originFor(i) ? { expectOrigin: originFor(i)! } : {}),
         ...(startFor(i) !== undefined ? { expectStartMs: startFor(i)! } : {}),
+        ...(perTarget(options.expectDurationMs, i) !== undefined
+          ? { expectDurationMs: perTarget(options.expectDurationMs, i)! }
+          : {}),
+        ...(perTarget(options.expectIterations, i) !== undefined
+          ? { expectIterations: perTarget(options.expectIterations, i)! }
+          : {}),
       }),
     };
     if (i === 0) staggerFrom ??= judged.startsAtMs;

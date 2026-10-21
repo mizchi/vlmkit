@@ -220,6 +220,22 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
       ["--selector", ".toast", "--exits", "--expect-easing", "ease-out,ease-in"],
       /FAIL snap-back .*in the hold after 660ms/,
     ],
+    // Round 6: an exit not held (no target-lost beside it), a run 5x too long, a pulse that never stops.
+    [
+      "banner.html",
+      ["--selector", ".banner", "--exits", "--expect-easing", "ease-in"],
+      /^(?![\s\S]*target-lost)[\s\S]*FAIL snap-back at 2600ms/,
+    ],
+    [
+      "sheet.html",
+      ["--selector", ".sheet", "--expect-duration", "280ms"],
+      /FAIL duration-mismatch .*one run takes 1400ms, not 280ms \(5\.0x\)/,
+    ],
+    [
+      "badge.html",
+      ["--selector", ".badge", "--expect-iterations", "3"],
+      /every animation repeats forever[\s\S]*FAIL iterations-mismatch .*it runs forever, not 3 times/,
+    ],
     // Round 5: a scaleY drop-down (one axis), a wave in reverse, and a start held back.
     [
       "tooltip.html",
