@@ -1,5 +1,5 @@
 // Hidden from the agents: judges a repaired page against its brief.
-// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet|slidein|progress|accordion> <page.html>
+// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet|slidein|progress|accordion|dialog|hover|reveal> <page.html>
 import { chromium } from "playwright";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
@@ -257,6 +257,81 @@ if (kind === "notify") {
     return document.querySelector(".panel").getBoundingClientRect().height;
   });
   ok("clicking again closes it with a transition, back to 0", back === 0, back);
+} else if (kind === "dialog") {
+  await page.click(".delete");
+  const pop = await page.evaluate(() => {
+    const a = document.querySelector(".dialog").getAnimations()[0];
+    if (!a) return null;
+    const t = a.effect.getComputedTiming();
+    return { duration: t.duration };
+  });
+  ok("opening the dialog runs an animation of 200ms", pop && Math.abs(pop.duration - 200) <= 1, pop);
+  const centre = (r) => r && { cx: r.x + r.w / 2, cy: r.y + r.h / 2 };
+  for (const t of [0, 60, 100, 160]) {
+    await at(t);
+    const r = await probe(".dialog");
+    const c = centre(r);
+    ok(`centred at ${t}ms of the opening`, c && Math.abs(c.cx - 640) <= 2 && Math.abs(c.cy - 400) <= 2, { ...r, ...c });
+  }
+  await at(100);
+  const mid = await probe(".dialog");
+  ok("mid-opening (100ms): part faded in and a little smaller", mid && mid.opacity > 0.3 && mid.opacity < 0.98 && mid.w < 400 && mid.w > 380, mid);
+  await at(2000);
+  const rest = await probe(".dialog");
+  ok("open at rest: 400px wide, centred, fully visible", rest && Math.abs(rest.w - 400) <= 1 && Math.abs(rest.x + rest.w / 2 - 640) <= 1 && Math.abs(rest.y + rest.h / 2 - 400) <= 1 && rest.visible >= 0.96 && rest.opacity > 0.95, rest);
+} else if (kind === "hover") {
+  const restY = (await rect("#c2"))[1];
+  const box = await rect("#c2");
+  const lift = async (t) =>
+    page.evaluate((t) => {
+      const el = document.querySelector("#c2");
+      const a = el.getAnimations().find((x) => x.transitionProperty === "transform");
+      if (!a) return null;
+      const d = a.effect.getComputedTiming().duration;
+      a.pause();
+      a.currentTime = t;
+      const y = el.getBoundingClientRect().y;
+      return { d, y };
+    }, t);
+  const finish = () => page.evaluate(() => document.querySelector("#c2").getAnimations().forEach((a) => a.finish()));
+  await page.mouse.move(box[0] + box[2] / 2, box[1] + box[3] / 2);
+  const up = await lift(75);
+  ok("pointer over: a 150ms transform transition runs", up && Math.abs(up.d - 150) <= 1, up);
+  ok("lifting at 75ms: more than half way up (ease-out)", up && (restY - up.y) / 4 > 0.6 && restY - up.y < 3.98, { restY, up });
+  await finish();
+  ok("lifted 4px while over it", Math.abs((await rect("#c2"))[1] - (restY - 4)) <= 0.5, await rect("#c2"));
+  await page.mouse.move(5, 5);
+  const down = await lift(75);
+  ok("pointer off: a 150ms transform transition runs back", down && Math.abs(down.d - 150) <= 1, down);
+  ok("settling at 75ms: more than half way down (ease-out)", down && (down.y - (restY - 4)) / 4 > 0.6 && down.y < restY - 0.02, { restY, down });
+  await finish();
+  ok("back at rest", (await rect("#c2"))[1] === restY, await rect("#c2"));
+} else if (kind === "reveal") {
+  const hidden = await probe(".team");
+  ok("a section far below the fold is hidden at load", hidden && hidden.opacity < 0.05, hidden);
+  for (const sel of [".what", ".studio", ".team", ".contact"]) {
+    await page.evaluate((sel) => document.querySelector(sel).scrollIntoView({ block: "start" }), sel);
+    await page.waitForTimeout(150);
+    const tr = await page.evaluate((sel) => {
+      const el = document.querySelector(sel);
+      const a = el.getAnimations().find((x) => x.transitionProperty === "opacity");
+      if (!a) return { opacity: Number(getComputedStyle(el).opacity) };
+      a.pause();
+      const d = a.effect.getComputedTiming().duration;
+      a.currentTime = d / 2;
+      const r = { d, mid: Number(getComputedStyle(el).opacity) };
+      el.getAnimations().forEach((x) => x.finish());
+      return r;
+    }, sel);
+    if (sel !== ".contact" || tr.d !== undefined)
+      ok(`${sel} fades in over 400ms when scrolled to (mid-fade at 200ms)`, tr.d !== undefined && Math.abs(tr.d - 400) <= 1 && tr.mid > 0.3 && tr.mid < 0.98, tr);
+    await page.waitForTimeout(50);
+    const o = await page.evaluate((sel) => {
+      const el = document.querySelector(sel);
+      return { opacity: Number(getComputedStyle(el).opacity), transform: getComputedStyle(el).transform };
+    }, sel);
+    ok(`${sel} fully visible once scrolled to`, o.opacity > 0.98 && (o.transform === "none" || o.transform === "matrix(1, 0, 0, 1, 0, 0)"), o);
+  }
 }
 await browser.close();
 const failed = checks.filter((c) => !c.pass);

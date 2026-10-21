@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>About Kumo Studio</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.6 system-ui, sans-serif; background: #fbfbfa; color: #1d1f22; }
+  header { padding: 120px 48px 80px; background: #1d2a3a; color: #fff; }
+  header h1 { margin: 0; font-size: 44px; }
+  section { max-width: 960px; margin: 0 auto; padding: 64px 48px; }
+  section h2 { margin: 0 0 12px; font-size: 28px; }
+  .studio { min-height: 900px; }
+  .studio .photo { height: 640px; border-radius: 16px; background: linear-gradient(160deg, #a7b8c8, #4f6478); }
+  .team ul { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; list-style: none; padding: 0; }
+  .team li { background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+  .reveal { opacity: 0; transform: translateY(16px); transition: opacity 400ms ease-out, transform 400ms ease-out; }
+  .reveal.in { opacity: 1; transform: none; }
+</style></head>
+<body>
+  <header><h1>About Kumo Studio</h1><p>We design calm software for busy teams.</p></header>
+  <section class="reveal what"><h2>What we do</h2><p>Product design, front-end engineering and design systems for teams of five to five hundred. We prototype in the browser from the first week, and we measure what we ship.</p><p>Our clients run logistics, clinics and newsrooms: software people use all day, where calm matters more than flash.</p></section>
+  <section class="reveal studio"><h2>Our studio</h2><p>A converted print works by the river, with room for twelve.</p><div class="photo" role="img" aria-label="The studio floor"></div></section>
+  <section class="reveal team"><h2>Team</h2><ul><li><strong>Aya Mori</strong><br>Design lead</li><li><strong>Ken Ito</strong><br>Engineering</li><li><strong>Rui Sato</strong><br>Research</li></ul></section>
+  <section class="reveal contact"><h2>Contact</h2><p>hello@kumo.example — we answer within a day.</p></section>
+  <script>
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+    }, { threshold: 1 });
+    document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
+  </script>
+</body></html>

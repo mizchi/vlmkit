@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Project settings</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #f4f5f7; color: #1f2125; }
+  main { max-width: 720px; margin: 48px auto; padding: 0 24px; }
+  .danger { background: #fff; border: 1px solid #f1c4c4; border-radius: 10px; padding: 20px; }
+  .danger button, .dialog button { font: inherit; padding: 8px 14px; border-radius: 6px; border: 1px solid #c62828; background: #c62828; color: #fff; cursor: pointer; }
+  .dialog button.cancel { background: #fff; color: #1f2125; border-color: #c8ccd2; }
+  .scrim { position: fixed; inset: 0; background: rgba(20, 22, 26, 0.45); display: none; }
+  .dialog { position: fixed; left: 50%; top: 50%; width: 400px; transform: translate(-50%, -50%); background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25); display: none; }
+  .dialog h2 { margin: 0 0 8px; font-size: 18px; }
+  .dialog .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+  body.confirming .scrim, body.confirming .dialog { display: block; }
+  body.confirming .dialog { animation: pop 200ms ease-out; }
+  @keyframes pop {
+    from { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+    to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  }
+</style></head>
+<body>
+  <main>
+    <h1>Project settings</h1>
+    <section class="danger">
+      <h2>Danger zone</h2>
+      <p>Deleting the project removes every board, file and comment in it.</p>
+      <button type="button" class="delete">Delete project</button>
+    </section>
+  </main>
+  <div class="scrim"></div>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-title">
+    <h2 id="dlg-title">Delete "Atlas"?</h2>
+    <p>This cannot be undone. 14 boards and 312 files will be removed.</p>
+    <div class="actions"><button type="button" class="cancel">Cancel</button><button type="button">Delete</button></div>
+  </div>
+  <script>
+    document.querySelector(".delete").addEventListener("click", () => document.body.classList.add("confirming"));
+    document.querySelector(".cancel").addEventListener("click", () => document.body.classList.remove("confirming"));
+  </script>
+</body></html>
