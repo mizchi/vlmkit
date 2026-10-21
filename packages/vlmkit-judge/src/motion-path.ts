@@ -153,6 +153,8 @@ export interface MotionSample {
      * frame's time less this is when that animation begins: what a stagger is made of.
      */
     elapsedMs?: number | null;
+    /** Share of its box where it is the topmost thing painted, measured by the page (0-1). */
+    visible?: number;
     /** One run of its own longest animation (ms), and how many runs (null: infinite). */
     durationMs?: number;
     iterations?: number | null;
@@ -184,6 +186,13 @@ const originAt = (name: OriginName) => ({
 const originCss = (name: OriginName) => (name === "center" ? "center" : name.replace("-", " "));
 /** The fixed point named when it is within this (a fraction of the box) of one. */
 const ORIGIN_SNAP = 0.15;
+/** Which way a segment moves, by the larger of its two components. */
+export const MOTION_DIRECTIONS = ["left", "right", "up", "down"] as const;
+export type MotionDirection = (typeof MOTION_DIRECTIONS)[number];
+const directionOf = (dx: number, dy: number): MotionDirection =>
+  Math.abs(dx) >= Math.abs(dy) ? (dx < 0 ? "left" : "right") : dy < 0 ? "up" : "down";
+const towards = (d: MotionDirection) => `${d}wards`;
+
 /** A start this far (ms) from the expected one is a mismatch: one 60fps frame. */
 const START_TOLERANCE_MS = 17;
 
@@ -223,6 +232,8 @@ export interface MotionPathOptions {
   expectOrigin?: OriginName;
   /** When its own animation must begin (page ms): measured from the element's animation time. */
   expectStartMs?: number;
+  /** Which way the first segment's motion must go. */
+  expectDirection?: MotionDirection;
   /** How long one run must take (ms), and how many runs (null: infinite). */
   expectDurationMs?: number;
   expectIterations?: number | null;
@@ -243,7 +254,8 @@ export type MotionRule =
   | "start-mismatch"
   | "start-unchecked"
   | "duration-mismatch"
-  | "iterations-mismatch";
+  | "iterations-mismatch"
+  | "direction-mismatch";
 
 export interface MotionFinding {
   rule: MotionRule;
@@ -306,7 +318,13 @@ export interface MotionPathReport {
   /** Positions of the frames the target is shown in, motion and rest; `edge` = put back from a clipped box. */
   path: { atMs: number; x: number; y: number; rest: boolean; edge: boolean }[];
   /** Per segment: its span, how far the target travels in it, the fit or why there is none. */
-  segments: (MotionSegment & { travelPx: number; easing: SegmentEasing; origin?: ScaleOrigin })[];
+  segments: (MotionSegment & {
+    travelPx: number;
+    easing: SegmentEasing;
+    origin?: ScaleOrigin;
+    /** Which way it moves, and from where to where (centres), when it travels the floor or more. */
+    direction?: { way: MotionDirection; from: { x: number; y: number }; to: { x: number; y: number } };
+  })[];
   /** When its own animation begins (page ms), measured: absent without --selector or an animation. */
   startsAtMs?: number;
   /** One run of its own animation (ms) and how many runs (null: infinite), measured. */
@@ -348,6 +366,11 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
   const seen = (s: MotionSample): number | null => {
     if (s.dom) {
       if (s.dom.opacity < 0.05) return 0;
+      // A model's "not shown" on a frame the page measures as mid-fade and on screen is the
+      // fade, not a loss: Jev read a panel at opacity 0.45 as 0.23 and a correct page failed
+      // target-lost (round 7). Unknown, not evidence. (Without Jev, present is the page's own.)
+      if (s.present < thr && s.dom.opacity < sure && (s.dom.visible ?? 0) >= thr && s.present !== s.dom.visible)
+        return null;
       if (s.box && s.present >= thr && !overlaps(s.box, s.dom.box)) return null;
       return s.present;
     }
@@ -385,7 +408,9 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     return { x, y };
   };
 
-  const path = sorted.filter(shown).map((s) => ({ atMs: s.atMs, ...position(s), rest: isRest(s), edge: atEdge(s) }));
+  const path = sorted
+    .filter(shown)
+    .map((s) => ({ atMs: s.atMs, ...position(s), rest: isRest(s), edge: !s.dom && atEdge(s) }));
   const motion = path.filter((p) => !p.rest);
 
   // Presence: absent between two frames that show it, or gone once it stops. A faint frame whose
@@ -627,7 +652,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
             rule: "jump",
             severity: "fail",
             atMs: frames[i + 1]!.atMs,
-            message: `moves ${Math.round(st.px)}px between ${ms(frames[i]!.atMs)} and ${ms(frames[i + 1]!.atMs)}, ${times.toFixed(1)}x as fast as the steps around it: a discontinuity in the keyframes`,
+            message: `moves ${Math.round(st.px)}px between ${ms(frames[i]!.atMs)} and ${ms(frames[i + 1]!.atMs)}, ${times.toFixed(1)}x as fast as the steps around it: a discontinuity — a gap between keyframes, or a property changed with no transition or animation for it`,
           });
         }
       });
@@ -646,7 +671,27 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         });
       }
     }
-    return { ...seg, travelPx, easing, ...(origin ? { origin } : {}) };
+    // Which way: from the segment's first frame to where it ends (its last frame, or the held rest
+    // for the last segment). A panel meant to come in from the right edge came from mid-page,
+    // moving rightwards, and "travels 360px" read the same for both (round 7).
+    let direction: MotionPathReport["segments"][number]["direction"];
+    if (frames.length >= 2) {
+      const a = frames[0]!;
+      const restHere = last ? geoRest[0] : undefined;
+      const z = restHere && dist(restHere, a) > floor ? restHere : frames[frames.length - 1]!;
+      if (dist(a, z) >= floor) {
+        direction = { way: directionOf(z.x - a.x, z.y - a.y), from: { x: a.x, y: a.y }, to: { x: z.x, y: z.y } };
+      }
+    }
+    if (k === 0 && options.expectDirection && direction && direction.way !== options.expectDirection) {
+      findings.push({
+        rule: "direction-mismatch",
+        severity: "fail",
+        atMs: seg.startMs,
+        message: `it moves ${towards(direction.way)} (centre ${Math.round(direction.from.x)},${Math.round(direction.from.y)} → ${Math.round(direction.to.x)},${Math.round(direction.to.y)}), not ${towards(options.expectDirection)}: where it starts is its first keyframe's (a translate with the wrong sign is the usual cause)`,
+      });
+    }
+    return { ...seg, travelPx, easing, ...(origin ? { origin } : {}), ...(direction ? { direction } : {}) };
   });
   if (options.expectOrigin && !reports.some((x) => x.origin)) {
     findings.push({

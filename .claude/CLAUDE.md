@@ -330,6 +330,13 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   `--expect-iterations` fail on them. A page whose animations are all infinite is sampled over
   its first three runs (4s at most) with no rest frame, instead of refused. With `--exits`, frames
   from the last segment on are leaving, not lost.
+- **Which way, and after a click** (round 7, `docs/reports/2026-10-21-motion-repair-v7.md`): a
+  panel entering from the wrong side, a `widht` transition and an accordion snapping open on
+  `height: auto` passed every gate. Each segment names its direction (`--expect-direction`);
+  `--click` drives the held page before sampling, and with nothing animating a changed target is
+  `snapped`; timers are run to find a transition a script starts, its start put on the frame after
+  the timer; `check animation`'s `unknown-transition-property` (suspect) names a property CSS does
+  not know.
 
 ## Generated figures (raster images)
 
@@ -1458,7 +1465,7 @@ case at 0.23.0.
 | `docs/reports/2026-08-06-gate-rule-cost-bench.md` | Measured gate/rule execution cost: where a ruleset's time goes, why per-rule cost is attributed rather than isolated, why suppression saves nothing |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
 | `docs/design/package-decomposition.md` | **Splitting vlmkit by layer** (collector / pure judge / driver / loop / diagrams): what was measured, phase 1 (`vlmkit-judge`) and the proposed phases 2-5 |
-| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 35 gates + 220 rules, behavior changes, what is deliberately not a gate |
+| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 35 gates + 221 rules, behavior changes, what is deliberately not a gate |
 | `docs/design/moonbit-boundary.md` | **TS ↔ MoonBit boundary**: what the positional FFI costs (61 commands, 233 args, 2 duplicated dispatch tables), the JSON boundary that replaces it for new logic, how to add a command, and which pure logic belongs in MoonBit versus which deliberately does not |
 | `docs/crater-css-status.md` | Crater CSS rendering verification status |
 | `docs/reset-css-comparison.md` | Reset CSS domain knowledge |

@@ -210,7 +210,8 @@ export type AnimationEvalIssueKind =
   | "clock-motion-unsettled"
   | "undefined-keyframes"
   | "motion-mostly-hidden"
-  | "delayed-entrance";
+  | "delayed-entrance"
+  | "unknown-transition-property";
 
 export interface AnimationEvalIssue {
   kind: AnimationEvalIssueKind;
@@ -443,6 +444,8 @@ export interface DeriveIssuesInput {
   virtualTime?: boolean;
   clockMotion?: ClockMotion;
   undefinedKeyframes?: { selector: string; name: string; reducedMotion: boolean }[];
+  /** transition-property names no CSS property, with a duration over 0. */
+  unknownTransitions?: { selector: string; name: string }[];
 }
 
 /** A delay this long (ms) at least, with the element held unseen through it, is a `delayed-entrance`. */
@@ -457,6 +460,15 @@ export function deriveAnimationIssues(
   // is the number the gate actually measures against.
   const durationFloor = options.reducedMotionDurationFloorMs ?? 100;
   const issues: AnimationEvalIssue[] = [];
+
+  for (const u of input.unknownTransitions ?? []) {
+    issues.push({
+      kind: "unknown-transition-property",
+      severity: "suspect",
+      selector: u.selector,
+      message: `${u.selector} transitions \`${u.name}\`, which is no CSS property, so that transition never runs and the property it meant changes in one frame. Check the spelling in transition / transition-property.`,
+    });
+  }
 
   for (const u of input.undefinedKeyframes ?? []) {
     issues.push({
@@ -851,6 +863,29 @@ const NOT_MOTION = new Set([
   "textShadow",
 ]);
 
+// A transition-property no browser knows: \`widht\` computes as itself and the transition never
+// runs, so a progress bar jumped to 70% and every gate passed it (motion-repair round 7).
+const UNKNOWN_TRANSITION_PROPERTY_SCRIPT = `(() => {
+${ANIMATION_HELPERS_JS}
+  const out = [];
+  const seen = new Set();
+  for (const el of document.querySelectorAll("*")) {
+    const cs = getComputedStyle(el);
+    const props = cs.transitionProperty.split(",").map((p) => p.trim());
+    const durations = cs.transitionDuration.split(",").map((d) => parseFloat(d) || 0);
+    props.forEach((name, i) => {
+      if (!name || name === "all" || name === "none" || name.startsWith("--")) return;
+      if (!(durations[i % durations.length] > 0)) return;
+      if (CSS.supports(name, "initial")) return;
+      const selector = stableSelector(el);
+      if (seen.has(selector + "\\u0000" + name) || out.length >= 8) return;
+      seen.add(selector + "\\u0000" + name);
+      out.push({ selector, name });
+    });
+  }
+  return out;
+})()`;
+
 const UNDEFINED_KEYFRAMES_SCRIPT = `(() => {
 ${ANIMATION_HELPERS_JS}
   const ran = new Set((window.__vlmkitStarted || []).map((r) => r.selector + "\\u0000" + r.name));
@@ -1013,6 +1048,10 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
 
     const timings = await collectAnimations(page);
     const undefinedOnPage = (await page.evaluate(UNDEFINED_KEYFRAMES_SCRIPT)) as { selector: string; name: string }[];
+    const unknownTransitions = (await page.evaluate(UNKNOWN_TRANSITION_PROPERTY_SCRIPT)) as {
+      selector: string;
+      name: string;
+    }[];
     // Settle / never-settles are about motion the page performs on its own, so a
     // paused animation does not count. `finished` used to be excluded here too,
     // on the reasoning that it is "visually static" — which quietly made the
@@ -1542,6 +1581,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         ...(options.virtualTime ? { virtualTime: true } : {}),
         ...(clockMotion ? { clockMotion } : {}),
         ...(undefinedKeyframes.length > 0 ? { undefinedKeyframes } : {}),
+        ...(unknownTransitions.length > 0 ? { unknownTransitions } : {}),
       },
       {
         settleThresholdMs: options.settleThresholdMs,

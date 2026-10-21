@@ -220,6 +220,17 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
       ["--selector", ".toast", "--exits", "--expect-easing", "ease-out,ease-in"],
       /FAIL snap-back .*in the hold after 660ms/,
     ],
+    // Round 7: a panel from the wrong side, and a click that snaps a panel open.
+    [
+      "slidein.html",
+      ["--selector", ".panel", "--expect-direction", "left"],
+      /FAIL direction-mismatch .*moves rightwards .*not leftwards/,
+    ],
+    [
+      "accordion.html",
+      ["--click", ".toggle", "--selector", ".panel", "--selector", ".after"],
+      /FAIL snapped: \.panel: 592x0 .* → 592x116 .*in one frame/,
+    ],
     // Round 6: an exit not held (no target-lost beside it), a run 5x too long, a pulse that never stops.
     [
       "banner.html",
@@ -408,7 +419,7 @@ describe("inspect motion after motion-repair round 2", () => {
         console.log = log;
       }
       const out = lines.join("\n");
-      assert.match(out, /300\.\.660ms: travels \d+px, follows ease-in/, out);
+      assert.match(out, /300\.\.660ms: travels \d+px( \w+wards)?, follows ease-in/, out);
       assert.match(out, /the first fail's own frame \(1160ms, [^)]*\): .*0\d{3}-t001160\.png/);
     },
   );

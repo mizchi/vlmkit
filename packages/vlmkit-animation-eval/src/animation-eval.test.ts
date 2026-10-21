@@ -1032,3 +1032,16 @@ test("an element held unseen through a long delay raises delayed-entrance (warn)
   assert.equal(issues({ delayMs: 1200, fill: "forwards", startsHidden: true }).length, 0);
   assert.equal(issues({ delayMs: 1200, fill: "both", startsHidden: false }).length, 0);
 });
+
+test("a transition-property that is no CSS property raises unknown-transition-property (suspect)", () => {
+  const issues = deriveAnimationIssues({
+    evaluated: [],
+    settleMs: 0,
+    infinite: [],
+    unknownTransitions: [{ selector: "div.bar", name: "widht" }],
+  });
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0]!.kind, "unknown-transition-property");
+  assert.equal(issues[0]!.severity, "suspect");
+  assert.match(issues[0]!.message, /div\.bar transitions `widht`, which is no CSS property/);
+});

@@ -97,6 +97,12 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       docs: "Its motion region covered under a quarter of the element's own box at rest, so most of the element is likely clipped (an ancestor's overflow) or covered (a stacking context). `inspect motion --selector` names which.",
     },
     {
+      id: "unknown-transition-property",
+      title: "transition-property names no CSS property",
+      severity: "suspect",
+      docs: "A misspelt property (`widht`) computes as itself and its transition never runs: the property it meant changes in one frame, and with no animation on the page nothing else reports it.",
+    },
+    {
       id: "delayed-entrance",
       title: "An element is held unseen through a long animation-delay",
       severity: "warn",

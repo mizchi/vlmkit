@@ -1051,7 +1051,9 @@ vlmkit inspect motion   <html|url> --selector .toast [--target "the green Saved 
   # over text). vlmkit judges target-lost, absent-at-rest, snap-back, jump, easing-mismatch,
   # target-static, locate-unsure. --selector takes geometry, opacity, scale and the element's own
   # animation time from the page (use it on your own page). Frames + motion-report.json in
-  # --frames (default test-results/inspect-motion). Exit 0 / 1 fail / 2 usage. Advisory.
+  # --frames (default test-results/inspect-motion/<page>). Exit 0 / 1 fail / 2 usage: an inspect
+  # leaf, not a registered gate, but its exit is a verdict. Expectations: --expect-easing, -origin,
+  # -start, -stagger, -duration, -iterations, -direction; --click drives the page first.
 # Checks.
 vlmkit check motion <html|url>                 # CSS motion / reduced-motion detection (declarations)
 vlmkit check animation <html|url>              # Frame-sampled animation evaluation: pause + seek each

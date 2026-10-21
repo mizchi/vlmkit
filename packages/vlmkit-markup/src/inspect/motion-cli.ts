@@ -16,11 +16,13 @@ import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import {
   EASING_NAMES,
   ORIGIN_NAMES,
+  MOTION_DIRECTIONS,
   describeOrigin,
+  type MotionDirection,
   type EasingName,
   type OriginName,
 } from "@mizchi/vlmkit-judge/motion-path.ts";
-import { parseFramesManifest, parseInstants } from "@mizchi/vlmkit-judge/frames.ts";
+import { frameTimeMs, parseFramesManifest, parseInstants } from "@mizchi/vlmkit-judge/frames.ts";
 import type { MotionCheckReport, MotionDom, MotionFrame } from "@mizchi/vlmkit-ai/motion-check.ts";
 
 /** Each selector's element as rendered: border box, opacity through its ancestors, transform scale. */
@@ -183,6 +185,9 @@ export async function measureTargets(
           ...(Math.abs(scaleX - scaleY) > 1e-6 ? { scaleX, scaleY } : {}),
           t,
           visible,
+          // How much of its box is inside the viewport: a panel entering from beyond the edge read
+          // "share seen 1.00" with 16% of it on screen (round 7).
+          onScreen: inView / 25,
           elapsedMs,
           ...(durationMs !== null ? { durationMs, iterations: iterations ?? null } : {}),
           ownOpacity,
@@ -226,6 +231,8 @@ each forbidden statement is. vlmkit judges the motion from that:
   start-mismatch   its animation begins at another time than --expect-start / --expect-stagger
   duration-mismatch one run takes another time than --expect-duration
   iterations-mismatch it runs another number of times than --expect-iterations
+  direction-mismatch it moves another way than --expect-direction
+  snapped          after --click a --selector target changed with no animation at all
   forbid           a statement seen at rest fails; only mid-motion, warns (--jev)
 
 Frames: each span some finite animation runs in is a segment (an entrance, and
@@ -271,8 +278,13 @@ an easing is checked on each channel that changes.
                           given (from the first target's --expect-start, or its measured start)
   --expect-duration <ms>  How long one run of its own animation takes ("280ms", "1.2s").
                           Once for every target, or comma-separated per target. --selector
+  --expect-direction <d>  Which way its (first) motion goes: left | right | up | down — "slides in
+                          from the right edge" moves left. Once for every target, or per target
   --expect-iterations <n> How many times it runs: 3, or infinite. Once for every target, or
                           comma-separated per target. --selector
+  --click <css>           Click this first, on the held page (repeat for several, in order): the
+                          motion a click starts is sampled from it. Nothing animating while a
+                          --selector target changes is \`snapped\` (fail)
   --exits                 The targets are meant to leave (gone at rest is their end)
   --at <instants>         Frames to shoot (default: 11 per segment + rest); the segments stay
                           the page's own spans of motion
@@ -289,6 +301,13 @@ Measured: https://github.com/mizchi/vlmkit/blob/main/docs/reports/2026-10-18-jev
 
 export class MotionUsageError extends Error {}
 
+/** After --click nothing animated: the targets that changed did so in one frame. */
+export class SnappedError extends Error {
+  constructor(readonly changed: string[]) {
+    super("no animation or transition started after --click");
+  }
+}
+
 export interface MotionCliOptions {
   source: string;
   targets: string[];
@@ -304,6 +323,7 @@ export interface MotionCliOptions {
   expectDurationMs?: number[];
   /** How many times it runs (null: infinite), per target in order. */
   expectIterations?: (number | null)[];
+  expectDirection?: MotionDirection[];
   exits: boolean;
   at?: number[];
   startMs?: number;
@@ -314,6 +334,8 @@ export interface MotionCliOptions {
   json: boolean;
   /** Ask TypeSafe Jev. Without it every target is a --selector, measured from the page alone. */
   jev: boolean;
+  /** Elements clicked, in order, on the held page before any frame is shot. */
+  clicks: string[];
 }
 
 export function parseMotionArgs(argv: string[]): MotionCliOptions {
@@ -327,6 +349,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   let expectStaggerMs: number | undefined;
   let expectDurationMs: number[] | undefined;
   let expectIterations: (number | null)[] | undefined;
+  let expectDirection: MotionDirection[] | undefined;
   let at: number[] | undefined;
   let startMs: number | undefined;
   let endMs: number | undefined;
@@ -337,6 +360,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   let exits = false;
   let noForbid = false;
   let jev = false;
+  const clicks: string[] = [];
   const value = (flag: string, v: string | undefined) => {
     if (v === undefined || v.startsWith("--")) throw new MotionUsageError(`${flag} needs a value`);
     return v;
@@ -401,6 +425,18 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
             .map((x) => one(a, x.trim())),
         );
         break;
+      case "--expect-direction":
+        (expectDirection ??= []).push(
+          ...value(a, argv[++i])
+            .split(",")
+            .map((x) => {
+              const v = x.trim().replace(/wards?$/, "");
+              if (!(MOTION_DIRECTIONS as readonly string[]).includes(v))
+                throw new MotionUsageError(`--expect-direction takes ${MOTION_DIRECTIONS.join(", ")}, got ${x}`);
+              return v as MotionDirection;
+            }),
+        );
+        break;
       case "--expect-iterations":
         (expectIterations ??= []).push(
           ...value(a, argv[++i])
@@ -420,6 +456,9 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
         break;
       case "--selector":
         selectors.push(value(a, argv[++i]).trim());
+        break;
+      case "--click":
+        clicks.push(value(a, argv[++i]).trim());
         break;
       case "--at":
         at = parseInstants(value(a, argv[++i]), a);
@@ -517,6 +556,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   for (const [flag, xs] of [
     ["--expect-duration", expectDurationMs],
     ["--expect-iterations", expectIterations],
+    ["--expect-direction", expectDirection],
   ] as const) {
     if (xs && xs.length > 1 && xs.length !== targets.length)
       throw new MotionUsageError(
@@ -550,6 +590,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
     ...(expectStaggerMs !== undefined ? { expectStaggerMs } : {}),
     ...(expectDurationMs ? { expectDurationMs } : {}),
     ...(expectIterations ? { expectIterations } : {}),
+    ...(expectDirection ? { expectDirection } : {}),
     exits,
     ...(at ? { at } : {}),
     ...(startMs !== undefined ? { startMs } : {}),
@@ -566,6 +607,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
     threshold,
     json,
     jev,
+    clicks,
   };
 }
 
@@ -747,6 +789,12 @@ interface Captured {
   delays?: (string | null)[];
   /** Only infinite animations ran: the first runs were sampled and nothing rests. */
   forever?: boolean;
+  /**
+   * Each target's parent box at rest, when it is at most six times the target's area: what it
+   * fills or sits in (a bar's track), which the crop keeps. A crop around the bar alone cut its
+   * track off at 70%, the very thing to judge (round 7).
+   */
+  context?: { x: number; y: number; width: number; height: number }[];
   /** Every line of text on the page at rest, so a suggested crop does not cut one in half. */
   textLines?: { x: number; y: number; width: number; height: number }[];
 }
@@ -766,12 +814,56 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
       // again. A bar a script marks loaded at 100ms gets its transition then, and the page read
       // "no animation on the page" (round 7). Found, the page is opened afresh to shoot from 0.
       let ranTo: number | null = null;
-      if (held.length === 0 && o.endMs === undefined) {
+      // The clock's time once the --click actions ran: nothing before it can be shot again.
+      let clockNow = 0;
+      if (o.clicks.length > 0) {
+        const beforeClick = o.selectors.length > 0 ? await measureTargets(page, o.selectors) : [];
+        const heldBefore = held.length;
+        // Each --click on the held page, in order, then one frame so the styles they change are
+        // computed and their transitions exist. A panel opened by a click was out of reach: only
+        // frames.json from inspect interact with --jev could judge it (round 7).
+        for (const sel of o.clicks) {
+          try {
+            await page.click(sel, { timeout: 5000 });
+          } catch (e) {
+            throw new MotionUsageError(`--click ${sel}: ${(e as Error).message.split("\n")[0]}`);
+          }
+        }
+        clockNow = frameTimeMs(1);
+        await timeline.at(clockNow);
+        held = await timeline.animations();
+        if (held.length === heldBefore && o.endMs === undefined) {
+          // Nothing animates after the click: if a target changed, it changed in one frame.
+          const afterClick = o.selectors.length > 0 ? await measureTargets(page, o.selectors) : [];
+          const changed = o.selectors.flatMap((sel, i) => {
+            const a = beforeClick[i];
+            const b = afterClick[i];
+            if (!a || !b) return [];
+            const d = Math.max(
+              Math.abs(a.box.x - b.box.x),
+              Math.abs(a.box.y - b.box.y),
+              Math.abs(a.box.width - b.box.width),
+              Math.abs(a.box.height - b.box.height),
+            );
+            const op = Math.abs(a.opacity - b.opacity);
+            return d >= 1 || op >= 0.05
+              ? [
+                  `${sel}: ${Math.round(a.box.width)}x${Math.round(a.box.height)} at (${Math.round(a.box.x)},${Math.round(a.box.y)}) → ${Math.round(b.box.width)}x${Math.round(b.box.height)} at (${Math.round(b.box.x)},${Math.round(b.box.y)})${op >= 0.05 ? `, opacity ${a.opacity.toFixed(2)} → ${b.opacity.toFixed(2)}` : ""}`,
+                ]
+              : [];
+          });
+          throw new SnappedError(changed);
+        }
+      } else if (held.length === 0 && o.endMs === undefined) {
         for (let guard = 0; guard < 20 && held.length === 0; guard++) {
           const due = await timeline.pending();
           if (due.timers === 0 || due.latestTimerMs === null || due.latestTimerMs > 10_000) break;
-          await timeline.at(due.latestTimerMs + 20);
-          ranTo = due.latestTimerMs + 20;
+          // The first frame after it is due: a transition the timer starts begins when the page
+          // next renders. Jumping 20ms past it began a 100ms timer's transition at 120ms, and
+          // --expect-start 100 failed a correct page (round 7).
+          const next = frameTimeMs(Math.floor((due.latestTimerMs * 60) / 1000 + 1e-6) + 1);
+          await timeline.at(next);
+          ranTo = Math.round(next);
           held = await timeline.animations();
         }
         if (held.length > 0) {
@@ -798,7 +890,7 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
       if (o.endMs === undefined && plan.segments.length === 0) {
         if (infinite.length === 0) {
           throw new MotionUsageError(
-            `no animation or transition on the page${ranTo !== null ? `, at load or after its timers ran (to ${ranTo}ms)` : " at load"}: nothing to sample. If one should run, it never starts — check animation lists what does; a misspelt transition-property or animation-name, or a class added in the same frame as the style it transitions from, are the usual causes. Give --at and --end to shoot the page anyway`,
+            `no animation or transition on the page${ranTo !== null ? `, at load or after its timers ran (to ${ranTo}ms)` : " at load"}: nothing to sample. If one should run, it never starts — check animation lists what does; a misspelt transition-property or animation-name, a transition to height: auto (which needs interpolate-size: allow-keywords), or a class added in the same frame as the style it transitions from, are the usual causes. If a click starts it, give --click <css>. To shoot the page anyway, give --end <ms> (with --start, or --at for the instants)`,
           );
         }
         const s0 = Math.min(...infinite.map((a) => a.startMs));
@@ -809,16 +901,18 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
       const startMs = o.startMs ?? (given ? 0 : (forever?.startMs ?? plan.startMs));
       // --at chooses the frames; the segments are still the page's own spans of motion.
       const segments = given || forever ? [{ startMs, endMs }] : plan.segments;
-      const instants = o.at
-        ? [...new Set(o.at)].sort((a, b) => a - b)
-        : given
-          ? (() => {
-              const m = motionInstants(startMs, endMs);
-              return [...m.motion, m.rest];
-            })()
-          : forever
-            ? motionInstants(startMs, endMs, 31).motion
-            : [...plan.motion, plan.rest];
+      const instants = (
+        o.at
+          ? [...new Set(o.at)].sort((a, b) => a - b)
+          : given
+            ? (() => {
+                const m = motionInstants(startMs, endMs);
+                return [...m.motion, m.rest];
+              })()
+            : forever
+              ? motionInstants(startMs, endMs, 31).motion
+              : [...plan.motion, plan.rest]
+      ).filter((t) => t >= clockNow);
       const writer = await frameWriter(resolve(o.frames), {
         tool: "inspect motion",
         url,
@@ -845,6 +939,21 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
       }
       const written = await writer.finish();
       const delays = o.selectors.length > 0 ? await delaySources(page, o.selectors) : undefined;
+      const context = await page
+        .evaluate((sels) => {
+          const out: { x: number; y: number; width: number; height: number }[] = [];
+          for (const sel of sels) {
+            const el = document.querySelector(sel);
+            const parent = el?.parentElement;
+            if (!el || !parent || parent === document.body) continue;
+            const a = el.getBoundingClientRect();
+            const b = parent.getBoundingClientRect();
+            if (b.width * b.height > 0 && b.width * b.height <= 6 * Math.max(1, a.width * a.height))
+              out.push({ x: b.x, y: b.y, width: b.width, height: b.height });
+          }
+          return out;
+        }, o.selectors)
+        .catch(() => []);
       // The page is at its rest instant now (the last one shot).
       const textLines = await page
         .evaluate(() => {
@@ -870,6 +979,7 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
         files,
         viewport: o.viewport,
         textLines,
+        context,
         ...(delays ? { delays } : {}),
         ...(forever ? { forever: true } : {}),
       };
@@ -956,7 +1066,7 @@ export function formatMotionReport(
     );
     if (t.segments.length <= 1) {
       lines.push(
-        `  target ${JSON.stringify(t.target)}${begins(t)}: travels ${Math.round(t.travelPx)}px over the frames measured, ${fitText(t.easing, broken)}${t.segments[0] ? grows(t.segments[0]) : ""}`,
+        `  target ${JSON.stringify(t.target)}${begins(t)}: travels ${Math.round(t.travelPx)}px${t.segments[0]?.direction ? ` ${t.segments[0].direction.way}wards` : ""} over the frames measured, ${fitText(t.easing, broken)}${t.segments[0] ? grows(t.segments[0]) : ""}`,
       );
     } else {
       lines.push(`  target ${JSON.stringify(t.target)}${begins(t)}: ${t.segments.length} segments`);
@@ -968,14 +1078,14 @@ export function formatMotionReport(
           (f) => (f.rule === "jump" || f.rule === "snap-back") && f.atMs >= g.startMs && f.atMs <= g.endMs,
         );
         lines.push(
-          `    ${Math.round(g.startMs)}..${Math.round(g.endMs)}ms: travels ${Math.round(g.travelPx)}px, ${fitText(g.easing, own)}${grows(g)}`,
+          `    ${Math.round(g.startMs)}..${Math.round(g.endMs)}ms: travels ${Math.round(g.travelPx)}px${g.direction ? ` ${g.direction.way}wards` : ""}, ${fitText(g.easing, own)}${grows(g)}`,
         );
       }
     }
     // What was read per frame: presence, and the position judged (· = not shown, ~ = put back from the edge).
     const pos = new Map(t.path.map((p) => [p.atMs, p]));
     lines.push(
-      `    frames (time, share of it seen [op = opacity, when partial], centre): ${r.frames
+      `    frames (time, share of its on-screen part seen [op = opacity, on-screen = share of its box in the viewport, when partial], centre): ${r.frames
         .map((f) => {
           const p = pos.get(f.atMs);
           const pr = f.targets[i]!.present.toFixed(2);
@@ -983,7 +1093,9 @@ export function formatMotionReport(
           // partial, or "1.00" at 20% opacity read as fully visible (round 5).
           const op = captured.frames.find((c) => c.atMs === f.atMs)?.dom?.[i]?.opacity;
           const faded = op !== undefined && op < 0.95 && op >= 0.05 ? ` op ${op.toFixed(2)}` : "";
-          return `${Math.round(f.atMs)}ms ${pr}${faded}${p ? ` (${Math.round(p.x)},${Math.round(p.y)})${p.edge ? "~" : ""}` : " ·"}`;
+          const on = captured.frames.find((c) => c.atMs === f.atMs)?.dom?.[i]?.onScreen;
+          const offScreen = on !== undefined && on < 0.95 ? ` on-screen ${on.toFixed(2)}` : "";
+          return `${Math.round(f.atMs)}ms ${pr}${faded}${offScreen}${p ? ` (${Math.round(p.x)},${Math.round(p.y)})${p.edge ? "~" : ""}` : " ·"}`;
         })
         .join(", ")}`,
     );
@@ -1030,7 +1142,10 @@ export function formatMotionReport(
   );
   // Cropped to where the targets move when that is a small part of the frame: eleven 1280px
   // frames on one sheet were too small to read, and round 3's agent cropped them by hand.
-  const boxes = captured.frames.flatMap((f) => (f.dom ?? []).filter((d) => d !== null).map((d) => d!.box));
+  const boxes = [
+    ...captured.frames.flatMap((f) => (f.dom ?? []).filter((d) => d !== null).map((d) => d!.box)),
+    ...(captured.context ?? []),
+  ];
   let crop = "";
   if (boxes.length > 0) {
     // Padded by a quarter of the region (48px at least): what it moves out of or next to, a
@@ -1063,7 +1178,9 @@ export function formatMotionReport(
     }
     const w = cx1 - cx0;
     const h = cy1 - cy0;
-    if (w > 0 && h > 0 && w * h < 0.5 * vw * vh) crop = ` --crop ${cx0},${cy0},${w},${h}`;
+    // Under three quarters of the frame: a panel sliding across the right half (556x800) got no
+    // crop on the broken page and one on the fixed (round 7).
+    if (w > 0 && h > 0 && w * h < 0.75 * vw * vh) crop = ` --crop ${cx0},${cy0},${w},${h}`;
   }
   lines.push(
     `  look at the frames: vlmkit snapshot strip --manifest ${captured.manifest} --max-frames 6 --columns 3${crop} --out ${join(dirname(captured.manifest), "strip.png")}`,
@@ -1118,6 +1235,24 @@ export async function runMotionCli(argv: string[]): Promise<number> {
   try {
     captured = /(^|\/)frames\.json$/.test(o.source) ? await readFrames(o) : await captureMotion(o);
   } catch (e) {
+    if (e instanceof SnappedError) {
+      if (e.changed.length === 0) {
+        console.error(
+          `error: nothing animated after --click ${o.clicks.join(", ")}, and no --selector target changed: check the click reaches the control (and that --selector names what it opens)`,
+        );
+        return 2;
+      }
+      console.log(
+        `inspect motion: ${o.source} — after --click ${o.clicks.join(", ")}, no animation or transition started`,
+      );
+      for (const c of e.changed) {
+        console.log(
+          `    FAIL snapped: ${c} in one frame. If it should animate, its transition never starts: a transition to or from an intrinsic size (height: auto) does not run without interpolate-size: allow-keywords (or grid-template-rows 0fr → 1fr); a misspelt transition-property and a property the transition does not list are the other usual causes`,
+        );
+      }
+      console.log(`  ${e.changed.length} fail; measured from the page, no model asked`);
+      return 1;
+    }
     if (!(e instanceof MotionUsageError)) throw e;
     console.error(`error: ${e.message}`);
     return 2;
@@ -1138,6 +1273,7 @@ export async function runMotionCli(argv: string[]): Promise<number> {
     ...(o.expectStaggerMs !== undefined ? { expectStaggerMs: o.expectStaggerMs } : {}),
     ...(o.expectDurationMs ? { expectDurationMs: o.expectDurationMs } : {}),
     ...(o.expectIterations ? { expectIterations: o.expectIterations } : {}),
+    ...(o.expectDirection ? { expectDirection: o.expectDirection } : {}),
   });
   const json = {
     source: o.source,

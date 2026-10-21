@@ -279,7 +279,13 @@ vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ea
   still" is `--expect-iterations 3` (an infinite animation is now sampled
   over its first runs instead of refused); "gone for good" is `--exits`,
   and a snap-back after it is the fail. Without the flag, each target's
-  line still says `begins at …, runs …ms x3` / `and repeats forever`. In motion-repair round 3 a wrong
+  line still says `begins at …, runs …ms x3` / `and repeats forever`. Which way: "glides in
+  from beyond the right edge" moves left — `--expect-direction left`
+  (every line says `travels 360px leftwards`). Motion a click starts:
+  `--click <css>` (repeat for several) clicks on the held page first;
+  if nothing animates and a `--selector` target changes anyway, that
+  is `snapped` — the usual cause is a transition to `height: auto`,
+  which needs `interpolate-size: allow-keywords`. In motion-repair round 3 a wrong
   `transform-origin` and a stagger that was not one both read "follows ease-out exactly, no fail"
   until these existed.
 - **What it does not judge**: fps or jank, a target it is not told about, and anything under

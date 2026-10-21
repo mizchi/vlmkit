@@ -18,6 +18,7 @@ import {
   judgeMotionPath,
   type EasingName,
   type OriginName,
+  type MotionDirection,
   type MotionPathReport,
   type MotionSample,
   type MotionSegment,
@@ -50,6 +51,8 @@ export interface MotionDom {
   scaleY?: number;
   durationMs?: number;
   iterations?: number | null;
+  /** The share of its box inside the viewport (0-1). */
+  onScreen?: number;
   /** Its own opacity, before its ancestors': unchanged while it fades, the fade is theirs. */
   ownOpacity?: number;
   /** The ancestor with the lowest opacity under 1 at this frame. */
@@ -91,6 +94,8 @@ export interface MotionCheckOptions {
   /** How long one run takes (ms) and how many runs (null: infinite): one for all, or per target. */
   expectDurationMs?: readonly number[];
   expectIterations?: readonly (number | null)[];
+  /** Which way each target's first segment moves: one for all, or per target. */
+  expectDirection?: readonly MotionDirection[];
   /** A statement is true at or above this (default 0.5). */
   threshold?: number;
   /** Within this of the threshold an answer is `uncertain` (default 0.3). */
@@ -344,6 +349,9 @@ export async function checkMotionFrames(
         ...(startFor(i) !== undefined ? { expectStartMs: startFor(i)! } : {}),
         ...(perTarget(options.expectDurationMs, i) !== undefined
           ? { expectDurationMs: perTarget(options.expectDurationMs, i)! }
+          : {}),
+        ...(perTarget(options.expectDirection, i) !== undefined
+          ? { expectDirection: perTarget(options.expectDirection, i)! }
           : {}),
         ...(perTarget(options.expectIterations, i) !== undefined
           ? { expectIterations: perTarget(options.expectIterations, i)! }
