@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Features</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.55 system-ui, sans-serif; background: #fbfaf8; color: #1c1b19; }
+  main { max-width: 1000px; margin: 56px auto; padding: 0 24px; }
+  h1 { font-size: 36px; margin: 0 0 24px; }
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; list-style: none; padding: 0; margin: 0; }
+  .tile { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08); opacity: 0; animation: rise 400ms ease-out forwards; }
+  .tile:nth-child(2) { animation-delay: 80ms; }
+  .tile:nth-child(3) { animation-delay: 160ms; }
+  .tile h2 { margin: 0 0 6px; font-size: 18px; }
+  .tile p { margin: 0; color: #5d5a54; }
+  @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .tile { animation: none; opacity: 1; }
+  }
+</style></head>
+<body>
+  <main>
+    <h1>Everything your shop needs</h1>
+    <ul class="tiles">
+      <li class="tile"><h2>Payments</h2><p>Cards, wallets and bank transfer, settled next day.</p></li>
+      <li class="tile"><h2>Shipping</h2><p>Labels and tracking for every major carrier.</p></li>
+      <li class="tile"><h2>Reports</h2><p>Sales, refunds and stock, by day or by product.</p></li>
+    </ul>
+  </main>
+</body></html>

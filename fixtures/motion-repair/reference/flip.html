@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Flash cards</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; background: #f3f1ec; color: #1e1d1a; }
+  main { max-width: 640px; margin: 64px auto; padding: 0 24px; text-align: center; }
+  .scene { width: 420px; height: 260px; margin: 32px auto; perspective: 1200px; }
+  .card { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform 500ms ease-in-out; }
+  .card.flipped { transform: rotateY(180deg); }
+  .face { position: absolute; inset: 0; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; padding: 24px; border-radius: 16px; font-size: 22px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); }
+  .back { background: #1f3a5f; color: #fff; transform: rotateY(180deg); }
+  .front { background: #fff; }
+  .flip { font: inherit; padding: 10px 18px; border-radius: 8px; border: 1px solid #1f3a5f; background: #1f3a5f; color: #fff; cursor: pointer; }
+</style></head>
+<body>
+  <main>
+    <h1>Japanese, lesson 4</h1>
+    <div class="scene">
+      <div class="card">
+        <div class="face back">Answer: たべる (taberu)</div>
+        <div class="face front">Question: “to eat”</div>
+      </div>
+    </div>
+    <button type="button" class="flip">Show answer</button>
+  </main>
+  <script>
+    const card = document.querySelector(".card");
+    document.querySelector(".flip").addEventListener("click", () => card.classList.toggle("flipped"));
+  </script>
+</body></html>

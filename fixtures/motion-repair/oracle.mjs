@@ -1,5 +1,5 @@
 // Hidden from the agents: judges a repaired page against its brief.
-// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet|slidein|progress|accordion|dialog|hover|reveal> <page.html>
+// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet|slidein|progress|accordion|dialog|hover|reveal|flip|interrupt|reduced> <page.html>
 import { chromium } from "playwright";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
@@ -7,6 +7,7 @@ import { resolve } from "node:path";
 const [kind, file] = process.argv.slice(2);
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+if (kind === "reduced") await page.emulateMedia({ reducedMotion: "reduce" });
 await page.goto(pathToFileURL(resolve(file)).href);
 const at = (t) =>
   page.evaluate((t) => {
@@ -332,6 +333,85 @@ if (kind === "notify") {
     }, sel);
     ok(`${sel} fully visible once scrolled to`, o.opacity > 0.98 && (o.transform === "none" || o.transform === "matrix(1, 0, 0, 1, 0, 0)"), o);
   }
+} else if (kind === "flip") {
+  // Who is seen at the card's centre: hit-testing skips a hidden backface, as painting does.
+  const seen = () =>
+    page.evaluate(() => {
+      const r = document.querySelector(".card").getBoundingClientRect();
+      const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      return top?.closest(".face")?.classList.contains("back") ? "back" : top?.closest(".face") ? "front" : "none";
+    });
+  ok("question side faces you at load", (await seen()) === "front", await seen());
+  await page.click(".flip");
+  const tr = await page.evaluate(() => {
+    const a = document.querySelector(".card").getAnimations().find((x) => x.transitionProperty === "transform");
+    return a ? a.effect.getComputedTiming().duration : null;
+  });
+  ok("clicking turns the card with a 500ms transform transition", tr !== null && Math.abs(tr - 500) <= 1, tr);
+  for (const t of [350, 450]) {
+    await at(t);
+    ok(`past edge-on (${t}ms): the answer side, not the question mirrored`, (await seen()) === "back", await seen());
+  }
+  await at(2000);
+  ok("turned over at rest: the answer side", (await seen()) === "back", await seen());
+  await page.click(".flip");
+  await at(2000);
+  ok("turned back: the question side again", (await seen()) === "front", await seen());
+} else if (kind === "interrupt") {
+  const full = async () => {
+    const h = await page.evaluate(() => {
+      const m = document.querySelector(".menu");
+      return { h: m.getBoundingClientRect().height, op: Number(getComputedStyle(m).opacity) };
+    });
+    return h;
+  };
+  // The menu's laid-out height (scale 1), for fractions.
+  const layoutH = await page.evaluate(() => document.querySelector(".menu").offsetHeight);
+  await page.click(".filters");
+  const dur = await page.evaluate(() =>
+    document.querySelector(".menu").getAnimations().map((a) => a.effect.getComputedTiming().duration),
+  );
+  ok("opening runs 300ms", dur.length > 0 && dur.every((d) => Math.abs(d - 300) <= 1), dur);
+  await at(100);
+  const mid = await full();
+  ok("part open at 100ms (ease-out: past a third)", mid.h / layoutH > 0.35 && mid.h / layoutH < 0.95, { ...mid, layoutH });
+  // A second click while it unfolds: what the page does next must start where it is.
+  await page.click(".filters");
+  await page.evaluate(() => document.querySelector(".menu").getAnimations().forEach((a) => a.pause()));
+  const after = await full();
+  ok("clicked again at 100ms: it does not jump (height within 15% of where it was)", Math.abs(after.h - mid.h) / layoutH < 0.15, { before: mid, after, layoutH });
+  await page.evaluate(() => document.querySelector(".menu").getAnimations().forEach((a) => a.finish()));
+  const shut = await full();
+  ok("and folds up to closed", shut.h < 1 && shut.op < 0.05, shut);
+  await page.click(".filters");
+  await page.evaluate(() => document.querySelector(".menu").getAnimations().forEach((a) => a.finish()));
+  const open = await full();
+  ok("opened again: fully open", Math.abs(open.h - layoutH) <= 1 && open.op > 0.98, { ...open, layoutH });
+  const m = await probe(".menu");
+  ok("menu under the button, 280px wide", m && Math.abs(m.w - 280) <= 1 && m.visible >= 0.96, m);
+} else if (kind === "reduced") {
+  await page.waitForTimeout(100);
+  const moving = await page.evaluate(() => document.getAnimations().filter((a) => a.playState === "running").length);
+  ok("under reduced motion nothing animates", moving === 0, moving);
+  for (let i = 1; i <= 3; i++) {
+    const t = await probe(`.tile:nth-child(${i})`);
+    ok(`tile ${i} is there at once, in place, under reduced motion`, t && t.opacity > 0.98 && t.visible >= 0.9, t);
+  }
+  // Without the preference: still the staggered rise.
+  const plain = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  await plain.goto(pathToFileURL(resolve(file)).href);
+  const r = await plain.evaluate(() =>
+    [...document.querySelectorAll(".tile")].map((el) => {
+      const a = el.getAnimations()[0];
+      if (!a) return null;
+      const t = a.effect.getComputedTiming();
+      a.pause();
+      a.currentTime = t.delay + 200;
+      const mid = Number(getComputedStyle(el).opacity);
+      return { d: t.duration, delay: t.delay, mid };
+    }),
+  );
+  ok("without the preference the tiles still rise in, 400ms each, 80ms apart", r.every((x, i) => x && Math.abs(x.d - 400) <= 1 && Math.abs(x.delay - 80 * i) <= 1 && x.mid > 0.3 && x.mid < 0.98), r);
 }
 await browser.close();
 const failed = checks.filter((c) => !c.pass);
