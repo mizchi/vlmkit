@@ -1045,3 +1045,26 @@ test("a transition-property that is no CSS property raises unknown-transition-pr
   assert.equal(issues[0]!.severity, "suspect");
   assert.match(issues[0]!.message, /div\.bar transitions `widht`, which is no CSS property/);
 });
+
+test(
+  "runAnimationEval: an element reduced motion leaves at opacity 0 raises reduced-motion-hides (suspect)",
+  { timeout: 180_000 },
+  async () => {
+    // fixtures/motion-repair round 9: `animation: none` under reduce on tiles whose base style is
+    // opacity 0. Every gate called the preference honoured; the page was empty below its heading.
+    const dir = join(import.meta.dirname, "../../../fixtures/motion-repair");
+    const run = (file: string) => runAnimationEval({ source: join(dir, file), viewport: { width: 1280, height: 800 } });
+    const broken = (await run("broken/reduced.html")).issues.filter((i) => i.kind === "reduced-motion-hides");
+    assert.equal(broken.length, 3);
+    assert.equal(broken[0]!.severity, "suspect");
+    assert.match(
+      broken[0]!.message,
+      /rests at opacity 0\.00 under prefers-reduced-motion: reduce, and at 1\.00 without it/,
+    );
+    const fixed = await run("reference/reduced.html");
+    assert.deepEqual(
+      fixed.issues.map((i) => i.kind),
+      [],
+    );
+  },
+);

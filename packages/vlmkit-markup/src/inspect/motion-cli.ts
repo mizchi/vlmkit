@@ -61,8 +61,10 @@ export async function measureTargets(
         let scaleY = 1;
         if (transform && transform !== "none") {
           const m = new DOMMatrixReadOnly(transform);
-          scaleX = Math.hypot(m.a, m.b);
-          scaleY = Math.hypot(m.c, m.d);
+          // Column norms in 3D: a card turning on rotateY has a = cos θ, and its turn read as a
+          // scale ("the scale grows from the line through its middle", round 8 → 9).
+          scaleX = Math.hypot(m.m11, m.m12, m.m13);
+          scaleY = Math.hypot(m.m21, m.m22, m.m23);
           // The scale fitted is the axis that changes more: a scaleY drop-down read 1 (round 5).
           scale = Math.abs(scaleY - 1) > Math.abs(scaleX - 1) ? scaleY : scaleX;
         }
@@ -73,7 +75,11 @@ export async function measureTargets(
         let durationMs: number | null = null;
         let iterations: number | null | undefined;
         let longest = 0;
-        for (const a of el.getAnimations()) {
+        // Its own animation, or the nearest ancestor's: a flip card's faces turn with the card,
+        // and --expect-duration on a face printed nothing (round 9).
+        let timed: Element | null = el;
+        while (timed && timed.getAnimations().length === 0) timed = timed.parentElement;
+        for (const a of (timed ?? el).getAnimations()) {
           const c = a.effect?.getComputedTiming();
           const d = Number(c?.duration);
           if (!c || !Number.isFinite(d) || d <= longest || c.localTime === null) continue;
@@ -86,6 +92,19 @@ export async function measureTargets(
           durationMs = d;
           iterations = Number.isFinite(Number(c.iterations)) ? Number(c.iterations) : null;
         }
+        // Which way it faces: the z of its normal through every transform up the tree. Turned past
+        // edge-on, a face shows its back — mirrored, unless backface-visibility hides it (the
+        // flip card of round 9 showed its question backwards over the answer).
+        const facing = (e: Element) => {
+          let M = new DOMMatrix();
+          for (let n: Element | null = e; n && n !== document.documentElement; n = n.parentElement) {
+            const tf = getComputedStyle(n).transform;
+            if (tf && tf !== "none") M = new DOMMatrix(tf).multiply(M);
+          }
+          return M.m33;
+        };
+        const m33 = facing(el);
+        const backHidden = getComputedStyle(el).backfaceVisibility === "hidden";
         // What of it is the topmost thing painted, over a 5x5 grid of its box inside the viewport:
         // a clip (overflow: hidden), a cover (z-index) and leaving the screen all take it away.
         el.setAttribute("data-vlmkit-probe", "");
@@ -128,7 +147,10 @@ export async function measureTargets(
           return null;
         };
         let hiddenBy: string | undefined;
-        if (opacity < 0.05) {
+        if (m33 < -0.01 && backHidden && visible < 0.5) {
+          hiddenBy =
+            "it faces away from you and its backface-visibility is hidden: turned over, as the far side of a flip card is";
+        } else if (opacity < 0.05) {
           // Transparent: name what makes it so. Round 3's whole page sat at an ancestor's
           // opacity 0, whose animation-name matched no @keyframes, and the line said "clipped,
           // covered, or off-screen".
@@ -161,6 +183,17 @@ export async function measureTargets(
             if (!hiddenBy && missed.top) {
               const cover = missed.top;
               hiddenBy = `covered by ${name(cover)}`;
+              for (let c: Element | null = cover; c && c !== document.body; c = c.parentElement) {
+                if (
+                  facing(c) < -0.01 &&
+                  getComputedStyle(c).backfaceVisibility !== "hidden" &&
+                  c !== el &&
+                  !c.contains(el)
+                ) {
+                  hiddenBy = `covered by ${name(c)}, which faces away from you (turned past edge-on) with backface-visibility: visible, so it is painted mirrored over the target: give it backface-visibility: hidden (both faces of a flip card)`;
+                  break;
+                }
+              }
               // The trap: the outermost stacking context around the target that does not also
               // hold the cover. A z-index inside it cannot lift the target above the cover.
               let trap: Element | null = null;
@@ -193,6 +226,12 @@ export async function measureTargets(
           ownOpacity,
           ...(fadeBy ? { fadeBy: name(fadeBy) } : {}),
           ...(hiddenBy ? { hiddenBy } : {}),
+          // Turned in 3D: its box is the turned shape's bounds, and within 15° of edge-on it has
+          // next to no area, so nothing is judged from it (an edge-on card read target-lost).
+          ...(Math.abs(m33) < 0.999 ? { rotated3d: true } : {}),
+          ...(Math.abs(m33) < 0.26 ? { edgeOn: true } : {}),
+          ...(m33 < -0.01 ? { facingAway: true } : {}),
+          ...(m33 < -0.01 && !backHidden ? { mirrored: true } : {}),
         };
       });
     } finally {
@@ -234,6 +273,8 @@ each forbidden statement is. vlmkit judges the motion from that:
   direction-mismatch it moves another way than --expect-direction
   still-mismatch   its centre moves though --expect-still says only size and opacity change
   snapped          after an action a --selector target changed with no animation at all
+  interrupt-jump   an action cut into a motion (--wait) and the target jumped as it landed
+  mirrored         a face turned past edge-on is seen backwards (backface-visibility)
   forbid           a statement seen at rest fails; only mid-motion, warns (--jev)
 
 Frames: each span some finite animation runs in is a segment (an entrance, and
@@ -292,6 +333,10 @@ an easing is checked on each channel that changes.
                           settling back), --scroll brings an element's top to the viewport's
                           top (or scrolls to a y in px) — what a scroll-triggered reveal needs.
                           Nothing animating while a --selector target changes is \`snapped\`
+  --wait <ms>             After an action: let only this long pass before the next one instead
+                          of its whole motion — a change of mind mid-motion. "--click .menu-btn
+                          --wait 100 --click .menu-btn" lands the second click 100ms into the
+                          opening; a target that jumps when it lands is \`interrupt-jump\` (fail)
   --exits                 The targets are meant to leave (gone at rest is their end)
   --at <instants>         Frames to shoot (default: 11 per segment + rest); the segments stay
                           the page's own spans of motion
@@ -355,10 +400,17 @@ export type MotionAction =
   | { kind: "click" | "hover"; selector: string }
   | { kind: "leave" }
   | { kind: "scroll"; selector: string }
-  | { kind: "scroll"; y: number };
+  | { kind: "scroll"; y: number }
+  | { kind: "wait"; ms: number };
 
 export const describeAction = (a: MotionAction): string =>
-  a.kind === "leave" ? "--leave" : "selector" in a ? `--${a.kind} ${a.selector}` : `--scroll ${a.y}`;
+  a.kind === "leave"
+    ? "--leave"
+    : a.kind === "wait"
+      ? `--wait ${a.ms}`
+      : "selector" in a
+        ? `--${a.kind} ${a.selector}`
+        : `--scroll ${a.y}`;
 
 export function parseMotionArgs(argv: string[]): MotionCliOptions {
   const positional: string[] = [];
@@ -487,6 +539,9 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
       case "--leave":
         actions.push({ kind: "leave" });
         break;
+      case "--wait":
+        actions.push({ kind: "wait", ms: one(a, value(a, argv[++i])) });
+        break;
       case "--scroll": {
         const v = value(a, argv[++i]).trim();
         actions.push(/^\d+(px)?$/.test(v) ? { kind: "scroll", y: parseInt(v, 10) } : { kind: "scroll", selector: v });
@@ -563,7 +618,9 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
         "give each target a --selector (measured from the page, no key), or add --jev to find --target by its words",
       );
     }
-    if (targets.length === 0) targets.push(...selectors);
+    // A --target names the selector in its position; the rest are named by their selectors (the
+    // help said so, and 3 --selector with 1 --target was refused, round 9).
+    if (targets.length < selectors.length) targets.push(...selectors.slice(targets.length));
     if (targets.length !== selectors.length) {
       throw new MotionUsageError(
         `${selectors.length} --selector for ${targets.length} --target: without --jev every target is measured, so each needs one`,
@@ -825,6 +882,8 @@ interface Captured {
   delays?: (string | null)[];
   /** Only infinite animations ran: the first runs were sampled and nothing rests. */
   forever?: boolean;
+  /** The last action cut into the motion before it: the targets as they were just before it. */
+  interrupt?: { atMs: number; action: string; before: (MotionDom | null)[] };
   /** The page's scroll position across the frames shot, when it moved (a clamp at the page's end). */
   scrolled?: { from: number; to: number };
   /**
@@ -839,6 +898,7 @@ interface Captured {
 
 /** Do one action on the held page; an element it cannot reach is the user's error, named. */
 async function runAction(page: import("playwright").Page, act: MotionAction): Promise<void> {
+  if (act.kind === "wait") return;
   try {
     if (act.kind === "click") await page.click(act.selector, { timeout: 5000 });
     else if (act.kind === "hover") await page.hover(act.selector, { timeout: 5000 });
@@ -876,6 +936,8 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
       let clockNow = 0;
       // Animations held before the last action: what it starts comes after them.
       let heldBefore = held.length;
+      // The last action landed while the one before was still moving: its targets just before it.
+      let interrupt: Captured["interrupt"];
       if (o.actions.length > 0) {
         let beforeClick: Awaited<ReturnType<typeof measureTargets>> = [];
         const scrolled = () => page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }));
@@ -883,11 +945,28 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
         // Each action on the held page, in order. Before the next one, the motion it started runs
         // to its end: a hover's lift must be finished before --leave lets it settle back, and two
         // --click on one page sampled only the last with the first never run (round 8).
-        for (const [k, act] of o.actions.entries()) {
-          if (k === o.actions.length - 1) {
+        // A --wait after an action cuts its motion short instead: the clock runs that long and the
+        // next action lands mid-motion. A change of mind (a second click on a menu still
+        // unfolding) could not be expressed at all (round 9).
+        const steps: { act: MotionAction; waitAfter?: number }[] = [];
+        for (const act of o.actions) {
+          if (act.kind !== "wait") steps.push({ act });
+          else if (steps.length > 0)
+            steps[steps.length - 1]!.waitAfter = (steps[steps.length - 1]!.waitAfter ?? 0) + act.ms;
+          else {
+            clockNow += act.ms;
+            await timeline.at(clockNow);
+          }
+        }
+        if (steps.length === 0)
+          throw new MotionUsageError("--wait needs an action to follow (--click, --hover, --leave, --scroll)");
+        for (const [k, { act, waitAfter }] of steps.entries()) {
+          if (k === steps.length - 1) {
             beforeClick = o.selectors.length > 0 ? await measureTargets(page, o.selectors) : [];
             scrollBefore = await scrolled();
             heldBefore = held.length;
+            if (k > 0 && steps[k - 1]!.waitAfter !== undefined)
+              interrupt = { atMs: clockNow, action: describeAction(act), before: beforeClick };
           }
           await runAction(page, act);
           clockNow += frameTimeMs(1);
@@ -898,7 +977,10 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
           clockNow += frameTimeMs(1);
           await timeline.at(clockNow);
           held = await timeline.animations();
-          if (k < o.actions.length - 1) {
+          if (k < steps.length - 1 && waitAfter !== undefined) {
+            clockNow += waitAfter;
+            await timeline.at(clockNow);
+          } else if (k < steps.length - 1) {
             const ends = held
               .filter((h) => h.iterations !== null)
               .map((h) => h.startMs + h.durationMs * (h.iterations ?? 1));
@@ -942,16 +1024,21 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
           throw new SnappedError(changed);
         }
       } else if (held.length === 0 && o.endMs === undefined) {
+        // Frame by frame up to the latest timer: jumping straight to it ran a click at 100ms and
+        // its reversal at 200ms in one step, and a transition that had run read "no animation"
+        // (round 9). Each frame is the first after a timer due in it, as a page renders it.
+        let n = 0;
         for (let guard = 0; guard < 20 && held.length === 0; guard++) {
           const due = await timeline.pending();
           if (due.timers === 0 || due.latestTimerMs === null || due.latestTimerMs > 10_000) break;
-          // The first frame after it is due: a transition the timer starts begins when the page
-          // next renders. Jumping 20ms past it began a 100ms timer's transition at 120ms, and
-          // --expect-start 100 failed a correct page (round 7).
-          const next = frameTimeMs(Math.floor((due.latestTimerMs * 60) / 1000 + 1e-6) + 1);
-          await timeline.at(next);
-          ranTo = Math.round(next);
-          held = await timeline.animations();
+          const lastFrame = Math.floor((due.latestTimerMs * 60) / 1000 + 1e-6) + 1;
+          if (lastFrame <= n) break;
+          while (n < lastFrame && held.length === 0) {
+            n++;
+            await timeline.at(frameTimeMs(n));
+            ranTo = Math.round(frameTimeMs(n));
+            held = await timeline.animations();
+          }
         }
         if (held.length > 0) {
           await page.close();
@@ -1073,6 +1160,7 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
         context,
         ...(delays ? { delays } : {}),
         ...(forever ? { forever: true } : {}),
+        ...(interrupt ? { interrupt } : {}),
         ...(scrollYs.length > 1 && Math.max(...scrollYs) - Math.min(...scrollYs) >= 1
           ? { scrolled: { from: scrollYs[0]!, to: scrollYs[scrollYs.length - 1]! } }
           : {}),
@@ -1081,6 +1169,50 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
       await page.close();
     }
   });
+}
+
+/**
+ * After an action that cut into a motion: did each target jump the moment it landed? Compared
+ * with how far it moves between any two frames after, a jump to its other end is a new motion
+ * starting from its own first keyframe instead of from where the interrupted one had got to —
+ * the menu of round 9 went from 49% open to fully open on its second click.
+ */
+export function interruptJumps(
+  captured: Pick<Captured, "interrupt" | "frames" | "endMs">,
+  selectors: readonly string[],
+): { selector: string; message: string }[] {
+  const it = captured.interrupt;
+  if (!it) return [];
+  const motion = captured.frames.filter((f) => f.atMs <= captured.endMs);
+  const out: { selector: string; message: string }[] = [];
+  selectors.forEach((sel, i) => {
+    const a = it.before[i];
+    const doms = motion.map((f) => f.dom?.[i]).filter((d): d is MotionDom => !!d);
+    const b = doms[0];
+    if (!a || !b) return;
+    const geo = (x: MotionDom, y: MotionDom) =>
+      Math.max(
+        Math.abs(x.box.width - y.box.width),
+        Math.abs(x.box.height - y.box.height),
+        Math.abs(x.box.x + x.box.width / 2 - (y.box.x + y.box.width / 2)),
+        Math.abs(x.box.y + x.box.height / 2 - (y.box.y + y.box.height / 2)),
+      );
+    let step = 0;
+    let opStep = 0;
+    for (let k = 1; k < doms.length; k++) {
+      step = Math.max(step, geo(doms[k - 1]!, doms[k]!));
+      opStep = Math.max(opStep, Math.abs(doms[k - 1]!.opacity - doms[k]!.opacity));
+    }
+    const jump = geo(a, b);
+    const opJump = Math.abs(a.opacity - b.opacity);
+    if ((jump >= 8 && jump > 2 * step) || (opJump >= 0.2 && opJump > 2 * opStep)) {
+      out.push({
+        selector: sel,
+        message: `${sel} jumps the moment ${it.action} lands at ${Math.round(it.atMs)}ms: ${Math.round(a.box.width)}x${Math.round(a.box.height)}${opJump >= 0.05 ? ` at opacity ${a.opacity.toFixed(2)}` : ""} → ${Math.round(b.box.width)}x${Math.round(b.box.height)}${opJump >= 0.05 ? ` at ${b.opacity.toFixed(2)}` : ""} within a frame, more than it moves in any frame after (${Math.round(step)}px). Its new motion starts from its own first keyframe, not from where the one it cut into had got to: a @keyframes animation always starts from its \`from\`, a transition reverses from where it is — move the two states into one transition`,
+      });
+    }
+  });
+  return out;
 }
 
 async function readFrames(o: MotionCliOptions): Promise<Captured> {
@@ -1383,13 +1515,15 @@ export async function runMotionCli(argv: string[]): Promise<number> {
     ...(o.expectDirection ? { expectDirection: o.expectDirection } : {}),
     ...(o.expectStill ? { expectStill: true } : {}),
   });
+  const jumps = interruptJumps(captured, o.selectors);
   const json = {
     source: o.source,
+    ...(jumps.length > 0 ? { interruptJumps: jumps } : {}),
     frames: captured.manifest,
     startMs: captured.startMs,
     endMs: captured.endMs,
     segments: captured.segments,
-    passed: r.passed,
+    passed: r.passed && jumps.length === 0,
     targets: r.targets,
     forbidden: r.forbidden,
     answers: r.frames,
@@ -1400,8 +1534,13 @@ export async function runMotionCli(argv: string[]): Promise<number> {
   const saved = join(dirname(captured.manifest), "motion-report.json");
   await writeFile(saved, `${JSON.stringify(json, null, 2)}\n`);
   if (o.json) console.log(JSON.stringify(json, null, 2));
-  else console.log(`${formatMotionReport(o.source, captured, r, o.forbid)}\n  report: ${saved}`);
-  return r.passed ? 0 : 1;
+  else {
+    console.log(formatMotionReport(o.source, captured, r, o.forbid));
+    for (const j of jumps) console.log(`    FAIL interrupt-jump: ${j.message}`);
+    if (jumps.length > 0 && r.passed) console.log(`  ${jumps.length} fail`);
+    console.log(`  report: ${saved}`);
+  }
+  return r.passed && jumps.length === 0 ? 0 : 1;
 }
 
 if (isCliEntry(import.meta.url, "motion")) {

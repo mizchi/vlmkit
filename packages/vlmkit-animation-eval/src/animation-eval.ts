@@ -184,7 +184,13 @@ export interface ClockMotion {
    * CSS transitions and animations that came into being while the clock advanced — begun by a
    * timer or a script, so the sweep's motion may be theirs and not a requestAnimationFrame loop.
    */
-  started?: Array<{ selector: string; name: string; kind: "transition" | "animation"; atMs: number }>;
+  started?: Array<{
+    selector: string;
+    name: string;
+    kind: "transition" | "animation";
+    atMs: number;
+    durationMs?: number;
+  }>;
 }
 
 /** Pure: what a clock sweep's motion is, named as far as the page let it be. */
@@ -227,7 +233,8 @@ export type AnimationEvalIssueKind =
   | "undefined-keyframes"
   | "motion-mostly-hidden"
   | "delayed-entrance"
-  | "unknown-transition-property";
+  | "unknown-transition-property"
+  | "reduced-motion-hides";
 
 export interface AnimationEvalIssue {
   kind: AnimationEvalIssueKind;
@@ -451,6 +458,15 @@ export function computeSettleMs(animations: AnimationTimingSample[]): number | n
   return settle;
 }
 
+/** An element that rests seen without reduced motion and hidden (or moved) with it. */
+export interface ReducedHidden {
+  selector: string;
+  opacity: number;
+  reducedOpacity: number;
+  /** How far its centre rests from where it rests without the preference (px). */
+  offPx: number;
+}
+
 export interface DeriveIssuesInput {
   evaluated: EvaluatedAnimation[];
   settleMs: number | null;
@@ -462,6 +478,8 @@ export interface DeriveIssuesInput {
   undefinedKeyframes?: { selector: string; name: string; reducedMotion: boolean }[];
   /** transition-property names no CSS property, with a duration over 0. */
   unknownTransitions?: { selector: string; name: string }[];
+  /** Seen at rest without the preference, hidden or out of place at rest under reduce. */
+  reducedHidden?: ReducedHidden[];
 }
 
 /** A delay this long (ms) at least, with the element held unseen through it, is a `delayed-entrance`. */
@@ -476,6 +494,20 @@ export function deriveAnimationIssues(
   // is the number the gate actually measures against.
   const durationFloor = options.reducedMotionDurationFloorMs ?? 100;
   const issues: AnimationEvalIssue[] = [];
+
+  // Round 9: `animation: none` under reduce on a tile whose base style is opacity 0 left a page
+  // empty below its heading, and every gate called the preference honoured.
+  for (const h of input.reducedHidden ?? []) {
+    const gone = h.reducedOpacity < 0.05;
+    issues.push({
+      kind: "reduced-motion-hides",
+      severity: "suspect",
+      selector: h.selector,
+      message: gone
+        ? `${h.selector} rests at opacity ${h.reducedOpacity.toFixed(2)} under prefers-reduced-motion: reduce, and at ${h.opacity.toFixed(2)} without it: the reduce rule took its animation away, and with it the fill that showed it. Give it its end state in that rule (opacity: 1, transform: none), or make the hidden state the first keyframe's (fill: both) instead of the element's own.`
+        : `${h.selector} rests ${Math.round(h.offPx)}px from its place under prefers-reduced-motion: reduce: the reduce rule took its animation away and left the element where the animation started. Give it its end state in that rule (transform: none).`,
+    });
+  }
 
   for (const u of input.unknownTransitions ?? []) {
     issues.push({
@@ -884,6 +916,30 @@ const NOT_MOTION = new Set([
 
 // A transition-property no browser knows: \`widht\` computes as itself and the transition never
 // runs, so a progress bar jumped to 70% and every gate passed it (motion-repair round 7).
+/**
+ * Every animated element at rest — each finite animation finished — with the opacity it renders
+ * at and the centre of its box: the targets the page's animations had (null), or those given.
+ */
+const restStateScript = (selectors: readonly string[] | null) => `(() => {
+  ${STABLE_SELECTOR_JS}
+  const given = ${JSON.stringify(selectors)};
+  const els = new Set();
+  if (given) for (const sel of given) { const el = document.querySelector(sel); if (el) els.add(el); }
+  else {
+    for (const a of document.getAnimations()) if (a.effect && a.effect.target) els.add(a.effect.target);
+    for (const r of window.__vlmkitStarted || []) { try { const el = document.querySelector(r.selector); if (el) els.add(el); } catch {} }
+  }
+  for (const a of document.getAnimations()) {
+    try { if (Number.isFinite(a.effect.getComputedTiming().endTime)) a.finish(); } catch {}
+  }
+  return [...els].map((el) => {
+    let op = getComputedStyle(el).visibility === "hidden" ? 0 : 1;
+    for (let n = el; n; n = n.parentElement) op *= Number(getComputedStyle(n).opacity);
+    const r = el.getBoundingClientRect();
+    return { selector: given ? given[[...els].indexOf(el)] ?? stableSelector(el) : stableSelector(el), opacity: op, x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  });
+})()`;
+
 const UNKNOWN_TRANSITION_PROPERTY_SCRIPT = `(() => {
 ${ANIMATION_HELPERS_JS}
   const out = [];
@@ -1002,9 +1058,19 @@ async function sampleClock(
         const el = a.effect && a.effect.target;
         const kind = typeof a.transitionProperty === "string" ? "transition" : "animation";
         const name = kind === "transition" ? a.transitionProperty : (a.animationName || a.id || "(el.animate)");
-        return { key: (el ? stableSelector(el) : "(no target)") + "\\u0000" + kind + "\\u0000" + name, selector: el ? stableSelector(el) : "(no target)", name, kind };
+        let durationMs = null;
+        try { durationMs = Number(a.effect.getComputedTiming().duration) || null; } catch {}
+        return { key: (el ? stableSelector(el) : "(no target)") + "\\u0000" + kind + "\\u0000" + name, selector: el ? stableSelector(el) : "(no target)", name, kind, durationMs };
       });
-    })()`) as Promise<Array<{ key: string; selector: string; name: string; kind: "transition" | "animation" }>>;
+    })()`) as Promise<
+      Array<{
+        key: string;
+        selector: string;
+        name: string;
+        kind: "transition" | "animation";
+        durationMs: number | null;
+      }>
+    >;
   const known = new Set((await listStarted().catch(() => [])).map((a) => a.key));
   const started: NonNullable<ClockMotion["started"]> = [];
   for (const t of times) {
@@ -1012,7 +1078,13 @@ async function sampleClock(
     for (const a of await listStarted().catch(() => [])) {
       if (known.has(a.key)) continue;
       known.add(a.key);
-      started.push({ selector: a.selector, name: a.name, kind: a.kind, atMs: t });
+      started.push({
+        selector: a.selector,
+        name: a.name,
+        kind: a.kind,
+        atMs: t,
+        ...(a.durationMs !== null ? { durationMs: a.durationMs } : {}),
+      });
     }
     const frame = await shot(`${label}-${t}ms`);
     const delta = frameDelta(previous, frame, tolerance);
@@ -1538,6 +1610,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
     // tricks (`animation-duration: 0.01ms`) count as honored.
     let reducedMotion: AnimationEvalReport["reducedMotion"];
     let undefinedUnderReduce: { selector: string; name: string }[] = [];
+    let reducedHidden: ReducedHidden[] = [];
     // Also when the only motion is script-driven: that page has no WAAPI animation to count,
     // and skipping the pass there would make a rAF loop that ignores the preference pass.
     if (!options.skipReducedMotion && (timings.length > 0 || clockMotion?.visible)) {
@@ -1546,6 +1619,32 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       await rmPage.emulateMedia({ reducedMotion: "reduce" });
       await loadPage(rmPage);
       const rmTimings = await collectAnimations(rmPage);
+      // Where each animated element rests with and without the preference: honouring it by taking
+      // the animation away can take the element's end state with it.
+      {
+        const restPage = await browser.newPage({ viewport });
+        try {
+          await loadPage(restPage);
+          type Rest = { selector: string; opacity: number; x: number; y: number };
+          const plain = (await restPage.evaluate(restStateScript(null))) as Rest[];
+          const seenPlain = plain.filter((r) => r.opacity >= 0.5);
+          if (seenPlain.length > 0) {
+            const reduced = (await rmPage.evaluate(restStateScript(seenPlain.map((r) => r.selector)))) as Rest[];
+            reducedHidden = seenPlain.flatMap((a) => {
+              const b = reduced.find((r) => r.selector === a.selector);
+              if (!b) return [];
+              const offPx = Math.hypot(b.x - a.x, b.y - a.y);
+              return b.opacity < 0.05 || offPx >= 8
+                ? [{ selector: a.selector, opacity: a.opacity, reducedOpacity: b.opacity, offPx }]
+                : [];
+            });
+          }
+        } catch {
+          reducedHidden = [];
+        } finally {
+          await restPage.close();
+        }
+      }
       undefinedUnderReduce = (await rmPage.evaluate(UNDEFINED_KEYFRAMES_SCRIPT)) as {
         selector: string;
         name: string;
@@ -1600,7 +1699,8 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
             remaining.push({
               selector: `${st.selector} (a ${st.kind} a timer started at ${st.atMs}ms)`,
               name: st.name,
-              durationMs: lasted,
+              // Its own duration: "shrink 500ms" was the clock window for a 300ms animation (round 9).
+              durationMs: st.durationMs ?? lasted,
             });
         } else if (lasted >= durationFloor) {
           remaining.push({
@@ -1630,6 +1730,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         ...(clockMotion ? { clockMotion } : {}),
         ...(undefinedKeyframes.length > 0 ? { undefinedKeyframes } : {}),
         ...(unknownTransitions.length > 0 ? { unknownTransitions } : {}),
+        ...(reducedHidden.length > 0 ? { reducedHidden } : {}),
       },
       {
         settleThresholdMs: options.settleThresholdMs,
@@ -1695,7 +1796,7 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
   if (report.reducedMotion) {
     lines.push(
       report.reducedMotion.remainingCount === 0
-        ? `reduced-motion: honored`
+        ? `reduced-motion: honored${report.issues.some((i) => i.kind === "reduced-motion-hides") ? ` — but ${report.issues.filter((i) => i.kind === "reduced-motion-hides").length} element(s) rest hidden or out of place under it${ruleTag("reduced-motion-hides")}` : ""}`
         : `reduced-motion: ${report.reducedMotion.remainingCount} animation(s) still running${ruleTag("reduced-motion-ignored")}`,
     );
   }

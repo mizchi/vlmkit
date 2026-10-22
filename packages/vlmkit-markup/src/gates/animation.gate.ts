@@ -103,6 +103,12 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       docs: "A misspelt property (`widht`) computes as itself and its transition never runs: the property it meant changes in one frame, and with no animation on the page nothing else reports it.",
     },
     {
+      id: "reduced-motion-hides",
+      title: "Under reduced motion an element rests hidden or out of place",
+      severity: "suspect",
+      docs: "Seen at rest without prefers-reduced-motion and at opacity 0 (or 8px+ from its place) at rest with it: `animation: none` in the reduce rule removed the animation and the fill that held its end state, so its base style (opacity 0, a start transform) shows. The preference is honoured and the content is gone.",
+    },
+    {
       id: "delayed-entrance",
       title: "An element is held unseen through a long animation-delay",
       severity: "warn",

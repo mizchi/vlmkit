@@ -294,7 +294,17 @@ vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ea
   load only: it passes a page whose motion all waits for a click, a hover or a scroll. "Stays
   dead centre", "only its size and opacity change" is `--expect-still`; a target that sits off
   its place through the whole motion and jumps there at the end is a keyframe `transform`
-  replacing the element's own (a `translate(-50%, -50%)` centring). In motion-repair round 3 a wrong
+  replacing the element's own (a `translate(-50%, -50%)` centring). A change of mind — "if it is
+  clicked again while still unfolding, it folds back from where it is" — is `--click X --wait 100
+  --click X`: `--wait` lets only that long pass before the next action, and a target that jumps
+  as it lands is `interrupt-jump` (a `@keyframes` animation restarts from its `from`; a transition
+  reverses from where it is). A card that "turns over" is `--click` and a `--selector` per face:
+  a face turned past edge-on with its back face drawn is `mirrored`, edge-on frames are not
+  judged, and a face turned away at rest is not "absent". Under reduced motion, `check animation`
+  compares where every animated element rests with and without the preference:
+  `reduced-motion-hides` (suspect) is `animation: none` leaving the element at its base style
+  (opacity 0, a start transform) — "honored" alone never meant the content is there; look with
+  `--frames-reduced-motion`. In motion-repair round 3 a wrong
   `transform-origin` and a stagger that was not one both read "follows ease-out exactly, no fail"
   until these existed.
 - **What it does not judge**: fps or jank, a target it is not told about, and anything under

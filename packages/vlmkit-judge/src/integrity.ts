@@ -1252,6 +1252,8 @@ export interface OcclusionCandidate {
   selector: string;
   text: string;
   occluder: string;
+  /** The text faces away from the viewer (turned past edge-on) with its back face drawn. */
+  facesAway?: boolean;
   /** occluded sample points / total sampled points, 0..1 */
   coverage: number;
   sampled: number;
@@ -1295,7 +1297,9 @@ export function findOccludedText(
       severity: "fail",
       viewport,
       selector: c.selector,
-      message: `"${clip(c.text)}" (${c.selector}) is painted over by an opaque element ${c.occluder} @${viewport} — ${Math.round(c.coverage * 100)}% of sampled glyph points hit the occluder instead of the text. Move or shrink the covering element, or reorder the stacking so the text stays readable.`,
+      message: c.facesAway
+        ? `"${clip(c.text)}" (${c.selector}) faces away from you, turned past edge-on with its back face drawn, behind ${c.occluder} @${viewport}: the far side of a flip card. Give the faces backface-visibility: hidden — reordering the stacking would show it mirrored.`
+        : `"${clip(c.text)}" (${c.selector}) is painted over by an opaque element ${c.occluder} @${viewport} — ${Math.round(c.coverage * 100)}% of sampled glyph points hit the occluder instead of the text. Move or shrink the covering element, or reorder the stacking so the text stays readable.`,
       evidence: { text: c.text, occluder: c.occluder, coverage: c.coverage },
     });
   }

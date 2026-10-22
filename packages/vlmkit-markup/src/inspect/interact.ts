@@ -1564,6 +1564,13 @@ export async function runInteractCli(cliArgs: readonly string[], options: { cwd?
     );
     console.log("                   // ... + frames.json (vlmkit-frames/1), recorded on a page of its own: the steps");
     console.log("                   // before it run again there, so snapshots are as they are without it.");
+    // Round 9: two agents recorded a click, a wait and a second click here and got the menu fully
+    // open at 0ms on both pages — the earlier steps replay with motion off.
+    console.log("                   // Those steps replay with motion OFF, so an action that cuts into an earlier");
+    console.log("                   // one's motion (a second click mid-opening) cannot be recorded here: use");
+    console.log(
+      "                   // inspect motion --click X --wait 100 --click X. Give at, or everyMs/forMs, not both.",
+    );
     console.log("  click | hover    { selector: string }");
     console.log('  click            { describe: string }   // e.g. "the Save button": found on a screenshot');
     console.log("                   // by TypeSafe Jev (TYPESAFEAI_API_KEY), clicked at its centre; for canvas apps");

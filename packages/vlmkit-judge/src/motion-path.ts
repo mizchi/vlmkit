@@ -148,6 +148,12 @@ export interface MotionSample {
     t?: number | null;
     /** What keeps it from being seen, when the page could tell: "clipped by …", "covered by …". */
     hiddenBy?: string;
+    /** Turned in 3D (its box is the turned shape's bounds); within 15° of edge-on; facing away
+     * with its back face drawn (so it shows mirrored). */
+    rotated3d?: boolean;
+    edgeOn?: boolean;
+    facingAway?: boolean;
+    mirrored?: boolean;
     /**
      * How long its own animation has been in its active phase (ms; negative in its delay). The
      * frame's time less this is when that animation begins: what a stagger is made of.
@@ -258,7 +264,8 @@ export type MotionRule =
   | "duration-mismatch"
   | "iterations-mismatch"
   | "direction-mismatch"
-  | "still-mismatch";
+  | "still-mismatch"
+  | "mirrored";
 
 export interface MotionFinding {
   rule: MotionRule;
@@ -376,6 +383,9 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
   const seen = (s: MotionSample): number | null => {
     if (s.dom) {
       if (s.dom.opacity < 0.05) return 0;
+      // Edge-on, a turning card has next to no area, and a face turned away is not meant to be
+      // seen (if it is drawn, that is `mirrored`): neither seen nor lost (round 9).
+      if (s.dom.edgeOn || s.dom.facingAway) return null;
       // A model's "not shown" on a frame the page measures as mid-fade and on screen is the
       // fade, not a loss: Jev read a panel at opacity 0.45 as 0.23 and a correct page failed
       // target-lost (round 7). Unknown, not evidence. (Without Jev, present is the page's own.)
@@ -475,7 +485,9 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       }
     }
     const restSamples = judged.filter(isRest);
-    const goneAtRest = restSamples.length > 0 && restSamples.every((s) => !shown(s));
+    // A face turned away at rest is the far side of what turned, not a loss.
+    const goneAtRest =
+      restSamples.length > 0 && restSamples.every((s) => !shown(s)) && !restSamples.some((s) => s.dom?.facingAway);
     if (goneAtRest && motion.length > 0 && !options.exits) {
       findings.push({
         rule: "absent-at-rest",
@@ -507,7 +519,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
   const geoRest = all.filter((p) => p.rest);
 
   // A model's box that lands far off and is back the next frame is another element's, not a jump.
-  const unsureAt = sorted.filter((s) => seen(s) === null).map((s) => s.atMs);
+  const unsureAt = sorted.filter((s) => seen(s) === null && !s.dom?.edgeOn && !s.dom?.facingAway).map((s) => s.atMs);
   if (!exact) {
     const out = new Set<number>();
     for (let k = 1; k < geo.length - 1; k++) {
@@ -657,7 +669,11 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         if (neighbours.length === 0) return;
         const local = Math.max(...neighbours.map((n) => n.speed));
         const times = st.speed / Math.max(local, 1e-3);
-        if (st.px >= floor && times > ratio) {
+        // Out of its delay, unseen, into its first keyframe: the base style and the keyframe differ
+        // where nobody can see it (a tile at opacity 0 "jumped" 10px into its rise, round 9).
+        const from = sorted.find((x) => x.atMs === frames[i]!.atMs)?.dom;
+        const unseenDelay = from !== undefined && (from.elapsedMs ?? 0) < 0 && from.opacity < 0.05;
+        if (st.px >= floor && times > ratio && !unseenDelay) {
           findings.push({
             rule: "jump",
             severity: "fail",
@@ -803,9 +819,26 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     }
   }
 
+  // A face turned past edge-on with its back face drawn is seen backwards: the question side of
+  // a flip card, mirrored over its answer, read "shown 1.00" (round 9).
+  const backwards = sorted.find((s) => s.dom?.mirrored && !s.dom.edgeOn && s.present >= thr);
+  if (backwards) {
+    findings.push({
+      rule: "mirrored",
+      severity: "fail",
+      atMs: backwards.atMs,
+      message: `seen mirrored at ${ms(backwards.atMs)}: it faces away from you (turned past edge-on) and its back face is drawn — give it backface-visibility: hidden (on each face of a flip card)`,
+    });
+  }
+
+  // Turned in 3D, a box's centre is the bounds of a turned shape under perspective, not a place.
+  const turnedAt = new Set(sorted.filter((s) => s.dom?.rotated3d).map((s) => s.atMs));
   if (options.expectStill && geo.length > 0) {
     const anchor = geoRest[0] ?? geo[geo.length - 1]!;
-    const far = [...geo, ...geoRest].reduce((a, b) => (dist(b, anchor) > dist(a, anchor) ? b : a));
+    const far = [...geo, ...geoRest]
+      .filter((p) => !turnedAt.has(p.atMs))
+      .concat(anchor)
+      .reduce((a, b) => (dist(b, anchor) > dist(a, anchor) ? b : a));
     if (dist(far, anchor) >= Math.max(2, still)) {
       findings.push({
         rule: "still-mismatch",

@@ -118,6 +118,22 @@ export const COLLECT_OCCLUSIONS = `(() => {
     if (!el || SKIP.has(el.tagName)) continue;
     const style = getComputedStyle(el);
     if (style.visibility === "hidden" || style.display === "none" || style.opacity === "0") continue;
+    // The far side of a flip card: turned away with backface-visibility: hidden, it is not painted,
+    // so nothing covers it (an answer face read "painted over by" its question, round 9).
+    const normalZ = (e) => {
+      let M = new DOMMatrix();
+      for (let n = e; n && n !== document.documentElement; n = n.parentElement) {
+        const tf = getComputedStyle(n).transform;
+        if (tf && tf !== "none") M = new DOMMatrix(tf).multiply(M);
+      }
+      return M.m33;
+    };
+    let facesAwayHidden = false;
+    for (let p = el; p && p !== document.documentElement && !facesAwayHidden; p = p.parentElement) {
+      if (getComputedStyle(p).backfaceVisibility === "hidden" && normalZ(p) < -0.01) facesAwayHidden = true;
+    }
+    if (facesAwayHidden) continue;
+    const facesAway = normalZ(el) < -0.01;
     const range = document.createRange();
     range.selectNodeContents(node);
     const rects = Array.from(range.getClientRects()).filter((r) => r.width >= 4 && r.height >= 4);
@@ -180,6 +196,7 @@ export const COLLECT_OCCLUSIONS = `(() => {
         sampled,
         ariaHidden: !!el.closest('[aria-hidden="true"]'),
         pinnedEscapable,
+        ...(facesAway ? { facesAway: true } : {}),
       });
     }
   }

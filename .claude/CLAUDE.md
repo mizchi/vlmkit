@@ -347,6 +347,17 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   `--selector` an easing is fitted from 2px (a 4px lift read "static") and a scale's point is solved
   from 2% (a 96% dialog read "not checked"). `check integrity` exempts text hidden by an element wholly below the fold
   that is set to fade (a scroll reveal waiting for its scroll); on screen and transparent stays a fail.
+- **A change of mind, a card turned over, and reduced motion that hides** (round 9,
+  `docs/reports/2026-10-22-motion-repair-v9.md`): a menu whose second click restarted a
+  `@keyframes` from fully open, a flip card without `backface-visibility: hidden`, and tiles left at
+  opacity 0 by `animation: none` under reduce passed every gate (the last read "reduced-motion:
+  honored"). `--wait <ms>` lets the next action land mid-motion and `interrupt-jump` fails a target
+  that jumps as it does; facing is the z of the normal through every transform up the tree, so a
+  face turned away is `mirrored` when its back is drawn, not judged edge-on, and not "absent" at
+  rest, and a rotation is no longer read as a scale (3D column norms); `check animation`'s
+  `reduced-motion-hides` (suspect, 222 rules) compares each animated element's rest with and
+  without the preference. The timer search steps frame by frame (a click at 100ms and its reversal
+  at 200ms in one jump read "no animation").
 
 ## Generated figures (raster images)
 
@@ -1475,7 +1486,7 @@ case at 0.23.0.
 | `docs/reports/2026-08-06-gate-rule-cost-bench.md` | Measured gate/rule execution cost: where a ruleset's time goes, why per-rule cost is attributed rather than isolated, why suppression saves nothing |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
 | `docs/design/package-decomposition.md` | **Splitting vlmkit by layer** (collector / pure judge / driver / loop / diagrams): what was measured, phase 1 (`vlmkit-judge`) and the proposed phases 2-5 |
-| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 35 gates + 221 rules, behavior changes, what is deliberately not a gate |
+| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 35 gates + 222 rules, behavior changes, what is deliberately not a gate |
 | `docs/design/moonbit-boundary.md` | **TS ↔ MoonBit boundary**: what the positional FFI costs (61 commands, 233 args, 2 duplicated dispatch tables), the JSON boundary that replaces it for new logic, how to add a command, and which pure logic belongs in MoonBit versus which deliberately does not |
 | `docs/crater-css-status.md` | Crater CSS rendering verification status |
 | `docs/reset-css-comparison.md` | Reset CSS domain knowledge |

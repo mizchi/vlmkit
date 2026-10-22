@@ -1056,6 +1056,9 @@ vlmkit inspect motion   <html|url> --selector .toast [--target "the green Saved 
   # -start, -stagger, -duration, -iterations, -direction, --expect-still. Actions on the held page
   # first, in order (each before the last run to its end): --click, --hover, --leave, --scroll <css|px>.
   # "--hover .card --leave" samples a card settling back; "--scroll .section" a scroll reveal.
+  # --wait <ms> after an action lets the next one land mid-motion ("--click .btn --wait 100 --click
+  # .btn"): a target that jumps as it lands is interrupt-jump. A face turned past edge-on with its
+  # back drawn is mirrored (backface-visibility).
 # Checks.
 vlmkit check motion <html|url>                 # CSS motion / reduced-motion detection (declarations)
 vlmkit check animation <html|url>              # Frame-sampled animation evaluation: pause + seek each

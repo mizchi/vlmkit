@@ -258,7 +258,9 @@ describe("composed built-in registry", () => {
     // 220 → 221: `check animation` / `unknown-transition-property` (suspect) — a `widht` transition
     //       never ran and the bar jumped to 70% with no animation for any gate to see (round 7).
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 221);
+    // 221 → 222: `check animation` / `reduced-motion-hides` (suspect) — tiles left at opacity 0 by
+    // `animation: none` under reduce, which every gate called honoured (motion-repair round 9).
+    assert.equal(total, 222);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {

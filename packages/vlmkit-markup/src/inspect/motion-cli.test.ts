@@ -220,6 +220,18 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
       ["--selector", ".toast", "--exits", "--expect-easing", "ease-out,ease-in"],
       /FAIL snap-back .*in the hold after 660ms/,
     ],
+    // Round 9: a flip card's faces with their back faces drawn, and a second click that lands
+    // while the menu is still unfolding.
+    [
+      "flip.html",
+      ["--click", ".flip", "--selector", ".back", "--selector", ".front"],
+      /FAIL mirrored .*give it backface-visibility: hidden/,
+    ],
+    [
+      "interrupt.html",
+      ["--selector", ".menu", "--click", ".filters", "--wait", "100", "--click", ".filters", "--exits"],
+      /FAIL interrupt-jump: \.menu jumps the moment --click \.filters lands .*a @keyframes animation always starts from its `from`/,
+    ],
     // Round 8: a keyframe transform replacing the centring, a :hover-only transition, a reveal
     // whose observer never fires for a section taller than the screen.
     [

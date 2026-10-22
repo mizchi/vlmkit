@@ -86,6 +86,33 @@ describe("judgeMotionPath", () => {
     expect(l.segments[0]!.direction?.way).toBe("up");
   });
 
+  it("fails a face seen turned away, and judges neither edge-on frames nor a far side at rest (round 9)", () => {
+    const b = box(400, 200);
+    const face = (
+      atMs: number,
+      present: number,
+      dom: { edgeOn?: boolean; facingAway?: boolean; mirrored?: boolean },
+    ) => ({
+      atMs,
+      present,
+      box: b,
+      dom: { box: b, opacity: 1, scale: 1, visible: present, ...dom },
+    });
+    // The question side of a flip card, turning away: edge-on at 250ms, away from 300ms on.
+    const hidden = [
+      face(0, 1, {}),
+      face(100, 1, {}),
+      face(250, 0, { edgeOn: true }),
+      face(300, 0, { facingAway: true }),
+      face(499, 0, { facingAway: true }),
+      face(800, 0, { facingAway: true }),
+    ];
+    expect(judgeMotionPath(hidden, { startMs: 0, endMs: 500 }).findings).toEqual([]);
+    // The same with its back face drawn: seen mirrored.
+    const drawn = hidden.map((f) => (f.dom.facingAway ? face(f.atMs, 1, { facingAway: true, mirrored: true }) : f));
+    expect(judgeMotionPath(drawn, { startMs: 0, endMs: 500 }).findings.map((f) => f.rule)).toEqual(["mirrored"]);
+  });
+
   it("names a keyframe transform that replaces the element's placement", () => {
     // Off by (200,98) through the whole opening, at its place only once it stops.
     const at = (atMs: number, dx: number, op: number) => {
