@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Uploading</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #f5f6f8; color: #1c1e22; display: grid; place-items: center; min-height: 100vh; }
+  .card { width: 360px; padding: 32px; background: #fff; border-radius: 14px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); text-align: center; }
+  .spinner { width: 56px; height: 56px; margin: 0 auto 20px; border-radius: 50%; border: 6px solid #e3e7ee; border-top-color: #2f6fed; border-right-color: #2f6fed; animation: spin 1s linear infinite; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .card p { margin: 0; color: #5c6370; }
+</style></head>
+<body>
+  <div class="card">
+    <div class="spinner" role="progressbar" aria-label="Uploading"></div>
+    <h1 style="font-size:18px;margin:0 0 6px">Uploading 3 photos…</h1>
+    <p>Keep this tab open until it finishes.</p>
+  </div>
+</body></html>

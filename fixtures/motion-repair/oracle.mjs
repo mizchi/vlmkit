@@ -1,5 +1,5 @@
 // Hidden from the agents: judges a repaired page against its brief.
-// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet|slidein|progress|accordion|dialog|hover|reveal|flip|interrupt|reduced> <page.html>
+// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet|slidein|progress|accordion|dialog|hover|reveal|flip|interrupt|reduced|push|seam|draw> <page.html>
 import { chromium } from "playwright";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
@@ -412,6 +412,83 @@ if (kind === "notify") {
     }),
   );
   ok("without the preference the tiles still rise in, 400ms each, 80ms apart", r.every((x, i) => x && Math.abs(x.d - 400) <= 1 && Math.abs(x.delay - 80 * i) <= 1 && x.mid > 0.3 && x.mid < 0.98), r);
+} else if (kind === "push") {
+  const y = () => page.evaluate(() => document.querySelector("article h1").getBoundingClientRect().y);
+  const ys = [];
+  for (const t of [0, 100, 150, 250, 2000]) {
+    await at(t);
+    ys.push(await y());
+  }
+  ok("the article never moves (0 to rest)", Math.max(...ys) - Math.min(...ys) <= 0.5, ys);
+  ok("the article starts right under the top bar (64px + its 40px padding)", Math.abs(ys[0] - 104) <= 1, ys[0]);
+  const rest = await probe(".notice");
+  ok("notice pinned under the top bar at rest, full width, fully visible", rest && Math.abs(rest.y - 64) <= 1 && Math.abs(rest.h - 56) <= 1 && rest.w >= 1279 && rest.visible >= 0.96, rest);
+  const dur = await page.evaluate(() => document.querySelector(".notice").getAnimations().map((a) => a.effect.getComputedTiming().duration));
+  ok("the notice arrives over 300ms", dur.some((d) => Math.abs(d - 300) <= 1), dur);
+  await at(150);
+  const mid = await probe(".notice");
+  ok("mid-way (150ms): coming down from behind the bar, past half (ease-out)", mid && mid.y < 63 && mid.y > 64 - 56 * 0.4, mid);
+  await at(2000);
+  const covered = await page.evaluate(() => {
+    const h = document.querySelector("article h1").getBoundingClientRect();
+    const top = document.elementFromPoint(h.x + 20, h.y + 10);
+    return top?.closest(".notice") ? "notice" : top?.tagName;
+  });
+  ok("the notice lies over the top of the article", covered === "notice", covered);
+} else if (kind === "seam") {
+  const angle = (t) =>
+    page.evaluate((t) => {
+      const el = document.querySelector(".spinner");
+      const a = el.getAnimations()[0];
+      if (!a) return null;
+      a.pause();
+      a.currentTime = t;
+      const m = new DOMMatrixReadOnly(getComputedStyle(el).transform);
+      return (Math.atan2(m.b, m.a) * 180) / Math.PI;
+    }, t);
+  const timing = await page.evaluate(() => {
+    const a = document.querySelector(".spinner").getAnimations()[0];
+    const t = a?.effect.getComputedTiming();
+    return t ? { d: t.duration, it: t.iterations, easing: t.easing } : null;
+  });
+  ok("one turn a second, forever", timing && Math.abs(timing.d - 1000) <= 1 && timing.it === Infinity, timing);
+  // Every 1/60s step the same, across the loop's seam too: 6 degrees a frame.
+  const steps = [];
+  for (const t of [100, 500, 983, 1000, 1017, 1983, 2017]) {
+    const a0 = await angle(t - 1000 / 60), a1 = await angle(t);
+    steps.push(((a1 - a0 + 540) % 360) - 180);
+  }
+  ok("steady speed, no hitch at the seam (each 16.7ms step is 6 degrees clockwise)", steps.every((d) => Math.abs(d - 6) <= 0.4), steps);
+  const r = await probe(".spinner");
+  const w = await page.evaluate(() => document.querySelector(".spinner").offsetWidth);
+  ok("spinner visible, 56px (its own box; a turned box's bounds are wider)", r && w === 56 && r.visible >= 0.8, { ...r, w });
+} else if (kind === "draw") {
+  const state = (t) =>
+    page.evaluate((t) => {
+      const p = document.querySelector(".tick path");
+      for (const a of p.getAnimations()) { a.pause(); a.currentTime = t; }
+      const cs = getComputedStyle(p);
+      const dash = cs.strokeDasharray === "none" ? [Infinity] : cs.strokeDasharray.split(/[ ,]+/).map(parseFloat);
+      const len = p.getTotalLength();
+      const off = parseFloat(cs.strokeDashoffset) || 0;
+      // Drawn length: with dash d (on) and gap g, offset o, the stroke visible over [0, len].
+      const on = dash[0], gap = dash.length > 1 ? dash[1] : dash[0];
+      let drawn = 0;
+      if (!Number.isFinite(on)) drawn = len;
+      else for (let x = 0; x < len; x += 0.25) { const ph = (((x + off) % (on + gap)) + (on + gap)) % (on + gap); if (ph < on) drawn += 0.25; }
+      // One continuous run from the start?
+      let firstGap = len;
+      if (Number.isFinite(on)) for (let x = 0; x < len; x += 0.25) { const ph = (((x + off) % (on + gap)) + (on + gap)) % (on + gap); if (ph >= on) { firstGap = x; break; } }
+      return { len, drawn, firstGap, visibleFromStart: Number.isFinite(on) ? ((((0 + off) % (on + gap)) + (on + gap)) % (on + gap)) < on : true };
+    }, t);
+  const dur = await page.evaluate(() => document.querySelector(".tick path").getAnimations().map((a) => { const t = a.effect.getComputedTiming(); return { d: t.duration, delay: t.delay }; }));
+  ok("draws over 600ms, starting 200ms in", dur.length === 1 && Math.abs(dur[0].d - 600) <= 1 && Math.abs(dur[0].delay - 200) <= 1, dur);
+  const before = await state(100);
+  ok("nothing drawn before 200ms", before.drawn < 1, before);
+  const mid = await state(200 + 300);
+  ok("half way (500ms): one stroke from the short end, past half (ease-out), not done", mid.visibleFromStart && Math.abs(mid.firstGap - mid.drawn) < 1 && mid.drawn > mid.len * 0.55 && mid.drawn < mid.len - 1, mid);
+  const end = await state(2000);
+  ok("at rest the whole check mark is drawn", end.drawn >= end.len - 0.5, end);
 }
 await browser.close();
 const failed = checks.filter((c) => !c.pass);

@@ -591,6 +591,9 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       );
       if (xs.length < 4) return null;
       const v = xs.map((x) => x.dom![key]!);
+      // A 2D turn reads -180..180: unwrapped, so a spinner past 180° is not a step back of 350°.
+      if (key === "turnDeg")
+        for (let k = 1; k < v.length; k++) v[k] = v[k]! - 360 * Math.round((v[k]! - v[k - 1]!) / 360);
       const delta = v[v.length - 1]! - v[0]!;
       if (Math.abs(delta) < least) return null;
       return xs.map((x, i) => ({ t: timeOf(x.atMs, seg), s: Math.sign(delta) * v[i]! }));
@@ -869,7 +872,9 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       sorted.some(
         (x) =>
           Math.abs(x.dom!.opacity - sorted[0]!.dom!.opacity) > 0.05 ||
-          Math.abs(x.dom!.scale - sorted[0]!.dom!.scale) > 0.01,
+          Math.abs(x.dom!.scale - sorted[0]!.dom!.scale) > 0.01 ||
+          // A spinner turns in place: static by its centre, not by its turn.
+          Math.abs((x.dom!.turnDeg ?? 0) - (sorted[0]!.dom!.turnDeg ?? 0)) > 2,
       )
     )
   ) {

@@ -125,20 +125,52 @@ export async function measureTargets(
         el.setAttribute("data-vlmkit-probe", "");
         let inView = 0;
         let hits = 0;
+        let outside = 0;
+        let onViewport = 0;
         let missed: { x: number; y: number; top: Element | null } | null = null;
+        // A point of the box that is not of the element's own shape is not evidence: a spinner's
+        // round, turned box has corners where the card behind it shows through, and a check mark's
+        // stroke covers a sliver of its box (both read "covered" on correct pages, round 10). An
+        // ancestor hit inside every clipping ancestor is such a point; a clip is not.
+        const clips: DOMRect[] = [];
+        for (let a = el.parentElement; a; a = a.parentElement) {
+          const s = getComputedStyle(a);
+          if (s.overflowX !== "visible" || s.overflowY !== "visible") clips.push(a.getBoundingClientRect());
+        }
+        const inClips = (x: number, y: number) =>
+          clips.every((b) => x >= b.left && x < b.right && y >= b.top && y < b.bottom);
+        const geometry = el instanceof SVGGeometryElement ? el : null;
+        const ctm = geometry?.getScreenCTM()?.inverse() ?? null;
         for (let gy = 0; gy < 5; gy++) {
           for (let gx = 0; gx < 5; gx++) {
             const x = r.x + ((gx + 0.5) / 5) * r.width;
             const y = r.y + ((gy + 0.5) / 5) * r.height;
             if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) continue;
-            inView++;
+            onViewport++;
+            if (geometry && ctm) {
+              const p = new DOMPoint(x, y).matrixTransform(ctm);
+              if (!geometry.isPointInFill(p) && !geometry.isPointInStroke(p)) {
+                outside++;
+                continue;
+              }
+            }
             const top = document.elementFromPoint(x, y);
-            if (top && el.contains(top)) hits++;
-            else missed ??= { x, y, top };
+            if (top && el.contains(top)) {
+              inView++;
+              hits++;
+              continue;
+            }
+            if (top && top !== el && top.contains(el) && inClips(x, y)) {
+              outside++;
+              continue;
+            }
+            inView++;
+            missed ??= { x, y, top };
           }
         }
         el.removeAttribute("data-vlmkit-probe");
-        const visible = opacity < 0.05 || inView === 0 ? 0 : hits / inView;
+        // Every point outside its shape: nothing was seen covering it.
+        const visible = opacity < 0.05 ? 0 : inView === 0 ? (outside > 0 ? 1 : 0) : hits / inView;
         // Why it is not seen, named for the repair: round 1 of motion-repair found the cause by
         // reading the CSS (an ancestor's overflow, a transform's stacking context) every time.
         const name = (e: Element) =>
@@ -185,7 +217,7 @@ export async function measureTargets(
             }
           }
         } else if (visible < 0.5) {
-          if (inView === 0) hiddenBy = "its box is outside the viewport";
+          if (onViewport === 0) hiddenBy = "its box is outside the viewport";
           else if (missed) {
             for (let a = el.parentElement; a && !hiddenBy; a = a.parentElement) {
               const s = getComputedStyle(a);
@@ -235,7 +267,7 @@ export async function measureTargets(
           visible,
           // How much of its box is inside the viewport: a panel entering from beyond the edge read
           // "share seen 1.00" with 16% of it on screen (round 7).
-          onScreen: inView / 25,
+          onScreen: onViewport / 25,
           elapsedMs,
           ...(durationMs !== null ? { durationMs, iterations: iterations ?? null } : {}),
           ownOpacity,
