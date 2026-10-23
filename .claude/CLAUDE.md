@@ -361,6 +361,15 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   variant and `check integrity --reduced-motion` look at what is left on screen under reduce, `check
   motion` counts motion declared but not active at load, `--exit <css>` marks one target as leaving,
   and a target's turn (its normal's angle in 3D, else its 2D rotation) is fitted as a channel.
+- **What moves something else, a seam at every loop, a stroke left unfinished** (round 10,
+  `docs/reports/2026-10-23-motion-repair-v10.md`): a notice animating `margin-top` that shoves the
+  article, a spinner ending at 350deg, and a check mark whose dash is shorter than its line. A
+  target with no animation of its own that moves is `pushed` (warn, naming the layout property
+  animated elsewhere) and `--still <css>` makes it a fail; `loop-seam` compares a repeating
+  animation's pose either side of the end of a run; a dashed stroke's drawn share comes from its
+  dash pattern, is a channel, and `stroke-incomplete` fails one that ends part drawn. Points of a
+  target's box outside its own shape (a turned round box's corners, the empty part of a stroke's box)
+  are not counted as covered.
 
 ## Generated figures (raster images)
 

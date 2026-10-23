@@ -220,6 +220,23 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
       ["--selector", ".toast", "--exits", "--expect-easing", "ease-out,ease-in"],
       /FAIL snap-back .*in the hold after 660ms/,
     ],
+    // Round 10: a notice whose margin-top shoves the article, a spinner one turn short of a loop,
+    // and a check mark whose dash is shorter than its line.
+    [
+      "push.html",
+      ["--selector", ".notice", "--selector", "article h1", "--still", "article h1"],
+      /FAIL still-mismatch .*it has no animation of its own, .*div\.notice animates margin-top/,
+    ],
+    [
+      "seam.html",
+      ["--selector", ".spinner"],
+      /FAIL loop-seam: \.spinner `spin` turns 10\.\d° in one step at every loop/,
+    ],
+    [
+      "draw.html",
+      ["--selector", ".tick path"],
+      /FAIL stroke-incomplete .*its stroke ends 54% drawn .*stroke-dasharray 40px/,
+    ],
     // Round 9: a flip card's faces with their back faces drawn, and a second click that lands
     // while the menu is still unfolding.
     [

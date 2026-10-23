@@ -306,7 +306,12 @@ vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ea
   (opacity 0, a start transform) — "honored" alone never meant the content is there; look with
   `--frames-reduced-motion`, or judge the page under it with `check integrity --reduced-motion`.
   A flip card is one run: a `--selector` per face and `--exit` on the face that turns away; its
-  turn is fitted like position (`follows ease-in-out in its turn`). In motion-repair round 3 a wrong
+  turn is fitted like position (`follows ease-in-out in its turn`). "The article never moves" is a
+  `--selector` on the article with `--still` on it: a target with no animation of its own that moves
+  is `pushed` (warn) and names the layout property animated elsewhere (`margin-top` — animate
+  `transform` instead). A repeating animation whose run does not end on the pose the next begins on
+  is `loop-seam` (a 350deg spin). A stroke that draws itself is measured by its dash pattern, fitted
+  as its "drawn length", and fails `stroke-incomplete` when it ends part drawn. In motion-repair round 3 a wrong
   `transform-origin` and a stagger that was not one both read "follows ease-out exactly, no fail"
   until these existed.
 - **What it does not judge**: fps or jank, a target it is not told about, and anything under

@@ -141,6 +141,42 @@ export async function measureTargets(
           clips.every((b) => x >= b.left && x < b.right && y >= b.top && y < b.bottom);
         const geometry = el instanceof SVGGeometryElement ? el : null;
         const ctm = geometry?.getScreenCTM()?.inverse() ?? null;
+        // A dashed stroke: how much of its line is drawn, from the dash pattern itself. A check mark
+        // whose dash was shorter than its line stopped half way up its long arm, and read "covered
+        // by circle" (round 10). Points of the line its dashes leave undrawn are not covered.
+        let drawn: number | undefined;
+        let dashNote: string | undefined;
+        if (geometry) {
+          const cs = getComputedStyle(geometry);
+          if (cs.strokeDasharray && cs.strokeDasharray !== "none") {
+            const dash = cs.strokeDasharray
+              .split(/[ ,]+/)
+              .map(parseFloat)
+              .filter((v) => Number.isFinite(v));
+            const pattern = dash.length % 2 === 1 ? [...dash, ...dash] : dash;
+            const period = pattern.reduce((a, b) => a + b, 0);
+            const len = geometry.getTotalLength();
+            const attr = Number(geometry.getAttribute("pathLength"));
+            const scaleLen = Number.isFinite(attr) && attr > 0 ? attr / len : 1;
+            const off = parseFloat(cs.strokeDashoffset) || 0;
+            if (period > 0 && len > 0) {
+              let on = 0;
+              const step = len / 400;
+              for (let x = step / 2; x < len; x += step) {
+                let ph = (((x * scaleLen + off) % period) + period) % period;
+                for (let k = 0; k < pattern.length; k++) {
+                  if (ph < pattern[k]!) {
+                    if (k % 2 === 0) on++;
+                    break;
+                  }
+                  ph -= pattern[k]!;
+                }
+              }
+              drawn = on / 400;
+              dashNote = `stroke-dasharray ${cs.strokeDasharray} with stroke-dashoffset ${cs.strokeDashoffset} on a line ${(len * scaleLen).toFixed(1)} long`;
+            }
+          }
+        }
         for (let gy = 0; gy < 5; gy++) {
           for (let gx = 0; gx < 5; gx++) {
             const x = r.x + ((gx + 0.5) / 5) * r.width;
@@ -158,6 +194,11 @@ export async function measureTargets(
             if (top && el.contains(top)) {
               inView++;
               hits++;
+              continue;
+            }
+            // On the line but not painted: its dashes leave it undrawn there, nothing covers it.
+            if (drawn !== undefined) {
+              outside++;
               continue;
             }
             if (top && top !== el && top.contains(el) && inClips(x, y)) {
@@ -278,6 +319,7 @@ export async function measureTargets(
           ...(Math.abs(m33) < 0.999 ? { rotated3d: true } : {}),
           ...(Math.abs(m33) < 0.26 ? { edgeOn: true } : {}),
           ...(m33 < -0.01 ? { facingAway: true } : {}),
+          ...(drawn !== undefined ? { drawn, ...(dashNote ? { dashNote } : {}) } : {}),
           ...turn(el),
           ...(m33 < -0.01 && !backHidden ? { mirrored: true } : {}),
         };
@@ -322,6 +364,9 @@ each forbidden statement is. vlmkit judges the motion from that:
   still-mismatch   its centre moves though --expect-still says only size and opacity change
   snapped          after an action a --selector target changed with no animation at all
   interrupt-jump   an action cut into a motion (--wait) and the target jumped as it landed
+  loop-seam        a repeating animation's run ends where the next does not begin (a 350deg spin)
+  pushed           moves with no animation of its own: a layout property animated elsewhere (warn)
+  stroke-incomplete a stroke drawing itself ends part drawn (a dash shorter than its line)
   mirrored         a face turned past edge-on is seen backwards (backface-visibility)
   forbid           a statement seen at rest fails; only mid-motion, warns (--jev)
 
@@ -386,6 +431,8 @@ an easing is checked on each channel that changes.
                           --wait 100 --click .menu-btn" lands the second click 100ms into the
                           opening; a target that jumps when it lands is \`interrupt-jump\` (fail)
   --exits                 The targets are meant to leave (gone at rest is their end)
+  --still <css>           One --selector target's centre must not move (repeat): the article a
+                          notice slides over, beside the notice that moves
   --exit <css>            One --selector target is meant to leave, the others are not (repeat):
                           a flip card's front face turned away, beside its back turning in
   --at <instants>         Frames to shoot (default: 11 per segment + rest); the segments stay
@@ -429,6 +476,8 @@ export interface MotionCliOptions {
   exits: boolean;
   /** --selector targets meant to leave, by selector. */
   exitSelectors: string[];
+  /** --selector targets whose centre must not move (one target's --expect-still). */
+  stillSelectors: string[];
   at?: number[];
   startMs?: number;
   endMs?: number;
@@ -485,6 +534,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   let json = false;
   let exits = false;
   const exitSelectors: string[] = [];
+  const stillSelectors: string[] = [];
   let noForbid = false;
   let jev = false;
   const actions: MotionAction[] = [];
@@ -634,6 +684,9 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
       case "--exit":
         exitSelectors.push(value(a, argv[++i]).trim());
         break;
+      case "--still":
+        stillSelectors.push(value(a, argv[++i]).trim());
+        break;
       case "--exits":
         exits = true;
         break;
@@ -719,9 +772,13 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
       `${selectors.length} --selector for ${targets.length} --target: each selector names the target given in the same position`,
     );
   }
-  for (const sel of exitSelectors)
-    if (!selectors.includes(sel))
-      throw new MotionUsageError(`--exit ${sel} names no --selector: give the same selector to both`);
+  for (const [flag, list] of [
+    ["--exit", exitSelectors],
+    ["--still", stillSelectors],
+  ] as const)
+    for (const sel of list)
+      if (!selectors.includes(sel))
+        throw new MotionUsageError(`${flag} ${sel} names no --selector: give the same selector to both`);
   if (selectors.length > 0 && fromFrames)
     throw new MotionUsageError("--selector measures a live page: give the page, not frames.json");
   // On a page the span comes from its animations, --at or not; saved frames carry none.
@@ -744,6 +801,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
     ...(expectDirection ? { expectDirection } : {}),
     exits,
     exitSelectors,
+    stillSelectors,
     ...(at ? { at } : {}),
     ...(startMs !== undefined ? { startMs } : {}),
     ...(endMs !== undefined ? { endMs } : {}),
@@ -940,6 +998,10 @@ interface Captured {
   viewport?: { width: number; height: number };
   /** Per --selector, the declaration its animation-delay comes from. */
   delays?: (string | null)[];
+  /** A repeating animation whose run does not end where the next begins: a jump at every loop. */
+  seams?: { selector: string; message: string }[];
+  /** Animations whose keyframes move layout (margin, height, top…): what pushes its neighbours. */
+  layoutMovers?: string[];
   /** Only infinite animations ran: the first runs were sampled and nothing rests. */
   forever?: boolean;
   /** The last action cut into the motion before it: the targets as they were just before it. */
@@ -1177,6 +1239,111 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
       }
       const written = await writer.finish();
       const delays = o.selectors.length > 0 ? await delaySources(page, o.selectors) : undefined;
+      // Where a repeating run ends against where the next begins: a spinner whose keyframes end at
+      // 350deg jumped 10deg forward once a second, and every frame read "follows linear in its
+      // turn, no fail" (round 10). Its state a ms before the seam, at it, and a ms before that.
+      const seams = await page
+        .evaluate((sels) => {
+          const out: { selector: string; message: string }[] = [];
+          const read = (el: Element) => {
+            const cs = getComputedStyle(el);
+            const m =
+              cs.transform && cs.transform !== "none" ? new DOMMatrixReadOnly(cs.transform) : new DOMMatrixReadOnly();
+            return {
+              x: m.e,
+              y: m.f,
+              deg: (Math.atan2(m.b, m.a) * 180) / Math.PI,
+              sx: Math.hypot(m.a, m.b),
+              op: Number(cs.opacity),
+            };
+          };
+          const turn = (a: number, b: number) => ((b - a + 540) % 360) - 180;
+          for (const sel of sels) {
+            const el = document.querySelector(sel);
+            if (!el) continue;
+            for (const a of el.getAnimations()) {
+              const t = a.effect?.getComputedTiming();
+              const d = Number(t?.duration);
+              if (!t || !Number.isFinite(d) || d <= 4 || (t.iterations !== Infinity && Number(t.iterations) < 2))
+                continue;
+              if (t.direction === "alternate" || t.direction === "alternate-reverse") continue;
+              const delay = Number(t.delay) || 0;
+              const was = a.currentTime;
+              a.pause();
+              const at = (ms: number) => {
+                a.currentTime = delay + ms;
+                return read(el);
+              };
+              const p0 = at(d - 2),
+                p1 = at(d - 1),
+                p2 = at(d + 0.001),
+                p3 = at(d + 1);
+              a.currentTime = was;
+              const rate = Math.max(Math.abs(turn(p0.deg, p1.deg)), Math.abs(turn(p2.deg, p3.deg)));
+              const jump = Math.abs(turn(p1.deg, p2.deg));
+              const moveRate = Math.max(Math.hypot(p1.x - p0.x, p1.y - p0.y), Math.hypot(p3.x - p2.x, p3.y - p2.y));
+              const move = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+              const opJump = Math.abs(p2.op - p1.op);
+              const opRate = Math.max(Math.abs(p1.op - p0.op), Math.abs(p3.op - p2.op));
+              const name = (a as CSSAnimation).animationName ?? "its animation";
+              const kf = (a.effect as KeyframeEffect).getKeyframes();
+              const ends =
+                kf.length >= 2
+                  ? ` (its keyframes run from ${String(kf[0]!.transform ?? kf[0]!.opacity ?? "?")} to ${String(kf[kf.length - 1]!.transform ?? kf[kf.length - 1]!.opacity ?? "?")})`
+                  : "";
+              if (jump > Math.max(1, 3 * rate)) {
+                out.push({
+                  selector: sel,
+                  message: `${sel} \`${name}\` turns ${jump.toFixed(1)}° in one step at every loop (${rate.toFixed(2)}° a ms either side)${ends}: each run ends where the next does not begin — end it on the same pose it starts on (360deg, not 350deg)`,
+                });
+              } else if (move > Math.max(1, 3 * moveRate)) {
+                out.push({
+                  selector: sel,
+                  message: `${sel} \`${name}\` jumps ${move.toFixed(1)}px at every loop${ends}: each run ends where the next does not begin — make its last keyframe the first one's pose (a ticker's track one full copy long)`,
+                });
+              } else if (opJump > Math.max(0.05, 3 * opRate)) {
+                out.push({
+                  selector: sel,
+                  message: `${sel} \`${name}\` jumps from opacity ${p1.op.toFixed(2)} to ${p2.op.toFixed(2)} at every loop${ends}: each run ends where the next does not begin`,
+                });
+              }
+            }
+          }
+          return out;
+        }, o.selectors)
+        .catch(() => []);
+      // Which animations change layout: an article with no animation of its own followed a
+      // notice's margin-top down 56px, and the fail blamed a transform (round 10).
+      const layoutMovers = await page
+        .evaluate(() => {
+          const layout =
+            /^(margin|padding|top|bottom|left|right|inset|height|width|min-height|max-height|min-width|max-width|gap|row-gap|column-gap|flex-basis|grid-template-rows|grid-template-columns|font-size|line-height|border-width)/;
+          const out: string[] = [];
+          for (const a of document.getAnimations()) {
+            const el = (a.effect as KeyframeEffect | null)?.target as Element | null;
+            if (!el) continue;
+            const props = new Set<string>();
+            for (const k of (a.effect as KeyframeEffect).getKeyframes())
+              for (const p of Object.keys(k))
+                if (!["offset", "computedOffset", "easing", "composite"].includes(p))
+                  props.add(p.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`));
+            const tp = (a as CSSTransition).transitionProperty;
+            if (tp) props.add(tp);
+            const moving = [...props].filter((p) => layout.test(p));
+            if (moving.length === 0) continue;
+            const name =
+              el.tagName.toLowerCase() +
+              (el.id
+                ? `#${el.id}`
+                : typeof el.className === "string" && el.className.trim()
+                  ? `.${el.className.trim().split(/\s+/)[0]}`
+                  : "");
+            const what = `${name} animates ${moving.join(", ")}`;
+            if (!out.includes(what)) out.push(what);
+          }
+          return out.slice(0, 4);
+        })
+        .catch(() => []);
       const context = await page
         .evaluate((sels) => {
           const out: { x: number; y: number; width: number; height: number }[] = [];
@@ -1219,6 +1386,8 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
         textLines,
         context,
         ...(delays ? { delays } : {}),
+        ...(layoutMovers.length > 0 ? { layoutMovers } : {}),
+        ...(seams.length > 0 ? { seams } : {}),
         ...(forever ? { forever: true } : {}),
         ...(interrupt ? { interrupt } : {}),
         ...(scrollYs.length > 1 && Math.max(...scrollYs) - Math.min(...scrollYs) >= 1
@@ -1317,7 +1486,7 @@ export function formatMotionReport(
       .sort((a, b) => e.errors[a]! - e.errors[b]!)[0];
     const on =
       e.channel && e.channel !== "position"
-        ? ` in its ${e.channel}${e.channel === "opacity" && fadeOwner ? ` (${fadeOwner}'s fade: its own opacity does not change)` : ""}`
+        ? ` in its ${e.channel === "drawn" ? "drawn length" : e.channel}${e.channel === "opacity" && fadeOwner ? ` (${fadeOwner}'s fade: its own opacity does not change)` : ""}`
         : "";
     if (!Number.isFinite(e.margin) || e.margin >= 1000)
       return `follows ${e.best}${on} exactly (measured: no other curve comes close)`;
@@ -1575,8 +1744,15 @@ export async function runMotionCli(argv: string[]): Promise<number> {
     ...(o.expectIterations ? { expectIterations: o.expectIterations } : {}),
     ...(o.expectDirection ? { expectDirection: o.expectDirection } : {}),
     ...(o.expectStill ? { expectStill: true } : {}),
+    ...(o.stillSelectors.length > 0
+      ? { expectStillFor: o.selectors.map((sel) => o.stillSelectors.includes(sel)) }
+      : {}),
+    ...(captured.layoutMovers ? { layoutMovers: captured.layoutMovers } : {}),
   });
-  const jumps = interruptJumps(captured, o.selectors);
+  const jumps = [
+    ...interruptJumps(captured, o.selectors),
+    ...(captured.seams ?? []).map((s) => ({ ...s, rule: "loop-seam" })),
+  ];
   const json = {
     source: o.source,
     ...(jumps.length > 0 ? { interruptJumps: jumps } : {}),
@@ -1596,10 +1772,20 @@ export async function runMotionCli(argv: string[]): Promise<number> {
   await writeFile(saved, `${JSON.stringify(json, null, 2)}\n`);
   if (o.json) console.log(JSON.stringify(json, null, 2));
   else {
-    console.log(formatMotionReport(o.source, captured, r, o.forbid));
-    for (const j of jumps) console.log(`    FAIL interrupt-jump: ${j.message}`);
-    if (jumps.length > 0 && r.passed) console.log(`  ${jumps.length} fail`);
-    console.log(`  report: ${saved}`);
+    const lines = formatMotionReport(o.source, captured, r, o.forbid).split("\n");
+    if (jumps.length > 0) {
+      // Into the report, above its tally, and counted in it: "no fail" printed above a FAIL line.
+      const at = lines.findIndex((l) => /^ {2}(no fail|\d+ fail)/.test(l));
+      const extra = jumps.map((j) => `    FAIL ${"rule" in j ? j.rule : "interrupt-jump"}: ${j.message}`);
+      if (at < 0) lines.push(...extra);
+      else {
+        const tally = lines[at]!;
+        const fails = /^ {2}no fail/.test(tally) ? 0 : Number(/^ {2}(\d+) fail/.exec(tally)![1]);
+        lines[at] = tally.replace(/^ {2}(no fail|\d+ fail)/, `  ${fails + jumps.length} fail`);
+        lines.splice(at, 0, ...extra);
+      }
+    }
+    console.log(`${lines.join("\n")}\n  report: ${saved}`);
   }
   return r.passed && jumps.length === 0 ? 0 : 1;
 }

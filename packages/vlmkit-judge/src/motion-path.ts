@@ -155,6 +155,9 @@ export interface MotionSample {
     facingAway?: boolean;
     /** How far it is turned (degrees): from its normal in 3D, or its 2D rotation. */
     turnDeg?: number;
+    /** A dashed stroke: the share of its line its dashes draw (0-1), and the pattern, for the message. */
+    drawn?: number;
+    dashNote?: string;
     mirrored?: boolean;
     /**
      * How long its own animation has been in its active phase (ms; negative in its delay). The
@@ -247,6 +250,8 @@ export interface MotionPathOptions {
   expectIterations?: number | null;
   /** Its centre must not move: only its size, opacity or colour change (a dialog that stays centred). */
   expectStill?: boolean;
+  /** Animations on the page that change layout, named ("div.notice animates margin-top"). */
+  layoutMovers?: readonly string[];
 }
 
 export type MotionRule =
@@ -267,7 +272,9 @@ export type MotionRule =
   | "iterations-mismatch"
   | "direction-mismatch"
   | "still-mismatch"
-  | "mirrored";
+  | "mirrored"
+  | "stroke-incomplete"
+  | "pushed";
 
 export interface MotionFinding {
   rule: MotionRule;
@@ -278,7 +285,7 @@ export interface MotionFinding {
 }
 
 /** What an easing was fitted to: the path, or with the element measured, its opacity or scale. */
-export type EasingChannel = "position" | "opacity" | "scale" | "turn";
+export type EasingChannel = "position" | "opacity" | "scale" | "turn" | "drawn";
 
 export type ChannelFit = EasingFit & { channel: EasingChannel };
 
@@ -585,7 +592,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     const tag = segments.length > 1 ? ` in ${ms(seg.startMs)}..${ms(seg.endMs)}` : "";
     let easing: SegmentEasing;
     // Measured, a fade or a scale has an easing too: fit every channel that changes.
-    const channel = (key: "opacity" | "scale" | "turnDeg", least: number) => {
+    const channel = (key: "opacity" | "scale" | "turnDeg" | "drawn", least: number) => {
       const xs = sorted.filter(
         (x) => x.dom && x.atMs >= seg.startMs && x.atMs <= seg.endMs && Number.isFinite(x.dom[key] ?? NaN),
       );
@@ -627,6 +634,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         ["opacity", 0.2],
         ["scale", 0.02],
         ["turnDeg", 10],
+        ["drawn", 0.2],
       ] as const) {
         const pts = channel(key, least);
         const fit = pts ? fitEasingAffine(pts) : null;
@@ -841,6 +849,44 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     });
   }
 
+  // A stroke that draws itself must end drawn: a dash shorter than the line leaves part of it off
+  // for good (a check mark stopped half way up its long arm, round 10).
+  const drawnAt = sorted.filter((s) => typeof s.dom?.drawn === "number");
+  if (drawnAt.length >= 2) {
+    const restDrawn = drawnAt.filter(isRest);
+    const endFrame = restDrawn[restDrawn.length - 1] ?? drawnAt[drawnAt.length - 1]!;
+    const changes =
+      Math.max(...drawnAt.map((s) => s.dom!.drawn!)) - Math.min(...drawnAt.map((s) => s.dom!.drawn!)) > 0.05;
+    const early = drawnAt.find((s) => (s.dom!.elapsedMs ?? 0) < 0 && s.dom!.drawn! > 0.02);
+    if (changes && endFrame.dom!.drawn! < 0.98 && !options.exits) {
+      findings.push({
+        rule: "stroke-incomplete",
+        severity: "fail",
+        atMs: endFrame.atMs,
+        message: `its stroke ends ${Math.round(endFrame.dom!.drawn! * 100)}% drawn at ${ms(endFrame.atMs)}${early ? `, and ${Math.round(early.dom!.drawn! * 100)}% of it shows at ${ms(early.atMs)}, before its draw begins` : ""}: ${endFrame.dom!.dashNote ?? "its dash pattern"} — a dash shorter than the line leaves the rest of it off. Set stroke-dasharray and stroke-dashoffset to at least the line's length (or pathLength="1" with 1 and 1)`,
+      });
+    }
+  }
+
+  // Moved with no animation of its own: something else in the flow pushed it. An article followed
+  // a notice's margin-top down 56px and read "follows ease-out exactly, no fail" (round 10).
+  // Known only when the page said so: every frame's own animation time explicitly null.
+  const ownMotion = !(sorted.length > 0 && sorted.every((s) => s.dom !== undefined && s.dom.elapsedMs === null));
+  const movers = options.layoutMovers ?? [];
+  const pushedBy = `it has no animation of its own, so something else in the layout moves it — ${movers.length > 0 ? `${movers.join("; ")}: ` : ""}an animated layout property (margin, height, top, padding) on an element before it in the flow reflows everything after; animate transform (or take the element out of the flow) instead`;
+  if (exact && !ownMotion && !options.expectStill) {
+    const pts = geo.filter((p) => !p.rest).concat(geoRest);
+    const travel = pts.length >= 2 ? Math.max(...pts.map((p) => dist(p, pts[0]!))) : 0;
+    if (travel >= floor) {
+      findings.push({
+        rule: "pushed",
+        severity: "warn",
+        atMs: pts[0]!.atMs,
+        message: `moves ${Math.round(travel)}px while ${pushedBy}. If it is meant to make room (an accordion opening above it), this is that; if not, give it --still to make it a fail`,
+      });
+    }
+  }
+
   // Turned in 3D, a box's centre is the bounds of a turned shape under perspective, not a place.
   const turnedAt = new Set(sorted.filter((s) => s.dom?.rotated3d).map((s) => s.atMs));
   if (options.expectStill && geo.length > 0) {
@@ -854,7 +900,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         rule: "still-mismatch",
         severity: "fail",
         atMs: far.atMs,
-        message: `its centre is at ${Math.round(far.x)},${Math.round(far.y)} at ${ms(far.atMs)}, ${Math.round(dist(far, anchor))}px from ${Math.round(anchor.x)},${Math.round(anchor.y)} where it rests, though only its size and opacity may change: a keyframe \`transform\` that replaces the element's own placement, or a scale whose transform-origin is not its centre`,
+        message: `its centre is at ${Math.round(far.x)},${Math.round(far.y)} at ${ms(far.atMs)}, ${Math.round(dist(far, anchor))}px from ${Math.round(anchor.x)},${Math.round(anchor.y)} where it rests, though only its size and opacity may change: ${ownMotion ? "a keyframe `transform` that replaces the element's own placement, or a scale whose transform-origin is not its centre" : pushedBy}`,
       });
     }
   }
@@ -863,6 +909,9 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
   const firstMotion = sorted.find((s) => !isRest(s));
   if (
     firstMotion &&
+    !options.expectStill &&
+    // Nothing of its own to apply: an element no animation drives is still by design.
+    ownMotion &&
     firstMotion.present >= sure &&
     sorted.every((s) => shown(s)) &&
     geo.length >= 2 &&
@@ -873,8 +922,9 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         (x) =>
           Math.abs(x.dom!.opacity - sorted[0]!.dom!.opacity) > 0.05 ||
           Math.abs(x.dom!.scale - sorted[0]!.dom!.scale) > 0.01 ||
-          // A spinner turns in place: static by its centre, not by its turn.
-          Math.abs((x.dom!.turnDeg ?? 0) - (sorted[0]!.dom!.turnDeg ?? 0)) > 2,
+          // A spinner turns in place: static by its centre, not by its turn; a stroke draws in place.
+          Math.abs((x.dom!.turnDeg ?? 0) - (sorted[0]!.dom!.turnDeg ?? 0)) > 2 ||
+          Math.abs((x.dom!.drawn ?? 0) - (sorted[0]!.dom!.drawn ?? 0)) > 0.05,
       )
     )
   ) {

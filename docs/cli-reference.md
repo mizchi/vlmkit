@@ -1060,7 +1060,9 @@ vlmkit inspect motion   <html|url> --selector .toast [--target "the green Saved 
   # --wait <ms> after an action lets the next one land mid-motion ("--click .btn --wait 100 --click
   # .btn"): a target that jumps as it lands is interrupt-jump. A face turned past edge-on with its
   # back drawn is mirrored (backface-visibility). --exit <css> marks one target as leaving; a turn
-  # (rotateY, rotate) is fitted as its own channel.
+  # (rotateY, rotate) is fitted as its own channel. --still <css>: one target must not move (pushed
+  # names a layout property animated elsewhere); loop-seam: a repeating run that does not close;
+  # stroke-incomplete: a dashed stroke that ends part drawn.
 # Checks.
 vlmkit check motion <html|url>                 # CSS motion / reduced-motion detection (declarations)
 vlmkit check animation <html|url>              # Frame-sampled animation evaluation: pause + seek each
