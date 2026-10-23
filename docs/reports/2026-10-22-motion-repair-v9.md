@@ -114,3 +114,29 @@ text, at $0.003 each.
   angle is not a channel it fits.
 - `check integrity --timeline` cannot emulate reduced motion either. `reduced-motion-hides` is
   `check animation`'s.
+
+## The deferred items, fixed
+
+- **`stress media`'s reduced-motion variant looks at what is left on screen.** It lists every
+  element with text of its own, or an image, after every finite animation has finished, once with
+  the preference and once without. Elements seen without it and invisible with it make the variant
+  `suspect`, whatever the stylesheet declares. On the broken page that reads `Under reduced motion
+  6 element(s) seen at rest without it rest invisible (ul.tiles > li:nth-of-type(1) > h2 …)`; the
+  reference page is still `ok` at 0.06%. Its default viewport is now 1280x800, as the motion gates'.
+- **`check motion` counts motion declared but not active at load.** The stylesheet may declare
+  `@keyframes`, or an animation or transition, that only a class, `:hover` or a script applies.
+  With no reduce rule, that is now `missing-reduced-motion` too: "none active at load (a class,
+  :hover or a script applies them)". The broken interrupt page had read "No motion issues
+  detected".
+- **`--exit <css>` marks one target as leaving.** A flip card's front face turning away and its
+  back turning in are now judged in one run (`--selector .back --selector .front --exit .front`).
+  An `--exit` that names no `--selector` is refused.
+- **The turn is a channel.** Each frame now measures how far the target is turned. In 3D that is
+  the angle of its normal through every transform; otherwise it is its own 2D rotation. The turn
+  is fitted beside position, opacity and scale. On the reference flip page both faces read
+  `follows ease-in-out in its turn exactly`, and `--expect-easing linear` fails `the turn follows
+  ease-in-out … not linear`.
+- **`check integrity --reduced-motion`** loads every page, and every instant of `--timeline`, with
+  the preference emulated. The broken reduced page fails its tiles' text there as `invisible-text`
+  and names the transparent tile. The reference page is clean.
+

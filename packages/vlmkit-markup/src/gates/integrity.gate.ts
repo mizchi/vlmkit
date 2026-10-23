@@ -145,6 +145,11 @@ ${ALLOW_HELP}`,
     },
     { name: "allow", kind: "string", description: "Exempt an intentional pattern (see below)", repeatable: true },
     {
+      name: "reduced-motion",
+      kind: "boolean",
+      description: "Load the page with prefers-reduced-motion: reduce emulated (what a reduce rule leaves on screen)",
+    },
+    {
       name: "timeline",
       kind: "boolean",
       description: "Also judge layout across the page's motion (clock and animations held), tiered by persistence",
@@ -230,6 +235,7 @@ ${ALLOW_HELP}`,
       ...(storageState ? { storageState } : {}),
       ...(har ? { har } : {}),
       ...(allow.length > 0 ? { allow } : {}),
+      ...(argv.includes("--reduced-motion") ? { reducedMotion: true } : {}),
       ...(timeline
         ? {
             timeline: {

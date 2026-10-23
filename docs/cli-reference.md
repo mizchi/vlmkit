@@ -450,6 +450,7 @@ rects instead of a page — no browser, no DOM:
 
 ```bash
 vlmkit check integrity --elements elements.json --image frame.png
+vlmkit check integrity page.html --reduced-motion   # the page as prefers-reduced-motion: reduce leaves it
 ```
 
 `elements.json` is the same schema `diff png --elements-json` accepts (`path`, `tag`,
@@ -1058,7 +1059,8 @@ vlmkit inspect motion   <html|url> --selector .toast [--target "the green Saved 
   # "--hover .card --leave" samples a card settling back; "--scroll .section" a scroll reveal.
   # --wait <ms> after an action lets the next one land mid-motion ("--click .btn --wait 100 --click
   # .btn"): a target that jumps as it lands is interrupt-jump. A face turned past edge-on with its
-  # back drawn is mirrored (backface-visibility).
+  # back drawn is mirrored (backface-visibility). --exit <css> marks one target as leaving; a turn
+  # (rotateY, rotate) is fitted as its own channel.
 # Checks.
 vlmkit check motion <html|url>                 # CSS motion / reduced-motion detection (declarations)
 vlmkit check animation <html|url>              # Frame-sampled animation evaluation: pause + seek each

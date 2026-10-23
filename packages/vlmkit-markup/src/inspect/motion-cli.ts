@@ -104,6 +104,21 @@ export async function measureTargets(
           return M.m33;
         };
         const m33 = facing(el);
+        // How far it is turned: its normal's angle in 3D, else its own 2D rotation.
+        const turn = (e: Element): { turnDeg?: number } => {
+          // Any 3D transform up the tree: the angle of its normal, 0 facing you, 180 turned over.
+          let threeD = false;
+          for (let n: Element | null = e; n && n !== document.documentElement && !threeD; n = n.parentElement) {
+            const tf = getComputedStyle(n).transform;
+            if (tf && tf !== "none" && !new DOMMatrixReadOnly(tf).is2D) threeD = true;
+          }
+          if (threeD) return { turnDeg: (Math.acos(Math.max(-1, Math.min(1, m33))) * 180) / Math.PI };
+          const tf = getComputedStyle(e).transform;
+          if (!tf || tf === "none") return {};
+          const m = new DOMMatrixReadOnly(tf);
+          const deg = (Math.atan2(m.b, m.a) * 180) / Math.PI;
+          return Math.abs(deg) > 0.01 ? { turnDeg: deg } : {};
+        };
         const backHidden = getComputedStyle(el).backfaceVisibility === "hidden";
         // What of it is the topmost thing painted, over a 5x5 grid of its box inside the viewport:
         // a clip (overflow: hidden), a cover (z-index) and leaving the screen all take it away.
@@ -231,6 +246,7 @@ export async function measureTargets(
           ...(Math.abs(m33) < 0.999 ? { rotated3d: true } : {}),
           ...(Math.abs(m33) < 0.26 ? { edgeOn: true } : {}),
           ...(m33 < -0.01 ? { facingAway: true } : {}),
+          ...turn(el),
           ...(m33 < -0.01 && !backHidden ? { mirrored: true } : {}),
         };
       });
@@ -338,6 +354,8 @@ an easing is checked on each channel that changes.
                           --wait 100 --click .menu-btn" lands the second click 100ms into the
                           opening; a target that jumps when it lands is \`interrupt-jump\` (fail)
   --exits                 The targets are meant to leave (gone at rest is their end)
+  --exit <css>            One --selector target is meant to leave, the others are not (repeat):
+                          a flip card's front face turned away, beside its back turning in
   --at <instants>         Frames to shoot (default: 11 per segment + rest); the segments stay
                           the page's own spans of motion
   --start <ms> --end <ms> The motion's span (needed for frames.json): one segment
@@ -377,6 +395,8 @@ export interface MotionCliOptions {
   expectIterations?: (number | null)[];
   expectDirection?: MotionDirection[];
   exits: boolean;
+  /** --selector targets meant to leave, by selector. */
+  exitSelectors: string[];
   at?: number[];
   startMs?: number;
   endMs?: number;
@@ -432,6 +452,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   let threshold = 0.5;
   let json = false;
   let exits = false;
+  const exitSelectors: string[] = [];
   let noForbid = false;
   let jev = false;
   const actions: MotionAction[] = [];
@@ -578,6 +599,9 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
       case "--json":
         json = true;
         break;
+      case "--exit":
+        exitSelectors.push(value(a, argv[++i]).trim());
+        break;
       case "--exits":
         exits = true;
         break;
@@ -663,6 +687,9 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
       `${selectors.length} --selector for ${targets.length} --target: each selector names the target given in the same position`,
     );
   }
+  for (const sel of exitSelectors)
+    if (!selectors.includes(sel))
+      throw new MotionUsageError(`--exit ${sel} names no --selector: give the same selector to both`);
   if (selectors.length > 0 && fromFrames)
     throw new MotionUsageError("--selector measures a live page: give the page, not frames.json");
   // On a page the span comes from its animations, --at or not; saved frames carry none.
@@ -684,6 +711,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
     ...(expectIterations ? { expectIterations } : {}),
     ...(expectDirection ? { expectDirection } : {}),
     exits,
+    exitSelectors,
     ...(at ? { at } : {}),
     ...(startMs !== undefined ? { startMs } : {}),
     ...(endMs !== undefined ? { endMs } : {}),
@@ -1505,6 +1533,7 @@ export async function runMotionCli(argv: string[]): Promise<number> {
     segments: captured.segments,
     threshold: o.threshold,
     exits: o.exits,
+    ...(o.exitSelectors.length > 0 ? { exitsFor: o.selectors.map((sel) => o.exitSelectors.includes(sel)) } : {}),
     jev: o.jev,
     ...motionEasingOptions(o.expectEasing),
     ...(o.expectOrigin ? { expectOrigin: o.expectOrigin.length === 1 ? o.expectOrigin[0]! : o.expectOrigin } : {}),

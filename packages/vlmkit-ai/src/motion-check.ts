@@ -78,6 +78,8 @@ export interface MotionCheckOptions {
   segments?: readonly MotionSegment[];
   /** The targets are meant to leave by the end (a dismissed toast): gone at rest is not a fail. */
   exits?: boolean;
+  /** Per target in order: this one is meant to leave (a flip card's front face, turned away). */
+  exitsFor?: readonly boolean[];
   /** The timing function the author meant, for every segment or per segment in order. */
   expectEasing?: EasingName | readonly EasingName[];
   /** Per target, in order, overriding `expectEasing` for that target (cards ease-out, a bar ease-in-out). */
@@ -343,7 +345,7 @@ export async function checkMotionFrames(
         ...(options.segments ? { segments: options.segments } : {}),
         ...(frameSize ? { frame: frameSize } : {}),
         presenceThreshold: threshold,
-        ...(options.exits ? { exits: true } : {}),
+        ...(options.exits || options.exitsFor?.[i] ? { exits: true } : {}),
         ...((options.targetEasing?.[i] ?? options.expectEasing)
           ? { expectEasing: (options.targetEasing?.[i] ?? options.expectEasing)! }
           : {}),

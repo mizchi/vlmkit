@@ -43,6 +43,32 @@ import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { ruleTier, hiddenByRuleNote } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { type PageLoadOptions, navigatePage } from "@mizchi/vlmkit-core/page-load.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { STABLE_SELECTOR_JS } from "@mizchi/vlmkit-core/stable-selector.ts";
+
+/**
+ * What a reader can see once every finite animation has run: each element with text of its own
+ * (or an image), with the opacity it renders at. The reduced-motion variant compares this with
+ * and without the preference — a reduce rule that takes an animation away can take its end
+ * state with it, and the stylesheet check called such a page "honors the preference" (round 9).
+ */
+const REST_VISIBILITY_SCRIPT = `(() => {
+  ${STABLE_SELECTOR_JS}
+  for (const a of document.getAnimations()) {
+    try { if (Number.isFinite(a.effect.getComputedTiming().endTime)) a.finish(); } catch {}
+  }
+  const out = [];
+  for (const el of document.body ? document.body.querySelectorAll("*") : []) {
+    if (out.length >= 800) break;
+    const own = [...el.childNodes].some((n) => n.nodeType === 3 && (n.nodeValue || "").trim());
+    if (!own && el.tagName !== "IMG") continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1 || r.bottom < 0 || r.top > innerHeight) continue;
+    let op = getComputedStyle(el).visibility === "hidden" ? 0 : 1;
+    for (let n = el; n; n = n.parentElement) op *= Number(getComputedStyle(n).opacity);
+    out.push({ selector: stableSelector(el), opacity: op });
+  }
+  return out;
+})()`;
 
 export type MediaVariant = "forced-colors" | "reduced-motion" | "print" | "rtl" | "zoom-200";
 
@@ -115,7 +141,9 @@ async function readAllStylesheets(page: Page): Promise<string> {
 export async function runMediaVariants(options: MediaVariantsOptions): Promise<MediaVariantsReport> {
   const outputDir = resolve(options.outputDir);
   await mkdir(outputDir, { recursive: true });
-  const viewport = options.viewport ?? { width: 1280, height: 720 };
+  // 1280x800, as check animation, check integrity and inspect motion (round 9 read "1280×720"
+  // here beside "1280x800" there).
+  const viewport = options.viewport ?? { width: 1280, height: 800 };
   const threshold = options.threshold ?? 0.03;
   const variants = options.variants ?? ALL_VARIANTS;
 
@@ -126,6 +154,8 @@ export async function runMediaVariants(options: MediaVariantsOptions): Promise<M
   // same string computed a few lines earlier.
   const defaultScreenshot = join(outputDir, "default.png");
   let allCss = "";
+  let restPlain: { selector: string; opacity: number }[] = [];
+  let restReduced: { selector: string; opacity: number }[] = [];
   const variantResults: VariantResult[] = [];
   await withBrowser(async (browser) => {
     // Default render — used as the baseline for diffs. Transitions
@@ -136,6 +166,8 @@ export async function runMediaVariants(options: MediaVariantsOptions): Promise<M
     await defaultPage.screenshot({ path: defaultScreenshot, fullPage: false });
     // Read all stylesheets — used for reduced-motion static check.
     allCss = await readAllStylesheets(defaultPage);
+    if (variants.includes("reduced-motion"))
+      restPlain = ((await defaultPage.evaluate(REST_VISIBILITY_SCRIPT).catch(() => [])) as typeof restPlain) ?? [];
     await defaultPage.close();
 
     // One pass per requested variant.
@@ -177,6 +209,8 @@ export async function runMediaVariants(options: MediaVariantsOptions): Promise<M
           }));
         }
         await page.screenshot({ path: screenshotPath, fullPage: false });
+        if (variant === "reduced-motion")
+          restReduced = ((await page.evaluate(REST_VISIBILITY_SCRIPT).catch(() => [])) as typeof restReduced) ?? [];
       } catch (error) {
         await page.close();
         variantResults.push({
@@ -246,7 +280,18 @@ export async function runMediaVariants(options: MediaVariantsOptions): Promise<M
           //   2. does the page declare any animations at all?
           const hasReduceRule = /@media[^{]*prefers-reduced-motion[^{]*reduce/i.test(allCss);
           const hasAnimation = /\banimation\s*:|@keyframes\b|\btransition\s*:/i.test(allCss);
-          if (hasReduceRule) {
+          // Declared is not enough: what is seen at rest without the preference must be seen with it.
+          const reducedOp = new Map(restReduced.map((r) => [r.selector, r.opacity]));
+          const lost = restPlain.filter((r) => r.opacity >= 0.5 && (reducedOp.get(r.selector) ?? 1) < 0.05);
+          if (lost.length > 0) {
+            verdict = "suspect";
+            note = `Under reduced motion ${lost.length} element(s) seen at rest without it rest invisible (${lost
+              .slice(0, 3)
+              .map((r) => r.selector)
+              .join(
+                ", ",
+              )}${lost.length > 3 ? ", …" : ""}): the reduce rule took their animation away and with it the fill that showed them — give them their end state in that rule. \`vlmkit check animation\` names each (reduced-motion-hides).`;
+          } else if (hasReduceRule) {
             verdict = "ok";
             note = "Stylesheet declares `@media (prefers-reduced-motion: reduce)` — author CSS honors the preference.";
           } else if (!hasAnimation) {

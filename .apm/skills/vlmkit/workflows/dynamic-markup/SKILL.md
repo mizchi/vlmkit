@@ -304,7 +304,9 @@ vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ea
   compares where every animated element rests with and without the preference:
   `reduced-motion-hides` (suspect) is `animation: none` leaving the element at its base style
   (opacity 0, a start transform) — "honored" alone never meant the content is there; look with
-  `--frames-reduced-motion`. In motion-repair round 3 a wrong
+  `--frames-reduced-motion`, or judge the page under it with `check integrity --reduced-motion`.
+  A flip card is one run: a `--selector` per face and `--exit` on the face that turns away; its
+  turn is fitted like position (`follows ease-in-out in its turn`). In motion-repair round 3 a wrong
   `transform-origin` and a stagger that was not one both read "follows ease-out exactly, no fail"
   until these existed.
 - **What it does not judge**: fps or jank, a target it is not told about, and anything under

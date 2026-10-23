@@ -153,6 +153,8 @@ export interface MotionSample {
     rotated3d?: boolean;
     edgeOn?: boolean;
     facingAway?: boolean;
+    /** How far it is turned (degrees): from its normal in 3D, or its 2D rotation. */
+    turnDeg?: number;
     mirrored?: boolean;
     /**
      * How long its own animation has been in its active phase (ms; negative in its delay). The
@@ -276,7 +278,7 @@ export interface MotionFinding {
 }
 
 /** What an easing was fitted to: the path, or with the element measured, its opacity or scale. */
-export type EasingChannel = "position" | "opacity" | "scale";
+export type EasingChannel = "position" | "opacity" | "scale" | "turn";
 
 export type ChannelFit = EasingFit & { channel: EasingChannel };
 
@@ -583,10 +585,12 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     const tag = segments.length > 1 ? ` in ${ms(seg.startMs)}..${ms(seg.endMs)}` : "";
     let easing: SegmentEasing;
     // Measured, a fade or a scale has an easing too: fit every channel that changes.
-    const channel = (key: "opacity" | "scale", least: number) => {
-      const xs = sorted.filter((x) => x.dom && x.atMs >= seg.startMs && x.atMs <= seg.endMs);
+    const channel = (key: "opacity" | "scale" | "turnDeg", least: number) => {
+      const xs = sorted.filter(
+        (x) => x.dom && x.atMs >= seg.startMs && x.atMs <= seg.endMs && Number.isFinite(x.dom[key] ?? NaN),
+      );
       if (xs.length < 4) return null;
-      const v = xs.map((x) => x.dom![key]);
+      const v = xs.map((x) => x.dom![key]!);
       const delta = v[v.length - 1]! - v[0]!;
       if (Math.abs(delta) < least) return null;
       return xs.map((x, i) => ({ t: timeOf(x.atMs, seg), s: Math.sign(delta) * v[i]! }));
@@ -615,13 +619,16 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       else skipped = "the frames' times do not spread across the segment: nothing to fit";
     }
     if (exact) {
+      // A card turning over moves no centre: its turn is the channel (round 9 fitted nothing).
       for (const [key, least] of [
         ["opacity", 0.2],
         ["scale", 0.02],
+        ["turnDeg", 10],
       ] as const) {
         const pts = channel(key, least);
         const fit = pts ? fitEasingAffine(pts) : null;
-        if (fit && Number.isFinite(fit.errors[fit.best])) fits.push({ ...fit, channel: key });
+        if (fit && Number.isFinite(fit.errors[fit.best]))
+          fits.push({ ...fit, channel: key === "turnDeg" ? "turn" : key });
       }
     }
     easing = fits[0] ? { ...fits[0], channels: fits } : { skipped: skipped ?? "nothing about it changes" };

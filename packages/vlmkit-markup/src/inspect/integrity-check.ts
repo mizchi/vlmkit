@@ -704,6 +704,8 @@ export interface IntegrityOptions {
    * `frames`, each instant is also captured into `<frames>/<width>/` as a `vlmkit-frames/1` sequence.
    */
   timeline?: { at?: readonly number[]; frames?: string };
+  /** Load every page with prefers-reduced-motion: reduce emulated. */
+  reducedMotion?: boolean;
 }
 
 export const DEFAULT_INTEGRITY_VIEWPORTS = [
@@ -758,6 +760,8 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
     for (let vi = 0; vi < viewports.length; vi++) {
       const viewport = viewports[vi]!;
       const page = await browser.newPage(withAuthState({ viewport }, options.storageState));
+      // Round 9: tiles a reduce rule left at opacity 0 were invisible text no gate could reach.
+      if (options.reducedMotion) await page.emulateMedia({ reducedMotion: "reduce" });
       // Through `applyHar`, not a local `routeFromHAR`: the shared helper reads the
       // recording and can therefore tell a request the fixture never held from a
       // resource the page actually broke. Without that, an out-of-date HAR reads as
@@ -1022,6 +1026,7 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
             ...(options.timeline.at ? { at: options.timeline.at } : {}),
             ...(options.timeline.frames ? { frames: options.timeline.frames } : {}),
             ...(options.storageState ? { storageState: options.storageState } : {}),
+            ...(options.reducedMotion ? { reducedMotion: true } : {}),
             ...(options.har ? { har: options.har } : {}),
             ...(options.timeout !== undefined ? { timeout: options.timeout } : {}),
             ...(options.waitUntil ? { waitUntil: options.waitUntil } : {}),

@@ -357,7 +357,10 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   rest, and a rotation is no longer read as a scale (3D column norms); `check animation`'s
   `reduced-motion-hides` (suspect, 222 rules) compares each animated element's rest with and
   without the preference. The timer search steps frame by frame (a click at 100ms and its reversal
-  at 200ms in one jump read "no animation").
+  at 200ms in one jump read "no animation"). Its deferred items: `stress media`'s reduced-motion
+  variant and `check integrity --reduced-motion` look at what is left on screen under reduce, `check
+  motion` counts motion declared but not active at load, `--exit <css>` marks one target as leaving,
+  and a target's turn (its normal's angle in 3D, else its 2D rotation) is fitted as a channel.
 
 ## Generated figures (raster images)
 
