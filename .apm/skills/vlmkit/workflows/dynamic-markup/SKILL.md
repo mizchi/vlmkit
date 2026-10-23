@@ -21,7 +21,7 @@ below are Playwright + pixel/DOM math — no AI API, no key.
 ## Invocation
 
 ```bash
-node --experimental-strip-types src/cli/vlmkit.ts <command...>
+npx vlmkit <command...>        # installed; in this repository's checkout: node dist/vlmkit.mjs <command...>
 ```
 
 ## Inputs — how behavior requirements arrive
