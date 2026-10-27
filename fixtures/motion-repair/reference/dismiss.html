@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Field Notes</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 17px/1.65 Georgia, serif; background: #fbfaf7; color: #26231f; }
+  main { max-width: 660px; margin: 0 auto; padding: 56px 24px 160px; }
+  h1 { font-size: 34px; line-height: 1.2; margin: 0 0 16px; }
+  .consent[hidden] { display: none; }
+  .consent { position: fixed; left: 24px; right: 24px; bottom: 24px; display: flex; align-items: center; gap: 20px; padding: 18px 22px; border-radius: 14px; background: #26231f; color: #f5f1e8; font: 15px/1.4 system-ui, sans-serif; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); }
+  .consent p { margin: 0; flex: 1; }
+  .consent button { padding: 10px 18px; border: 0; border-radius: 8px; background: #f5f1e8; color: #26231f; font: 600 15px system-ui, sans-serif; cursor: pointer; }
+  .consent.leaving { animation: leave 250ms ease-in forwards; }
+  @keyframes leave { to { opacity: 0; transform: translateY(16px); } }
+</style></head>
+<body>
+  <main>
+    <h1>Notes from a wet October</h1>
+    <p>The rain came early this year, and with it the fungi: shaggy inkcaps on the verges, a ring of fairy bonnets under the birch by the gate, and one morning a parasol mushroom as wide as a dinner plate.</p>
+    <p>Most of them are gone within a day. That is the pleasure of it — a walk is never the same walk twice.</p>
+  </main>
+  <div class="consent" role="dialog" aria-label="Cookies">
+    <p>We use one cookie to remember that you have seen this message.</p>
+    <button type="button" class="dismiss">Dismiss</button>
+  </div>
+  <script>
+    const consent = document.querySelector(".consent");
+    document.querySelector(".dismiss").addEventListener("click", () => {
+      consent.classList.add("leaving");
+      consent.addEventListener("animationend", () => { consent.hidden = true; }, { once: true });
+    });
+  </script>
+</body></html>

@@ -40,6 +40,32 @@ export async function measureTargets(
       return sels.map((sel) => {
         const el = document.querySelector(sel);
         if (!el) return null;
+        // Not rendered at all (display: none on it or an ancestor): no box, not a box at 0,0. A
+        // dismissed banner's rest frame read as a centre at (0,0), "travels up", and the easing
+        // fitted to it was "steps" (round 11).
+        if (el.getClientRects().length === 0) {
+          let none: Element | null = el;
+          while (none && getComputedStyle(none).display !== "none") none = none.parentElement;
+          const who =
+            !none || none === el
+              ? "it"
+              : none.tagName.toLowerCase() +
+                (typeof none.className === "string" && none.className.trim()
+                  ? `.${none.className.trim().split(/\s+/)[0]}`
+                  : "");
+          return {
+            box: { x: 0, y: 0, width: 0, height: 0 },
+            opacity: 0,
+            scale: 1,
+            t: null,
+            visible: 0,
+            onScreen: 0,
+            elapsedMs: null,
+            ownOpacity: 0,
+            notRendered: true,
+            hiddenBy: `not rendered: ${who === "it" ? "it is" : `${who} is`} display: none${el.hasAttribute("hidden") || none?.hasAttribute("hidden") ? " (the hidden attribute)" : ""}`,
+          };
+        }
         const r = el.getBoundingClientRect();
         let opacity = getComputedStyle(el).visibility === "hidden" ? 0 : 1;
         // Which ancestor's opacity is lowest: a drawer "followed ease-out in its opacity" for its

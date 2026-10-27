@@ -1,5 +1,5 @@
 // Hidden from the agents: judges a repaired page against its brief.
-// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet|slidein|progress|accordion|dialog|hover|reveal|flip|interrupt|reduced|push|seam|draw> <page.html>
+// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet|slidein|progress|accordion|dialog|hover|reveal|flip|interrupt|reduced|push|seam|draw|gradient|quote|dismiss> <page.html>
 import { chromium } from "playwright";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
@@ -492,6 +492,101 @@ if (kind === "notify") {
   ok("half way (500ms): one stroke from the short end, past half (ease-out), not done", mid.visibleFromStart && Math.abs(mid.firstGap - mid.drawn) < 1 && mid.drawn > mid.len * 0.55 && mid.drawn < mid.len - 1, mid);
   const end = await state(2000);
   ok("at rest the whole check mark is drawn", end.drawn >= end.len - 0.5, end);
+} else if (kind === "gradient") {
+  // Colours come from the pixels: whatever drives the gradient (registered custom properties, a
+  // layer cross-faded on top), a point of the button must pass through colours between its two looks.
+  const sample = async (p) => {
+    const b = await p.evaluate(() => { const r = document.querySelector(".upgrade").getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
+    const shot = await p.screenshot({ clip: { x: b.x, y: b.y, width: b.w, height: b.h } });
+    const { PNG } = await import("pngjs");
+    const img = PNG.sync.read(shot);
+    const px = (fx) => { const x = Math.round(img.width * fx), y = Math.round(img.height * 0.2), i = (y * img.width + x) * 4; return [img.data[i], img.data[i + 1], img.data[i + 2]]; };
+    return { left: px(0.12), right: px(0.88), box: b };
+  };
+  const dist = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])));
+  const hold = (t) => page.evaluate((t) => { for (const a of document.getAnimations()) { a.pause(); a.currentTime = t; } }, t);
+  const want = { restLeft: [0x25, 0x63, 0xeb], restRight: [0x4f, 0x46, 0xe5], hoverLeft: [0x93, 0x33, 0xea], hoverRight: [0xdb, 0x27, 0x77] };
+  await page.mouse.move(10, 10);
+  const rest = await sample(page);
+  ok("at rest: blue on the left, indigo on the right (as before)", dist(rest.left, want.restLeft) <= 24 && dist(rest.right, want.restRight) <= 24, rest);
+  const c = rest.box;
+  await page.mouse.move(c.x + c.w / 2, c.y + c.h / 2);
+  const n = await page.evaluate(() => document.getAnimations().length);
+  const durs = await page.evaluate(() => document.getAnimations().map((a) => a.effect.getComputedTiming().duration));
+  await hold(100);
+  const mid = await sample(page);
+  await hold(10000);
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r())));
+  const end = await sample(page);
+  ok("under the pointer: purple on the left, pink on the right (as before)", dist(end.left, want.hoverLeft) <= 24 && dist(end.right, want.hoverRight) <= 24, end);
+  ok("a third of the way (100ms in) the colours are between the two looks", n > 0 && dist(mid.left, want.restLeft) > 20 && dist(mid.left, want.hoverLeft) > 20 && dist(mid.right, want.restRight) > 20 && dist(mid.right, want.hoverRight) > 20, { n, mid });
+  ok("the shift takes 300ms", durs.length > 0 && durs.every((d) => Math.abs(d - 300) <= 1), durs);
+  // And back when the pointer leaves.
+  await page.evaluate(() => { for (const a of document.getAnimations()) a.finish(); });
+  await page.mouse.move(10, 10);
+  const back = await page.evaluate(() => document.getAnimations().length);
+  await hold(100);
+  const midBack = await sample(page);
+  ok("leaving, it shifts back over time too", back > 0 && dist(midBack.left, want.restLeft) > 20 && dist(midBack.left, want.hoverLeft) > 20, { back, midBack });
+} else if (kind === "quote") {
+  const entrance = await page.evaluate(() => {
+    const p = document.querySelector(".price");
+    const cs = getComputedStyle(p);
+    return { name: cs.animationName, duration: cs.animationDuration, easing: cs.animationTimingFunction };
+  });
+  ok("the price still has its 400ms ease-out entrance", entrance.name !== "none" && entrance.duration === "0.4s" && entrance.easing === "ease-out", entrance);
+  // On the real clock: from 0.6s to 3.6s, sampled every ~30ms.
+  await page.waitForTimeout(600);
+  const samples = [];
+  const t0 = Date.now();
+  while (Date.now() - t0 < 3000) {
+    samples.push(await page.evaluate(() => {
+      const p = document.querySelector(".price");
+      let op = 1;
+      for (let e = p; e; e = e.parentElement) op *= Number(getComputedStyle(e).opacity);
+      const r = p.getBoundingClientRect();
+      return { op, y: r.y, text: p.textContent };
+    }));
+    await page.waitForTimeout(30);
+  }
+  const minOp = Math.min(...samples.map((s) => s.op));
+  const ys = samples.map((s) => s.y);
+  ok("after the entrance the price never fades again", minOp >= 0.99, { minOp, n: samples.length });
+  ok("after the entrance the price never moves", Math.max(...ys) - Math.min(...ys) <= 0.5, [Math.min(...ys), Math.max(...ys)]);
+  const texts = new Set(samples.map((s) => s.text));
+  ok("the price updates every second", texts.size >= 3 && [...texts].every((t) => /^\$18\d\.\d\d$/.test(t)), [...texts]);
+  const change = await page.evaluate(() => document.querySelector(".change")?.textContent);
+  ok("the change line still updates beside it", /^\+\d+\.\d\d today$/.test(change ?? ""), change);
+} else if (kind === "dismiss") {
+  const before = await probe(".consent");
+  ok("the message is shown at the bottom before Dismiss", before && before.visible >= 0.9 && Math.abs(before.bottom - 776) <= 1, before);
+  // Click and hold whatever animation the click starts, in the same task.
+  const states = await page.evaluate(() => {
+    const c = document.querySelector(".consent");
+    document.querySelector(".dismiss").click();
+    const anims = document.getAnimations();
+    const read = () => {
+      const cs = getComputedStyle(c);
+      const r = c.getBoundingClientRect();
+      return { display: cs.display, opacity: Number(cs.opacity), y: r.y, hidden: c.hidden };
+    };
+    const out = { n: anims.length, durations: anims.map((a) => a.effect.getComputedTiming().duration) };
+    for (const a of anims) { a.pause(); a.currentTime = 0; }
+    out.start = read();
+    for (const a of anims) a.currentTime = 125;
+    out.mid = read();
+    return out;
+  });
+  ok("clicking starts a 250ms leave", states.n > 0 && states.durations.every((d) => Math.abs(d - 250) <= 1), states);
+  ok("half way (125ms) it is still on screen, part faded and part sunk", states.mid.display !== "none" && states.mid.opacity > 0.1 && states.mid.opacity < 0.9 && states.mid.y - states.start.y > 1 && states.mid.y - states.start.y < 15, states);
+  await page.evaluate(() => { for (const a of document.getAnimations()) a.play(); });
+  await page.waitForTimeout(800);
+  const gone = await page.evaluate(() => {
+    const c = document.querySelector(".consent");
+    const top = document.elementFromPoint(640, 740);
+    return { display: getComputedStyle(c).display, through: !(top && c.contains(top)), opacity: Number(getComputedStyle(c).opacity) };
+  });
+  ok("then it is gone and nothing is in the way of a click there", (gone.display === "none" || gone.opacity < 0.02) && gone.through, gone);
 }
 await browser.close();
 const failed = checks.filter((c) => !c.pass);
