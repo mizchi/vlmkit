@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Settings</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; background: #f3f4f6; color: #111827; display: grid; place-items: center; min-height: 100vh; }
+  .sync { display: flex; align-items: center; gap: 14px; padding: 18px 26px; border-radius: 14px; background: #fff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); }
+  .sync svg { display: block; }
+  .gear { transform-box: fill-box; transform-origin: center; animation: spin 2s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style></head>
+<body>
+  <div class="sync" role="status">
+    <svg width="120" height="48" viewBox="0 0 120 48" aria-hidden="true">
+      <rect x="0" y="0" width="120" height="48" rx="10" fill="#eef2ff"/>
+      <g class="gear">
+        <path fill="#4f46e5" d="M24 13l3 0 1 4 3 1.5 3.5-2 2 2-2 3.5 1.5 3 4 1v3l-4 1-1.5 3 2 3.5-2 2-3.5-2-3 1.5-1 4h-3l-1-4-3-1.5-3.5 2-2-2 2-3.5-1.5-3-4-1v-3l4-1 1.5-3-2-3.5 2-2 3.5 2 3-1.5z"/>
+        <circle cx="25.5" cy="24.5" r="4" fill="#eef2ff"/>
+      </g>
+      <rect x="48" y="20" width="56" height="9" rx="4.5" fill="#c7d2fe"/>
+    </svg>
+    <span>Syncing settings…</span>
+  </div>
+</body></html>

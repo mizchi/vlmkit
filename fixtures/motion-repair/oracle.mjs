@@ -1,5 +1,5 @@
 // Hidden from the agents: judges a repaired page against its brief.
-// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet|slidein|progress|accordion|dialog|hover|reveal|flip|interrupt|reduced|push|seam|draw|gradient|quote|dismiss> <page.html>
+// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet|slidein|progress|accordion|dialog|hover|reveal|flip|interrupt|reduced|push|seam|draw|gradient|quote|dismiss|reading|gear|label> <page.html>
 import { chromium } from "playwright";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
@@ -587,6 +587,72 @@ if (kind === "notify") {
     return { display: getComputedStyle(c).display, through: !(top && c.contains(top)), opacity: Number(getComputedStyle(c).opacity) };
   });
   ok("then it is gone and nothing is in the way of a click there", (gone.display === "none" || gone.opacity < 0.02) && gone.through, gone);
+} else if (kind === "reading") {
+  // Whatever drives it (a scroll timeline, a scroll listener), the bar's painted width follows the
+  // scroll position: empty at the top, half at the middle, full at the end, and back again.
+  const width = async (f) => {
+    await page.evaluate((f) => scrollTo(0, f * (document.documentElement.scrollHeight - innerHeight)), f);
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    await page.waitForTimeout(50);
+    return page.evaluate(() => document.querySelector(".progress").getBoundingClientRect().width);
+  };
+  const tall = await page.evaluate(() => document.documentElement.scrollHeight - innerHeight);
+  ok("the article still scrolls (it is long)", tall > 2000, tall);
+  const w = [];
+  for (const f of [0, 0.25, 0.5, 0.75, 1, 0.5, 0]) w.push(await width(f));
+  const want = [0, 320, 640, 960, 1280, 640, 0];
+  ok("the bar's width follows the scroll (0, 1/4, 1/2, 3/4, all, and back)", w.every((x, i) => Math.abs(x - want[i]) <= 16), w.map(Math.round));
+  const bar = await page.evaluate(() => { const r = document.querySelector(".progress").getBoundingClientRect(); const cs = getComputedStyle(document.querySelector(".progress")); return { y: r.y, h: r.height, x: r.x, bg: cs.backgroundColor, pos: cs.position }; });
+  ok("the bar is the same red 4px line at the top, from the left", Math.abs(bar.y) <= 0.5 && Math.abs(bar.h - 4) <= 0.5 && Math.abs(bar.x) <= 0.5 && bar.bg === "rgb(225, 29, 72)", bar);
+} else if (kind === "gear") {
+  const pose = (t) =>
+    page.evaluate((t) => {
+      const g = document.querySelector(".gear");
+      for (const a of document.getAnimations()) { a.pause(); a.currentTime = t; }
+      const r = g.getBoundingClientRect();
+      const m = new DOMMatrixReadOnly(getComputedStyle(g).transform === "none" ? undefined : getComputedStyle(g).transform);
+      return { cx: r.x + r.width / 2, cy: r.y + r.height / 2, deg: (Math.atan2(m.b, m.a) * 180) / Math.PI };
+    }, t);
+  const poses = [];
+  for (const t of [0, 250, 500, 750, 1000, 1500, 1999]) poses.push(await pose(t));
+  const cx = poses.map((p) => p.cx), cy = poses.map((p) => p.cy);
+  ok("the gear stays where it is drawn: its centre moves under 1px", Math.max(...cx) - Math.min(...cx) < 1 && Math.max(...cy) - Math.min(...cy) < 1, poses.map((p) => [Math.round(p.cx * 10) / 10, Math.round(p.cy * 10) / 10]));
+  const timing = await page.evaluate(() => { const a = document.querySelector(".gear").getAnimations()[0]; const t = a?.effect.getComputedTiming(); return t ? { d: t.duration, it: t.iterations } : null; });
+  ok("one turn every 2s, forever", timing && Math.abs(timing.d - 2000) <= 1 && timing.it === Infinity, timing);
+  const d500 = ((poses[2].deg - poses[0].deg + 360) % 360);
+  ok("clockwise, a quarter turn at 500ms", Math.abs(d500 - 90) <= 3, poses.map((p) => Math.round(p.deg)));
+  const svg = await page.evaluate(() => { const r = document.querySelector(".sync svg").getBoundingClientRect(); return [r.width, r.height]; });
+  ok("the status pill is unchanged (120x48 icon)", svg[0] === 120 && svg[1] === 48, svg);
+  const inPill = await page.evaluate(() => { const g = document.querySelector(".gear").getBoundingClientRect(); const s = document.querySelector(".sync svg").getBoundingClientRect(); return g.x >= s.x - 1 && g.y >= s.y - 1 && g.right <= s.right + 1 && g.bottom <= s.bottom + 1; });
+  ok("the gear lies inside its pill", inPill, inPill);
+} else if (kind === "label") {
+  const before = await page.evaluate(() => { const a = document.querySelector(".add"); const r = a.getBoundingClientRect(); const cs = getComputedStyle(a); return { w: r.width, h: r.height, bg: cs.backgroundColor, text: a.textContent.trim() }; });
+  ok("before the click: 'Add to cart', 150px wide, 44px high, dark", before.text === "Add to cart" && Math.abs(before.w - 150) <= 1 && Math.abs(before.h - 44) <= 1 && before.bg === "rgb(28, 25, 23)", before);
+  const run = await page.evaluate(() => {
+    const a = document.querySelector(".add");
+    a.click();
+    const anims = document.getAnimations();
+    const lines = () => {
+      // Lines of its text, from the text's own boxes: one line is one distinct top.
+      const range = document.createRange();
+      range.selectNodeContents(a);
+      return new Set([...range.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top))).size;
+    };
+    const durs = anims.map((x) => x.effect.getComputedTiming().duration);
+    const out = [];
+    for (const t of [0, 16, 50, 100, 150, 200, 250, 299]) {
+      for (const x of anims) { x.pause(); x.currentTime = t; }
+      const r = a.getBoundingClientRect();
+      out.push({ t, w: Math.round(r.width), h: Math.round(r.height * 10) / 10, lines: lines() });
+    }
+    return { durs, out, text: a.textContent.trim() };
+  });
+  ok("clicking widens it over 300ms", run.durs.some((d) => Math.abs(d - 300) <= 1) && run.out[0].w < 170 && run.out[3].w > 170 && run.out[3].w < 255, run);
+  ok("all through, the button keeps its 44px height", run.out.every((x) => Math.abs(x.h - 44) <= 0.5), run.out);
+  ok("all through, the label is one line", run.out.every((x) => x.lines === 1), run.out);
+  await page.evaluate(() => { for (const x of document.getAnimations()) x.finish(); });
+  const after = await page.evaluate(() => { const a = document.querySelector(".add"); const r = a.getBoundingClientRect(); const cs = getComputedStyle(a); return { w: r.width, h: r.height, bg: cs.backgroundColor, text: a.textContent.trim(), clipped: a.scrollWidth > a.clientWidth + 1 }; });
+  ok("after: 'Added ✓ — View cart', 260px wide, 44px high, green, nothing cut off", after.text === "Added ✓ — View cart" && Math.abs(after.w - 260) <= 1 && Math.abs(after.h - 44) <= 1 && after.bg === "rgb(21, 128, 61)" && !after.clipped, after);
 }
 await browser.close();
 const failed = checks.filter((c) => !c.pass);

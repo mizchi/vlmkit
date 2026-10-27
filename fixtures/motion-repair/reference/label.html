@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Product</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; background: #fafaf9; color: #1c1917; display: grid; place-items: center; min-height: 100vh; }
+  .product { width: 420px; padding: 28px; border-radius: 16px; background: #fff; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08); }
+  .product h1 { font-size: 22px; margin: 0 0 4px; }
+  .product p { margin: 0 0 20px; color: #57534e; }
+  .add { display: inline-block; width: 150px; padding: 12px 18px; border: 0; border-radius: 10px; background: #1c1917; color: #fff; font: 600 16px/20px system-ui, sans-serif; text-align: left; white-space: nowrap; overflow: hidden; cursor: pointer; transition: width 300ms ease-out, background-color 300ms ease-out; }
+  .add.added { width: 260px; background: #15803d; }
+</style></head>
+<body>
+  <div class="product">
+    <h1>Linen tea towel</h1>
+    <p>Stonewashed, 50 x 70 cm. ¥2,400</p>
+    <button class="add" type="button">Add to cart</button>
+  </div>
+  <script>
+    const add = document.querySelector(".add");
+    add.addEventListener("click", () => {
+      add.textContent = "Added ✓ — View cart";
+      add.classList.add("added");
+    });
+  </script>
+</body></html>

@@ -198,6 +198,19 @@ export async function measureTargets(
           clips.every((b) => x >= b.left && x < b.right && y >= b.top && y < b.bottom);
         const geometry = el instanceof SVGGeometryElement ? el : null;
         const ctm = geometry?.getScreenCTM()?.inverse() ?? null;
+        // An SVG group (or <svg>) is its shapes: each geometry inside it, with its own inverse CTM.
+        const shapes =
+          !geometry && el instanceof SVGGraphicsElement
+            ? [...el.querySelectorAll("path,rect,circle,ellipse,line,polyline,polygon")]
+                .filter((g): g is SVGGeometryElement => g instanceof SVGGeometryElement)
+                .slice(0, 64)
+                .map((g) => ({ g, inv: g.getScreenCTM()?.inverse() ?? null }))
+            : [];
+        const inShape = (s: (typeof shapes)[number], x: number, y: number) => {
+          if (!s.inv) return true;
+          const q = new DOMPoint(x, y).matrixTransform(s.inv);
+          return s.g.isPointInFill(q) || s.g.isPointInStroke(q);
+        };
         // A dashed stroke: how much of its line is drawn, from the dash pattern itself. A check mark
         // whose dash was shorter than its line stopped half way up its long arm, and read "covered
         // by circle" (round 10). Points of the line its dashes leave undrawn are not covered.
@@ -246,6 +259,11 @@ export async function measureTargets(
                 outside++;
                 continue;
               }
+            } else if (shapes.length > 0 && !shapes.some((s) => inShape(s, x, y))) {
+              // An SVG group's box is its turned shapes' bounds: a point no shape of it covers is not
+              // evidence. A spinning gear group read "covered by rect" (its backdrop) 24 times (round 12).
+              outside++;
+              continue;
             }
             const top = document.elementFromPoint(x, y);
             if (top && el.contains(top)) {
@@ -1201,12 +1219,16 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
             const a = beforeClick[i];
             const b = afterClick[i];
             if (!a || !b) return [];
-            const d = Math.max(
-              Math.abs(a.box.x - (b.box.x + dx)),
-              Math.abs(a.box.y - (b.box.y + dy)),
-              Math.abs(a.box.width - b.box.width),
-              Math.abs(a.box.height - b.box.height),
-            );
+            const off = (sx: number, sy: number) =>
+              Math.max(
+                Math.abs(a.box.x - (b.box.x + sx)),
+                Math.abs(a.box.y - (b.box.y + sy)),
+                Math.abs(a.box.width - b.box.width),
+                Math.abs(a.box.height - b.box.height),
+              );
+            // In the page's coordinates, or the viewport's for what the scroll does not carry (a
+            // fixed progress bar read "1280x4 at (0,0) → 1280x4 at (0,0)" as a change, round 12).
+            const d = Math.min(off(dx, dy), off(0, 0));
             const op = Math.abs(a.opacity - b.opacity);
             const pa = a.paint ?? [];
             const pb = b.paint ?? [];
@@ -1840,6 +1862,182 @@ export function motionEasingOptions(given: EasingName[][] | undefined) {
   return { targetEasing: given.map(oneOrList) };
 }
 
+/**
+ * A target whose animation runs on a scroll timeline (`animation-timeline: scroll()` / `view()`)
+ * is judged against the scroll, not the clock: the scroller is swept 0..100% and back to 50%, and
+ * each target's animation progress and its box, scale, opacity and colour are read at each step.
+ * On the clock such a bar read "snapped 0x4 → 1126x4 in one frame" for a scroll jump (round 12).
+ * Null when no target is driven by a scroll timeline: the caller samples time as before.
+ */
+async function scrollSweep(o: MotionCliOptions): Promise<number | null> {
+  const { withBrowser } = await import("@mizchi/vlmkit-core/browser-launch.ts");
+  const { sourceToUrl } = await import("@mizchi/vlmkit-core/page-open.ts");
+  const { captureStable, frameWriter, frameSourceFacts } =
+    await import("@mizchi/vlmkit-animation-eval/frames-capture.ts");
+  const url = sourceToUrl(o.source);
+  return withBrowser(async (browser) => {
+    const page = await browser.newPage({ viewport: o.viewport, deviceScaleFactor: 1 });
+    try {
+      await page.goto(url, { waitUntil: "load" });
+      const driven = await page.evaluate((sels) => {
+        const out: { i: number; name: string; timeline: string; root: boolean }[] = [];
+        for (const a of document.getAnimations()) {
+          const tl = a.timeline as (AnimationTimeline & { source?: Element | null }) | null;
+          if (!tl || tl instanceof DocumentTimeline) continue;
+          const el = (a.effect as KeyframeEffect | null)?.target as Element | null;
+          if (!el) continue;
+          const i = sels.findIndex((s) => {
+            const t = document.querySelector(s);
+            return !!t && (t === el || t.contains(el) || el.contains(t));
+          });
+          if (i < 0) continue;
+          const src = tl.source ?? null;
+          const root =
+            !src || src === document.scrollingElement || src === document.documentElement || src === document.body;
+          if (!root) src!.setAttribute("data-vlmkit-scroller", "");
+          out.push({
+            i,
+            name: (a as CSSAnimation).animationName || "an animation",
+            timeline: getComputedStyle(el).animationTimeline,
+            root,
+          });
+        }
+        return out;
+      }, o.selectors);
+      if (driven.length === 0) return null;
+      const root = driven.every((d) => d.root);
+      const range = await page.evaluate((root) => {
+        const sc = root ? document.scrollingElement! : document.querySelector("[data-vlmkit-scroller]")!;
+        return sc.scrollHeight - sc.clientHeight;
+      }, root);
+      const steps = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 0.5, 0];
+      const writer = await frameWriter(resolve(o.frames), {
+        tool: "inspect motion",
+        url,
+        viewport: o.viewport,
+        ...(await frameSourceFacts(page)),
+        clock: "wall",
+      });
+      const rows: { f: number; dom: (MotionDom | null)[]; progress: (number | null)[] }[] = [];
+      for (const [k, f] of steps.entries()) {
+        await page.evaluate(
+          ([root, y]) => {
+            const sc = root ? document.scrollingElement! : document.querySelector("[data-vlmkit-scroller]")!;
+            sc.scrollTop = y as number;
+          },
+          [root, Math.round(f * range)] as const,
+        );
+        await page.evaluate(
+          () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))),
+        );
+        const dom = await measureTargets(page, o.selectors);
+        const progress = await page.evaluate(
+          (sels) =>
+            sels.map((s) => {
+              const t = document.querySelector(s);
+              if (!t) return null;
+              const a = [...document.getAnimations()].find((x) => {
+                const el = (x.effect as KeyframeEffect | null)?.target as Element | null;
+                return (
+                  !!el && !(x.timeline instanceof DocumentTimeline) && (el === t || t.contains(el) || el.contains(t))
+                );
+              });
+              const p = a?.effect?.getComputedTiming().progress;
+              return typeof p === "number" ? p : null;
+            }),
+          o.selectors,
+        );
+        const { png, stable } = await captureStable(page);
+        await writer.add(png, { atMs: k * 100, stable, label: `scroll ${Math.round(f * 100)}%` });
+        rows.push({ f, dom, progress });
+      }
+      const written = await writer.finish();
+      let fails = 0;
+      const lines = [
+        `inspect motion: ${o.source} — driven by the scroll: ${steps.length} frames, the ${root ? "page" : "scroller"} swept 0..100% (${range}px) and back to 50% (${written.manifest})`,
+      ];
+      o.selectors.forEach((sel, i) => {
+        const d = driven.find((x) => x.i === i);
+        if (!d) {
+          lines.push(
+            `  target "${sel}": no scroll-driven animation on it (judged by the clock, run without the others)`,
+          );
+          return;
+        }
+        const fwd = rows.slice(0, 11);
+        const at = (f: number) => fwd.find((r) => Math.abs(r.f - f) < 1e-9)!;
+        const pr = (r: (typeof rows)[number]) => r.progress[i];
+        const fmt = (v: number | null) => (v === null ? "–" : v.toFixed(2));
+        const first = fwd[0]!.dom[i];
+        const last = fwd[fwd.length - 1]!.dom[i];
+        const changes: string[] = [];
+        if (first && last) {
+          const sx = (x: MotionDom) => x.scaleX ?? x.scale;
+          const sy = (x: MotionDom) => x.scaleY ?? x.scale;
+          if (Math.abs(sx(first) - sx(last)) > 0.02)
+            changes.push(`scaleX ${sx(first).toFixed(2)} → ${sx(last).toFixed(2)}`);
+          if (Math.abs(sy(first) - sy(last)) > 0.02 && Math.abs(sy(first) - sx(first)) > 1e-6)
+            changes.push(`scaleY ${sy(first).toFixed(2)} → ${sy(last).toFixed(2)}`);
+          if (Math.abs(first.opacity - last.opacity) > 0.05)
+            changes.push(`opacity ${first.opacity.toFixed(2)} → ${last.opacity.toFixed(2)}`);
+          const cx = (x: MotionDom) => [x.box.x + x.box.width / 2, x.box.y + x.box.height / 2] as const;
+          const [ax, ay] = cx(first);
+          const [bx, by] = cx(last);
+          if (Math.hypot(bx - ax, by - ay) >= 2)
+            changes.push(`centre (${Math.round(ax)},${Math.round(ay)}) → (${Math.round(bx)},${Math.round(by)})`);
+          const pa = first.paint ?? [];
+          const pb = last.paint ?? [];
+          if (pa.length === pb.length && pa.some((v, k) => Math.abs(v - pb[k]!) >= 8)) changes.push("its colour");
+        }
+        lines.push(
+          `  target "${sel}" follows the scroll (\`${d.name}\` on ${d.timeline}): progress ${[0, 0.25, 0.5, 0.75, 1].map((f) => `${fmt(pr(at(f === 0.25 ? 0.2 : f === 0.75 ? 0.8 : f)))} at ${Math.round((f === 0.25 ? 0.2 : f === 0.75 ? 0.8 : f) * 100)}%`).join(", ")}; back at 50% ${fmt(pr(rows[11]!))}, at 0% ${fmt(pr(rows[12]!))}${changes.length > 0 ? `; ${changes.join(", ")}` : ""}`,
+        );
+        const ps = fwd.map(pr).filter((v): v is number => v !== null);
+        const monotonic =
+          ps.every((v, k) => k === 0 || v >= ps[k - 1]! - 1e-3) ||
+          ps.every((v, k) => k === 0 || v <= ps[k - 1]! + 1e-3);
+        const back = pr(rows[11]!);
+        const mid = pr(at(0.5));
+        if (changes.length === 0) {
+          fails++;
+          lines.push(
+            `    FAIL scroll-static: its animation runs with the scroll, but nothing of it changes on screen from the top to the end (box, scale, opacity, colour)`,
+          );
+        } else if (!monotonic || (back !== null && mid !== null && Math.abs(back - mid) > 0.02)) {
+          fails++;
+          lines.push(
+            `    FAIL scroll-mismatch: its progress does not follow the scroll one way (${ps.map((v) => v.toFixed(2)).join(" ")}), or differs at 50% on the way back (${fmt(back)} against ${fmt(mid)})`,
+          );
+        }
+      });
+      if ([...argvExpects(o)].length > 0)
+        lines.push(
+          `  --expect-* are times and curves of motion in time; a scroll-driven animation is judged against the scroll here`,
+        );
+      lines.push(
+        fails === 0
+          ? "  no fail; measured from the page, no model asked"
+          : `  ${fails} fail; measured from the page, no model asked`,
+      );
+      console.log(lines.join("\n"));
+      return fails === 0 ? 0 : 1;
+    } finally {
+      await page.close();
+    }
+  });
+}
+
+/** The --expect-* the options carry, by name. */
+function* argvExpects(o: MotionCliOptions): Generator<string> {
+  if (o.expectEasing) yield "easing";
+  if (o.expectOrigin) yield "origin";
+  if (o.expectStartMs) yield "start";
+  if (o.expectDurationMs) yield "duration";
+  if (o.expectIterations) yield "iterations";
+  if (o.expectDirection) yield "direction";
+  if (o.expectStill) yield "still";
+}
+
 export async function runMotionCli(argv: string[]): Promise<number> {
   if (argv.includes("--help") || argv.includes("-h")) {
     console.log(MOTION_USAGE);
@@ -1861,6 +2059,17 @@ export async function runMotionCli(argv: string[]): Promise<number> {
       "error: --jev asks TypeSafe Jev and needs TYPESAFEAI_API_KEY (console.typesafe.ai/keys). Without --jev, give each target a --selector.",
     );
     return 2;
+  }
+  // A target on a scroll timeline is judged against the scroll (round 12).
+  if (
+    !/(^|\/)frames\.json$/.test(o.source) &&
+    !o.jev &&
+    o.selectors.length > 0 &&
+    o.endMs === undefined &&
+    o.actions.every((a) => a.kind === "scroll")
+  ) {
+    const swept = await scrollSweep(o);
+    if (swept !== null) return swept;
   }
   let captured: Captured;
   try {
