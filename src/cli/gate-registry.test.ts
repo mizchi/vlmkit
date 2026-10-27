@@ -265,7 +265,10 @@ describe("composed built-in registry", () => {
     // its line passed every gate without a target (motion-repair round 10).
     // 225 → 226: `check animation` / `discrete-transition` (warn) — a hover gradient with
     // `transition: background` snapped, and every gate passed it (motion-repair round 11).
-    assert.equal(total, 226);
+    // 226 → 227: `check animation` / `animation-replayed` (suspect) — a quote re-rendered by
+    // innerHTML replayed its entrance every second and --virtual-time read it "visible" (round 11's
+    // deferred items).
+    assert.equal(total, 227);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {

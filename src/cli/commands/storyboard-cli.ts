@@ -328,7 +328,10 @@ export async function writeStoryboard(
   const dir = dirname(manifestFile);
   const paths = manifest.frames.map((f) => resolve(dir, f.file));
   const pixels = framesOnDisk(paths);
+  const beforeFile = manifest.source.before ? resolve(dir, manifest.source.before) : null;
+  const before = beforeFile && existsSync(beforeFile) ? decode(beforeFile) : null;
   const story = buildStoryboard(manifest.frames, pixels, {
+    ...(before && before.width === pixels.width && before.height === pixels.height ? { before: before.data } : {}),
     ignore: options.ignore ?? [],
     ...(options.floor !== undefined ? { floor: options.floor } : {}),
   });
@@ -354,6 +357,7 @@ export async function writeStoryboard(
     })),
     timeline: story.timeline,
     ...(story.loops ? { loops: story.loops } : {}),
+    ...(story.beforeFirst ? { beforeFirst: story.beforeFirst } : {}),
   };
   const files = {
     story: join(outDir, "story.json"),
@@ -484,6 +488,11 @@ async function main(): Promise<void> {
   console.log(
     `  ${DIM}${plural(f.count, "frame")} of ${f.width}x${f.height} px, ${formatInstant(f.fromMs)}–${formatInstant(f.toMs)} ms${f.sampling.everyFrame && written.manifest.source.clock !== "stream" ? ", every 60 fps frame" : ""}${RESET}`,
   );
+  if (story.beforeFirst) {
+    console.log(
+      `  Before frame 0: the page just before the action differs from frame 0 by ${story.beforeFirst.over} px — done by the first frame`,
+    );
+  }
   if (story.events.length === 0) {
     console.log(`  No events: every frame is within the floor of frame 0.`);
   } else {

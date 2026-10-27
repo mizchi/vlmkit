@@ -83,6 +83,11 @@ export interface FramesSource {
   /** `inspect interact`: the `frames` step this sequence records. */
   step?: string;
   /**
+   * `inspect interact`: the page just before the step's action, a PNG relative to `frames.json`.
+   * Not a frame of the sequence: what changed before the first frame is told from it.
+   */
+  before?: string;
+  /**
    * Regions, in CSS px, whose pixels the capture could not hold to the sequence's clock: a
    * `<video>` it paused, an animated image or one whose bytes could not be read, pixels that
    * changed while nothing was advanced. `check flash` writes it and leaves those pixels out of
@@ -393,6 +398,12 @@ export function parseFramesManifest(text: string): FramesManifest {
     refuse("source.deviceScaleFactor", "must be a finite number > 0");
   }
   if (source.video !== undefined) checkVideo(source.video);
+  if (source.before !== undefined) {
+    const b = source.before as unknown;
+    if (typeof b !== "string" || b === "" || /^[\\/]|^[A-Za-z]:/.test(b) || b.split(/[\\/]/).includes("..")) {
+      refuse("source.before", "must be a PNG path inside the manifest's directory");
+    }
+  }
   if (source.clock === "stream") {
     // What `check flash` reads to decide the sequence leaves nothing out: unchecked, a missing
     // index read as a gap and a repeated one as nothing missing.

@@ -7,6 +7,7 @@ import {
   computeOscillation,
   computeSettleMs,
   deriveAnimationIssues,
+  clockUpdatesOnly,
   formatAnimationEvalReport,
   frameDelta,
   restTimeForAnimation,
@@ -1127,5 +1128,53 @@ test(
     );
     assert.match(broken[0]!.message, /button\.upgrade transitions `background` over a gradient .*does not interpolate/);
     assert.deepEqual((await run("reference/gradient.html")).issues, []);
+  },
+);
+
+test("clockUpdatesOnly: a slow timer with no animation frame is an update, not motion", () => {
+  const w = { windowMs: 2000 };
+  assert.equal(clockUpdatesOnly({ ...w, runs: { frames: 0, timers: 2 } }), true);
+  assert.equal(clockUpdatesOnly({ ...w, runs: { frames: 120, timers: 2 } }), false, "a requestAnimationFrame loop");
+  assert.equal(clockUpdatesOnly({ ...w, runs: { frames: 0, timers: 125 } }), false, "setInterval(move, 16)");
+  assert.equal(
+    clockUpdatesOnly({
+      ...w,
+      runs: { frames: 0, timers: 2 },
+      replays: [{ selector: "s", name: "rise", atMs: [1000], newElement: true }],
+    }),
+    false,
+    "an entrance the timer replays is motion",
+  );
+  assert.equal(clockUpdatesOnly({ ...w }), false, "no counts: not known");
+});
+
+test(
+  "runAnimationEval --virtual-time: an entrance a re-render replays is named, a ticker updating in place is not motion",
+  { timeout: 300_000 },
+  async () => {
+    // fixtures/motion-repair round 11's deferred items: under --virtual-time the broken quote read
+    // "visible" and nothing else, and the one-second ticker of both pages read as script-driven
+    // motion still running under reduced motion.
+    const dir = join(import.meta.dirname, "../../../fixtures/motion-repair");
+    const run = (file: string) =>
+      runAnimationEval({ source: join(dir, file), viewport: { width: 1280, height: 800 }, virtualTime: true });
+    const broken = await run("broken/quote.html");
+    const replay = broken.issues.find((i) => i.kind === "animation-replayed");
+    assert.equal(replay?.severity, "suspect");
+    assert.match(replay!.message, /span\.price `rise` plays again by 1000ms, 2000ms of virtual time on a new element/);
+    const fixed = await run("reference/quote.html");
+    assert.equal(
+      fixed.issues.find((i) => i.kind === "animation-replayed"),
+      undefined,
+    );
+    assert.match(
+      fixed.issues.find((i) => i.kind === "clock-motion-unsettled")!.message,
+      /changes only when a timer updates it .*not motion/,
+    );
+    assert.deepEqual(
+      fixed.reducedMotion?.remaining.map((r) => r.name),
+      ["rise"],
+      "the entrance, not the ticker",
+    );
   },
 );

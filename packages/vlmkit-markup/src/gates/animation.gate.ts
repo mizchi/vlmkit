@@ -109,6 +109,12 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       docs: "Seen at rest without prefers-reduced-motion and at opacity 0 (or 8px+ from its place) at rest with it: `animation: none` in the reduce rule removed the animation and the fill that held its end state, so its base style (opacity 0, a start transform) shows. The preference is honoured and the content is gone.",
     },
     {
+      id: "animation-replayed",
+      title: "An animation begins again as the page's timers run",
+      severity: "suspect",
+      docs: "With --virtual-time: an animation already seen started again on a new element (a re-render replaced it — innerHTML, a framework re-keying the node — and its entrance plays again; suspect), or on the same one (a class toggled on a timer; warn).",
+    },
+    {
       id: "discrete-transition",
       title: "A transition on a gradient background, which steps",
       severity: "warn",

@@ -939,6 +939,13 @@ async function recordFramesStep(
       () => (window as unknown as InteractWindow).__vlmkitInteract!.arm(),
       undefined,
     );
+    // The page just before the action: a change done by the first frame (a hover colour that
+    // snapped) is told from it, beside the frames (round 11).
+    const before = await captureStable(page).catch(() => null);
+    if (before) {
+      await mkdir(options.dir, { recursive: true });
+      await writeFile(join(options.dir, "before.png"), before.png);
+    }
     let actionError: string | undefined;
     try {
       await executeStep(page, action);
@@ -956,6 +963,7 @@ async function recordFramesStep(
         ...facts,
         clock: "wall",
         step: options.name,
+        ...(before ? { before: "before.png" } : {}),
       },
     });
     return { ...written, ...entry, ...(actionError !== undefined ? { actionError } : {}) };

@@ -191,6 +191,27 @@ export interface ClockMotion {
     atMs: number;
     durationMs?: number;
   }>;
+  /**
+   * An animation already seen begun again while the clock ran — on a new element (a re-render
+   * replaced it) or on the same one. A quote whose innerHTML was rebuilt every second replayed
+   * its price's entrance, and under --virtual-time it read "visible" and nothing else (round 11).
+   */
+  replays?: Array<{ selector: string; name: string; atMs: number[]; newElement: boolean }>;
+  /**
+   * What the clock ran in the window: animation-frame callbacks and timer runs. With no frame
+   * callback and timers at most 5 a second, the pixels change only when a timer updates the page
+   * (a clock, a live value): updates, not motion.
+   */
+  runs?: { frames: number; timers: number };
+}
+
+/** Pure: the sweep's pixels changed only as a slow timer updated the page (no animation frames). */
+export function clockUpdatesOnly(clock: Pick<ClockMotion, "runs" | "started" | "replays" | "windowMs">): boolean {
+  const r = clock.runs;
+  if (!r || r.frames > 0) return false;
+  // An animation a timer began, or began again, is motion.
+  if ((clock.started ?? []).length > 0 || (clock.replays ?? []).length > 0) return false;
+  return r.timers > 0 && r.timers <= 5 * Math.max(1, clock.windowMs / 1000);
 }
 
 /** Pure: what a clock sweep's motion is, named as far as the page let it be. */
@@ -238,7 +259,8 @@ export type AnimationEvalIssueKind =
   | "layout-animation"
   | "loop-seam"
   | "stroke-incomplete"
-  | "discrete-transition";
+  | "discrete-transition"
+  | "animation-replayed";
 
 export interface AnimationEvalIssue {
   kind: AnimationEvalIssueKind;
@@ -699,7 +721,31 @@ export function deriveAnimationIssues(
   }
 
   const clock = input.clockMotion;
-  if (clock?.visible && clock.settledAtMs === null) {
+  // An animation begun again as the clock ran. On a new element it is a re-render replaying an
+  // entrance (round 11's quote, every second); on the same one, a class toggled on a timer.
+  for (const r of clock?.replays ?? []) {
+    const when = r.atMs
+      .slice(0, 3)
+      .map((t) => `${t}ms`)
+      .join(", ");
+    issues.push({
+      kind: "animation-replayed",
+      severity: r.newElement ? "suspect" : "warn",
+      selector: r.selector,
+      message: r.newElement
+        ? `${r.selector} \`${r.name}\` plays again by ${when}${r.atMs.length > 3 ? ", …" : ""} of virtual time on a new element: the page replaced it (a re-render — innerHTML, a framework re-keying the node), and each new one plays its entrance again. Update what it shows (textContent, an attribute) instead of re-creating it.`
+        : `${r.selector} \`${r.name}\` begins again by ${when}${r.atMs.length > 3 ? ", …" : ""} of virtual time on the same element (a class or animation-name toggled on a timer). If it should play once, nothing should start it again.`,
+    });
+  }
+  const updatesOnly = clock ? clockUpdatesOnly(clock) : false;
+  if (clock?.visible && clock.settledAtMs === null && updatesOnly) {
+    const b = clock.motionBbox!;
+    issues.push({
+      kind: "clock-motion-unsettled",
+      severity: "warn",
+      message: `The page at (${b.x},${b.y}) ${b.width}x${b.height} changes only when a timer updates it (${clock.runs!.timers} timer run(s) in ${clock.windowMs}ms of virtual time, no animation frame): a value updated in place (a clock, a live price) is not motion, and needs nothing under reduced motion. It does keep captures from being still: mask the region in them.`,
+    });
+  } else if (clock?.visible && clock.settledAtMs === null) {
     const b = clock.motionBbox!;
     issues.push({
       kind: "clock-motion-unsettled",
@@ -1313,13 +1359,19 @@ async function sampleClock(
   const listStarted = () =>
     page.evaluate(`(() => {
       ${STABLE_SELECTOR_JS}
+      const seen = (window.__vlmkitSeenAnims = window.__vlmkitSeenAnims || new WeakSet());
+      const targets = (window.__vlmkitSeenTargets = window.__vlmkitSeenTargets || new WeakSet());
       return document.getAnimations().map((a) => {
         const el = a.effect && a.effect.target;
+        const fresh = !seen.has(a);
+        seen.add(a);
+        const newElement = !!el && !targets.has(el);
+        if (el) targets.add(el);
         const kind = typeof a.transitionProperty === "string" ? "transition" : "animation";
         const name = kind === "transition" ? a.transitionProperty : (a.animationName || a.id || "(el.animate)");
         let durationMs = null;
         try { durationMs = Number(a.effect.getComputedTiming().duration) || null; } catch {}
-        return { key: (el ? stableSelector(el) : "(no target)") + "\\u0000" + kind + "\\u0000" + name, selector: el ? stableSelector(el) : "(no target)", name, kind, durationMs };
+        return { key: (el ? stableSelector(el) : "(no target)") + "\\u0000" + kind + "\\u0000" + name, selector: el ? stableSelector(el) : "(no target)", name, kind, durationMs, fresh, newElement };
       });
     })()`) as Promise<
       Array<{
@@ -1328,13 +1380,32 @@ async function sampleClock(
         name: string;
         kind: "transition" | "animation";
         durationMs: number | null;
+        fresh: boolean;
+        newElement: boolean;
       }>
     >;
+  const readRuns = () =>
+    page
+      .evaluate(() => {
+        const c = (window as unknown as { __vlmkitClock?: { runs?: () => { frames: number; timers: number } } })
+          .__vlmkitClock;
+        return c?.runs ? c.runs() : null;
+      })
+      .catch(() => null);
+  const runsBefore = await readRuns();
   const known = new Set((await listStarted().catch(() => [])).map((a) => a.key));
   const started: NonNullable<ClockMotion["started"]> = [];
+  const replays = new Map<string, { selector: string; name: string; atMs: number[]; newElement: boolean }>();
   for (const t of times) {
     await advanceClock(page, t);
     for (const a of await listStarted().catch(() => [])) {
+      if (known.has(a.key) && a.fresh && a.kind === "animation") {
+        const r = replays.get(a.key) ?? { selector: a.selector, name: a.name, atMs: [], newElement: false };
+        r.atMs.push(t);
+        r.newElement ||= a.newElement;
+        replays.set(a.key, r);
+        continue;
+      }
       if (known.has(a.key)) continue;
       known.add(a.key);
       started.push({
@@ -1354,6 +1425,7 @@ async function sampleClock(
   const errors = await page.evaluate(() => [
     ...(window as unknown as { __vlmkitClock: { errors: string[] } }).__vlmkitClock.errors,
   ]);
+  const runsAfter = await readRuns();
   return {
     windowMs,
     times,
@@ -1363,6 +1435,10 @@ async function sampleClock(
     settledAtMs: clockSettledAt(times, frames, minChangedPixels),
     errors: errors.slice(0, 5),
     ...(started.length > 0 ? { started } : {}),
+    ...(replays.size > 0 ? { replays: [...replays.values()] } : {}),
+    ...(runsBefore && runsAfter
+      ? { runs: { frames: runsAfter.frames - runsBefore.frames, timers: runsAfter.timers - runsBefore.timers } }
+      : {}),
   };
 }
 
@@ -1970,7 +2046,9 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
               // Its own duration: "shrink 500ms" was the clock window for a 300ms animation (round 9).
               durationMs: st.durationMs ?? lasted,
             });
-        } else if (lasted >= durationFloor) {
+        } else if (lasted >= durationFloor && !clockUpdatesOnly(rmClock)) {
+          // A value a slow timer updates in place is not motion: the quote's one-second ticker
+          // read "2 animation(s) still running" under reduce (round 11).
           remaining.push({
             selector: `(script-driven motion at ${b.x},${b.y} ${b.width}x${b.height})`,
             name: "requestAnimationFrame / timers",
@@ -2085,9 +2163,11 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
     lines.push(
       !c.visible
         ? `script-driven motion: none in ${c.windowMs}ms of virtual time`
-        : c.settledAtMs === null
-          ? `script-driven motion${where}: still moving at ${c.windowMs}ms of virtual time${ruleTag("clock-motion-unsettled")}`
-          : `script-driven motion${where}: settles by ${c.settledAtMs}ms of virtual time${ruleTag("long-settle")}`,
+        : c.settledAtMs === null && clockUpdatesOnly(c)
+          ? `script-driven change${where}: a timer updates it in place (${c.runs!.timers} run(s), no animation frame) — not motion${ruleTag("clock-motion-unsettled")}`
+          : c.settledAtMs === null
+            ? `script-driven motion${where}: still moving at ${c.windowMs}ms of virtual time${ruleTag("clock-motion-unsettled")}`
+            : `script-driven motion${where}: settles by ${c.settledAtMs}ms of virtual time${ruleTag("long-settle")}`,
     );
     if (c.visible && (c.started ?? []).length > 0)
       lines.push(`${DIM}  not a requestAnimationFrame loop: ${clockMotionSource(c)}${RESET}`);

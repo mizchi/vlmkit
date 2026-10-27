@@ -37,6 +37,8 @@ export interface MotionComputedSample {
   transitionProperty: string;
   transitionDuration: string;
   transitionDelay: string;
+  /** Its background-image is a gradient: a transition on background then steps (round 11). */
+  gradientBackground?: boolean;
 }
 
 export type MotionIssueKind = "missing-reduced-motion" | "unreadable-stylesheet" | "running-animation";
@@ -280,6 +282,7 @@ export async function runMotionDetection(options: MotionDetectionOptions): Promi
           transitionProperty: style.transitionProperty,
           transitionDuration: style.transitionDuration,
           transitionDelay: style.transitionDelay,
+          ...(/gradient\(/.test(style.backgroundImage) ? { gradientBackground: true } : {}),
         };
         const hasAnimation = sample.animationName.trim() !== "none" && maxTimeInPage(sample.animationDuration) > 0;
         const hasTransition =
@@ -337,7 +340,11 @@ export function formatMotionDetectionReport(report: MotionDetectionReport, rules
     lines.push("Motion samples:");
     for (const sample of report.samples.slice(0, 20)) {
       lines.push(
-        `  - ${sample.selector}: animation=${sample.animationName} ${sample.animationDuration} ${sample.animationPlayState}; transition=${sample.transitionProperty} ${sample.transitionDuration}`,
+        `  - ${sample.selector}: animation=${sample.animationName} ${sample.animationDuration} ${sample.animationPlayState}; transition=${sample.transitionProperty} ${sample.transitionDuration}` +
+          (sample.gradientBackground &&
+          sample.transitionProperty.split(",").some((p) => /^(background|background-image)$/.test(p.trim()))
+            ? " (over a gradient, which does not interpolate: it steps — check animation's discrete-transition)"
+            : ""),
       );
     }
   }

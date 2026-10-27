@@ -427,7 +427,7 @@ each forbidden statement is. vlmkit judges the motion from that:
   loop-seam        a repeating animation's run ends where the next does not begin (a 350deg spin)
   pushed           moves with no animation of its own: a layout property animated elsewhere (warn)
   invisible-blocker at rest it is transparent and still takes clicks at its centre
-  replayed         after rest, as the page's timers run (3s), it is replaced by a new element that
+  replayed         after rest, as the page's timers run (up to 10s), it is replaced by a new element that
                    plays its animation again (a re-render); the same element starting again is a warn
   stroke-incomplete a stroke drawing itself ends part drawn (a dash shorter than its line)
   mirrored         a face turned past edge-on is seen backwards (backface-visibility)
@@ -1460,7 +1460,8 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
         .catch(() => []);
       // After rest, the page's own timers: a quote re-rendered by innerHTML every second replaced
       // its price with a new element whose entrance played again, and the frames, which end at
-      // rest, read "no fail" (round 11). The clock runs on for 3s and each target is looked at.
+      // rest, read "no fail" (round 11). The clock runs on, up to 10s, while timers are due, and
+      // each target is looked at every 100ms; it stops once every target has replayed twice.
       const replays: { selector: string; message: string; warn?: boolean }[] = [];
       const due = forever || o.selectors.length === 0 ? null : await timeline.pending().catch(() => null);
       if (due && due.timers > 0) {
@@ -1475,8 +1476,16 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
           replaced: [] as number[],
           restarted: [] as number[],
           names: new Set<string>(),
+          // Still playing from the step before: one run seen twice is not two starts.
+          wasActive: false,
         }));
-        for (let t = last + 100; t <= last + 3000; t += 100) {
+        for (let t = last + 100; t <= last + 10_000; t += 100) {
+          if (seen.every((s) => s.replaced.length + s.restarted.length >= 2)) break;
+          // Every 1s, whether anything is still due: a page whose timers are spent has said all.
+          if ((t - last) % 1000 < 100) {
+            const left = await timeline.pending().catch(() => null);
+            if (left && left.timers === 0) break;
+          }
           await timeline.at(t);
           const now = await page
             .evaluate(
@@ -1508,7 +1517,8 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
             if (!x) return;
             const s = seen[i]!;
             if (x.fresh && x.active.length > 0) s.replaced.push(t);
-            else if (x.active.length > 0 && !s.restarted.some((r) => t - r <= 100)) s.restarted.push(t);
+            else if (x.active.length > 0 && !s.wasActive) s.restarted.push(t);
+            s.wasActive = x.active.length > 0;
             x.active.forEach((n) => s.names.add(n));
           });
         }

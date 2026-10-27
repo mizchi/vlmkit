@@ -61,6 +61,7 @@ const story = (frames: readonly Uint8Array[], options: Parameters<typeof sequenc
   return buildStoryboard(s.entries, s.pixels, { ignore });
 };
 
+const SOURCE = { tool: "t", url: "u", viewport: { width: W, height: H }, deviceScaleFactor: 1, clock: "held" as const };
 const blank = frame([]);
 const dot: Paint = { x: 5, y: 6, w: 4, h: 3, rgb: [0, 0, 0] };
 const repeat = (f: Uint8Array, n: number) => Array.from({ length: n }, () => f);
@@ -182,6 +183,44 @@ describe("buildStoryboard: the planted cases", () => {
         }
       }
     }
+  });
+
+  test("a change done before frame 0 is told from the page before the action", () => {
+    // A hover colour that snapped: every frame already shows it, so the frames hold no event.
+    const after = frame([dot]);
+    const s = sequence(repeat(after, 10));
+    const story = buildStoryboard(s.entries, s.pixels, { before: blank });
+    assert.equal(story.events.length, 0);
+    assert.deepEqual(story.beforeFirst, { over: 12, box: { x: 5, y: 6, width: 4, height: 3 } });
+    assert.match(
+      storyboardSummary(story, SOURCE, s.entries),
+      /Before frame 0: the page just before the action \(before\.png\) differs from frame 0 by 12 px over 5,6 4x3/,
+    );
+    assert.equal(buildStoryboard(s.entries, s.pixels, { before: after }).beforeFirst, undefined);
+  });
+
+  test("a change that is largest at its start and settles near where it began is named an entrance played again", () => {
+    // Text A (a wide block) goes at once, and text B, almost as wide, fades in over 6 frames.
+    const a = frame([{ x: 4, y: 4, w: 30, h: 8, rgb: [0, 0, 0] }]);
+    const b = (k: number) =>
+      frame([
+        { x: 4, y: 4, w: 30, h: 8, rgb: [255 - k * 40, 255 - k * 40, 255 - k * 40] },
+        { x: 34, y: 4, w: 2, h: 8, rgb: [0, 0, 0] },
+      ]);
+    const frames = [
+      ...repeat(a, 8),
+      b(1),
+      b(2),
+      b(3),
+      b(4),
+      b(5),
+      b(6),
+      ...repeat(frame([{ x: 4, y: 4, w: 32, h: 8, rgb: [0, 0, 0] }]), 10),
+    ];
+    const s = sequence(frames);
+    const story = buildStoryboard(s.entries, s.pixels);
+    const summary = storyboardSummary(story, SOURCE, s.entries);
+    assert.match(summary, /E1: it differs most near its start .* an entrance playing again/);
   });
 
   test("blinks at changing intervals, or over different boxes, are not a loop", () => {

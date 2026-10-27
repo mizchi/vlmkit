@@ -247,6 +247,8 @@ export interface StoryEvent {
    * new state at its start (motion-repair round 6).
    */
   edgeOnly?: true;
+  /** change / drift: how far the state it settled in differs from the state it left, over the floor. */
+  endOver?: number;
 }
 
 export interface StoryState {
@@ -295,6 +297,8 @@ export interface Storyboard {
    * read as one "transient" a second, every second (motion-repair round 10); it is one loop.
    */
   loops?: StoryLoop[];
+  /** The page just before the action differs from frame 0 by this, over the floor. */
+  beforeFirst?: { over: number; box: Box | null };
 }
 
 export interface StoryLoop {
@@ -371,6 +375,12 @@ export interface StoryboardOptions {
   settleMs?: number;
   /** Boxes, in the frames' pixels, no comparison looks at: a video, a clock the capture cannot hold. */
   ignore?: readonly Box[];
+  /**
+   * The page just before the action the frames follow (`inspect interact`'s `before.png`), in the
+   * frames' size. A hover whose colour snapped had changed by frame 0, and the frames read "No
+   * events" (round 11): a difference here is what happened before the first frame.
+   */
+  before?: Uint8Array;
 }
 
 /** The gaps between consecutive instants. */
@@ -639,8 +649,9 @@ export function buildStoryboard(
       spanStart = -1;
       break;
     }
+    const endOver = vsAnchor(settled).over;
     const to = stateOf(settled);
-    events.push({ ...event, to, settled: ref(settled) });
+    events.push({ ...event, to, settled: ref(settled), endOver });
     timeline.push({ event: id, from: ref(s), to: ref(settled) });
     state = to;
     // The anchor is the state's own frame, on a return to an earlier state too: anchored on the
@@ -678,6 +689,11 @@ export function buildStoryboard(
     ...(() => {
       const loops = findLoops(events);
       return loops.length > 0 ? { loops } : {};
+    })(),
+    ...(() => {
+      if (!options.before || options.before.length !== width * height * 4) return {};
+      const d = frameDelta(options.before, pixels.pixels(0), width, height, { floor, mask });
+      return d.over > 0 ? { beforeFirst: { over: d.over, box: d.box } } : {};
     })(),
   };
 }
@@ -766,6 +782,12 @@ export function storyboardSummary(
     "",
     "## Events",
     "",
+    ...(story.beforeFirst
+      ? [
+          `Before frame 0: the page just before the action (before.png) differs from frame 0 by ${story.beforeFirst.over} px${story.beforeFirst.box ? ` over ${boxText(story.beforeFirst.box)}` : ""}. That change was done by the first frame — in one step, a snap, unless an event below goes on with it.`,
+          "",
+        ]
+      : []),
   ];
   if (story.events.length === 0) {
     lines.push(
@@ -858,6 +880,19 @@ export function storyboardSummary(
       );
     }
     if (e.unstable > 0) notes.push(`${e.id}: ${e.unstable} of its frames never captured the same twice.`);
+    // Largest at its first frame and less after: what was there went at once and came back over
+    // the event. A quote re-rendered every second read only as a "change" (round 11).
+    if (
+      e.kind === "change" &&
+      e.frames >= 3 &&
+      e.endOver !== undefined &&
+      e.peak.n - e.first.n <= Math.max(2, Math.floor(e.frames * 0.2)) &&
+      e.peak.over >= 2 * Math.max(1, e.endOver)
+    ) {
+      notes.push(
+        `${e.id}: it differs most near its start (${e.peak.over} px at ${ms(e.peak.atMs)} ms) and ends ${e.endOver} px from ${e.from}: what was in its box went at once and came back over ${ms(e.settled!.atMs - e.first.atMs)} ms — an entrance playing again (an element re-created, a class reset), not a move.`,
+      );
+    }
   }
   const video = source.video;
   // On the stream clock, consecutive indices are every frame the recording holds between them.

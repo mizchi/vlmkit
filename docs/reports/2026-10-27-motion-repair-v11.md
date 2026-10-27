@@ -95,7 +95,35 @@ forbids it (`list_sessions`, read only). It said so in its report. Nothing else 
     when the seek had already taken it to its end. A banner hidden on `animationend` removes its
     finished animation, and the line had read as a fault.
 
-## Deferred
+## Deferred, and fixed after the round
+
+Every item below is fixed.
+
+- **`check animation --virtual-time` names an entrance that a re-render replays.** While the clock
+  runs, the sweep tells a new animation object from one already seen. If one begins again under a
+  key it has already seen, it is `animation-replayed`. On a new element (a re-render) it is a
+  suspect: `span.price rise plays again by 1000ms, 2000ms of virtual time on a new element`. On the
+  same element it is a warn. There are now 227 rules.
+- **A value updated in place is not motion.** The virtual clock now counts the animation-frame
+  callbacks and timer runs it makes. With no frame callback, no animation begun, and timers at most
+  5 a second, the sweep's change is an update: `script-driven change …: a timer updates it in place
+  (2 run(s), no animation frame) — not motion`. It is no longer counted as motion still running
+  under reduced motion. A `setInterval` that moves something every 16ms is still motion. On the
+  reference quote page, reduced motion now names only the entrance.
+- **`snapshot storyboard`**:
+  - An `inspect interact` frames step now writes `before.png`, the page just before its action,
+    and names it in `frames.json` (`source.before`). The storyboard compares it with frame 0. The
+    snapped hover reads `Before frame 0: the page just before the action differs from frame 0 by
+    7476 px — done by the first frame`. Before, it read only "No events".
+  - A change that is largest near its start and ends close to where it began gets a note: `an
+    entrance playing again (an element re-created, a class reset), not a move`. The broken quote's
+    two re-renders get it, and the reference page's text-only updates do not.
+- **`check motion`** marks a transition on `background` over a gradient in its sample line: `(over a
+  gradient, which does not interpolate: it steps — check animation's discrete-transition)`.
+- **`replayed` looks up to 10s past rest** while timers are due. It stops once every target has
+  replayed twice, or once no timer is left. A quote that re-renders every 5s is caught at 5000ms.
+
+## Deferred (as written after the round)
 
 - `check animation --virtual-time` reads the replaying quote's entrance as `visible` with no
   `seek-ineffective`. It also counts the required one-second ticker as motion still running
