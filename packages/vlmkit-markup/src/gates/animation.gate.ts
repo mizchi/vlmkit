@@ -109,6 +109,24 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       docs: "Seen at rest without prefers-reduced-motion and at opacity 0 (or 8px+ from its place) at rest with it: `animation: none` in the reduce rule removed the animation and the fill that held its end state, so its base style (opacity 0, a start transform) shows. The preference is honoured and the content is gone.",
     },
     {
+      id: "layout-animation",
+      title: "An animated layout property moves other elements",
+      severity: "warn",
+      docs: "An in-flow element animating margin, padding, width, height or font size reflows what comes after it: their boxes differ between the start and the end of its first run, with no animation of their own. A warn: an accordion pushing the content below it is meant. Otherwise animate transform.",
+    },
+    {
+      id: "loop-seam",
+      title: "A repeating animation jumps where one run meets the next",
+      severity: "suspect",
+      docs: "The pose 1ms before the end of a run against the pose as the next begins, next to the steps 1ms either side. A spinner keyed to 350deg turns 10deg in one step every second. `steps()` timing and `alternate` are left out.",
+    },
+    {
+      id: "stroke-incomplete",
+      title: "A stroke drawing itself rests part drawn",
+      severity: "suspect",
+      docs: "A dashed SVG stroke whose dash pattern (stroke-dasharray, stroke-dashoffset, pathLength) changes over the animation and leaves 2-98% of its line drawn at rest: a dash shorter than the line.",
+    },
+    {
       id: "delayed-entrance",
       title: "An element is held unseen through a long animation-delay",
       severity: "warn",

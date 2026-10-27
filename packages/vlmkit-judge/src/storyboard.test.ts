@@ -168,9 +168,38 @@ describe("buildStoryboard: the planted cases", () => {
             assert.equal(e.frames, onFrames, label);
             assert.equal(e.kind, onFrames === 1 ? "glitch" : "transient", label);
           }
+          // Three or more at one period are also one loop, the events kept as they are.
+          const loops = story(frames).loops ?? [];
+          if (k >= 3) {
+            assert.equal(loops.length, 1, label);
+            assert.deepEqual(
+              loops[0]!.events,
+              events.map((e) => e.id),
+              label,
+            );
+            assert.ok(Math.abs(loops[0]!.periodMs - frameTimeMs(onFrames + offFrames)) < 1e-6, label);
+          } else assert.equal(loops.length, 0, label);
         }
       }
     }
+  });
+
+  test("blinks at changing intervals, or over different boxes, are not a loop", () => {
+    const on = frame([dot]);
+    const elsewhere = frame([{ ...dot, x: 25, y: 18 }]);
+    const frames = repeat(blank, 5);
+    for (const [f, off] of [
+      [on, 2],
+      [on, 9],
+      [on, 3],
+      [on, 14],
+    ] as const) {
+      frames.push(f, f, ...repeat(blank, off));
+    }
+    assert.equal(story(frames).loops, undefined, "periods 4, 11, 5 frames");
+    const mixed = repeat(blank, 5);
+    for (const f of [on, elsewhere, on, elsewhere]) mixed.push(f, f, blank, blank);
+    assert.equal(story(mixed).loops, undefined, "two boxes");
   });
 
   test("a slow fade is a drift, with the frames it moved below the floor named", () => {

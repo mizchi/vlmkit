@@ -369,7 +369,13 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   animation's pose either side of the end of a run; a dashed stroke's drawn share comes from its
   dash pattern, is a channel, and `stroke-incomplete` fails one that ends part drawn. Points of a
   target's box outside its own shape (a turned round box's corners, the empty part of a stroke's box)
-  are not counted as covered.
+  are not counted as covered. Its deferred items: `check animation` names all three with no target
+  (`layout-animation` warn — the boxes of elements with no animation of their own at the start and
+  end of an in-flow layout animation's first run; `loop-seam` and `stroke-incomplete` suspect; 225
+  rules), `infinite-animation` on a loading indicator says it is meant to run forever, `snapshot
+  storyboard` groups repeating returns into `loops`, integrity's ink counts a surface 3 levels off the
+  page (a white card on `#f5f6f8` read as a near-empty render), and `diff html` says an absent Crater
+  in one dim line.
 
 ## Generated figures (raster images)
 
@@ -614,7 +620,9 @@ States and events from the pixels alone, relative to an anchor (the frame of the
 **glitch** one frame off and back; **transient** back within 5000ms whatever it held (a toast is
 one); **change** not back, ending at the first 100ms of byte-identical frames — the next state, whose frame
 is the anchor from then on (an earlier state's own frame when the hold is within its floor);
-**drift** a change no step of which, inside its box, crosses the floor (a channel moving by more than 8). Pure half
+**drift** a change no step of which, inside its box, crosses the floor (a channel moving by more than 8);
+a **loop** three or more returns from one state over one box, of one length, one period apart (a
+spinner read as a transient a second, every second — `story.json` `loops`, the events kept). Pure half
 `@mizchi/vlmkit-judge/storyboard.ts` (`buildStoryboard`, `storyboardSummary`, `storyboardBrief`);
 CLI `src/cli/commands/storyboard-cli.ts` (an artifact command on the SPECS path, exits 0, no verdict:
 the brief is for the agent's own vision and nothing reads its answer back). Measured building it,
@@ -1498,7 +1506,7 @@ case at 0.23.0.
 | `docs/reports/2026-08-06-gate-rule-cost-bench.md` | Measured gate/rule execution cost: where a ruleset's time goes, why per-rule cost is attributed rather than isolated, why suppression saves nothing |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
 | `docs/design/package-decomposition.md` | **Splitting vlmkit by layer** (collector / pure judge / driver / loop / diagrams): what was measured, phase 1 (`vlmkit-judge`) and the proposed phases 2-5 |
-| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 35 gates + 222 rules, behavior changes, what is deliberately not a gate |
+| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 35 gates + 225 rules, behavior changes, what is deliberately not a gate |
 | `docs/design/moonbit-boundary.md` | **TS ↔ MoonBit boundary**: what the positional FFI costs (61 commands, 233 args, 2 duplicated dispatch tables), the JSON boundary that replaces it for new logic, how to add a command, and which pure logic belongs in MoonBit versus which deliberately does not |
 | `docs/crater-css-status.md` | Crater CSS rendering verification status |
 | `docs/reset-css-comparison.md` | Reset CSS domain knowledge |

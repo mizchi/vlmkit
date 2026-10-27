@@ -1072,7 +1072,11 @@ vlmkit check animation <html|url>              # Frame-sampled animation evaluat
                                                # mask hints), behavioral prefers-reduced-motion parity, and
                                                # uncontrolled motion (rAF/video/GIF) that WAAPI can't pause
                                                # Motion from load only: what a click, a :hover or a scroll
-                                               # starts is inspect motion's (--click/--hover/--scroll)
+                                               # starts is inspect motion's (--click/--hover/--scroll).
+                                               # Beyond an animation's own box: layout-animation (an
+                                               # in-flow margin/height animation moving other elements),
+                                               # loop-seam (a repeating run that does not close),
+                                               # stroke-incomplete (a dash shorter than its line)
 vlmkit check flash <html|url|frames.json|video>  # WCAG 2.3.1 Three Flashes: every 60fps frame of page time on
                                                # the held clock, per-pixel transitions (ΔL ≥ 0.1, darker
                                                # < 0.8; saturated red), >6 in 1s over >21,824 CSS px² of a

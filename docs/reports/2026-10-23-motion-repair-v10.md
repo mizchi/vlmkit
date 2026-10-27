@@ -97,7 +97,37 @@ and that the notice is pinned under the bar, in front.
   - The dynamic-markup skill gave a source-only invocation. It now names `npx vlmkit`, or
     `node dist/vlmkit.mjs` in a checkout.
 
-## Deferred
+## Deferred, and fixed after the round (2026-10-27)
+
+Every item below is fixed. On the 88 other animated pages of the repo (`fixtures/` and
+`examples/`, the broken motion-repair pages and the flash fixtures left out), none of the three new
+`check animation` rules fires.
+
+- **`check animation` names all three with no target.**
+  - `layout-animation` (warn): an in-flow element animating a layout property, with the elements
+    whose boxes differ between the start and the end of its first run (`div.notice drop animates
+    margin-top … moves 1 element(s) … article 56px`).
+  - `loop-seam` (suspect): the same 2ms / 1ms either side of the end of a run as `inspect motion`.
+  - `stroke-incomplete` (suspect): a dashed stroke that rests part drawn (`rests 54% drawn`).
+
+  The reference pages raise none of them. `check integrity --timeline` was left as it is: it judges
+  the layout at each instant, and none of the three is a layout defect at any one instant.
+- **`snapshot storyboard`** groups three or more returns from one state, over one box, of one length
+  and one period apart into a loop (`loops` in `story.json`, a Loops section in SUMMARY.md). The
+  spinner is one loop of 1000ms. Whether a run closes is not in its pixels at the 8-level floor, and
+  the section says that `check animation` measures it.
+- **`infinite-animation` on a loading indicator** (`role="progressbar"` / `status`, `aria-busy`, or a
+  `spin` / `load` / `busy` / `progress` name) now leads with "which is meant to: that is not a defect
+  of the page". Bounding the count comes last.
+- **`degenerate-render` on the spinner card**: `#fff` on `#f5f6f8` differs by 10, under the ink
+  tolerance of 12, so the card was not counted as ink. A browser's screenshot is lossless, so
+  `check integrity` now counts 3 levels as ink. The scene path (`--elements --image`, possibly lossy)
+  keeps 12.
+- **`diff html` without Crater** prints `Crater is not running at ws://127.0.0.1:9222 (optional) —
+  breakpoints read from the pages' own @media rules` in one dim line. Any other Crater error is
+  still a warning.
+
+## Deferred (as written after the round)
 
 - `check animation` and `check integrity --timeline` still raise nothing on a sibling's layout
   animation, a loop seam or a short dash. `inspect motion` catches each of them now, given the

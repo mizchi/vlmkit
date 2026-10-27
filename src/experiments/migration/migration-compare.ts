@@ -504,6 +504,8 @@ interface BreakpointDiscoveryStatus {
   requestedBackend: BreakpointDiscoveryBackend;
   backendUsed: "regex" | "crater";
   fallbackReason?: string;
+  /** The fallback is the usual case (an optional Crater not running), said without a warning. */
+  fallbackExpected?: boolean;
   breakpoints: ResponsiveBreakpoint[];
   diagnostics?: BreakpointDiscoveryDiagnosticsSummary;
 }
@@ -1014,7 +1016,11 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     console.log();
     console.log(`  ${DIM}Breakpoint discovery: ${breakpointDiscoveryStatus.backendUsed}${RESET}`);
     if (breakpointDiscoveryStatus.fallbackReason) {
-      console.log(`  ${YELLOW}! ${breakpointDiscoveryStatus.fallbackReason}${RESET}`);
+      console.log(
+        breakpointDiscoveryStatus.fallbackExpected
+          ? `  ${DIM}${breakpointDiscoveryStatus.fallbackReason}${RESET}`
+          : `  ${YELLOW}! ${breakpointDiscoveryStatus.fallbackReason}${RESET}`,
+      );
     }
     if (breakpointDiscoveryStatus.breakpoints.length > 0) {
       console.log();
@@ -2852,10 +2858,15 @@ export async function discoverResponsiveBreakpointsForHtmlDocuments(
     if (backend === "crater") {
       throw new Error(`Crater breakpoint discovery failed: ${String(error)}`);
     }
+    // Crater is optional under `auto`: not running is the usual case, not a warning.
+    const notRunning = /ECONNREFUSED|ENOTFOUND|ECONNRESET/u.test(String(error));
     return {
       requestedBackend: backend,
       backendUsed: "regex",
-      fallbackReason: `Crater breakpoint discovery unavailable, falling back to regex: ${String(error)}`,
+      fallbackReason: notRunning
+        ? `Crater is not running at ${craterUrl} (optional) — breakpoints read from the pages' own @media rules`
+        : `Crater breakpoint discovery unavailable, falling back to regex: ${String(error)}`,
+      ...(notRunning ? { fallbackExpected: true } : {}),
       breakpoints: regexBreakpoints,
     };
   }

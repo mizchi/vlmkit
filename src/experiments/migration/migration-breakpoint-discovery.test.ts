@@ -155,6 +155,39 @@ describe("discoverResponsiveBreakpointsForHtmlDocuments", () => {
     assert.deepEqual(status.diagnostics.totals.unsupportedQueries, ["(prefers-color-scheme: dark)"]);
   });
 
+  it("says an optional Crater that is not running plainly, and anything else as a warning", async () => {
+    // `diff html` printed `Error: connect ECONNREFUSED 127.0.0.1:9222` as a warning on every run
+    // without Crater, which is most of them (motion-repair round 10).
+    const failing = (message: string): BreakpointDiscoveryClient => ({
+      ...createMockClient([]),
+      async connect() {
+        throw new Error(message);
+      },
+    });
+    const html = "<style>@media (min-width: 720px) { .card { display:block } }</style>";
+    const refused = await discoverResponsiveBreakpointsForHtmlDocuments(
+      [{ label: "page", html }],
+      "auto",
+      "ws://127.0.0.1:9222",
+      () => failing("connect ECONNREFUSED 127.0.0.1:9222"),
+    );
+    assert.equal(refused.backendUsed, "regex");
+    assert.equal(refused.fallbackExpected, true);
+    assert.match(refused.fallbackReason!, /^Crater is not running at ws:\/\/127\.0\.0\.1:9222 \(optional\)/);
+    assert.deepEqual(
+      refused.breakpoints.map((bp) => bp.valuePx),
+      [720],
+    );
+    const broken = await discoverResponsiveBreakpointsForHtmlDocuments(
+      [{ label: "page", html }],
+      "auto",
+      "ws://127.0.0.1:9222",
+      () => failing("protocol mismatch"),
+    );
+    assert.equal(broken.fallbackExpected, undefined);
+    assert.match(broken.fallbackReason!, /unavailable, falling back to regex: Error: protocol mismatch/);
+  });
+
   it("should include local external stylesheet breakpoints in regex fallback", async () => {
     const dir = await mkdtemp(join(tmpdir(), "vlmkit-breakpoints-"));
     try {

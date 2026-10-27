@@ -976,7 +976,9 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
       // A2 — pixel side, last (after webfont/img settling)
       const shot = PNG.sync.read(await page.screenshot({ fullPage: true }));
       const components = extractComponentsFromRgba(shot.data, shot.width, shot.height);
-      const inkRatio = measureInkRatio(shot.data, shot.width, shot.height);
+      // A browser's own screenshot is lossless, so a surface a few levels off the page counts: a
+      // white card on #f5f6f8 differs by 10 and read as a near-empty render at the default 12.
+      const inkRatio = measureInkRatio(shot.data, shot.width, shot.height, 3);
       const render = judgeRender(
         { componentCount: components.length, inkRatio, textBlocks: blocks.length },
         viewport.width,

@@ -260,7 +260,10 @@ describe("composed built-in registry", () => {
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
     // 221 → 222: `check animation` / `reduced-motion-hides` (suspect) — tiles left at opacity 0 by
     // `animation: none` under reduce, which every gate called honoured (motion-repair round 9).
-    assert.equal(total, 222);
+    // 222 → 225: `check animation` / `layout-animation` (warn), `loop-seam` and `stroke-incomplete`
+    // (suspect) — a margin-top notice shoving the article, a 350deg spinner and a dash shorter than
+    // its line passed every gate without a target (motion-repair round 10).
+    assert.equal(total, 225);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {

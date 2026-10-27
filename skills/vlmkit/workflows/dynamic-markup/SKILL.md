@@ -311,7 +311,12 @@ vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ea
   is `pushed` (warn) and names the layout property animated elsewhere (`margin-top` — animate
   `transform` instead). A repeating animation whose run does not end on the pose the next begins on
   is `loop-seam` (a 350deg spin). A stroke that draws itself is measured by its dash pattern, fitted
-  as its "drawn length", and fails `stroke-incomplete` when it ends part drawn. In motion-repair round 3 a wrong
+  as its "drawn length", and fails `stroke-incomplete` when it ends part drawn. `check animation`
+  names the same three with no target: `layout-animation` (warn: an in-flow element animating
+  margin / height moves elements with no animation of their own), `loop-seam` and
+  `stroke-incomplete` (suspect). Its `infinite-animation` on a loading indicator (`role="progressbar"`,
+  `aria-busy`, a `spin` / `load` name) says the spinner is meant to run forever; a brief that says it
+  turns forever is not contradicted by it. In motion-repair round 3 a wrong
   `transform-origin` and a stagger that was not one both read "follows ease-out exactly, no fail"
   until these existed.
 - **What it does not judge**: fps or jank, a target it is not told about, and anything under

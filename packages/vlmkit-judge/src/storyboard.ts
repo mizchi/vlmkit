@@ -289,6 +289,80 @@ export interface Storyboard {
   states: StoryState[];
   events: StoryEvent[];
   timeline: TimelineSpan[];
+  /**
+   * Returns that repeat one motion: three or more glitches or transients from one state, over one
+   * box, lasting the same frames (±1), one period apart (±20 ms and 5%). A spinner
+   * read as one "transient" a second, every second (motion-repair round 10); it is one loop.
+   */
+  loops?: StoryLoop[];
+}
+
+export interface StoryLoop {
+  /** The events it groups, in order. */
+  events: string[];
+  /** The state each run leaves and comes back to. */
+  state: string;
+  /** Median time from one run's first frame to the next's. */
+  periodMs: number;
+  box: Box;
+}
+
+/** Repeating returns grouped as loops (`Storyboard.loops`). */
+export function findLoops(events: readonly StoryEvent[]): StoryLoop[] {
+  const loops: StoryLoop[] = [];
+  const sameBox = (a: Box, b: Box) =>
+    Math.abs(a.x - b.x) <= 2 &&
+    Math.abs(a.y - b.y) <= 2 &&
+    Math.abs(a.width - b.width) <= 4 &&
+    Math.abs(a.height - b.height) <= 4;
+  let run: StoryEvent[] = [];
+  const flush = () => {
+    if (run.length >= 3) {
+      const gaps = run
+        .slice(1)
+        .map((e, i) => e.first.atMs - run[i]!.first.atMs)
+        .sort((a, b) => a - b);
+      const box = run.reduce<Box | null>((b, e) => unionBox(b, e.box), null)!;
+      loops.push({
+        events: run.map((e) => e.id),
+        state: run[0]!.from,
+        periodMs: gaps[Math.floor(gaps.length / 2)]!,
+        box,
+      });
+    }
+    run = [];
+  };
+  for (const e of events) {
+    const returns = (e.kind === "glitch" || e.kind === "transient") && e.back !== undefined;
+    const prev = run[run.length - 1];
+    if (
+      returns &&
+      prev !== undefined &&
+      e.from === prev.from &&
+      sameBox(e.box, prev.box) &&
+      Math.abs(e.frames - prev.frames) <= 1 &&
+      (run.length < 2 ||
+        (() => {
+          const period = run[1]!.first.atMs - run[0]!.first.atMs;
+          return Math.abs(e.first.atMs - prev.first.atMs - period) <= 20 + period * 0.05;
+        })())
+    ) {
+      run.push(e);
+      continue;
+    }
+    // A period that broke off: the event before may still begin the next run with this one.
+    const carry =
+      returns &&
+      prev !== undefined &&
+      run.length < 3 &&
+      e.from === prev.from &&
+      sameBox(e.box, prev.box) &&
+      Math.abs(e.frames - prev.frames) <= 1;
+    flush();
+    if (returns) run = carry ? [prev!, e] : [e];
+  }
+  flush();
+  return loops;
 }
 
 export interface StoryboardOptions {
@@ -601,6 +675,10 @@ export function buildStoryboard(
     states,
     events,
     timeline,
+    ...(() => {
+      const loops = findLoops(events);
+      return loops.length > 0 ? { loops } : {};
+    })(),
   };
 }
 
@@ -710,6 +788,15 @@ export function storyboardSummary(
       "",
       "Began: between the last frame that showed the state and the first that did not. Ended: between the last frame that differed and the first back (glitch, transient), or between the last frame that moved and the first of the hold (change, drift). Box: every pixel the event moved over the floor, in the frames' pixels.",
     );
+  }
+  if (story.loops && story.loops.length > 0) {
+    lines.push("", "## Loops", "");
+    for (const loop of story.loops) {
+      const span = `${loop.events[0]}–${loop.events[loop.events.length - 1]}`;
+      lines.push(
+        `- ${span} (${loop.events.length} runs) repeat one motion every ${ms(loop.periodMs)} ms over ${boxText(loop.box)} px, leaving ${loop.state} and coming back to it: one loop, not ${loop.events.length} departures. Whether each run ends on the pose the next begins on is not in these pixels at this floor; \`check animation\` (loop-seam) measures it.`,
+      );
+    }
   }
   lines.push("", "## States", "", "| State | Frame | Visits |", "|---|---|---|");
   for (const s of story.states) lines.push(`| ${s.id} | ${ms(s.frame.atMs)} ms (n ${s.frame.n}) | ${s.visits} |`);

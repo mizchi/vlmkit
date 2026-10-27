@@ -1068,3 +1068,47 @@ test(
     );
   },
 );
+
+test(
+  "runAnimationEval: a layout property animated in the flow, a loop seam and a short dash are each named",
+  { timeout: 300_000 },
+  async () => {
+    // fixtures/motion-repair round 10: every gate passed all three without a target.
+    const dir = join(import.meta.dirname, "../../../fixtures/motion-repair");
+    const kinds = async (file: string) =>
+      (await runAnimationEval({ source: join(dir, file), viewport: { width: 1280, height: 800 } })).issues.filter(
+        (i) => i.kind !== "reduced-motion-ignored",
+      );
+    const push = await kinds("broken/push.html");
+    assert.deepEqual(
+      push.map((i) => [i.kind, i.severity]),
+      [["layout-animation", "warn"]],
+    );
+    assert.match(
+      push[0]!.message,
+      /animates margin-top, a layout property, in the flow, so it moves 1 element\(s\) .*article.* 56px/,
+    );
+    const seam = await kinds("broken/seam.html");
+    assert.deepEqual(
+      seam.map((i) => i.kind),
+      ["loop-seam", "infinite-animation"],
+    );
+    assert.match(seam[0]!.message, /turns 10\.\d° in one step at the end of every run, .*rotate\(350deg\)/);
+    // A spinner is meant to run forever: the warn says so before anything about bounding it.
+    assert.match(
+      seam[1]!.message,
+      /runs forever, on what reads as a loading indicator \(role="progressbar"\), which is meant to/,
+    );
+    const draw = await kinds("broken/draw.html");
+    assert.deepEqual(
+      draw.map((i) => [i.kind, i.severity]),
+      [["stroke-incomplete", "suspect"]],
+    );
+    assert.match(draw[0]!.message, /rests 54% drawn: stroke-dasharray 40px .* on a line 73\.6 long/);
+    for (const file of ["reference/push.html", "reference/draw.html"]) assert.deepEqual(await kinds(file), [], file);
+    assert.deepEqual(
+      (await kinds("reference/seam.html")).map((i) => i.kind),
+      ["infinite-animation"],
+    );
+  },
+);

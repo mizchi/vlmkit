@@ -234,7 +234,10 @@ export type AnimationEvalIssueKind =
   | "motion-mostly-hidden"
   | "delayed-entrance"
   | "unknown-transition-property"
-  | "reduced-motion-hides";
+  | "reduced-motion-hides"
+  | "layout-animation"
+  | "loop-seam"
+  | "stroke-incomplete";
 
 export interface AnimationEvalIssue {
   kind: AnimationEvalIssueKind;
@@ -250,7 +253,7 @@ export interface AnimationEvalReport {
   evaluated: EvaluatedAnimation[];
   /** Max over finite animations of delay + duration × iterations; null when an infinite animation is present. */
   settleMs: number | null;
-  infinite: { selector: string; name: string }[];
+  infinite: { selector: string; name: string; indicator?: string }[];
   /** Present unless the reduced-motion pass was skipped or there were no animations. */
   reducedMotion?: {
     remainingCount: number;
@@ -470,7 +473,7 @@ export interface ReducedHidden {
 export interface DeriveIssuesInput {
   evaluated: EvaluatedAnimation[];
   settleMs: number | null;
-  infinite: { selector: string; name: string }[];
+  infinite: { selector: string; name: string; indicator?: string }[];
   reducedMotion?: { remainingCount: number; remaining: ReducedMotionRemaining[] };
   uncontrolledMotion?: FrameDeltaStat;
   virtualTime?: boolean;
@@ -480,6 +483,35 @@ export interface DeriveIssuesInput {
   unknownTransitions?: { selector: string; name: string }[];
   /** Seen at rest without the preference, hidden or out of place at rest under reduce. */
   reducedHidden?: ReducedHidden[];
+  /** What an animation does beyond its own box (`MOTION_SHAPE_SCRIPT`). */
+  shapes?: MotionShapes;
+}
+
+export interface MotionShapes {
+  /** An in-flow element animating a layout property, and what that moved. */
+  pushes: {
+    selector: string;
+    name: string;
+    props: string[];
+    moved: { selector: string; dx: number; dy: number }[];
+    count: number;
+  }[];
+  /** A repeating animation whose run ends off the pose the next begins on. */
+  seams: {
+    selector: string;
+    name: string;
+    channel: string;
+    step: number;
+    usual: number;
+    unit: string;
+    prop: string;
+    from: string | null;
+    to: string | null;
+  }[];
+  /** A dashed stroke drawing itself that rests part drawn. */
+  strokes: { selector: string; name: string; drawn: number; note: string }[];
+  /** A looping animation on a loading indicator, and why it reads as one. */
+  indicators: { index: number; selector: string; name: string; why: string }[];
 }
 
 /** A delay this long (ms) at least, with the element held unseen through it, is a `delayed-entrance`. */
@@ -506,6 +538,37 @@ export function deriveAnimationIssues(
       message: gone
         ? `${h.selector} rests at opacity ${h.reducedOpacity.toFixed(2)} under prefers-reduced-motion: reduce, and at ${h.opacity.toFixed(2)} without it: the reduce rule took its animation away, and with it the fill that showed it. Give it its end state in that rule (opacity: 1, transform: none), or make the hidden state the first keyframe's (fill: both) instead of the element's own.`
         : `${h.selector} rests ${Math.round(h.offPx)}px from its place under prefers-reduced-motion: reduce: the reduce rule took its animation away and left the element where the animation started. Give it its end state in that rule (transform: none).`,
+    });
+  }
+
+  // Round 10: a notice animating margin-top shoved the article below it, a spinner keyed to
+  // 350deg jumped every second, and a check mark's dash stopped half way: every gate passed all
+  // three, because each defect is outside the animated element's own box or outside one run.
+  for (const push of input.shapes?.pushes ?? []) {
+    const moved = push.moved.map((m) => `${m.selector} ${Math.round(Math.hypot(m.dx, m.dy))}px`).join(", ");
+    issues.push({
+      kind: "layout-animation",
+      severity: "warn",
+      selector: push.selector,
+      message: `${push.selector} \`${push.name}\` animates ${push.props.map((p) => p.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)).join(", ")}, a layout property, in the flow, so it moves ${push.count} element(s) that have no animation of their own: ${moved}${push.count > push.moved.length ? ", …" : ""}. If they are meant to stay put, animate transform instead (or take ${push.selector} out of the flow); if pushing them is the design (an accordion opening), this is it.`,
+    });
+  }
+  for (const seam of input.shapes?.seams ?? []) {
+    const keyed = seam.from !== null && seam.to !== null ? ` (its keyframes run from ${seam.from} to ${seam.to})` : "";
+    const what = seam.channel === "turn" ? "turns" : seam.channel === "opacity" ? "fades" : "jumps";
+    issues.push({
+      kind: "loop-seam",
+      severity: "suspect",
+      selector: seam.selector,
+      message: `${seam.selector} \`${seam.name}\` ${what} ${seam.step.toFixed(1)}${seam.unit} in one step at the end of every run, against ${seam.usual.toFixed(2)}${seam.unit} a ms either side${keyed}: the run ends off the pose the next begins on. End it on the same pose it starts on (360deg for a turn, a whole copy for a ticker).`,
+    });
+  }
+  for (const stroke of input.shapes?.strokes ?? []) {
+    issues.push({
+      kind: "stroke-incomplete",
+      severity: "suspect",
+      selector: stroke.selector,
+      message: `${stroke.selector} \`${stroke.name}\` draws its stroke and rests ${Math.round(stroke.drawn * 100)}% drawn: ${stroke.note}. A dash shorter than the line leaves the rest of it off; make the dash (and the offset it starts from) at least the line's length, or set pathLength and use that.`,
     });
   }
 
@@ -608,12 +671,16 @@ export function deriveAnimationIssues(
       // mentions the CSS-level option (bound the iteration count), which is what I
       // did." The page-side fix goes first now; the harness ones stay for the case
       // where the animation is meant to run forever.
-      message:
-        `${anim.selector} animation \`${anim.name}\` runs forever — the page never settles.` +
-        ` To fix the page, give it a bounded \`animation-iteration-count\` (or stop it once its work is done).` +
-        ` If it is meant to run forever, the capture side has to absorb it instead:` +
-        ` mask it with \`vlmkit snapshot <url> --mask "${anim.selector}"\` (that flag belongs to \`snapshot\` / \`diff html\`, not to this gate)` +
-        ` or pause animations before screenshots.`,
+      message: anim.indicator
+        ? // A spinner's brief says it turns forever; leading with "bound it" contradicted it (round 10).
+          `${anim.selector} animation \`${anim.name}\` runs forever, on what reads as a loading indicator (${anim.indicator}), which is meant to: that is not a defect of the page.` +
+          ` The capture side absorbs it: mask it with \`vlmkit snapshot <url> --mask "${anim.selector}"\` (that flag belongs to \`snapshot\` / \`diff html\`, not to this gate) or pause animations before screenshots.` +
+          ` If it should stop once its work is done, give it a bounded \`animation-iteration-count\` or remove it then.`
+        : `${anim.selector} animation \`${anim.name}\` runs forever — the page never settles.` +
+          ` To fix the page, give it a bounded \`animation-iteration-count\` (or stop it once its work is done).` +
+          ` If it is meant to run forever, the capture side has to absorb it instead:` +
+          ` mask it with \`vlmkit snapshot <url> --mask "${anim.selector}"\` (that flag belongs to \`snapshot\` / \`diff html\`, not to this gate)` +
+          ` or pause animations before screenshots.`,
     });
   }
 
@@ -961,6 +1028,166 @@ ${ANIMATION_HELPERS_JS}
   return out;
 })()`;
 
+/**
+ * What an animation does beyond its own box, read from the held animations themselves
+ * (motion-repair round 10, where each of these passed every gate):
+ * - `pushes`: an in-flow element animating a layout property (`margin-top`) moves the elements
+ *   after it — their boxes at the start and the end of its first run differ.
+ * - `seams`: a repeating animation whose run does not end on the pose the next one begins on
+ *   (a spinner keyed to 350deg jumps 10deg a second). The step across the end of a run against
+ *   the steps either side of it; `steps()` timing is left out (every step jumps by design).
+ * - `strokes`: a dashed SVG stroke drawing itself that rests part drawn (a dash shorter than
+ *   its line), from the dash pattern along the path's length.
+ * - `indicators`: a looping animation on a loading indicator (role progressbar / status,
+ *   aria-busy, or named spin / load / busy), which is meant to run forever.
+ * Each animation's time is put back as it was found.
+ */
+const MOTION_SHAPE_SCRIPT = `(() => {
+${ANIMATION_HELPERS_JS}
+  const anims = window.__vlmkitAnims || [];
+  const LAYOUT = /^(margin|padding|width|height|minWidth|minHeight|maxWidth|maxHeight|borderWidth|border(Top|Right|Bottom|Left)Width|fontSize|lineHeight|flexBasis|gap|rowGap|columnGap|gridTemplate)/;
+  const nums = (v) => (String(v).match(/-?\\d*\\.?\\d+(e-?\\d+)?/g) || []).map(Number);
+  const pose = (el, props) => {
+    const cs = getComputedStyle(el);
+    const out = {};
+    for (const p of props) {
+      if (p === "transform") {
+        const m = new DOMMatrix(cs.transform === "none" ? undefined : cs.transform);
+        out.turn = (Math.atan2(m.b, m.a) * 180) / Math.PI;
+        out.x = m.e;
+        out.y = m.f;
+        out.scale = Math.hypot(m.a, m.b) * 100;
+      } else if (p === "opacity") out.opacity = Number(cs.opacity) * 100;
+      else nums(cs[p]).forEach((n, i) => { out[p + i] = n; });
+    }
+    return out;
+  };
+  const diff = (a, b) => {
+    const d = {};
+    for (const k of Object.keys(a)) {
+      let v = Math.abs((b[k] ?? 0) - a[k]);
+      if (k === "turn") v = Math.min(v, 360 - v);
+      d[k] = v;
+    }
+    return d;
+  };
+  const unit = (k) => (k === "turn" ? "°" : k === "opacity" || k === "scale" ? "%" : "px");
+  const describe = (el) => {
+    let n = el, why = null;
+    for (let depth = 0; n && depth < 4 && !why; n = n.parentElement, depth++) {
+      const role = n.getAttribute && n.getAttribute("role");
+      if (role === "progressbar" || role === "status") why = 'role="' + role + '"';
+      else if (n.getAttribute && n.getAttribute("aria-busy") === "true") why = 'aria-busy="true"';
+    }
+    return why;
+  };
+  const out = { pushes: [], seams: [], strokes: [], indicators: [] };
+  anims.forEach((anim, index) => {
+    const el = anim.effect && anim.effect.target;
+    if (!el || !anim.effect.getComputedTiming) return;
+    const t = anim.effect.getComputedTiming();
+    const d = typeof t.duration === "number" ? t.duration : 0;
+    if (!(d > 0)) return;
+    const delay = t.delay || 0;
+    const props = keyframeProps(anim);
+    const saved = anim.currentTime;
+    const selector = stableSelector(el);
+    const name = animationName(anim);
+    try {
+      const repeats = !Number.isFinite(t.iterations) || t.iterations > 1;
+      if (repeats) {
+        const why = describe(el) || (/spin|load|busy|progress/i.test(name + " " + (el.className && el.className.baseVal !== undefined ? el.className.baseVal : el.className)) ? "named " + name : null);
+        if (why) out.indicators.push({ index, selector, name, why });
+      }
+      const frames = anim.effect.getKeyframes ? anim.effect.getKeyframes() : [];
+      const stepped = [t.easing || "", ...frames.map((k) => k.easing || "")].some((e) => /steps|step-/.test(e));
+      if (repeats && !stepped && !String(t.direction).startsWith("alternate") && props.length > 0) {
+        const at = (ms) => { anim.currentTime = ms; return pose(el, props); };
+        const end = delay + d;
+        const a = at(end - 2), b = at(end - 1), c = at(end + 0.001), e = at(end + 1);
+        const before = diff(a, b), across = diff(b, c), after = diff(c, e);
+        for (const k of Object.keys(across)) {
+          const usual = Math.max(before[k], after[k]);
+          if (across[k] >= 2 && across[k] > 4 * usual + 0.5) {
+            const first = frames[0], last = frames[frames.length - 1];
+            const prop = k === "turn" || k === "x" || k === "y" || k === "scale" ? "transform" : k.replace(/\\d+$/, "");
+            out.seams.push({
+              selector, name, channel: k, step: across[k], usual, unit: unit(k),
+              from: first && first[prop] !== undefined ? String(first[prop]) : null,
+              to: last && last[prop] !== undefined ? String(last[prop]) : null,
+              prop,
+            });
+            break;
+          }
+        }
+      }
+      const cs = getComputedStyle(el);
+      const inFlow = cs.position !== "absolute" && cs.position !== "fixed";
+      const layoutProps = props.filter((p) => LAYOUT.test(p));
+      if (inFlow && layoutProps.length > 0) {
+        const skip = new Set();
+        for (let n = el; n; n = n.parentElement) skip.add(n);
+        const others = [...document.body.querySelectorAll("*")].filter((n) => !skip.has(n) && !el.contains(n)).slice(0, 2000);
+        const rects = () => others.map((n) => n.getBoundingClientRect());
+        anim.currentTime = delay;
+        const start = rects();
+        anim.currentTime = delay + d - 0.001;
+        const finish = rects();
+        const moved = [];
+        others.forEach((n, i) => {
+          const s0 = start[i], s1 = finish[i];
+          if (s0.width === 0 && s0.height === 0 && s1.width === 0 && s1.height === 0) return;
+          const dx = s1.x - s0.x, dy = s1.y - s0.y;
+          if (Math.hypot(dx, dy) < 2) return;
+          // Only the outermost of what moved together: a moved paragraph's text moves with it.
+          const parent = n.parentElement;
+          const pi = parent ? others.indexOf(parent) : -1;
+          if (pi >= 0) {
+            const pdx = finish[pi].x - start[pi].x, pdy = finish[pi].y - start[pi].y;
+            if (Math.abs(pdx - dx) < 1 && Math.abs(pdy - dy) < 1) return;
+          }
+          moved.push({ selector: stableSelector(n), dx, dy });
+        });
+        if (moved.length > 0) out.pushes.push({ selector, name, props: layoutProps, moved: moved.slice(0, 3), count: moved.length });
+      }
+      if (el instanceof SVGGeometryElement && Number.isFinite(t.iterations) && props.some((p) => p === "strokeDashoffset" || p === "strokeDasharray")) {
+        const drawnShare = () => {
+          const st = getComputedStyle(el);
+          if (!st.strokeDasharray || st.strokeDasharray === "none") return 1;
+          const dash = st.strokeDasharray.split(/[ ,]+/).map(parseFloat).filter((v) => Number.isFinite(v));
+          const pattern = dash.length % 2 === 1 ? [...dash, ...dash] : dash;
+          const period = pattern.reduce((x, y) => x + y, 0);
+          const len = el.getTotalLength();
+          const attr = Number(el.getAttribute("pathLength"));
+          const scaleLen = Number.isFinite(attr) && attr > 0 ? attr / len : 1;
+          const off = parseFloat(st.strokeDashoffset) || 0;
+          if (!(period > 0 && len > 0)) return 1;
+          let on = 0;
+          const step = len / 400;
+          for (let x = step / 2; x < len; x += step) {
+            let ph = (((x * scaleLen + off) % period) + period) % period;
+            for (let k = 0; k < pattern.length; k++) {
+              if (ph < pattern[k]) { if (k % 2 === 0) on++; break; }
+              ph -= pattern[k];
+            }
+          }
+          return { drawn: on / 400, note: "stroke-dasharray " + st.strokeDasharray + " with stroke-dashoffset " + st.strokeDashoffset + " on a line " + (len * scaleLen).toFixed(1) + " long" };
+        };
+        anim.currentTime = delay;
+        const first = drawnShare();
+        anim.currentTime = delay + d * t.iterations;
+        const rest = drawnShare();
+        const fd = typeof first === "number" ? first : first.drawn;
+        if (typeof rest !== "number" && Math.abs(rest.drawn - fd) > 0.05 && rest.drawn > 0.02 && rest.drawn < 0.98) {
+          out.strokes.push({ selector, name, drawn: rest.drawn, note: rest.note });
+        }
+      }
+    } catch {}
+    anim.currentTime = saved;
+  });
+  return out;
+})()`;
+
 const UNDEFINED_KEYFRAMES_SCRIPT = `(() => {
 ${ANIMATION_HELPERS_JS}
   const ran = new Set((window.__vlmkitStarted || []).map((r) => r.selector + "\\u0000" + r.name));
@@ -1158,6 +1385,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
     await loadPage(page);
 
     const timings = await collectAnimations(page);
+    const shapes = (await page.evaluate(MOTION_SHAPE_SCRIPT)) as MotionShapes;
     const undefinedOnPage = (await page.evaluate(UNDEFINED_KEYFRAMES_SCRIPT)) as { selector: string; name: string }[];
     const unknownTransitions = (await page.evaluate(UNKNOWN_TRANSITION_PROPERTY_SCRIPT)) as {
       selector: string;
@@ -1184,7 +1412,10 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
     const settleMs = computeSettleMs(selfDriven);
     const infinite = selfDriven
       .filter((t) => t.iterations === null)
-      .map((t) => ({ selector: t.selector, name: t.name }));
+      .map((t) => {
+        const indicator = shapes.indicators.find((i) => i.index === t.index)?.why;
+        return { selector: t.selector, name: t.name, ...(indicator ? { indicator } : {}) };
+      });
 
     // Returns what the Animation reports right after the seek, so a seek that did not take is
     // visible to the caller instead of being photographed as if it had. `null` = it took.
@@ -1731,6 +1962,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         ...(undefinedKeyframes.length > 0 ? { undefinedKeyframes } : {}),
         ...(unknownTransitions.length > 0 ? { unknownTransitions } : {}),
         ...(reducedHidden.length > 0 ? { reducedHidden } : {}),
+        shapes,
       },
       {
         settleThresholdMs: options.settleThresholdMs,

@@ -353,6 +353,7 @@ export async function writeStoryboard(
       keyframes: eventKeyframes(e).map((k) => ({ roles: k.roles, ...k.frame, file: manifest.frames[k.frame.n]!.file })),
     })),
     timeline: story.timeline,
+    ...(story.loops ? { loops: story.loops } : {}),
   };
   const files = {
     story: join(outDir, "story.json"),
@@ -488,6 +489,11 @@ async function main(): Promise<void> {
   } else {
     console.log(`  ${plural(story.events.length, "event")}, ${plural(story.states.length, "state")}:`);
     for (const e of story.events) console.log(`    ${eventLine(e)}`);
+  }
+  for (const loop of story.loops ?? []) {
+    console.log(
+      `  ${loop.events[0]}–${loop.events[loop.events.length - 1]}: one loop of ${loop.events.length} runs, every ${formatInstant(loop.periodMs)} ms (check animation's loop-seam judges where runs meet)`,
+    );
   }
   if (f.unstable.length > 0) {
     console.log(
