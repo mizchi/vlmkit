@@ -65,6 +65,8 @@ export interface MotionDom {
   discreteBg?: boolean;
   /** It takes a click at its centre as the page is. */
   catches?: boolean;
+  /** An SVG element inside an <svg> (transform-origin from the viewBox by default). */
+  svg?: boolean;
 }
 
 export interface MotionFrame {

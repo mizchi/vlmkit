@@ -220,6 +220,18 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
       ["--selector", ".toast", "--exits", "--expect-easing", "ease-out,ease-in"],
       /FAIL snap-back .*in the hold after 660ms/,
     ],
+    // Round 12: an SVG gear turning about its viewBox's centre, and a button whose label wraps
+    // while its width eases.
+    [
+      "gear.html",
+      ["--selector", ".gear", "--expect-still", "--expect-direction", "clockwise"],
+      /turns clockwise \d+° \(180°\/s, a turn every 2000ms\)[\s\S]*FAIL still-mismatch .*it turns about a point that is not its own centre .*transform-box: fill-box/,
+    ],
+    [
+      "label.html",
+      ["--selector", ".add", "--click", ".add"],
+      /FAIL size-jump at \d+ms: its height steps 64 → 44px .*text wrapping while the box is still narrow/,
+    ],
     // Round 11: a hover gradient that steps, a quote re-rendered every second, and a banner taken
     // out of rendering before its exit can play.
     [
@@ -388,6 +400,36 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
       assert.equal(fixed.code, 0, fixed.out);
     });
   }
+
+  it("judges a scroll-driven bar against the scroll, and names a 0s animation", { timeout: 120_000 }, async () => {
+    // Round 12: the reading bar on a scroll timeline, and the one whose shorthand reset it.
+    const fixed = await run("reference/reading.html", ["--selector", ".progress"]);
+    assert.equal(fixed.code, 0, fixed.out);
+    assert.match(
+      fixed.out,
+      /driven by the scroll[\s\S]*progress 0\.00 at 0%, 0\.20 at 20%, 0\.50 at 50%, 0\.80 at 80%, 1\.00 at 100%; back at 50% 0\.50, at 0% 0\.00; scaleX 0\.00 → 1\.00/,
+    );
+    const errors: string[] = [];
+    const error = console.error;
+    console.error = (m: string) => errors.push(m);
+    try {
+      const broken = await run("broken/reading.html", ["--selector", ".progress"]);
+      assert.equal(broken.code, 2);
+    } finally {
+      console.error = error;
+    }
+    assert.match(
+      errors.join("\n"),
+      /`grow` has a duration of 0s, .*`animation-timeline` has to come after the `animation` shorthand/,
+    );
+  });
+
+  it("names a turn off its centre without --expect-still", { timeout: 120_000 }, async () => {
+    const broken = await run("broken/gear.html", ["--selector", ".gear"]);
+    assert.match(broken.out, /warn turn-off-centre .*carried up to \d+px .*transform-box: fill-box/);
+    const fixed = await run("reference/gear.html", ["--selector", ".gear"]);
+    assert.doesNotMatch(fixed.out, /turn-off-centre/);
+  });
 
   it("samples the hold between two segments", () => {
     const plan = motionPlan([

@@ -879,7 +879,23 @@ async function recordFrames(
 
 const firstLine = (thrown: unknown) => String(thrown instanceof Error ? thrown.message : thrown).split("\n")[0]!;
 
-const MOTION_OFF_CSS = `*, *::before, *::after { transition: none !important; animation: none !important; }`;
+// An animation on a scroll timeline is left on: it is where the scroll is, not motion in time, and
+// `animation: none` showed a reading bar full at every scroll position (round 12). Its element is
+// marked first (`markScrollDriven`); `:where` keeps the rule at `*`'s specificity, so with nothing
+// marked it is the same rule.
+const MOTION_OFF_CSS = `*, *::before, *::after { transition: none !important; } :where(:not([data-vlmkit-scroll-driven])), :where(:not([data-vlmkit-scroll-driven]))::before, :where(:not([data-vlmkit-scroll-driven]))::after { animation: none !important; }`;
+
+async function markScrollDriven(page: Page): Promise<void> {
+  await page
+    .evaluate(() => {
+      for (const a of document.getAnimations()) {
+        if (!a.timeline || a.timeline instanceof DocumentTimeline) continue;
+        const el = (a.effect as KeyframeEffect | null)?.target as Element | null;
+        el?.setAttribute("data-vlmkit-scroll-driven", "");
+      }
+    })
+    .catch(() => {});
+}
 
 async function loadSource(page: Page, source: string): Promise<void> {
   if (isUrl(source)) {
@@ -921,6 +937,7 @@ async function recordFramesStep(
     // On every document from the start, so a navigation in the window keeps it. Inert until armed.
     await page.addInitScript(INTERACTION_HOLD_SCRIPT);
     await loadSource(page, options.source);
+    await markScrollDriven(page);
     const off = await page.addStyleTag({ content: MOTION_OFF_CSS });
     for (const prior of options.steps.slice(0, options.index - 1)) {
       if (prior.action === "snapshot" || prior.action === "frames") continue;
@@ -1062,6 +1079,7 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
   await withBrowser(async (browser) => {
     const page = await browser.newPage({ viewport });
     await loadSource(page, options.source);
+    await markScrollDriven(page);
     await page.addStyleTag({ content: MOTION_OFF_CSS });
 
     // The run every sequence gets, frames steps or not: motion off, so snapshots, transitions and

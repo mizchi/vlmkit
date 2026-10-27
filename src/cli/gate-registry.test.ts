@@ -268,7 +268,9 @@ describe("composed built-in registry", () => {
     // 226 → 227: `check animation` / `animation-replayed` (suspect) — a quote re-rendered by
     // innerHTML replayed its entrance every second and --virtual-time read it "visible" (round 11's
     // deferred items).
-    assert.equal(total, 227);
+    // 227 → 228: `check animation` / `zero-duration-animation` (suspect) — a reading bar's
+    // shorthand reset its animation-timeline, and it sat full from load (round 12).
+    assert.equal(total, 228);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {

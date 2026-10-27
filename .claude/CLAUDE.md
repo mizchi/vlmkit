@@ -392,6 +392,18 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   `inspect interact` frames step writes `before.png` (`source.before`) and `snapshot storyboard` says
   what changed before frame 0, and names a change largest at its start as an entrance played again;
   `check motion` marks a transition over a gradient; `replayed` looks up to 10s past rest.
+- **A scroll timeline reset by a shorthand, an SVG turning about its viewBox, a label wrapping
+  mid-widen** (round 12, `docs/reports/2026-10-27-motion-repair-v12.md`). A target on a scroll
+  timeline is judged by sweeping the scroll (0..100% and back to 50%: progress per step,
+  `scroll-static` / `scroll-mismatch`), not the clock. `check animation` lists scroll-driven
+  animations instead of seeking them (seeking threw), and `zero-duration-animation` (suspect, 228
+  rules) names a 0s animation: an `animation` shorthand after `animation-timeline` resets both. A
+  point of an SVG group's box counts only where one of its shapes is. `size-jump` fails a box that
+  steps in one frame while it eases (a label wrapping). A turn is reported with its way and rate, and
+  `--expect-direction clockwise|counterclockwise` checks it; a turn about another point is
+  `turn-off-centre` (warn), or a `still-mismatch` naming `transform-box: fill-box` on SVG.
+  `inspect interact` leaves scroll-timeline animations on in its motion-off snapshots, and `check
+  scroll` keeps a fixed element at `scaleX(0)`.
 
 ## Generated figures (raster images)
 
@@ -1522,7 +1534,7 @@ case at 0.23.0.
 | `docs/reports/2026-08-06-gate-rule-cost-bench.md` | Measured gate/rule execution cost: where a ruleset's time goes, why per-rule cost is attributed rather than isolated, why suppression saves nothing |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
 | `docs/design/package-decomposition.md` | **Splitting vlmkit by layer** (collector / pure judge / driver / loop / diagrams): what was measured, phase 1 (`vlmkit-judge`) and the proposed phases 2-5 |
-| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 35 gates + 227 rules, behavior changes, what is deliberately not a gate |
+| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 35 gates + 228 rules, behavior changes, what is deliberately not a gate |
 | `docs/design/moonbit-boundary.md` | **TS ↔ MoonBit boundary**: what the positional FFI costs (61 commands, 233 args, 2 duplicated dispatch tables), the JSON boundary that replaces it for new logic, how to add a command, and which pure logic belongs in MoonBit versus which deliberately does not |
 | `docs/crater-css-status.md` | Crater CSS rendering verification status |
 | `docs/reset-css-comparison.md` | Reset CSS domain knowledge |

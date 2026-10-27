@@ -1178,3 +1178,26 @@ test(
     );
   },
 );
+
+test(
+  "runAnimationEval: a scroll-driven animation is listed, not seeked, and a 0s animation is named",
+  { timeout: 180_000 },
+  async () => {
+    // fixtures/motion-repair round 12: seeking the reading bar's scroll-timeline animation threw
+    // "not supported for progress based animations", and the 0s one read "No animation issues".
+    const dir = join(import.meta.dirname, "../../../fixtures/motion-repair");
+    const run = (file: string) => runAnimationEval({ source: join(dir, file), viewport: { width: 1280, height: 800 } });
+    const fixed = await run("reference/reading.html");
+    assert.deepEqual(
+      fixed.scrollDriven?.map((s) => s.name),
+      ["grow"],
+    );
+    assert.deepEqual(fixed.issues, []);
+    const broken = await run("broken/reading.html");
+    assert.deepEqual(
+      broken.issues.map((i) => [i.kind, i.severity]),
+      [["zero-duration-animation", "suspect"]],
+    );
+    assert.match(broken.issues[0]!.message, /`animation-timeline` has to come after the `animation` shorthand/);
+  },
+);

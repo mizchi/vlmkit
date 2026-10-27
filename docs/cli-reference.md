@@ -1079,7 +1079,9 @@ vlmkit check animation <html|url>              # Frame-sampled animation evaluat
                                                # stroke-incomplete (a dash shorter than its line),
                                                # discrete-transition (background over a gradient);
                                                # --virtual-time: animation-replayed (a re-render
-                                               # plays an entrance again)
+                                               # plays an entrance again); zero-duration-animation (a
+                                               # shorthand after animation-timeline). Scroll-driven
+                                               # animations are listed: inspect motion sweeps the scroll
 vlmkit check flash <html|url|frames.json|video>  # WCAG 2.3.1 Three Flashes: every 60fps frame of page time on
                                                # the held clock, per-pixel transitions (ΔL ≥ 0.1, darker
                                                # < 0.8; saturated red), >6 in 1s over >21,824 CSS px² of a

@@ -376,7 +376,7 @@ The built-ins load through the same `createGateRegistry([...])` call. If the
 contract were not sufficient for them it would not be sufficient for anyone
 else, and making them its first consumer is the only way to keep that honest.
 
-## The 35 gates (227 tunable rules)
+## The 35 gates (228 tunable rules)
 
 | Gate | Rules | Plugin |
 |---|---|---|
@@ -397,7 +397,7 @@ else, and making them its first consumer is the only way to keep that honest.
 | `scan handlers` | 24 | markup |
 | `check grounding` | 7 | markup |
 | `check motion` | 3 | markup |
-| `check animation` | 17 | markup |
+| `check animation` | 18 | markup |
 | `check flash` | 6 | markup |
 | `stress i18n` | 3 | markup |
 | `stress media` | 2 | markup |

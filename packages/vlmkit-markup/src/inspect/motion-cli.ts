@@ -399,6 +399,7 @@ export async function measureTargets(
           ...(m33 < -0.01 && !backHidden ? { mirrored: true } : {}),
           ...(paint.length > 0 ? { paint } : {}),
           ...(discreteBg ? { discreteBg: true } : {}),
+          ...(el instanceof SVGElement && !(el instanceof SVGSVGElement) ? { svg: true } : {}),
           catches,
         };
       });
@@ -445,6 +446,8 @@ each forbidden statement is. vlmkit judges the motion from that:
   loop-seam        a repeating animation's run ends where the next does not begin (a 350deg spin)
   pushed           moves with no animation of its own: a layout property animated elsewhere (warn)
   invisible-blocker at rest it is transparent and still takes clicks at its centre
+  size-jump        its width or height steps in one frame while it eases (its text re-wrapping)
+  turn-off-centre  it turns and its centre is carried round: another transform-origin (warn)
   replayed         after rest, as the page's timers run (up to 10s), it is replaced by a new element that
                    plays its animation again (a re-render); the same element starting again is a warn
   stroke-incomplete a stroke drawing itself ends part drawn (a dash shorter than its line)
@@ -495,7 +498,8 @@ an easing is checked on each channel that changes.
   --expect-duration <ms>  How long one run of its own animation takes ("280ms", "1.2s").
                           Once for every target, or comma-separated per target. --selector
   --expect-direction <d>  Which way its (first) motion goes: left | right | up | down — "slides in
-                          from the right edge" moves left. Once for every target, or per target
+                          from the right edge" moves left — or which way it turns: clockwise |
+                          counterclockwise. Once for every target, or per target
   --expect-iterations <n> How many times it runs: 3, or infinite. Once for every target, or
                           comma-separated per target. --selector
   --expect-still          Its centre must not move: only its size and opacity change (a dialog
@@ -788,6 +792,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
           // Two of three round-1 agents reached for --out: say where the output goes.
           const near: Record<string, string> = {
             "--output": "--frames <dir>",
+            "--out-dir": "--frames <dir>",
             "--key": "--jev",
           };
           throw new MotionUsageError(`unknown option ${a}${near[a] ? ` (did you mean ${near[a]}?)` : ""}`);
@@ -796,6 +801,12 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
     }
   }
   if (positional.length !== 1) {
+    // `--expect-still .gear` read ".gear" as a second page (round 12): it takes no value.
+    const afterFlag = positional.find((p, k) => k > 0 && argv[argv.indexOf(p) - 1] === "--expect-still");
+    if (afterFlag)
+      throw new MotionUsageError(
+        `--expect-still takes no value (it applies to every target): for one target, write --still ${afterFlag}`,
+      );
     throw new MotionUsageError(
       `expected one page, URL or frames.json, got ${positional.length}${positional.length > 1 ? ' (quote each description: --target "the blue square")' : ""}`,
     );
@@ -1292,6 +1303,22 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
       let forever: { startMs: number; endMs: number } | null = null;
       if (o.endMs === undefined && plan.segments.length === 0) {
         if (infinite.length === 0) {
+          // A 0s animation is there and runs no time: an `animation` shorthand after
+          // `animation-timeline` resets both (round 12's reading bar, full from load).
+          const zero = await page
+            .evaluate(() =>
+              document
+                .getAnimations()
+                .filter(
+                  (a) => Number(a.effect?.getComputedTiming().duration) === 0 && (a as CSSAnimation).animationName,
+                )
+                .map((a) => (a as CSSAnimation).animationName),
+            )
+            .catch(() => [] as string[]);
+          if (zero.length > 0)
+            throw new MotionUsageError(
+              `no animation runs any time: ${[...new Set(zero)].map((n) => `\`${n}\``).join(", ")} ${zero.length === 1 ? "has" : "have"} a duration of 0s, so ${zero.length === 1 ? "it ends" : "they end"} as ${zero.length === 1 ? "it begins" : "they begin"} and ${zero.length === 1 ? "its" : "their"} fill holds the last keyframe from load. If it is meant to follow the scroll, \`animation-timeline\` has to come after the \`animation\` shorthand, which resets it to auto (and the duration to 0s); otherwise give it a duration`,
+            );
           throw new MotionUsageError(
             `no animation or transition on the page${ranTo !== null ? `, at load or after its timers ran (to ${ranTo}ms)` : " at load"}: nothing to sample. If one should run, it never starts — check animation lists what does; a misspelt transition-property or animation-name, a transition to height: auto (which needs interpolate-size: allow-keywords), or a class added in the same frame as the style it transitions from, are the usual causes. If a click starts it, give --click <css>. To shoot the page anyway, give --end <ms> (with --start, or --at for the instants)`,
           );
@@ -1719,7 +1746,19 @@ export function formatMotionReport(
     );
     if (t.segments.length <= 1) {
       lines.push(
-        `  target ${JSON.stringify(t.target)}${begins(t)}: travels ${Math.round(t.travelPx)}px${t.segments[0]?.direction ? ` ${t.segments[0].direction.way}wards` : ""} over the frames measured, ${fitText(t.easing, broken)}${t.segments[0] ? grows(t.segments[0]) : ""}`,
+        `  target ${JSON.stringify(t.target)}${begins(t)}: travels ${Math.round(t.travelPx)}px${t.segments[0]?.direction ? ` ${t.segments[0].direction.way}wards` : ""} over the frames measured${
+          // A gear orbiting back to its start read "travels 0px" (round 12).
+          t.excursionPx !== undefined && t.excursionPx >= Math.max(4, t.travelPx * 2)
+            ? ` (ending where it began; ${Math.round(t.excursionPx)}px away at most, between)`
+            : ""
+        }${
+          t.turn
+            ? t.turn.in3d
+              ? // In 3D the turn is its face's angle, 0 facing you to 180 turned over: no way round.
+                `, turns over ${Math.round(Math.abs(t.turn.deg))}° in 3D`
+              : `, turns ${t.turn.deg > 0 ? "clockwise" : "counterclockwise"} ${Math.round(Math.abs(t.turn.deg))}° (${Math.round(Math.abs(t.turn.perSecond))}°/s${Math.abs(t.turn.perSecond) >= 1 ? `, a turn every ${Math.round(360000 / Math.abs(t.turn.perSecond))}ms` : ""})`
+            : ""
+        }, ${fitText(t.easing, broken)}${t.segments[0] ? grows(t.segments[0]) : ""}`,
       );
     } else {
       lines.push(`  target ${JSON.stringify(t.target)}${begins(t)}: ${t.segments.length} segments`);

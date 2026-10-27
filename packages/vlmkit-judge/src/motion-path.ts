@@ -162,6 +162,8 @@ export interface MotionSample {
     paint?: number[];
     /** It takes a click at its centre: an invisible target that does sits over what is behind it. */
     catches?: boolean;
+    /** An SVG element inside an <svg>: its transform-origin is measured from the viewBox by default. */
+    svg?: boolean;
     mirrored?: boolean;
     /**
      * How long its own animation has been in its active phase (ms; negative in its delay). The
@@ -202,8 +204,10 @@ const originCss = (name: OriginName) => (name === "center" ? "center" : name.rep
 /** The fixed point named when it is within this (a fraction of the box) of one. */
 const ORIGIN_SNAP = 0.15;
 /** Which way a segment moves, by the larger of its two components. */
-export const MOTION_DIRECTIONS = ["left", "right", "up", "down"] as const;
+export const MOTION_DIRECTIONS = ["left", "right", "up", "down", "clockwise", "counterclockwise"] as const;
 export type MotionDirection = (typeof MOTION_DIRECTIONS)[number];
+/** A turn's way, not a path's: a gear "turning clockwise" had no flag (round 12). */
+const isTurnWay = (d: MotionDirection) => d === "clockwise" || d === "counterclockwise";
 const directionOf = (dx: number, dy: number): MotionDirection =>
   Math.abs(dx) >= Math.abs(dy) ? (dx < 0 ? "left" : "right") : dy < 0 ? "up" : "down";
 const towards = (d: MotionDirection) => `${d}wards`;
@@ -279,7 +283,9 @@ export type MotionRule =
   | "mirrored"
   | "stroke-incomplete"
   | "pushed"
-  | "invisible-blocker";
+  | "invisible-blocker"
+  | "size-jump"
+  | "turn-off-centre";
 
 export interface MotionFinding {
   rule: MotionRule;
@@ -360,6 +366,10 @@ export interface MotionPathReport {
   iterations?: number | null;
   /** The first segment's travel and fit (the whole motion when there is one segment). */
   travelPx: number;
+  /** The farthest its centre gets from where it starts: a gear orbiting back read "travels 0px" (round 12). */
+  excursionPx?: number;
+  /** How far it turns over the frames (degrees, clockwise positive) and how fast, when it turns. */
+  turn?: { deg: number; perSecond: number; in3d?: boolean };
   easing: SegmentEasing;
 }
 
@@ -755,7 +765,13 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         direction = { way: directionOf(z.x - a.x, z.y - a.y), from: { x: a.x, y: a.y }, to: { x: z.x, y: z.y } };
       }
     }
-    if (k === 0 && options.expectDirection && direction && direction.way !== options.expectDirection) {
+    if (
+      k === 0 &&
+      options.expectDirection &&
+      !isTurnWay(options.expectDirection) &&
+      direction &&
+      direction.way !== options.expectDirection
+    ) {
       findings.push({
         rule: "direction-mismatch",
         severity: "fail",
@@ -927,6 +943,79 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     }
   }
 
+  // How far it turns, and which way: a gear "clockwise, one turn every 2s" had nothing to say it.
+  const turned = sorted.filter((x) => Number.isFinite(x.dom?.turnDeg ?? NaN));
+  let turnReport: { deg: number; perSecond: number; in3d?: boolean } | undefined;
+  if (turned.length >= 2) {
+    const v = turned.map((x) => x.dom!.turnDeg!);
+    for (let k = 1; k < v.length; k++) v[k] = v[k]! - 360 * Math.round((v[k]! - v[k - 1]!) / 360);
+    const deg = v[v.length - 1]! - v[0]!;
+    const span = turned[turned.length - 1]!.atMs - turned[0]!.atMs;
+    if (Math.abs(deg) >= 10 && span > 0)
+      turnReport = {
+        deg,
+        perSecond: (deg * 1000) / span,
+        ...(turned.some((x) => x.dom?.rotated3d) ? { in3d: true } : {}),
+      };
+  }
+  const turns = turnReport !== undefined;
+  if (options.expectDirection && isTurnWay(options.expectDirection)) {
+    const way = turnReport && !turnReport.in3d ? (turnReport.deg > 0 ? "clockwise" : "counterclockwise") : null;
+    if (way !== options.expectDirection) {
+      findings.push({
+        rule: "direction-mismatch",
+        severity: "fail",
+        atMs: segments[0]!.startMs,
+        message: way
+          ? `it turns ${way} (${Math.round(Math.abs(turnReport!.deg))}° over the frames), not ${options.expectDirection}: a rotate() with the wrong sign`
+          : `it does not turn (under 10° over the frames), so it does not turn ${options.expectDirection}`,
+      });
+    }
+  }
+
+  // Turning, with its centre carried round: it turns about some other point. Without
+  // --expect-still nothing said so for a gear orbiting its SVG's centre (round 12).
+  // Not in 3D: a card turning over has a box that is a turned shape's bounds under perspective.
+  const in3d = sorted.some((x) => x.dom?.rotated3d);
+  if (turns && !in3d && !options.expectStill && ownMotion && geo.length >= 2) {
+    const far = Math.max(...geo.map((p) => dist(p, geo[0]!)));
+    if (far >= floor) {
+      findings.push({
+        rule: "turn-off-centre",
+        severity: "warn",
+        atMs: segments[0]!.startMs,
+        message: `it turns, and its centre is carried up to ${Math.round(far)}px from where it starts: it turns about a point that is not its own centre (transform-origin)${sorted.some((x) => x.dom?.svg) ? ` — on an SVG element transform-origin is measured from the <svg>'s viewBox unless transform-box: fill-box` : ""}. If it should turn in place, give it --expect-still to make this a fail`,
+      });
+    }
+  }
+
+  // Its size stepping at once while it eases: a button widening over 300ms grew 20px taller in one
+  // frame and back, as its new label wrapped in the still-narrow box (round 12). Measured only.
+  if (exact) {
+    const boxes = sorted.filter(
+      (x) => !isRest(x) && x.dom && !x.dom.rotated3d && x.dom.opacity >= 0.05 && x.dom.box.width > 0,
+    );
+    for (const dim of ["height", "width"] as const) {
+      const steps = boxes
+        .slice(1)
+        .map((x, k) => ({ at: x.atMs, from: boxes[k]!, d: x.dom!.box[dim] - boxes[k]!.dom!.box[dim] }));
+      if (steps.length < 3) continue;
+      const big = steps.reduce((a, b) => (Math.abs(b.d) > Math.abs(a.d) ? b : a));
+      const others = steps.filter((s) => s !== big).map((s) => Math.abs(s.d));
+      const usual = Math.max(0.5, median(others));
+      if (Math.abs(big.d) >= 4 && Math.abs(big.d) > 4 * usual) {
+        const a = big.from.dom!.box[dim];
+        findings.push({
+          rule: "size-jump",
+          severity: "fail",
+          atMs: big.at,
+          message: `its ${dim} steps ${Math.round(a)} → ${Math.round(a + big.d)}px between ${ms(big.from.atMs)} and ${ms(big.at)} in one frame (other frames ${usual.toFixed(1)}px): nothing animates it, its content re-flows — text wrapping while the box is still narrow (white-space: nowrap on it), or content swapped in at once`,
+        });
+        break;
+      }
+    }
+  }
+
   // Turned in 3D, a box's centre is the bounds of a turned shape under perspective, not a place.
   const turnedAt = new Set(sorted.filter((s) => s.dom?.rotated3d).map((s) => s.atMs));
   if (options.expectStill && geo.length > 0) {
@@ -940,7 +1029,14 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         rule: "still-mismatch",
         severity: "fail",
         atMs: far.atMs,
-        message: `its centre is at ${Math.round(far.x)},${Math.round(far.y)} at ${ms(far.atMs)}, ${Math.round(dist(far, anchor))}px from ${Math.round(anchor.x)},${Math.round(anchor.y)} where it rests, though only its size and opacity may change: ${ownMotion ? "a keyframe `transform` that replaces the element's own placement, or a scale whose transform-origin is not its centre" : pushedBy}`,
+        message: `its centre is at ${Math.round(far.x)},${Math.round(far.y)} at ${ms(far.atMs)}, ${Math.round(dist(far, anchor))}px from ${Math.round(anchor.x)},${Math.round(anchor.y)} where it rests, though only its size and opacity may change: ${
+          !ownMotion
+            ? pushedBy
+            : turns
+              ? // A gear orbiting its SVG's centre read "a scale whose transform-origin…" (round 12).
+                `it turns about a point that is not its own centre (transform-origin)${sorted.some((x) => x.dom?.svg) ? ": on an SVG element transform-origin is measured from the <svg>'s viewBox unless transform-box: fill-box — give it transform-box: fill-box with transform-origin: center" : ""}`
+              : "a keyframe `transform` that replaces the element's own placement, or a scale whose transform-origin is not its centre"
+        }`,
       });
     }
   }
@@ -1010,6 +1106,8 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     path,
     segments: reports,
     travelPx: first.travelPx,
+    ...(geo.length >= 2 ? { excursionPx: Math.max(...geo.map((p) => dist(p, geo[0]!))) } : {}),
+    ...(turnReport ? { turn: turnReport } : {}),
     easing: first.easing,
     ...(startsAtMs !== undefined ? { startsAtMs } : {}),
     ...(durationMs !== undefined ? { durationMs } : {}),

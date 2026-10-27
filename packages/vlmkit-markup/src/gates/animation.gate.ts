@@ -109,6 +109,12 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       docs: "Seen at rest without prefers-reduced-motion and at opacity 0 (or 8px+ from its place) at rest with it: `animation: none` in the reduce rule removed the animation and the fill that held its end state, so its base style (opacity 0, a start transform) shows. The preference is honoured and the content is gone.",
     },
     {
+      id: "zero-duration-animation",
+      title: "A CSS animation has no duration",
+      severity: "suspect",
+      docs: "animation-duration 0s: it ends as it begins and its fill holds its last keyframe from load. The usual cause is an `animation` shorthand written after `animation-timeline`, which resets the timeline to auto and the duration to 0s.",
+    },
+    {
       id: "animation-replayed",
       title: "An animation begins again as the page's timers run",
       severity: "suspect",

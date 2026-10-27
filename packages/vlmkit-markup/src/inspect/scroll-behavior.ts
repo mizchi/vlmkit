@@ -187,8 +187,11 @@ const COLLECT_SCRIPT = (maxElements: number) => `(async () => {
   for (const el of Array.from(document.querySelectorAll("*"))) {
     const style = getComputedStyle(el);
     if ((style.position === "sticky" || style.position === "fixed")) {
+      // Its layout box, not its transformed one: a reading bar at scaleX(0) at the top of the page
+      // dropped out of the list (round 12).
       const b = el.getBoundingClientRect();
-      if (b.width > 0 && b.height > 0 && stickyFixed.length < ${maxElements}) {
+      const laidOut = (el instanceof HTMLElement ? el.offsetWidth > 0 && el.offsetHeight > 0 : false) || (b.width > 0 && b.height > 0);
+      if (laidOut && stickyFixed.length < ${maxElements}) {
         const topPx = Number.parseFloat(style.top);
         stickyFixed.push({
           el,

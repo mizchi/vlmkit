@@ -260,7 +260,8 @@ export type AnimationEvalIssueKind =
   | "loop-seam"
   | "stroke-incomplete"
   | "discrete-transition"
-  | "animation-replayed";
+  | "animation-replayed"
+  | "zero-duration-animation";
 
 export interface AnimationEvalIssue {
   kind: AnimationEvalIssueKind;
@@ -273,6 +274,8 @@ export interface AnimationEvalReport {
   source: string;
   viewport: { width: number; height: number };
   animationCount: number;
+  /** Animations on a scroll timeline: listed, not evaluated (inspect motion sweeps the scroll). */
+  scrollDriven?: { selector: string; name: string; timeline: string }[];
   evaluated: EvaluatedAnimation[];
   /** Max over finite animations of delay + duration × iterations; null when an infinite animation is present. */
   settleMs: number | null;
@@ -504,6 +507,8 @@ export interface DeriveIssuesInput {
   undefinedKeyframes?: { selector: string; name: string; reducedMotion: boolean }[];
   /** transition-property names no CSS property, with a duration over 0. */
   unknownTransitions?: { selector: string; name: string }[];
+  /** CSS animations with no duration: they end as they begin. */
+  zeroDuration?: { selector: string; name: string }[];
   /** A transition on background over a gradient, which does not interpolate. */
   discreteTransitions?: { selector: string; name: string; image: string }[];
   /** Seen at rest without the preference, hidden or out of place at rest under reduce. */
@@ -599,6 +604,18 @@ export function deriveAnimationIssues(
 
   // Round 11: a hover gradient with `transition: background 300ms` snapped, and every gate passed
   // it — the transition is declared, has a duration, and never shows a frame between.
+  // Round 12: `animation-timeline: scroll(); animation: grow linear both;` — the shorthand after
+  // the timeline reset it to auto and the duration to 0s, so the bar was full from load. "1
+  // animation (evaluated 0)" and nothing else.
+  for (const z of input.zeroDuration ?? []) {
+    issues.push({
+      kind: "zero-duration-animation",
+      severity: "suspect",
+      selector: z.selector,
+      message: `${z.selector} \`${z.name}\` has no duration (0s): it ends the moment it begins, and its fill holds its last keyframe from the start. If it is meant to follow the scroll, \`animation-timeline\` has to come after the \`animation\` shorthand, which resets it to auto (and the duration to 0s); otherwise give it a duration.`,
+    });
+  }
+
   for (const u of input.discreteTransitions ?? []) {
     issues.push({
       kind: "discrete-transition",
@@ -946,6 +963,7 @@ ${ANIMATION_HELPERS_JS}
     const target = event.target;
     if (!target || !target.getAnimations) return;
     for (const anim of target.getAnimations()) {
+      if (anim.timeline && !(anim.timeline instanceof DocumentTimeline)) continue;
       const name = animationName(anim);
       if (event.animationName !== undefined && name !== event.animationName) continue;
       const timing = describeTiming(anim);
@@ -973,7 +991,16 @@ ${ANIMATION_HELPERS_JS}
 
 const COLLECT_ANIMATIONS_SCRIPT = `(() => {
 ${ANIMATION_HELPERS_JS}
-  const anims = document.getAnimations ? document.getAnimations({ subtree: true }) : [];
+  // On a scroll timeline an animation's time is a share of the scroll, not ms: seeking it threw
+  // "not supported for progress based animations" (round 12). It is listed, not evaluated.
+  const all = document.getAnimations ? document.getAnimations({ subtree: true }) : [];
+  const anims = all.filter((a) => !a.timeline || a.timeline instanceof DocumentTimeline);
+  window.__vlmkitScrollDriven = all
+    .filter((a) => a.timeline && !(a.timeline instanceof DocumentTimeline))
+    .map((a) => {
+      const el = a.effect && a.effect.target;
+      return { selector: el ? stableSelector(el) : "(no target)", name: animationName(a), timeline: el ? getComputedStyle(el).animationTimeline : "" };
+    });
   window.__vlmkitAnims = anims;
   return anims.map((anim, index) => {
     const timing = describeTiming(anim);
@@ -1493,6 +1520,12 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
     await loadPage(page);
 
     const timings = await collectAnimations(page);
+    const scrollDriven = (await page.evaluate(
+      () => (window as unknown as { __vlmkitScrollDriven?: unknown[] }).__vlmkitScrollDriven ?? [],
+    )) as { selector: string; name: string; timeline: string }[];
+    const zeroDuration = timings
+      .filter((t) => t.type === "css-animation" && t.durationMs === 0)
+      .map((t) => ({ selector: t.selector, name: t.name }));
     const shapes = (await page.evaluate(MOTION_SHAPE_SCRIPT)) as MotionShapes;
     const discreteTransitions = (await page.evaluate(DISCRETE_TRANSITION_SCRIPT)) as {
       selector: string;
@@ -2077,6 +2110,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         ...(undefinedKeyframes.length > 0 ? { undefinedKeyframes } : {}),
         ...(unknownTransitions.length > 0 ? { unknownTransitions } : {}),
         ...(discreteTransitions.length > 0 ? { discreteTransitions } : {}),
+        ...(zeroDuration.length > 0 ? { zeroDuration } : {}),
         ...(reducedHidden.length > 0 ? { reducedHidden } : {}),
         shapes,
       },
@@ -2090,6 +2124,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       source: options.source,
       viewport,
       animationCount: timings.length,
+      ...(scrollDriven.length > 0 ? { scrollDriven } : {}),
       evaluated,
       settleMs,
       infinite,
@@ -2117,6 +2152,11 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
   lines.push(`status: ${status}`);
   lines.push(
     `animations: ${report.animationCount} (evaluated ${report.evaluated.length}, infinite ${report.infinite.length})`,
+    ...(report.scrollDriven
+      ? [
+          `scroll-driven: ${report.scrollDriven.map((s) => `${s.selector} \`${s.name}\` on ${s.timeline}`).join(", ")} — its time is the scroll's, so it is not evaluated here: \`vlmkit inspect motion <page> --selector <el>\` sweeps the scroll`,
+        ]
+      : []),
   );
   // The status block reads like the most important part of the output, so a line in
   // it that carries no rule id sends the reader hunting. A dogfood agent: "`settle:

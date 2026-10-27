@@ -321,7 +321,14 @@ vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ea
   one frame is `snapped` (a gradient does not interpolate — `check animation`'s
   `discrete-transition`), and a page that re-renders the target on a timer is `replayed`. A brief's
   "nothing can be clicked through it" is `--exits` on the target: transparent and still taking
-  clicks at rest is `invisible-blocker`. In motion-repair round 3 a wrong
+  clicks at rest is `invisible-blocker`. A bar that follows the scroll (`animation-timeline:
+  scroll()` / `view()`) is judged against the scroll, not the clock: `inspect motion --selector <el>`
+  sweeps the scroller 0..100% and back and prints the progress at each step. Write
+  `animation-timeline` after the `animation` shorthand, which resets it (`check animation` names a
+  0s animation as `zero-duration-animation`). An SVG part that turns "in place" needs
+  `transform-box: fill-box` (a `still-mismatch` / `turn-off-centre` says so); "turns clockwise" is
+  `--expect-direction clockwise`. A box whose height steps while it eases (a label wrapping as a
+  button widens) is `size-jump`. In motion-repair round 3 a wrong
   `transform-origin` and a stagger that was not one both read "follows ease-out exactly, no fail"
   until these existed.
 - **What it does not judge**: fps or jank, a target it is not told about, and anything under
