@@ -220,6 +220,23 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
       ["--selector", ".toast", "--exits", "--expect-easing", "ease-out,ease-in"],
       /FAIL snap-back .*in the hold after 660ms/,
     ],
+    // Round 11: a hover gradient that steps, a quote re-rendered every second, and a banner taken
+    // out of rendering before its exit can play.
+    [
+      "gradient.html",
+      ["--selector", ".upgrade", "--hover", ".upgrade"],
+      /FAIL snapped: \.upgrade: its colour, by up to \d+ of 255 a channel, in one frame: only its colour changed, .*two gradients, which do not interpolate/,
+    ],
+    [
+      "quote.html",
+      ["--selector", ".price"],
+      /FAIL replayed: \.price after it came to rest: the page replaced it with a new element by 1000ms, 2000ms/,
+    ],
+    [
+      "dismiss.html",
+      ["--selector", ".consent", "--click", ".dismiss", "--exits"],
+      /FAIL snapped: \.consent: .* → 0x0 .*: the action took it out of rendering \(it is display: none \(the hidden attribute\)\) in the same frame/,
+    ],
     // Round 10: a notice whose margin-top shoves the article, a spinner one turn short of a loop,
     // and a check mark whose dash is shorter than its line.
     [
@@ -383,8 +400,9 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
     );
   });
 
-  it("points --out at --frames", () => {
-    assert.throws(() => parseMotionArgs(["p.html", "--selector", ".a", "--out", "x"]), /did you mean --frames <dir>/);
+  it("takes --out as --frames", () => {
+    // Refused with "did you mean --frames", it was still the flag an agent reached for (round 11).
+    assert.equal(parseMotionArgs(["p.html", "--selector", ".a", "--out", "x"]).frames, "x");
   });
 });
 

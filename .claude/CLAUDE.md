@@ -376,6 +376,16 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   storyboard` groups repeating returns into `loops`, integrity's ink counts a surface 3 levels off the
   page (a white card on `#f5f6f8` read as a near-empty render), and `diff html` says an absent Crater
   in one dim line.
+- **A colour that steps, an entrance replayed by a re-render, an exit hidden before it plays**
+  (round 11, `docs/reports/2026-10-27-motion-repair-v11.md`): a hover gradient on `transition:
+  background`, a quote re-rendered by `innerHTML` every second, and a banner set `hidden` in the same
+  task that starts its exit. `--selector` measures every colour a target paints and fits it as a
+  channel, and a colour changed in one frame is `snapped` (a transition over a gradient is named);
+  `check animation`'s `discrete-transition` (warn, 226 rules); after rest the page's timers run on
+  3s and a target replaced by a new element that animates again is `replayed`; a target with no
+  layout box is not rendered (not a box at 0,0) and a `snapped` one says the action hid it; a
+  transparent target that still takes clicks at rest is `invisible-blocker`; a pass lists the
+  `--expect-*` that held.
 
 ## Generated figures (raster images)
 
@@ -1506,7 +1516,7 @@ case at 0.23.0.
 | `docs/reports/2026-08-06-gate-rule-cost-bench.md` | Measured gate/rule execution cost: where a ruleset's time goes, why per-rule cost is attributed rather than isolated, why suppression saves nothing |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
 | `docs/design/package-decomposition.md` | **Splitting vlmkit by layer** (collector / pure judge / driver / loop / diagrams): what was measured, phase 1 (`vlmkit-judge`) and the proposed phases 2-5 |
-| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 35 gates + 225 rules, behavior changes, what is deliberately not a gate |
+| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 35 gates + 226 rules, behavior changes, what is deliberately not a gate |
 | `docs/design/moonbit-boundary.md` | **TS ↔ MoonBit boundary**: what the positional FFI costs (61 commands, 233 args, 2 duplicated dispatch tables), the JSON boundary that replaces it for new logic, how to add a command, and which pure logic belongs in MoonBit versus which deliberately does not |
 | `docs/crater-css-status.md` | Crater CSS rendering verification status |
 | `docs/reset-css-comparison.md` | Reset CSS domain knowledge |

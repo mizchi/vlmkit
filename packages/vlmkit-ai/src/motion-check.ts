@@ -57,6 +57,14 @@ export interface MotionDom {
   ownOpacity?: number;
   /** The ancestor with the lowest opacity under 1 at this frame. */
   fadeBy?: string;
+  /** No layout box at all (display: none on it or an ancestor). */
+  notRendered?: boolean;
+  /** Every colour it paints (background stops, text, border), RGBA in order. */
+  paint?: number[];
+  /** Its transition on background runs over a gradient (which steps: gradients do not interpolate). */
+  discreteBg?: boolean;
+  /** It takes a click at its centre as the page is. */
+  catches?: boolean;
 }
 
 export interface MotionFrame {

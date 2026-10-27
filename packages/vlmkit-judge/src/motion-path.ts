@@ -158,6 +158,10 @@ export interface MotionSample {
     /** A dashed stroke: the share of its line its dashes draw (0-1), and the pattern, for the message. */
     drawn?: number;
     dashNote?: string;
+    /** Every colour it paints (RGBA in order): fitted as a channel when it changes. */
+    paint?: number[];
+    /** It takes a click at its centre: an invisible target that does sits over what is behind it. */
+    catches?: boolean;
     mirrored?: boolean;
     /**
      * How long its own animation has been in its active phase (ms; negative in its delay). The
@@ -274,7 +278,8 @@ export type MotionRule =
   | "still-mismatch"
   | "mirrored"
   | "stroke-incomplete"
-  | "pushed";
+  | "pushed"
+  | "invisible-blocker";
 
 export interface MotionFinding {
   rule: MotionRule;
@@ -285,7 +290,7 @@ export interface MotionFinding {
 }
 
 /** What an easing was fitted to: the path, or with the element measured, its opacity or scale. */
-export type EasingChannel = "position" | "opacity" | "scale" | "turn" | "drawn";
+export type EasingChannel = "position" | "opacity" | "scale" | "turn" | "drawn" | "colour";
 
 export type ChannelFit = EasingFit & { channel: EasingChannel };
 
@@ -641,6 +646,28 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         if (fit && Number.isFinite(fit.errors[fit.best]))
           fits.push({ ...fit, channel: key === "turnDeg" ? "turn" : key });
       }
+      // Its colours, as one channel: how far each frame has gone from the first towards the last.
+      const painted = sorted.filter(
+        (x) =>
+          x.dom?.paint &&
+          x.atMs >= seg.startMs &&
+          x.atMs <= seg.endMs &&
+          x.dom.paint.length === sorted.find((y) => y.dom?.paint)!.dom!.paint!.length,
+      );
+      if (painted.length >= 4) {
+        const p0 = painted[0]!.dom!.paint!;
+        const p1 = painted[painted.length - 1]!.dom!.paint!;
+        const d = p1.map((v, i) => v - p0[i]!);
+        const len = Math.hypot(...d);
+        if (Math.max(...d.map(Math.abs)) >= 8) {
+          const pts = painted.map((x) => ({
+            t: timeOf(x.atMs, seg),
+            s: x.dom!.paint!.reduce((acc, v, i) => acc + (v - p0[i]!) * d[i]!, 0) / len,
+          }));
+          const fit = fitEasingAffine(pts);
+          if (Number.isFinite(fit.errors[fit.best])) fits.push({ ...fit, channel: "colour" });
+        }
+      }
     }
     easing = fits[0] ? { ...fits[0], channels: fits } : { skipped: skipped ?? "nothing about it changes" };
     if (expected) {
@@ -868,6 +895,19 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     }
   }
 
+  // Gone from sight but still taking clicks: a banner faded to opacity 0 and left in place sits
+  // over whatever is behind it (round 11's brief: "nothing on the page can be clicked through it").
+  const blocking = sorted.filter(isRest).find((s) => s.dom?.catches && s.dom.opacity < 0.05);
+  if (blocking) {
+    const b = blocking.dom!.box;
+    findings.push({
+      rule: "invisible-blocker",
+      severity: "fail",
+      atMs: blocking.atMs,
+      message: `at rest (${ms(blocking.atMs)}) it is transparent (opacity ${blocking.dom!.opacity.toFixed(2)}) but still takes the clicks at its centre (${Math.round(b.x + b.width / 2)},${Math.round(b.y + b.height / 2)}): whatever is behind it cannot be clicked. Once it has left, take it out (display: none, or the hidden attribute, on animationend) or give it pointer-events: none`,
+    });
+  }
+
   // Moved with no animation of its own: something else in the flow pushed it. An article followed
   // a notice's margin-top down 56px and read "follows ease-out exactly, no fail" (round 10).
   // Known only when the page said so: every frame's own animation time explicitly null.
@@ -924,7 +964,9 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
           Math.abs(x.dom!.scale - sorted[0]!.dom!.scale) > 0.01 ||
           // A spinner turns in place: static by its centre, not by its turn; a stroke draws in place.
           Math.abs((x.dom!.turnDeg ?? 0) - (sorted[0]!.dom!.turnDeg ?? 0)) > 2 ||
-          Math.abs((x.dom!.drawn ?? 0) - (sorted[0]!.dom!.drawn ?? 0)) > 0.05,
+          Math.abs((x.dom!.drawn ?? 0) - (sorted[0]!.dom!.drawn ?? 0)) > 0.05 ||
+          // A colour that fades in place: a hover gradient read "target-static" (round 11).
+          (x.dom!.paint ?? []).some((v, i) => Math.abs(v - (sorted[0]!.dom!.paint?.[i] ?? v)) >= 8),
       )
     )
   ) {

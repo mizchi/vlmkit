@@ -1112,3 +1112,20 @@ test(
     );
   },
 );
+
+test(
+  "runAnimationEval: a transition on a gradient background is named, one on registered colours is not",
+  { timeout: 180_000 },
+  async () => {
+    // fixtures/motion-repair round 11: `transition: background 300ms` between two gradients snapped.
+    const dir = join(import.meta.dirname, "../../../fixtures/motion-repair");
+    const run = (file: string) => runAnimationEval({ source: join(dir, file), viewport: { width: 1280, height: 800 } });
+    const broken = (await run("broken/gradient.html")).issues;
+    assert.deepEqual(
+      broken.map((i) => [i.kind, i.severity]),
+      [["discrete-transition", "warn"]],
+    );
+    assert.match(broken[0]!.message, /button\.upgrade transitions `background` over a gradient .*does not interpolate/);
+    assert.deepEqual((await run("reference/gradient.html")).issues, []);
+  },
+);

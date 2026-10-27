@@ -237,7 +237,8 @@ export type AnimationEvalIssueKind =
   | "reduced-motion-hides"
   | "layout-animation"
   | "loop-seam"
-  | "stroke-incomplete";
+  | "stroke-incomplete"
+  | "discrete-transition";
 
 export interface AnimationEvalIssue {
   kind: AnimationEvalIssueKind;
@@ -481,6 +482,8 @@ export interface DeriveIssuesInput {
   undefinedKeyframes?: { selector: string; name: string; reducedMotion: boolean }[];
   /** transition-property names no CSS property, with a duration over 0. */
   unknownTransitions?: { selector: string; name: string }[];
+  /** A transition on background over a gradient, which does not interpolate. */
+  discreteTransitions?: { selector: string; name: string; image: string }[];
   /** Seen at rest without the preference, hidden or out of place at rest under reduce. */
   reducedHidden?: ReducedHidden[];
   /** What an animation does beyond its own box (`MOTION_SHAPE_SCRIPT`). */
@@ -569,6 +572,17 @@ export function deriveAnimationIssues(
       severity: "suspect",
       selector: stroke.selector,
       message: `${stroke.selector} \`${stroke.name}\` draws its stroke and rests ${Math.round(stroke.drawn * 100)}% drawn: ${stroke.note}. A dash shorter than the line leaves the rest of it off; make the dash (and the offset it starts from) at least the line's length, or set pathLength and use that.`,
+    });
+  }
+
+  // Round 11: a hover gradient with `transition: background 300ms` snapped, and every gate passed
+  // it — the transition is declared, has a duration, and never shows a frame between.
+  for (const u of input.discreteTransitions ?? []) {
+    issues.push({
+      kind: "discrete-transition",
+      severity: "warn",
+      selector: u.selector,
+      message: `${u.selector} transitions \`${u.name}\` over a gradient (${u.image}): a gradient is an image and does not interpolate, so a change to another gradient steps at once with no frame between. To fade it, build the gradient from registered colour properties (@property --c { syntax: "<color>"; inherits: false; initial-value: … }) and transition those, or cross-fade a second gradient layer's opacity. If the gradient never changes, this transition does nothing.`,
     });
   }
 
@@ -1188,6 +1202,24 @@ ${ANIMATION_HELPERS_JS}
   return out;
 })()`;
 
+const DISCRETE_TRANSITION_SCRIPT = `(() => {
+${ANIMATION_HELPERS_JS}
+  const out = [];
+  for (const el of document.querySelectorAll("*")) {
+    const cs = getComputedStyle(el);
+    if (!/gradient\\(/.test(cs.backgroundImage)) continue;
+    const props = cs.transitionProperty.split(",").map((p) => p.trim());
+    const durations = cs.transitionDuration.split(",").map((d) => parseFloat(d) || 0);
+    // Named, not \`all\`: a gradient button with \`transition: all\` for its hover lift was 4 of 5
+    // findings on the repo's pages, and its gradient never changes.
+    const i = props.findIndex((p, k) => /^(background|background-image)$/.test(p) && durations[k % durations.length] > 0);
+    if (i < 0 || out.length >= 8) continue;
+    const image = cs.backgroundImage.length > 60 ? cs.backgroundImage.slice(0, 57) + "..." : cs.backgroundImage;
+    out.push({ selector: stableSelector(el), name: props[i], image });
+  }
+  return out;
+})()`;
+
 const UNDEFINED_KEYFRAMES_SCRIPT = `(() => {
 ${ANIMATION_HELPERS_JS}
   const ran = new Set((window.__vlmkitStarted || []).map((r) => r.selector + "\\u0000" + r.name));
@@ -1386,6 +1418,11 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
 
     const timings = await collectAnimations(page);
     const shapes = (await page.evaluate(MOTION_SHAPE_SCRIPT)) as MotionShapes;
+    const discreteTransitions = (await page.evaluate(DISCRETE_TRANSITION_SCRIPT)) as {
+      selector: string;
+      name: string;
+      image: string;
+    }[];
     const undefinedOnPage = (await page.evaluate(UNDEFINED_KEYFRAMES_SCRIPT)) as { selector: string; name: string }[];
     const unknownTransitions = (await page.evaluate(UNKNOWN_TRANSITION_PROPERTY_SCRIPT)) as {
       selector: string;
@@ -1961,6 +1998,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         ...(clockMotion ? { clockMotion } : {}),
         ...(undefinedKeyframes.length > 0 ? { undefinedKeyframes } : {}),
         ...(unknownTransitions.length > 0 ? { unknownTransitions } : {}),
+        ...(discreteTransitions.length > 0 ? { discreteTransitions } : {}),
         ...(reducedHidden.length > 0 ? { reducedHidden } : {}),
         shapes,
       },

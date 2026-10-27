@@ -602,7 +602,9 @@ export const INTERACTION_HOLD_SCRIPT = `(() => {
       const spans = [];
       for (const [anim, e] of entries) {
         const state = anim.playState;
-        if (state === "idle") { if (!quiet.has(anim)) cancelled.add(anim); continue; }
+        // One the seek already took to its end is not cancelled: a banner hidden on its animationend
+        // removes the finished animation, and read "cancelled or replaced mid-window" (round 11).
+        if (state === "idle") { if (!quiet.has(anim) && !endAt.has(anim)) cancelled.add(anim); continue; }
         if (state === "finished") continue;
         const begin = e.pre ? e.origin - anchor : Math.max(0, e.origin - anchor);
         const span = Number.isFinite(e.end) ? (e.rate > 0 ? e.end - e.from : e.from) / Math.abs(e.rate) : Infinity;

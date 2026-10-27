@@ -263,7 +263,9 @@ describe("composed built-in registry", () => {
     // 222 → 225: `check animation` / `layout-animation` (warn), `loop-seam` and `stroke-incomplete`
     // (suspect) — a margin-top notice shoving the article, a 350deg spinner and a dash shorter than
     // its line passed every gate without a target (motion-repair round 10).
-    assert.equal(total, 225);
+    // 225 → 226: `check animation` / `discrete-transition` (warn) — a hover gradient with
+    // `transition: background` snapped, and every gate passed it (motion-repair round 11).
+    assert.equal(total, 226);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {

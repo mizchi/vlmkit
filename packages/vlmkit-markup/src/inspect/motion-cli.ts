@@ -63,6 +63,7 @@ export async function measureTargets(
             elapsedMs: null,
             ownOpacity: 0,
             notRendered: true,
+            catches: false,
             hiddenBy: `not rendered: ${who === "it" ? "it is" : `${who} is`} display: none${el.hasAttribute("hidden") || none?.hasAttribute("hidden") ? " (the hidden attribute)" : ""}`,
           };
         }
@@ -146,6 +147,36 @@ export async function measureTargets(
           return Math.abs(deg) > 0.01 ? { turnDeg: deg } : {};
         };
         const backHidden = getComputedStyle(el).backfaceVisibility === "hidden";
+        // Its paint, as numbers: every colour in its background (a gradient's stops), its text and
+        // its border. A hover gradient that faded read "travels 0px … target-static", and one that
+        // snapped read "no --selector target changed" (round 11).
+        const own = getComputedStyle(el);
+        const paint: number[] = [];
+        for (const v of [own.backgroundImage, own.backgroundColor, own.color, own.borderTopColor, own.fill, own.stroke])
+          for (const m of String(v).matchAll(/rgba?\(([^)]*)\)/g)) {
+            const c = m[1]!
+              .split(/[\s,/]+/)
+              .filter(Boolean)
+              .map(Number);
+            paint.push(c[0] ?? 0, c[1] ?? 0, c[2] ?? 0, Math.round((c[3] ?? 1) * 255));
+          }
+        // A transition on background over a gradient: a gradient does not interpolate, so it steps.
+        const durations = own.transitionDuration.split(",").map((d) => parseFloat(d) || 0);
+        const discreteBg =
+          /gradient\(/.test(own.backgroundImage) &&
+          own.transitionProperty
+            .split(",")
+            .map((p) => p.trim())
+            .some((p, i) => /^(all|background|background-image)$/.test(p) && durations[i % durations.length]! > 0);
+        // Whether it takes a click at its centre as the page is: an invisible target that still does
+        // sits over whatever is behind it (a dismissed banner at opacity 0, round 11).
+        const cx = r.x + r.width / 2;
+        const cy = r.y + r.height / 2;
+        const atCentre =
+          r.width > 0 && r.height > 0 && cx >= 0 && cy >= 0 && cx < innerWidth && cy < innerHeight
+            ? document.elementFromPoint(cx, cy)
+            : null;
+        const catches = !!atCentre && el.contains(atCentre);
         // What of it is the topmost thing painted, over a 5x5 grid of its box inside the viewport:
         // a clip (overflow: hidden), a cover (z-index) and leaving the screen all take it away.
         el.setAttribute("data-vlmkit-probe", "");
@@ -348,6 +379,9 @@ export async function measureTargets(
           ...(drawn !== undefined ? { drawn, ...(dashNote ? { dashNote } : {}) } : {}),
           ...turn(el),
           ...(m33 < -0.01 && !backHidden ? { mirrored: true } : {}),
+          ...(paint.length > 0 ? { paint } : {}),
+          ...(discreteBg ? { discreteBg: true } : {}),
+          catches,
         };
       });
     } finally {
@@ -392,6 +426,9 @@ each forbidden statement is. vlmkit judges the motion from that:
   interrupt-jump   an action cut into a motion (--wait) and the target jumped as it landed
   loop-seam        a repeating animation's run ends where the next does not begin (a 350deg spin)
   pushed           moves with no animation of its own: a layout property animated elsewhere (warn)
+  invisible-blocker at rest it is transparent and still takes clicks at its centre
+  replayed         after rest, as the page's timers run (3s), it is replaced by a new element that
+                   plays its animation again (a re-render); the same element starting again is a warn
   stroke-incomplete a stroke drawing itself ends part drawn (a dash shorter than its line)
   mirrored         a face turned past edge-on is seen backwards (backface-visibility)
   forbid           a statement seen at rest fails; only mid-motion, warns (--jev)
@@ -465,7 +502,7 @@ an easing is checked on each channel that changes.
                           the page's own spans of motion
   --start <ms> --end <ms> The motion's span (needed for frames.json): one segment
   --viewport <WxH>        Default 1280x800
-  --frames <dir>          Where the frames go (default test-results/inspect-motion/<page name>, so
+  --frames <dir>          (or --out) Where the frames go (default test-results/inspect-motion/<page name>, so
                           two pages, or check animation's frames, do not overwrite each other)
   --threshold <0-1>       A statement is true at or above this (default 0.5)
   --json                  Print the report as JSON
@@ -478,7 +515,11 @@ export class MotionUsageError extends Error {}
 
 /** After --click nothing animated: the targets that changed did so in one frame. */
 export class SnappedError extends Error {
-  constructor(readonly changed: string[]) {
+  constructor(
+    readonly changed: string[],
+    /** Per change, the cause the page shows, when it does. */
+    readonly causes: (string | undefined)[] = [],
+  ) {
     super("no animation or transition started after --click");
   }
 }
@@ -694,7 +735,9 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
         viewport = { width: Number(m[1]), height: Number(m[2]) };
         break;
       }
+      // --out is what other commands call it: an agent reached for it and got "unknown option" (round 11).
       case "--frames":
+      case "--out":
         frames = value(a, argv[++i]);
         break;
       case "--threshold": {
@@ -726,7 +769,6 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
         if (a.startsWith("--")) {
           // Two of three round-1 agents reached for --out: say where the output goes.
           const near: Record<string, string> = {
-            "--out": "--frames <dir>",
             "--output": "--frames <dir>",
             "--key": "--jev",
           };
@@ -1026,6 +1068,8 @@ interface Captured {
   delays?: (string | null)[];
   /** A repeating animation whose run does not end where the next begins: a jump at every loop. */
   seams?: { selector: string; message: string }[];
+  /** After rest, as the page's timers ran: a target replaced by a new element, or its animation begun again. */
+  replays?: { selector: string; message: string; warn?: boolean }[];
   /** Animations whose keyframes move layout (margin, height, top…): what pushes its neighbours. */
   layoutMovers?: string[];
   /** Only infinite animations ran: the first runs were sampled and nothing rests. */
@@ -1152,6 +1196,7 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
           const after = await scrolled();
           const dx = after.x - scrollBefore.x;
           const dy = after.y - scrollBefore.y;
+          const causes: (string | undefined)[] = [];
           const changed = o.selectors.flatMap((sel, i) => {
             const a = beforeClick[i];
             const b = afterClick[i];
@@ -1163,13 +1208,25 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
               Math.abs(a.box.height - b.box.height),
             );
             const op = Math.abs(a.opacity - b.opacity);
-            return d >= 1 || op >= 0.05
-              ? [
-                  `${sel}: ${Math.round(a.box.width)}x${Math.round(a.box.height)} at (${Math.round(a.box.x)},${Math.round(a.box.y)}) → ${Math.round(b.box.width)}x${Math.round(b.box.height)} at (${Math.round(b.box.x)},${Math.round(b.box.y)})${op >= 0.05 ? `, opacity ${a.opacity.toFixed(2)} → ${b.opacity.toFixed(2)}` : ""}`,
-                ]
-              : [];
+            const pa = a.paint ?? [];
+            const pb = b.paint ?? [];
+            const paintStep =
+              pa.length === pb.length && pa.length > 0 ? Math.max(...pa.map((v, k) => Math.abs(v - pb[k]!))) : 0;
+            if (!(d >= 1 || op >= 0.05 || paintStep >= 8)) return [];
+            causes.push(
+              b.notRendered
+                ? `the action took it out of rendering (${b.hiddenBy?.replace(/^not rendered: /, "") ?? "display: none"}) in the same frame, so no exit animation can be drawn: let it leave first and hide it once it has (on animationend / transitionend), or transition display with transition-behavior: allow-discrete`
+                : paintStep >= 8 && d < 1 && op < 0.05 && (a.discreteBg || b.discreteBg)
+                  ? `only its colour changed, and its transition on background runs between two gradients, which do not interpolate (a gradient is an image: it steps at once). Build the gradient from registered colour properties (@property --c { syntax: "<color>"; … }) and transition those, or cross-fade a second gradient layer's opacity`
+                  : undefined,
+            );
+            return [
+              d >= 1 || op >= 0.05
+                ? `${sel}: ${Math.round(a.box.width)}x${Math.round(a.box.height)} at (${Math.round(a.box.x)},${Math.round(a.box.y)}) → ${Math.round(b.box.width)}x${Math.round(b.box.height)} at (${Math.round(b.box.x)},${Math.round(b.box.y)})${op >= 0.05 ? `, opacity ${a.opacity.toFixed(2)} → ${b.opacity.toFixed(2)}` : ""}`
+                : `${sel}: its colour, by up to ${Math.round(paintStep)} of 255 a channel,`,
+            ];
           });
-          throw new SnappedError(changed);
+          throw new SnappedError(changed, causes);
         }
       } else if (held.length === 0 && o.endMs === undefined) {
         // Frame by frame up to the latest timer: jumping straight to it ran a click at 100ms and
@@ -1401,6 +1458,82 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
           return out;
         })
         .catch(() => []);
+      // After rest, the page's own timers: a quote re-rendered by innerHTML every second replaced
+      // its price with a new element whose entrance played again, and the frames, which end at
+      // rest, read "no fail" (round 11). The clock runs on for 3s and each target is looked at.
+      const replays: { selector: string; message: string; warn?: boolean }[] = [];
+      const due = forever || o.selectors.length === 0 ? null : await timeline.pending().catch(() => null);
+      if (due && due.timers > 0) {
+        await page
+          .evaluate(
+            (sels) => sels.forEach((s) => document.querySelector(s)?.setAttribute("data-vlmkit-rest", "")),
+            o.selectors,
+          )
+          .catch(() => {});
+        const last = instants[instants.length - 1] ?? endMs;
+        const seen = o.selectors.map(() => ({
+          replaced: [] as number[],
+          restarted: [] as number[],
+          names: new Set<string>(),
+        }));
+        for (let t = last + 100; t <= last + 3000; t += 100) {
+          await timeline.at(t);
+          const now = await page
+            .evaluate(
+              (sels) =>
+                sels.map((s) => {
+                  const el = document.querySelector(s);
+                  if (!el) return null;
+                  const active = el
+                    .getAnimations()
+                    .filter((a) => {
+                      const c = a.effect?.getComputedTiming();
+                      if (!c || Number(c.iterations) === Infinity || c.localTime === null) return false;
+                      // In its active phase: a fill holds an ended one's progress at 1, which is not playing.
+                      const local = Number(c.localTime) - Number(c.delay ?? 0);
+                      return local >= 0 && local < Number(c.activeDuration);
+                    })
+                    .map(
+                      (a) =>
+                        (a as CSSAnimation).animationName || (a as CSSTransition).transitionProperty || "an animation",
+                    );
+                  const fresh = !el.hasAttribute("data-vlmkit-rest");
+                  el.setAttribute("data-vlmkit-rest", "");
+                  return { fresh, active };
+                }),
+              o.selectors,
+            )
+            .catch(() => []);
+          now.forEach((x, i) => {
+            if (!x) return;
+            const s = seen[i]!;
+            if (x.fresh && x.active.length > 0) s.replaced.push(t);
+            else if (x.active.length > 0 && !s.restarted.some((r) => t - r <= 100)) s.restarted.push(t);
+            x.active.forEach((n) => s.names.add(n));
+          });
+        }
+        o.selectors.forEach((sel, i) => {
+          const s = seen[i]!;
+          const when = (ts: number[]) =>
+            ts
+              .slice(0, 3)
+              .map((x) => `${Math.round(x)}ms`)
+              .join(", ") + (ts.length > 3 ? ", …" : "");
+          const names = [...s.names].map((n) => `\`${n}\``).join(", ");
+          if (s.replaced.length > 0) {
+            replays.push({
+              selector: sel,
+              message: `${sel} after it came to rest: the page replaced it with a new element by ${when(s.replaced)} (a re-render: innerHTML, a framework re-keying the node), and the new one plays ${names} again each time. Update what it shows (textContent, an attribute) instead of re-creating it`,
+            });
+          } else if (s.restarted.length > 0) {
+            replays.push({
+              warn: true,
+              selector: sel,
+              message: `${sel} after it came to rest: ${names} began again at ${when(s.restarted)} (a class toggled on a timer). If it should play once, nothing should start it again`,
+            });
+          }
+        });
+      }
       return {
         frames,
         startMs,
@@ -1414,6 +1547,7 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
         ...(delays ? { delays } : {}),
         ...(layoutMovers.length > 0 ? { layoutMovers } : {}),
         ...(seams.length > 0 ? { seams } : {}),
+        ...(replays.length > 0 ? { replays } : {}),
         ...(forever ? { forever: true } : {}),
         ...(interrupt ? { interrupt } : {}),
         ...(scrollYs.length > 1 && Math.max(...scrollYs) - Math.min(...scrollYs) >= 1
@@ -1739,11 +1873,15 @@ export async function runMotionCli(argv: string[]): Promise<number> {
         (last.kind === "hover" && o.actions.some((a, k) => k < o.actions.length - 1 && a.kind === "hover"))
           ? "a transition declared only in the :hover rule runs on the way in and not on the way out — declare it on the element itself; "
           : "";
-      for (const c of e.changed) {
+      for (const [k, c] of e.changed.entries()) {
+        const cause = e.causes[k];
         console.log(
-          `    FAIL snapped: ${c} in one frame. If it should animate, its transition never starts: ${pointer}a transition to or from an intrinsic size (height: auto) does not run without interpolate-size: allow-keywords (Chromium only so far; grid-template-rows 0fr → 1fr runs in every engine); a misspelt transition-property and a property the transition does not list are the other usual causes`,
+          cause
+            ? `    FAIL snapped: ${c} in one frame: ${cause}`
+            : `    FAIL snapped: ${c} in one frame. If it should animate, its transition never starts: ${pointer}a transition to or from an intrinsic size (height: auto) does not run without interpolate-size: allow-keywords (Chromium only so far; grid-template-rows 0fr → 1fr runs in every engine); a misspelt transition-property and a property the transition does not list are the other usual causes`,
         );
       }
+      console.log(`  no frames written: nothing animated to shoot`);
       console.log(`  ${e.changed.length} fail; measured from the page, no model asked`);
       return 1;
     }
@@ -1778,10 +1916,13 @@ export async function runMotionCli(argv: string[]): Promise<number> {
   const jumps = [
     ...interruptJumps(captured, o.selectors),
     ...(captured.seams ?? []).map((s) => ({ ...s, rule: "loop-seam" })),
+    ...(captured.replays ?? []).filter((s) => !s.warn).map((s) => ({ ...s, rule: "replayed" })),
   ];
+  const warnsAfter = (captured.replays ?? []).filter((s) => s.warn).map((s) => ({ ...s, rule: "replayed" }));
   const json = {
     source: o.source,
     ...(jumps.length > 0 ? { interruptJumps: jumps } : {}),
+    ...(warnsAfter.length > 0 ? { warnings: warnsAfter } : {}),
     frames: captured.manifest,
     startMs: captured.startMs,
     endMs: captured.endMs,
@@ -1799,17 +1940,49 @@ export async function runMotionCli(argv: string[]): Promise<number> {
   if (o.json) console.log(JSON.stringify(json, null, 2));
   else {
     const lines = formatMotionReport(o.source, captured, r, o.forbid).split("\n");
-    if (jumps.length > 0) {
+    if (jumps.length > 0 || warnsAfter.length > 0) {
       // Into the report, above its tally, and counted in it: "no fail" printed above a FAIL line.
       const at = lines.findIndex((l) => /^ {2}(no fail|\d+ fail)/.test(l));
-      const extra = jumps.map((j) => `    FAIL ${"rule" in j ? j.rule : "interrupt-jump"}: ${j.message}`);
+      const extra = [
+        ...jumps.map((j) => `    FAIL ${"rule" in j ? j.rule : "interrupt-jump"}: ${j.message}`),
+        ...warnsAfter.map((j) => `    warn ${j.rule}: ${j.message}`),
+      ];
       if (at < 0) lines.push(...extra);
       else {
         const tally = lines[at]!;
         const fails = /^ {2}no fail/.test(tally) ? 0 : Number(/^ {2}(\d+) fail/.exec(tally)![1]);
-        lines[at] = tally.replace(/^ {2}(no fail|\d+ fail)/, `  ${fails + jumps.length} fail`);
+        if (jumps.length > 0) lines[at] = tally.replace(/^ {2}(no fail|\d+ fail)/, `  ${fails + jumps.length} fail`);
         lines.splice(at, 0, ...extra);
       }
+    }
+    // A pass said nothing of what was asked: an agent could not tell an expectation met from one
+    // never checked (round 11). Each flag given, and whether a line above failed it.
+    const asked: string[] = [];
+    for (let k = 0; k < argv.length; k++) {
+      if (!argv[k]!.startsWith("--expect-")) continue;
+      asked.push(argv[k + 1] !== undefined && !argv[k + 1]!.startsWith("--") ? `${argv[k]} ${argv[k + 1]}` : argv[k]!);
+    }
+    if (asked.length > 0) {
+      const failed = new Set(
+        r.targets.flatMap((t) => t.findings.filter((f) => f.severity === "fail").map((f) => f.rule as string)),
+      );
+      const ruleOf = (flag: string) =>
+        /easing/.test(flag)
+          ? "easing-mismatch"
+          : /origin/.test(flag)
+            ? "origin-mismatch"
+            : /start|stagger/.test(flag)
+              ? "start-mismatch"
+              : /duration/.test(flag)
+                ? "duration-mismatch"
+                : /iterations/.test(flag)
+                  ? "iterations-mismatch"
+                  : /direction/.test(flag)
+                    ? "direction-mismatch"
+                    : "still-mismatch";
+      const held = asked.filter((f) => !failed.has(ruleOf(f)));
+      const at = lines.findIndex((l) => /^ {2}(no fail|\d+ fail)/.test(l));
+      if (held.length > 0) lines.splice(at < 0 ? lines.length : at, 0, `  held: ${held.join(", ")}`);
     }
     console.log(`${lines.join("\n")}\n  report: ${saved}`);
   }

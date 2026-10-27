@@ -386,4 +386,45 @@ describe("what motion-repair round 1 passed", () => {
     assert.ok(found.has("target-lost"), JSON.stringify(r.findings));
     assert.ok(found.has("snap-back"), "the hold frames are back where the entrance began");
   });
+
+  it("fits a colour that fades in place, and fails a transparent target that still takes clicks at rest", () => {
+    // A button whose gradient eases between two looks over 300ms; its box never moves.
+    const times = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 600];
+    const paintAt = (t: number) => {
+      const e = easingAt("ease", Math.min(1, t / 300));
+      return [
+        37 + (147 - 37) * e,
+        99 + (51 - 99) * e,
+        235,
+        255,
+        79 + (219 - 79) * e,
+        70 + (39 - 70) * e,
+        229 + (119 - 229) * e,
+        255,
+      ];
+    };
+    const colour = times.map((t) => ({
+      atMs: t,
+      present: 1,
+      box: box(300),
+      dom: { box: box(300), opacity: 1, scale: 1, paint: paintAt(t), elapsedMs: t },
+    }));
+    const c = judgeMotionPath(colour, { startMs: 0, endMs: 300 });
+    expect(c.findings).toEqual([]);
+    expect("best" in c.easing && [c.easing.best, c.easing.channel]).toEqual(["ease", "colour"]);
+    // A banner faded to opacity 0 and left where it was: gone from sight, still over the page.
+    const fade = times.map((t) => {
+      const e = easingAt("ease-in", Math.min(1, t / 300));
+      return {
+        atMs: t,
+        present: 1 - e,
+        box: box(300, 200 + 16 * e),
+        dom: { box: box(300, 200 + 16 * e), opacity: 1 - e, scale: 1, elapsedMs: t, catches: true },
+      };
+    });
+    const f = judgeMotionPath(fade, { startMs: 0, endMs: 300, exits: true });
+    expect(f.findings.map((x) => [x.rule, x.severity])).toEqual([["invisible-blocker", "fail"]]);
+    const gone = fade.map((x) => ({ ...x, dom: { ...x.dom, catches: x.atMs < 300 } }));
+    expect(judgeMotionPath(gone, { startMs: 0, endMs: 300, exits: true }).findings).toEqual([]);
+  });
 });

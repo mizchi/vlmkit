@@ -109,6 +109,12 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       docs: "Seen at rest without prefers-reduced-motion and at opacity 0 (or 8px+ from its place) at rest with it: `animation: none` in the reduce rule removed the animation and the fill that held its end state, so its base style (opacity 0, a start transform) shows. The preference is honoured and the content is gone.",
     },
     {
+      id: "discrete-transition",
+      title: "A transition on a gradient background, which steps",
+      severity: "warn",
+      docs: "transition-property names background (or background-image) on an element whose background-image is a gradient (`all` is left out: it is usually there for something else). A gradient does not interpolate, so a change to another gradient steps at once. Transition registered colour properties (@property) the gradient is built from, or cross-fade a layer.",
+    },
+    {
       id: "layout-animation",
       title: "An animated layout property moves other elements",
       severity: "warn",

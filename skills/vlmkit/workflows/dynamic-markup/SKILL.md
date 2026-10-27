@@ -316,7 +316,12 @@ vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ea
   margin / height moves elements with no animation of their own), `loop-seam` and
   `stroke-incomplete` (suspect). Its `infinite-animation` on a loading indicator (`role="progressbar"`,
   `aria-busy`, a `spin` / `load` name) says the spinner is meant to run forever; a brief that says it
-  turns forever is not contradicted by it. In motion-repair round 3 a wrong
+  turns forever is not contradicted by it. A hover that changes only a colour is measured too: a
+  `--selector` target's colours are a channel (`follows ease in its colour`), a colour changed in
+  one frame is `snapped` (a gradient does not interpolate — `check animation`'s
+  `discrete-transition`), and a page that re-renders the target on a timer is `replayed`. A brief's
+  "nothing can be clicked through it" is `--exits` on the target: transparent and still taking
+  clicks at rest is `invisible-blocker`. In motion-repair round 3 a wrong
   `transform-origin` and a stagger that was not one both read "follows ease-out exactly, no fail"
   until these existed.
 - **What it does not judge**: fps or jank, a target it is not told about, and anything under
