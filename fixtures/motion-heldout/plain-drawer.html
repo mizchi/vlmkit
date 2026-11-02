@@ -1,0 +1,10 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Drawer</title><style>body{margin:0;font:15px/1.4 system-ui,sans-serif;background:#f4f5f7;color:#1d2330}
+.menu-btn{margin:16px 24px;padding:8px 14px;border-radius:8px;border:1px solid #c6ccd6;background:#fff;cursor:pointer}
+.drawer{position:fixed;top:0;left:0;bottom:0;width:280px;background:#fff;box-shadow:4px 0 24px #0002;padding:24px;box-sizing:border-box;translate:-100% 0;transition:translate 300ms ease-out}
+.drawer.open{translate:0 0}
+.drawer a{display:block;padding:8px 0;color:#1d2330;text-decoration:none}
+</style></head><body>
+<button class="menu-btn" aria-controls="nav">Menu</button>
+<nav class="drawer" id="nav"><a href="#">Home</a><a href="#">Projects</a><a href="#">Team</a><a href="#">Settings</a></nav>
+<script>document.querySelector('.menu-btn').addEventListener('click',()=>document.querySelector('.drawer').classList.add('open'));</script>
+</body></html>

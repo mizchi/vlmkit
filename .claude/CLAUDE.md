@@ -443,6 +443,17 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   own run (`action-N/`, worst exit code); `diff html` drops a global shift that leaves no fewer pixels
   differing; channels that follow one curve exactly are said once; `target-unchanged` (warn) when
   every target is still and a non-ancestor animates.
+- **Held out, and what it found** (`fixtures/motion-heldout/`, `docs/reports/2026-11-02-motion-heldout-v1.md`):
+  25 pages by an agent that never saw the code — the ten defect classes in other forms (WAAPI, the
+  individual `translate`/`rotate`/`scale` properties, `offset-path`, `CSS.registerProperty`) and a
+  correct page built to look like each. The first run caught 7 of 10 broken pages, failed 2 correct
+  ones and `check animation` flagged 2 more. Not to re-learn: only `transform` was measured (now the
+  individual properties are composed first); a threshold from one round's example (10° off the axis,
+  now 5° and 8px); a seam on `steps()`; a mismatch claimed between curves within 1.5x
+  (`easing-unchecked` warn); a jump needs 3x the segment's median speed too; a fill is named only for a
+  property the element also transitions (`held-by-fill` when an action changes nothing); `clip` is a
+  channel; registration is probed by computing `initial`. `motion-heldout.test.ts` holds all 25. The
+  set is tuned against now: the next such check needs new pages.
 
 ## Generated figures (raster images)
 

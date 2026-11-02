@@ -1142,6 +1142,17 @@ ${ANIMATION_HELPERS_JS}
   for (const sheet of document.styleSheets) {
     try { walk(sheet.cssRules); } catch {}
   }
+  // Registered with a type anywhere (CSS.registerProperty in a script, a sheet the page cannot
+  // read): such a property computes \`initial\` to its initial value, an unregistered one to
+  // nothing. A switch registered from JS read as unregistered (held-out set).
+  const typedProperty = (name) => {
+    const probe = document.createElement("div");
+    probe.style.setProperty(name, "initial");
+    document.documentElement.append(probe);
+    const v = getComputedStyle(probe).getPropertyValue(name).trim();
+    probe.remove();
+    return v !== "";
+  };
   for (const el of document.querySelectorAll("*")) {
     const cs = getComputedStyle(el);
     // An offset animated on a static box does nothing: a notice meant to slide in animated
@@ -1151,6 +1162,9 @@ ${ANIMATION_HELPERS_JS}
         const kf = (a.effect && a.effect.getKeyframes) ? a.effect.getKeyframes() : [];
         const offs = [...new Set(kf.flatMap((k) => Object.keys(k).filter((p) => /^(top|left|right|bottom|inset)/.test(p))))];
         if (offs.length === 0) continue;
+        // It moves by a transform as well: the slide happens, the offset is only dead weight (a
+        // held-out box animating left and translateX together slid 200px and read "never moves").
+        if (kf.some((k) => ["transform", "translate"].some((p) => k[p] !== undefined && k[p] !== "none"))) continue;
         const selector = stableSelector(el);
         const key = selector + "\u0000" + (a.animationName || "");
         if (seen.has(key)) continue;
@@ -1164,7 +1178,7 @@ ${ANIMATION_HELPERS_JS}
       if (!name || name === "all" || name === "none") return;
       if (!(durations[i % durations.length] > 0)) return;
       if (name.startsWith("--")) {
-        if (registered.has(name)) return;
+        if (registered.has(name) || typedProperty(name)) return;
         const selector = stableSelector(el);
         if (seen.has(selector + "\u0000" + name) || out.length >= 8) return;
         seen.add(selector + "\u0000" + name);

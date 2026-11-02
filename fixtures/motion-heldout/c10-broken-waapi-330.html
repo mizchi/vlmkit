@@ -1,0 +1,8 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Loading</title><style>body{margin:0;font:15px/1.4 system-ui,sans-serif;background:#f4f5f7;color:#1d2330}
+.panel{margin:120px auto;width:320px;background:#fff;border-radius:12px;padding:32px;text-align:center;border:1px solid #dde1e8}
+.spinner{display:block;margin:0 auto 12px}
+</style></head><body>
+<div class="panel"><svg class="spinner" width="48" height="48" viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" fill="none" stroke="#e3e7ee" stroke-width="5"/><path d="M24 4 A20 20 0 0 1 44 24" fill="none" stroke="#2563eb" stroke-width="5" stroke-linecap="round"/></svg>Loading your reports&hellip;</div>
+<script>
+document.querySelector('.spinner').animate([{rotate:'0deg'},{rotate:'330deg'}],{duration:900,iterations:Infinity,easing:'linear'});
+</script></body></html>

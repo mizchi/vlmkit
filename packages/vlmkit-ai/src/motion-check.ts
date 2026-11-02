@@ -69,6 +69,8 @@ export interface MotionDom {
   sweepDeg?: number;
   /** Its own transform's translation (px): what carries its centre when it slides. */
   shift?: number[];
+  /** Its clip-path's numbers (inset edges, radii), on paint's scale (100% is 255). */
+  clip?: number[];
   /** Its own animation offsets a box that is position: static, where top / left do nothing. */
   inertOffsets?: string;
   /** A finished animation's forwards fill still holds what it animated, and why that matters. */

@@ -1,0 +1,10 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hero reveal</title><style>body{margin:0;font:15px/1.4 system-ui,sans-serif;background:#f4f5f7;color:#1d2330}
+.hero{margin:40px auto;width:880px;height:320px;border-radius:16px;overflow:hidden;position:relative}
+.reveal{position:absolute;inset:0;background:linear-gradient(120deg,#3a7bd5,#00d2ff);display:flex;align-items:flex-end;padding:32px;color:#fff;font:700 34px system-ui;box-sizing:border-box}
+</style></head><body>
+<section class="hero"><div class="reveal">Autumn collection</div></section>
+<script>
+document.querySelector('.reveal').animate(
+  [{clipPath:'inset(0 100% 0 0)'},{clipPath:'inset(0 0% 0 0)'}],
+  {duration:700,delay:150,easing:'ease-out',fill:'both'});
+</script></body></html>

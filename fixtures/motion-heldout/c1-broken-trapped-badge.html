@@ -1,0 +1,12 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cart badge</title><style>body{margin:0;font:15px/1.4 system-ui,sans-serif;background:#f4f5f7;color:#1d2330}
+.toolbar{position:relative;transform:translateZ(0);height:56px;background:#1e2a44;color:#fff;display:flex;align-items:center;padding:0 24px;justify-content:space-between}
+.cart{position:relative;width:32px;height:32px;border-radius:8px;background:#34466e;display:grid;place-items:center;font-size:13px}
+.badge{position:absolute;z-index:100;top:40px;left:4px;min-width:24px;height:22px;border-radius:11px;background:#e5383b;color:#fff;font:700 12px/22px system-ui;text-align:center;animation:pop 320ms cubic-bezier(.3,1.6,.6,1) 200ms both}
+@keyframes pop{from{scale:0}to{scale:1}}
+.promo{position:relative;z-index:1;margin-top:-18px;background:#ffe9a8;padding:22px 24px 14px;font-weight:600}
+main{padding:24px}
+</style></head><body>
+<header class="toolbar"><strong>Shoply</strong><div class="cart">Cart<span class="badge">3</span></div></header>
+<div class="promo">Free shipping on orders over $50 this week</div>
+<main><p>Browse our latest arrivals.</p></main>
+</body></html>

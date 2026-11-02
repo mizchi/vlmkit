@@ -36,6 +36,49 @@ export async function measureTargets(
     const probe = document.createElement("style");
     probe.textContent = "[data-vlmkit-probe],[data-vlmkit-probe] *{pointer-events:auto!important}";
     (document.head ?? document.documentElement).append(probe);
+    // An element's whole transform: the individual translate, rotate and scale properties, then
+    // transform, as CSS composes them. A spinner turned by the `rotate` property read "does not
+    // turn", and a card scaled by `scale` read scale 1 (held-out set, 2026-11-02).
+    const fullTransform = (e: Element): DOMMatrixReadOnly | null => {
+      const cs = getComputedStyle(e);
+      let m = new DOMMatrix();
+      let any = false;
+      const px = (v: string, size: number) => (v.endsWith("%") ? (parseFloat(v) / 100) * size : parseFloat(v) || 0);
+      if (cs.translate && cs.translate !== "none") {
+        const box = (e as HTMLElement).offsetWidth !== undefined ? e.getBoundingClientRect() : null;
+        const [x = "0", y = "0", z = "0"] = cs.translate.split(/\s+/);
+        m = m.translate(
+          px(x, (e as HTMLElement).offsetWidth ?? box?.width ?? 0),
+          px(y, (e as HTMLElement).offsetHeight ?? box?.height ?? 0),
+          parseFloat(z) || 0,
+        );
+        any = true;
+      }
+      if (cs.rotate && cs.rotate !== "none") {
+        const parts = cs.rotate.split(/\s+/);
+        const angle = parts[parts.length - 1]!;
+        const deg = angle.endsWith("rad")
+          ? (parseFloat(angle) * 180) / Math.PI
+          : angle.endsWith("turn")
+            ? parseFloat(angle) * 360
+            : parseFloat(angle);
+        const axis = parts.slice(0, -1);
+        const [ax, ay, az] =
+          axis.length === 3 ? axis.map(Number) : axis[0] === "x" ? [1, 0, 0] : axis[0] === "y" ? [0, 1, 0] : [0, 0, 1];
+        m = m.rotateAxisAngle(ax!, ay!, az!, deg);
+        any = true;
+      }
+      if (cs.scale && cs.scale !== "none") {
+        const [sx = "1", sy = sx, sz = "1"] = cs.scale.split(/\s+/);
+        m = m.scale(parseFloat(sx), parseFloat(sy), parseFloat(sz));
+        any = true;
+      }
+      if (cs.transform && cs.transform !== "none") {
+        m = m.multiply(new DOMMatrix(cs.transform));
+        any = true;
+      }
+      return any ? m : null;
+    };
     try {
       return sels.map((sel) => {
         const el = document.querySelector(sel);
@@ -82,12 +125,12 @@ export async function measureTargets(
           }
         }
         const ownOpacity = Number(getComputedStyle(el).opacity);
-        const transform = getComputedStyle(el).transform;
+        const whole = fullTransform(el);
         let scale = 1;
         let scaleX = 1;
         let scaleY = 1;
-        if (transform && transform !== "none") {
-          const m = new DOMMatrixReadOnly(transform);
+        if (whole) {
+          const m = whole;
           // Column norms in 3D: a card turning on rotateY has a = cos θ, and its turn read as a
           // scale ("the scale grows from the line through its middle", round 8 → 9).
           scaleX = Math.hypot(m.m11, m.m12, m.m13);
@@ -125,6 +168,22 @@ export async function measureTargets(
             ),
           ];
           if (props.length === 0) continue;
+          // Only a held property the element also transitions: that transition is the sign a hover
+          // or class is meant to change it. A clip-path reveal filled forwards, with nothing else
+          // setting clip-path, read "an animation ended with fill both and still holds clipPath"
+          // beside its own correct rest (held-out set).
+          const kebab = (p: string) => p.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+          const listed = getComputedStyle(el)
+            .transitionProperty.split(",")
+            .map((p) => p.trim());
+          const durations = getComputedStyle(el)
+            .transitionDuration.split(",")
+            .map((d) => parseFloat(d) || 0);
+          const contested = props.filter((p) =>
+            listed.some((l, i) => (l === "all" || l === kebab(p)) && durations[i % durations.length]! > 0),
+          );
+          if (contested.length === 0) continue;
+          props.splice(0, props.length, ...contested.map(kebab));
           const name = (a as CSSAnimation).animationName || "an animation";
           heldByFill = `\`${name}\` ended with animation-fill-mode: ${fill} and still holds ${props.join(", ")}: an animation's held value outranks every rule, so a :hover or class that sets ${props.length === 1 ? "it" : "them"} (and its transition) never applies — fill it backwards (it holds its from pose through its delay), or animate the separate translate / scale property`;
           break;
@@ -166,8 +225,8 @@ export async function measureTargets(
         const facing = (e: Element) => {
           let M = new DOMMatrix();
           for (let n: Element | null = e; n && n !== document.documentElement; n = n.parentElement) {
-            const tf = getComputedStyle(n).transform;
-            if (tf && tf !== "none") M = new DOMMatrix(tf).multiply(M);
+            const tf = fullTransform(n);
+            if (tf) M = new DOMMatrix(tf.toString()).multiply(M);
           }
           return M.m33;
         };
@@ -177,13 +236,12 @@ export async function measureTargets(
           // Any 3D transform up the tree: the angle of its normal, 0 facing you, 180 turned over.
           let threeD = false;
           for (let n: Element | null = e; n && n !== document.documentElement && !threeD; n = n.parentElement) {
-            const tf = getComputedStyle(n).transform;
-            if (tf && tf !== "none" && !new DOMMatrixReadOnly(tf).is2D) threeD = true;
+            const tf = fullTransform(n);
+            if (tf && !tf.is2D) threeD = true;
           }
           if (threeD) return { turnDeg: (Math.acos(Math.max(-1, Math.min(1, m33))) * 180) / Math.PI };
-          const tf = getComputedStyle(e).transform;
-          if (!tf || tf === "none") return {};
-          const m = new DOMMatrixReadOnly(tf);
+          const m = fullTransform(e);
+          if (!m) return {};
           const deg = (Math.atan2(m.b, m.a) * 180) / Math.PI;
           return Math.abs(deg) > 0.01 ? { turnDeg: deg } : {};
         };
@@ -238,8 +296,14 @@ export async function measureTargets(
         // Its own transform's translation: a card that slides while it straightens carries its
         // centre by that, not by turning about another point (round 14: turn-off-centre on a
         // correct fly-in).
-        const ownTf = own.transform && own.transform !== "none" ? new DOMMatrixReadOnly(own.transform) : null;
+        const ownTf = fullTransform(el);
         const shift = ownTf ? [ownTf.e, ownTf.f] : [0, 0];
+        // Its clip-path's numbers (an inset's edges, a circle's radius), on paint's scale (100% is
+        // 255): a wipe that reveals a card read "target-static" (held-out set).
+        const clip: number[] = [];
+        if (own.clipPath && own.clipPath !== "none")
+          for (const m of own.clipPath.matchAll(/(-?\d*\.?\d+)(%|px)/g))
+            clip.push(m[2] === "%" ? Number(m[1]) * 2.55 : Number(m[1]));
         // Its shadow, as numbers (each shadow's RGBA, then its offsets, blur and spread in px): a
         // card whose shadow deepened on hover was confirmed only by eye (round 13).
         const shadow: number[] = [];
@@ -508,6 +572,7 @@ export async function measureTargets(
           ...(shadow.length > 0 ? { shadow } : {}),
           ...(sweepDeg !== undefined ? { sweepDeg } : {}),
           shift,
+          ...(clip.length > 0 ? { clip } : {}),
           ...(inertOffsets ? { inertOffsets } : {}),
           ...(heldByFill ? { heldByFill } : {}),
           ...(discreteBg ? { discreteBg: true } : {}),
@@ -560,6 +625,8 @@ each forbidden statement is. vlmkit judges the motion from that:
   invisible-blocker at rest it is transparent and still takes clicks at its centre
   size-jump        its width or height steps in one frame while it eases (its text re-wrapping)
   turn-off-centre  it turns and its centre is carried round: another transform-origin (warn)
+  held-by-fill     after an action nothing changes, and its own finished animation holds what the
+                   action sets (a forwards fill under :hover)
   target-unchanged nothing about the target changes while another element animates: the trigger (warn)
   inert-offset     its animation moves top / left on a position: static box, where they do nothing (warn)
   channel-step     a colour, gradient or shadow changes all at once between two frames (fail in
@@ -661,6 +728,8 @@ export class SnappedError extends Error {
     readonly changed: string[],
     /** Per change, the cause the page shows, when it does. */
     readonly causes: (string | undefined)[] = [],
+    /** Targets nothing changed on whose own finished animation holds what the action sets. */
+    readonly heldBy: { selector: string; cause: string }[] = [],
   ) {
     super("no animation or transition started after --click");
   }
@@ -1294,13 +1363,24 @@ async function unregisteredTransitions(
         walk(sheet.cssRules);
       } catch {}
     }
+    // Registered with a type anywhere (CSS.registerProperty in a script, too): it computes
+    // `initial` to its initial value, an unregistered one to nothing (held-out set).
+    const typed = (name: string) => {
+      const probe = document.createElement("div");
+      probe.style.setProperty(name, "initial");
+      document.documentElement.append(probe);
+      const v = getComputedStyle(probe).getPropertyValue(name).trim();
+      probe.remove();
+      return v !== "";
+    };
     const out: { selector: string; property: string }[] = [];
     for (const el of [...document.querySelectorAll("*")]) {
       const cs = getComputedStyle(el);
       const durations = cs.transitionDuration.split(",").map((d) => parseFloat(d) || 0);
       cs.transitionProperty.split(",").forEach((raw, i) => {
         const prop = raw.trim();
-        if (!prop.startsWith("--") || registered.has(prop) || !(durations[i % durations.length]! > 0)) return;
+        if (!prop.startsWith("--") || registered.has(prop) || typed(prop) || !(durations[i % durations.length]! > 0))
+          return;
         const cls = [...el.classList].map((c) => `.${c}`).join("");
         out.push({ selector: `${el.localName}${el.id ? `#${el.id}` : ""}${cls}`, property: prop });
       });
@@ -1452,7 +1532,16 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
                 : `${sel}: its colour, by up to ${Math.round(paintStep)} of 255 a channel,`,
             ];
           });
-          throw new SnappedError(changed, causes);
+          // Nothing changed, and a target's own finished animation still holds what the action sets:
+          // a card whose WAAPI entrance filled `scale` forwards ignored its :hover scale, and the run
+          // ended "nothing animated … check the action reaches the control" (held-out set).
+          const heldBy =
+            changed.length === 0
+              ? o.selectors.flatMap((sel, i) =>
+                  afterClick[i]?.heldByFill ? [{ selector: sel, cause: afterClick[i]!.heldByFill! }] : [],
+                )
+              : [];
+          throw new SnappedError(changed, causes, heldBy);
         }
       } else if (held.length === 0 && o.endMs === undefined) {
         // Frame by frame up to the latest timer: jumping straight to it ran a click at 100ms and
@@ -1608,8 +1697,28 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
           const out: { selector: string; message: string }[] = [];
           const read = (el: Element) => {
             const cs = getComputedStyle(el);
-            const m =
-              cs.transform && cs.transform !== "none" ? new DOMMatrixReadOnly(cs.transform) : new DOMMatrixReadOnly();
+            // The individual rotate / translate / scale properties too: a spinner turned by
+            // `rotate` read as never turning (held-out set).
+            let m = new DOMMatrix();
+            if (cs.translate && cs.translate !== "none") {
+              const [x = "0", y = "0"] = cs.translate.split(/\s+/);
+              m = m.translate(parseFloat(x) || 0, parseFloat(y) || 0);
+            }
+            if (cs.rotate && cs.rotate !== "none") {
+              const parts = cs.rotate.split(/\s+/);
+              const a = parts[parts.length - 1]!;
+              const deg = a.endsWith("rad")
+                ? (parseFloat(a) * 180) / Math.PI
+                : a.endsWith("turn")
+                  ? parseFloat(a) * 360
+                  : parseFloat(a);
+              if (parts.length === 1 || parts[0] === "z") m = m.rotate(deg);
+            }
+            if (cs.scale && cs.scale !== "none") {
+              const [sx = "1", sy = sx] = cs.scale.split(/\s+/);
+              m = m.scale(parseFloat(sx), parseFloat(sy));
+            }
+            if (cs.transform && cs.transform !== "none") m = m.multiply(new DOMMatrix(cs.transform));
             return {
               x: m.e,
               y: m.f,
@@ -1628,6 +1737,14 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
               if (!t || !Number.isFinite(d) || d <= 4 || (t.iterations !== Infinity && Number(t.iterations) < 2))
                 continue;
               if (t.direction === "alternate" || t.direction === "alternate-reverse") continue;
+              // steps() jumps at every step by design, the loop's included: a 45° dot loader read
+              // as a 45° seam (held-out set). check animation leaves it out for the same reason.
+              const stepped =
+                /steps\(|step-(start|end)/.test(String(t.easing ?? "")) ||
+                (a.effect as KeyframeEffect)
+                  .getKeyframes()
+                  .some((k) => /steps\(|step-(start|end)/.test(String(k.easing ?? "")));
+              if (stepped) continue;
               const delay = Number(t.delay) || 0;
               const was = a.currentTime;
               a.pause();
@@ -1650,7 +1767,7 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
               const kf = (a.effect as KeyframeEffect).getKeyframes();
               const ends =
                 kf.length >= 2
-                  ? ` (its keyframes run from ${String(kf[0]!.transform ?? kf[0]!.opacity ?? "?")} to ${String(kf[kf.length - 1]!.transform ?? kf[kf.length - 1]!.opacity ?? "?")})`
+                  ? ` (its keyframes run from ${String(kf[0]!.transform ?? kf[0]!.rotate ?? kf[0]!.opacity ?? "?")} to ${String(kf[kf.length - 1]!.transform ?? kf[kf.length - 1]!.rotate ?? kf[kf.length - 1]!.opacity ?? "?")})`
                   : "";
               if (jump > Math.max(1, 3 * rate)) {
                 out.push({
@@ -1916,7 +2033,7 @@ function acrossText(d: { way: string; from: { x: number; y: number }; to: { x: n
   const horizontal = d.way === "left" || d.way === "right";
   const along = Math.abs(horizontal ? d.to.x - d.from.x : d.to.y - d.from.y);
   const across = horizontal ? d.to.y - d.from.y : d.to.x - d.from.x;
-  if (Math.abs(across) < Math.max(4, along * 0.15)) return "";
+  if (Math.abs(across) < Math.max(8, along * Math.tan((5 * Math.PI) / 180))) return "";
   const side = horizontal ? (across < 0 ? "upwards" : "downwards") : across < 0 ? "leftwards" : "rightwards";
   return ` (and ${Math.round(Math.abs(across))}px ${side})`;
 }
@@ -2414,6 +2531,15 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
     captured = /(^|\/)frames\.json$/.test(o.source) ? await readFrames(o) : await captureMotion(o);
   } catch (e) {
     if (e instanceof SnappedError) {
+      if (e.changed.length === 0 && e.heldBy.length > 0) {
+        console.log(
+          `inspect motion: ${o.source} — after ${o.actions.map(describeAction).join(", ")}, nothing changed and no animation or transition started`,
+        );
+        for (const h of e.heldBy) console.log(`    FAIL held-by-fill: ${h.selector}: ${h.cause}`);
+        console.log(`  no frames written: nothing animated to shoot`);
+        console.log(`  ${e.heldBy.length} fail; measured from the page, no model asked`);
+        return 1;
+      }
       if (e.changed.length === 0) {
         console.error(
           `error: nothing animated after ${o.actions.map(describeAction).join(", ")}, and no --selector target changed: check the action reaches the control (and that --selector names what it changes)`,
@@ -2614,8 +2740,10 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
       const unseen = r.targets.every((t) =>
         t.findings.some((f) => f.rule === "target-hidden" || (f.rule as string) === "hidden-at-once"),
       );
+      // The frames could not tell the expected curve from the fitted one (easing-unchecked).
+      const easingOpen = r.targets.some((t) => t.findings.some((f) => f.rule === "easing-unchecked"));
       const unjudged = (f: string) =>
-        unseen || (unfitted && /easing/.test(f)) || (pathless && /direction|origin/.test(f));
+        unseen || ((unfitted || easingOpen) && /easing/.test(f)) || (pathless && /direction|origin/.test(f));
       const held = asked.filter((f) => !failed.has(ruleOf(f)) && !unjudged(f));
       const skipped = asked.filter((f) => !failed.has(ruleOf(f)) && unjudged(f));
       const at = lines.findIndex((l) => /^ {2}(no fail|\d+ fail)/.test(l));

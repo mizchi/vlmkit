@@ -491,7 +491,7 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
       const lift = await run("broken/rise.html", ["--selector", "#p2", "--hover", "#p2", "--expect-direction", "up"]);
       assert.match(
         lift.out,
-        /warn target-static .*`rise` ended with animation-fill-mode: both and still holds opacity, transform/,
+        /warn target-static .*`rise` ended with animation-fill-mode: both and still holds transform:/,
       );
       // Expected to go up and it does not move: a fail since round 14, naming the fill.
       assert.match(
