@@ -3,6 +3,7 @@ import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { basename, join } from "node:path";
 import { compareScreenshots, parseIgnoreRegionSpec } from "@mizchi/vlmkit-core/heatmap.ts";
 import { readPngDimensions } from "@mizchi/vlmkit-core/image-resize.ts";
+import { decodePngBuffer } from "@mizchi/vlmkit-core/png-decode.ts";
 import { classifyVisualDiff } from "./visual-semantic.ts";
 import {
   captureRegionElementsFromHtml,
@@ -466,7 +467,30 @@ export async function runPngDiff(options: PngDiffCliOptions) {
     crops = await writeRegionCrops(options, diff.regions, diff.heatmapPath);
   }
 
-  return { diff, semantic, baselineSize, currentSize, sizeDelta, crops, kindSummary };
+  // Nothing past the threshold, and yet the pictures differ: a card held at blur(0.6px) differed
+  // from a sharp one in 2.57% of its pixels and read "no changes" (round 15). Counted exactly, so
+  // a 0 here means byte-identical pixels.
+  let belowThreshold: number | undefined;
+  if (diff.diffPixels === 0 && sizeDelta.width === 0 && sizeDelta.height === 0) {
+    try {
+      const a = decodePngBuffer(new Uint8Array(baselineBuf));
+      const b = decodePngBuffer(new Uint8Array(currentBuf));
+      let n = 0;
+      for (let i = 0; i < a.data.length; i += 4)
+        if (
+          a.data[i] !== b.data[i] ||
+          a.data[i + 1] !== b.data[i + 1] ||
+          a.data[i + 2] !== b.data[i + 2] ||
+          a.data[i + 3] !== b.data[i + 3]
+        )
+          n++;
+      belowThreshold = n;
+    } catch {
+      // An interlaced or palette PNG the fast decoder does not read: the count is left out.
+    }
+  }
+
+  return { diff, semantic, baselineSize, currentSize, sizeDelta, crops, kindSummary, belowThreshold };
 }
 
 /**
@@ -536,6 +560,7 @@ export async function runPngDiffCli(cliArgs = process.argv.slice(2)) {
       regions: result.diff.regions,
       heatmapPath: result.diff.heatmapPath,
       summary: result.semantic.summary,
+      ...(result.belowThreshold !== undefined ? { belowThreshold: result.belowThreshold } : {}),
       changes: result.semantic.changes,
       ...(result.crops ? { crops: result.crops } : {}),
       ...(result.kindSummary ? { kind: result.kindSummary } : {}),
@@ -639,6 +664,10 @@ export async function runPngDiffCli(cliArgs = process.argv.slice(2)) {
       }
     }
     console.log(`  summary:  ${output.summary}`);
+    if (output.belowThreshold !== undefined && output.belowThreshold > 0)
+      console.log(
+        `  below:    ${output.belowThreshold} px differ under the threshold (${((output.belowThreshold / output.totalPixels) * 100).toFixed(2)}%): too faint to count as a change at --threshold ${options.threshold}, but not the same picture (--threshold 0 counts them)`,
+      );
     if (output.heatmapPath) {
       console.log(`  heatmap:  ${output.heatmapPath}`);
     }

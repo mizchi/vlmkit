@@ -71,6 +71,12 @@ export interface MotionDom {
   shift?: number[];
   /** Its clip-path's numbers (inset edges, radii), on paint's scale (100% is 255). */
   clip?: number[];
+  /** Its filter's numbers (a blur's radius x 8, fractions x 255). */
+  filter?: number[];
+  /** A filter its finished animation's fill holds at rest, and why that matters. */
+  heldFilter?: string;
+  /** Its animation's @keyframes name is defined more than once, and what each defines. */
+  dupKeyframes?: string;
   /** Its own animation offsets a box that is position: static, where top / left do nothing. */
   inertOffsets?: string;
   /** A finished animation's forwards fill still holds what it animated, and why that matters. */

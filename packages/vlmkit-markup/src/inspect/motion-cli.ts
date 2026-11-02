@@ -266,7 +266,7 @@ export async function measureTargets(
         if (/gradient\(/.test(own.backgroundImage))
           for (const m of own.backgroundImage
             .replace(/rgba?\([^)]*\)/g, "")
-            .matchAll(/(-?\d*\.?\d+)(%|deg|turn|rad|grad|px)/g)) {
+            .matchAll(/(-?\d*\.?\d+(?:e[-+]?\d+)?)(%|deg|turn|rad|grad|px)/g)) {
             const v = Number(m[1]);
             const unit = m[2]!;
             stops.push(
@@ -302,8 +302,71 @@ export async function measureTargets(
         // 255): a wipe that reveals a card read "target-static" (held-out set).
         const clip: number[] = [];
         if (own.clipPath && own.clipPath !== "none")
-          for (const m of own.clipPath.matchAll(/(-?\d*\.?\d+)(%|px)/g))
+          for (const m of own.clipPath.matchAll(/(-?\d*\.?\d+(?:e[-+]?\d+)?)(%|px)/g))
             clip.push(m[2] === "%" ? Number(m[1]) * 2.55 : Number(m[1]));
+        // Its filter's numbers (a blur's radius in px, a brightness or opacity as a fraction x 255):
+        // a card that comes into focus read only as a fade (round 15).
+        const filterVals: number[] = [];
+        if (own.filter && own.filter !== "none")
+          for (const m of own.filter.matchAll(/([a-z-]+)\((-?\d*\.?\d+(?:e[-+]?\d+)?)(px|deg|%)?/g))
+            filterVals.push(
+              m[3] === "px"
+                ? Number(m[2]) * 8
+                : m[3] === "%"
+                  ? Number(m[2]) * 2.55
+                  : m[3] === "deg"
+                    ? (Number(m[2]) * 255) / 360
+                    : Number(m[2]) * 255,
+            );
+        // What its own finished animations leave behind: a filter its fill holds at rest (a blur
+        // that never ends at 0), and a @keyframes name more than one rule defines (round 15).
+        let heldFilter: string | undefined;
+        let dupKeyframes: string | undefined;
+        const kfDefs = new Map<string, string[][]>();
+        const walkKf = (rules: CSSRuleList) => {
+          for (const r of [...rules]) {
+            if (r instanceof CSSKeyframesRule) {
+              const props = new Set<string>();
+              for (const k of [...r.cssRules] as CSSKeyframeRule[])
+                for (let i = 0; i < k.style.length; i++) props.add(k.style[i]!);
+              kfDefs.set(r.name, [...(kfDefs.get(r.name) ?? []), [...props]]);
+            } else if ("cssRules" in r) walkKf((r as CSSGroupingRule).cssRules);
+          }
+        };
+        for (const sheet of [...document.styleSheets]) {
+          try {
+            walkKf(sheet.cssRules);
+          } catch {}
+        }
+        for (const a of el.getAnimations()) {
+          const name = (a as CSSAnimation).animationName;
+          const defs = name ? kfDefs.get(name) : undefined;
+          if (defs && defs.length > 1 && !dupKeyframes)
+            dupKeyframes = `\`${name}\` is defined by ${defs.length} @keyframes rules (${defs.map((d, i) => `#${i + 1} animates ${d.join(", ") || "nothing"}`).join("; ")}): the last one in the cascade wins, so the others never run — give each its own name`;
+          const fill = a.effect?.getComputedTiming().fill;
+          const kf = (a.effect as KeyframeEffect | null)?.getKeyframes?.() ?? [];
+          const last = kf[kf.length - 1] as Record<string, unknown> | undefined;
+          // Only a filter that changes the picture: blur(0) or brightness(1) at rest is the
+          // element as it is.
+          const changes = (f: string) =>
+            [...f.matchAll(/([a-z-]+)\(([^)]*)\)/g)].some(([, fn, arg]) => {
+              const v = parseFloat(arg!);
+              if (!Number.isFinite(v)) return true;
+              if (/^(blur|grayscale|sepia|invert|hue-rotate)$/.test(fn!)) return Math.abs(v) > 1e-3;
+              if (/^(brightness|contrast|saturate|opacity)$/.test(fn!))
+                return Math.abs((arg!.includes("%") ? v / 100 : v) - 1) > 1e-3;
+              return true;
+            });
+          if (
+            a.playState === "finished" &&
+            (fill === "forwards" || fill === "both") &&
+            last?.filter &&
+            last.filter !== "none" &&
+            changes(String(last.filter)) &&
+            !heldFilter
+          )
+            heldFilter = `\`${name || "an animation"}\` ends on filter: ${String(last.filter)} and its fill holds it at rest: a blur left there softens it for good (at 1x a blur under 1px can draw as no blur, so the frames may not show it) — end without the filter, or fill it backwards`;
+        }
         // Its shadow, as numbers (each shadow's RGBA, then its offsets, blur and spread in px): a
         // card whose shadow deepened on hover was confirmed only by eye (round 13).
         const shadow: number[] = [];
@@ -315,7 +378,7 @@ export async function measureTargets(
               .map(Number);
             shadow.push(c[0] ?? 0, c[1] ?? 0, c[2] ?? 0, Math.round((c[3] ?? 1) * 255));
           }
-          for (const m of own.boxShadow.replace(/rgba?\([^)]*\)/g, "").matchAll(/(-?\d*\.?\d+)px/g))
+          for (const m of own.boxShadow.replace(/rgba?\([^)]*\)/g, "").matchAll(/(-?\d*\.?\d+(?:e[-+]?\d+)?)px/g))
             shadow.push(Number(m[1]));
         }
         // A transition on background over a gradient: a gradient does not interpolate, so it steps.
@@ -573,6 +636,9 @@ export async function measureTargets(
           ...(sweepDeg !== undefined ? { sweepDeg } : {}),
           shift,
           ...(clip.length > 0 ? { clip } : {}),
+          ...(filterVals.length > 0 ? { filter: filterVals } : {}),
+          ...(heldFilter ? { heldFilter } : {}),
+          ...(dupKeyframes ? { dupKeyframes } : {}),
           ...(inertOffsets ? { inertOffsets } : {}),
           ...(heldByFill ? { heldByFill } : {}),
           ...(discreteBg ? { discreteBg: true } : {}),
@@ -2047,7 +2113,13 @@ export function formatMotionReport(
   const lines: string[] = [];
   const restCount = captured.frames.filter((f) => f.atMs > captured.endMs).length;
   lines.push(
-    `inspect motion: ${source} — ${captured.forever ? "every animation repeats forever, so the first runs are sampled and nothing rests; " : ""}${captured.frames.length - restCount} frames over ${Math.round(Math.min(captured.startMs, captured.frames[0]?.atMs ?? captured.startMs))}..${Math.round(captured.endMs)}ms${(captured.frames[0]?.atMs ?? captured.startMs) < captured.startMs ? ` (motion from ${Math.round(captured.startMs)}ms; the frames before it show the wait)` : ""} + ${restCount} at rest (${captured.manifest})`,
+    `inspect motion: ${source} — ${captured.forever ? "every animation repeats forever, so the first runs are sampled and nothing rests; " : ""}${captured.frames.length - restCount} frames over ${Math.round(Math.max(0, Math.min(captured.startMs, captured.frames[0]?.atMs ?? captured.startMs)))}..${Math.round(captured.endMs)}ms${(captured.frames[0]?.atMs ?? captured.startMs) < captured.startMs ? ` (motion from ${Math.round(captured.startMs)}ms; the frames before it show the wait)` : ""}${
+      // A negative delay starts motion before the page is shown: "6 frames over -240..300ms" with the
+      // first frame at 30ms (round 15).
+      captured.startMs < 0
+        ? ` (motion from ${Math.round(captured.startMs)}ms: some of it began before the page was shown, and only what runs from 0 is in the frames)`
+        : ""
+    } + ${restCount} at rest (${captured.manifest})`,
   );
   // Near a page's end the scroll is clamped, and it moves as a reveal's transform shrinks the
   // overflow: a 16px rise read "travels 1px" with nothing to say why (round 8).
@@ -2741,10 +2813,23 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
         t.findings.some((f) => f.rule === "target-hidden" || (f.rule as string) === "hidden-at-once"),
       );
       // The frames could not tell the expected curve from the fitted one (easing-unchecked).
-      const easingOpen = r.targets.some((t) => t.findings.some((f) => f.rule === "easing-unchecked"));
+      // Per target: one row with no fit made "--expect-easing ease-out" read "not judged" beside three
+      // rows that each followed ease-out (round 15). Checked on some, it is held for those and the
+      // others are named.
+      const easingChecked = r.targets.filter(
+        (t) => "best" in t.easing && !t.findings.some((f) => f.rule === "easing-unchecked"),
+      );
+      const easingMissed = r.targets.filter((t) => !easingChecked.includes(t)).map((t) => t.target);
+      const easingOpen = easingChecked.length === 0;
       const unjudged = (f: string) =>
         unseen || ((unfitted || easingOpen) && /easing/.test(f)) || (pathless && /direction|origin/.test(f));
-      const held = asked.filter((f) => !failed.has(ruleOf(f)) && !unjudged(f));
+      const held = asked
+        .filter((f) => !failed.has(ruleOf(f)) && !unjudged(f))
+        .map((f) =>
+          /easing/.test(f) && easingMissed.length > 0
+            ? `${f} (not checked on ${easingMissed.map((x) => JSON.stringify(x)).join(", ")}: no curve fitted there)`
+            : f,
+        );
       const skipped = asked.filter((f) => !failed.has(ruleOf(f)) && unjudged(f));
       const at = lines.findIndex((l) => /^ {2}(no fail|\d+ fail)/.test(l));
       const notes = [

@@ -103,6 +103,24 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       docs: "A misspelt property (`widht`) computes as itself and its transition never runs: the property it meant changes in one frame, and with no animation on the page nothing else reports it.",
     },
     {
+      id: "duplicate-keyframes",
+      title: "An animation's name is defined by more than one @keyframes rule",
+      severity: "suspect",
+      docs: "The last @keyframes of a name in the cascade wins, so the earlier ones never run: a component's fade-up that rises lost its rise to a utility's fade-only fade-up. Give each its own name.",
+    },
+    {
+      id: "negative-delay-entrance",
+      title: "An entrance starts part way through (a negative animation-delay)",
+      severity: "warn",
+      docs: "A negative delay skips that much of the run, so an entrance from a hidden or offset first keyframe is already part way in at load; in a stagger the later items finish first. A stagger is a positive delay per item.",
+    },
+    {
+      id: "held-filter",
+      title: "A filter is held at rest by an animation's fill",
+      severity: "warn",
+      docs: "A forwards or both fill keeps the last keyframe's filter for good: a blur(0.6px) left a card soft (at 1x it can draw as no blur, so screenshots miss it), and even blur(0) keeps a filter layer. End without the filter, or fill backwards.",
+    },
+    {
       id: "inert-offset-animation",
       title: "An animation moves top / left on a position: static box",
       severity: "suspect",

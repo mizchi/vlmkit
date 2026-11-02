@@ -274,7 +274,9 @@ describe("composed built-in registry", () => {
     // `transition: --p` on a custom property nothing registers stepped at once (round 13).
     // 229 → 230: `check animation` / `inert-offset-animation` (suspect) — a notice animating `left`
     // on a static box only faded (round 14).
-    assert.equal(total, 230);
+    // 230 → 233: `check animation` / `duplicate-keyframes`, `negative-delay-entrance`, `held-filter`
+    // (round 15: a @keyframes name defined twice, a stagger with negative delays, a blur held at rest).
+    assert.equal(total, 233);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {

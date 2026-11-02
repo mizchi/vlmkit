@@ -269,6 +269,9 @@ export type AnimationEvalIssueKind =
   | "unknown-transition-property"
   | "unregistered-property-transition"
   | "inert-offset-animation"
+  | "duplicate-keyframes"
+  | "negative-delay-entrance"
+  | "held-filter"
   | "reduced-motion-hides"
   | "layout-animation"
   | "loop-seam"
@@ -520,7 +523,16 @@ export interface DeriveIssuesInput {
   clockMotion?: ClockMotion;
   undefinedKeyframes?: { selector: string; name: string; reducedMotion: boolean }[];
   /** transition-property names no CSS property, with a duration over 0. */
-  unknownTransitions?: { selector: string; name: string; unregistered?: boolean; inertOffsets?: string[] }[];
+  unknownTransitions?: {
+    selector: string;
+    name: string;
+    unregistered?: boolean;
+    inertOffsets?: string[];
+    duplicate?: string[];
+    negativeDelayMs?: number;
+    durationMs?: number;
+    restFilter?: string;
+  }[];
   /** CSS animations with no duration: they end as they begin. */
   zeroDuration?: { selector: string; name: string }[];
   /** A transition on background over a gradient, which does not interpolate. */
@@ -640,6 +652,33 @@ export function deriveAnimationIssues(
   }
 
   for (const u of input.unknownTransitions ?? []) {
+    if (u.duplicate) {
+      issues.push({
+        kind: "duplicate-keyframes",
+        severity: "suspect",
+        selector: u.selector,
+        message: `${u.selector} plays \`${u.name}\`, which ${u.duplicate.length} @keyframes rules define (${u.duplicate.map((d, i) => `#${i + 1}: ${d || "nothing"}`).join("; ")}): the last one in the cascade wins, so the others never run. Give each its own name.`,
+      });
+      continue;
+    }
+    if (u.negativeDelayMs !== undefined) {
+      issues.push({
+        kind: "negative-delay-entrance",
+        severity: "warn",
+        selector: u.selector,
+        message: `${u.selector} \`${u.name}\` has animation-delay ${u.negativeDelayMs}ms: it starts ${-u.negativeDelayMs}ms into its ${u.durationMs}ms run, so that much of its entrance is skipped and it is already part way in at load. A stagger is a positive delay per item (calc(var(--i) * 80ms)); a negative one only suits a loop meant to start mid-run.`,
+      });
+      continue;
+    }
+    if (u.restFilter !== undefined) {
+      issues.push({
+        kind: "held-filter",
+        severity: "warn",
+        selector: u.selector,
+        message: `${u.selector} \`${u.name}\` ends on filter: ${u.restFilter} and its fill holds it at rest: a blur left there softens the element for good (at 1x a blur under 1px can draw as no blur, so a screenshot may not show it), End the animation without the filter, or fill it backwards so the element's own style shows once it ends.`,
+      });
+      continue;
+    }
     if (u.inertOffsets) {
       issues.push({
         kind: "inert-offset-animation",
@@ -1153,8 +1192,59 @@ ${ANIMATION_HELPERS_JS}
     probe.remove();
     return v !== "";
   };
+  // Every @keyframes rule by name, in sheet order, with the properties it animates: the last one
+  // of a name wins, and a component's fade-up lost its rise to a utility's later fade-up (round 15).
+  const keyframes = new Map();
+  const walkKf = (rules) => {
+    for (const r of rules) {
+      if (typeof CSSKeyframesRule !== "undefined" && r instanceof CSSKeyframesRule) {
+        const props = new Set();
+        for (const k of r.cssRules) for (let i = 0; i < k.style.length; i++) props.add(k.style[i]);
+        if (!keyframes.has(r.name)) keyframes.set(r.name, []);
+        keyframes.get(r.name).push([...props]);
+      } else if (r.cssRules) walkKf(r.cssRules);
+    }
+  };
+  for (const sheet of document.styleSheets) {
+    try { walkKf(sheet.cssRules); } catch {}
+  }
   for (const el of document.querySelectorAll("*")) {
     const cs = getComputedStyle(el);
+    if (out.length < 8) {
+      for (const a of el.getAnimations()) {
+        const name = a.animationName;
+        const t = a.effect && a.effect.getComputedTiming ? a.effect.getComputedTiming() : null;
+        const kf = a.effect && a.effect.getKeyframes ? a.effect.getKeyframes() : [];
+        const selector = stableSelector(el);
+        const defs = name ? keyframes.get(name) : undefined;
+        if (defs && defs.length > 1 && !seen.has("dup\u0000" + name)) {
+          seen.add("dup\u0000" + name);
+          out.push({ selector, name, duplicate: defs.map((d) => d.join(", ")) });
+        }
+        // An entrance with a negative delay starts part way through: a row 240ms into its 300ms
+        // rise was there at load, and the stagger read as running backwards (round 15).
+        const first = kf[0] || {};
+        const hiddenStart = Number(first.opacity) < 0.05 || (first.transform && first.transform !== "none") || (first.translate && first.translate !== "none");
+        if (t && Number(t.delay) < 0 && Number.isFinite(Number(t.iterations)) && hiddenStart && !seen.has("neg\u0000" + selector)) {
+          seen.add("neg\u0000" + selector);
+          out.push({ selector, name: name || "an animation", negativeDelayMs: Number(t.delay), durationMs: Number(t.duration) });
+        }
+        // A fill that holds a filter at rest: blur(0.6px) left a card soft for good, and even
+        // blur(0) keeps a filter layer the card is rasterised through (round 15).
+        const last = kf[kf.length - 1] || {};
+        const changes = (f) => [...f.matchAll(/([a-z-]+)\\(([^)]*)\\)/g)].some(([, fn, arg]) => {
+          const v = parseFloat(arg);
+          if (!Number.isFinite(v)) return true;
+          if (/^(blur|grayscale|sepia|invert|hue-rotate)$/.test(fn)) return Math.abs(v) > 1e-3;
+          if (/^(brightness|contrast|saturate|opacity)$/.test(fn)) return Math.abs((arg.includes("%") ? v / 100 : v) - 1) > 1e-3;
+          return true;
+        });
+        if (t && (t.fill === "forwards" || t.fill === "both") && last.filter && last.filter !== "none" && changes(String(last.filter)) && !seen.has("flt\u0000" + selector)) {
+          seen.add("flt\u0000" + selector);
+          out.push({ selector, name: name || "an animation", restFilter: String(last.filter) });
+        }
+      }
+    }
     // An offset animated on a static box does nothing: a notice meant to slide in animated
     // \`left\` and only faded, and \`check animation\` read it "visible" (round 14).
     if (cs.position === "static" && out.length < 8) {

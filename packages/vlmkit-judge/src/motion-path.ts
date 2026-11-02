@@ -173,6 +173,12 @@ export interface MotionSample {
     shift?: number[];
     /** Its clip-path's numbers (inset edges, radii), on paint's scale (100% is 255). */
     clip?: number[];
+    /** Its filter's numbers (a blur's radius x 8, fractions x 255). */
+    filter?: number[];
+    /** A filter its finished animation's fill holds at rest, and why that matters. */
+    heldFilter?: string;
+    /** Its animation's @keyframes name is defined more than once, and what each defines. */
+    dupKeyframes?: string;
     /** Its own animation offsets a box that is position: static, where top / left do nothing. */
     inertOffsets?: string;
     /** A finished animation's forwards fill still holds what it animated, and why that matters. */
@@ -306,7 +312,8 @@ export type MotionRule =
   | "channel-step"
   | "inert-offset"
   | "hidden-at-once"
-  | "target-unchanged";
+  | "target-unchanged"
+  | "held-filter";
 
 export interface MotionFinding {
   rule: MotionRule;
@@ -326,7 +333,8 @@ export type EasingChannel =
   | "colour"
   | "gradient"
   | "shadow"
-  | "clip";
+  | "clip"
+  | "filter";
 
 export type ChannelFit = EasingFit & { channel: EasingChannel };
 
@@ -723,6 +731,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         ["stops", "gradient"],
         ["shadow", "shadow"],
         ["clip", "clip"],
+        ["filter", "filter"],
       ] as const) {
         const first = sorted.find((y) => y.dom?.[key]);
         const painted = sorted.filter(
@@ -926,13 +935,29 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       sorted.some((x) => x.present >= thr)
     ) {
       const inert =
+        sorted.find((x) => x.dom?.dupKeyframes)?.dom?.dupKeyframes ??
         sorted.find((x) => x.dom?.inertOffsets)?.dom?.inertOffsets ??
         sorted.find((x) => x.dom?.heldByFill)?.dom?.heldByFill;
+      // Its own animation had ended before the first frame: it did move, before anything was shot
+      // (a row whose delay was -240ms of a 300ms run read "it does not move", round 15).
+      const d0 = sorted.find((x) => x.dom)?.dom;
+      const firstAt = sorted.find((x) => x.dom)?.atMs ?? 0;
+      // Begun before the page was shown and mostly through by the first frame (a row 270ms into its
+      // 300ms rise read "it does not move").
+      const endedBefore =
+        d0 &&
+        typeof d0.elapsedMs === "number" &&
+        typeof d0.durationMs === "number" &&
+        d0.durationMs > 0 &&
+        firstAt - d0.elapsedMs < 0 &&
+        d0.elapsedMs >= 0.5 * d0.durationMs;
       findings.push({
         rule: "direction-mismatch",
         severity: "fail",
         atMs: seg.startMs,
-        message: `it does not move (travels ${Math.round(travelPx)}px), so it does not go ${towards(options.expectDirection)}${inert ? `: ${inert}` : ": whatever was meant to move it is not applying"}`,
+        message: endedBefore
+          ? `its own animation began ${Math.round(d0!.elapsedMs! - firstAt)}ms before the page was shown and was ${Math.min(100, Math.round((d0!.elapsedMs! / d0!.durationMs!) * 100))}% through at the first frame (${ms(firstAt)}), so its motion is not seen and it does not go ${towards(options.expectDirection)} on screen — a negative animation-delay plays that part before the page is shown`
+          : `it does not move (travels ${Math.round(travelPx)}px), so it does not go ${towards(options.expectDirection)}${inert ? `: ${inert}` : ": whatever was meant to move it is not applying"}`,
       });
     }
     return { ...seg, travelPx, easing, ...(origin ? { origin } : {}), ...(direction ? { direction } : {}) };
@@ -1170,6 +1195,17 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     }
   }
 
+  // A filter its fill holds once it ends (round 15's card left at blur(0.6px), which at 1x drew as
+  // no blur at all, so only the computed style shows it).
+  const heldFilterAt = [...sorted].reverse().find((x) => x.dom?.heldFilter);
+  if (heldFilterAt)
+    findings.push({
+      rule: "held-filter",
+      severity: "warn",
+      atMs: heldFilterAt.atMs,
+      message: heldFilterAt.dom!.heldFilter!,
+    });
+
   // Its size stepping at once while it eases: a button widening over 300ms grew 20px taller in one
   // frame and back, as its new label wrapped in the still-narrow box (round 12). Measured only.
   if (exact) {
@@ -1247,7 +1283,8 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
           // A ring filling by its conic stop: no colour changes, the stop moves (round 13).
           (x.dom!.stops ?? []).some((v, i) => Math.abs(v - (sorted[0]!.dom!.stops?.[i] ?? v)) >= 8) ||
           // A clip-path wipe reveals in place (held-out set).
-          (x.dom!.clip ?? []).some((v, i) => Math.abs(v - (sorted[0]!.dom!.clip?.[i] ?? v)) >= 8),
+          (x.dom!.clip ?? []).some((v, i) => Math.abs(v - (sorted[0]!.dom!.clip?.[i] ?? v)) >= 8) ||
+          (x.dom!.filter ?? []).some((v, i) => Math.abs(v - (sorted[0]!.dom!.filter?.[i] ?? v)) >= 8),
       )
     )
   ) {
@@ -1257,6 +1294,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       atMs: firstMotion.atMs,
       message: `fully shown from ${ms(firstMotion.atMs)} and moves under ${still}px in every frame: if it is meant to animate, ${
         sorted.find((x) => x.dom?.heldByFill)?.dom?.heldByFill ??
+        sorted.find((x) => x.dom?.dupKeyframes)?.dom?.dupKeyframes ??
         sorted.find((x) => x.dom?.inertOffsets)?.dom?.inertOffsets ??
         "its animation is not applying (a dropped rule, a misspelt animation-name)"
       }`,

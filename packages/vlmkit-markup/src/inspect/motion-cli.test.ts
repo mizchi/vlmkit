@@ -220,6 +220,17 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
       ["--selector", ".toast", "--exits", "--expect-easing", "ease-out,ease-in"],
       /FAIL snap-back .*in the hold after 660ms/,
     ],
+    // Round 15: a @keyframes name defined twice, and a stagger whose delays are negative.
+    [
+      "fadeup.html",
+      ["--selector", "#n1", "--expect-direction", "up"],
+      /FAIL direction-mismatch .*`fade-up` is defined by 2 @keyframes rules \(#1 animates opacity, transform; #2 animates opacity\)/,
+    ],
+    [
+      "queue.html",
+      ["--selector", "#r4", "--expect-direction", "up"],
+      /FAIL direction-mismatch .*its own animation began 240ms before the page was shown and was \d+% through at the first frame/,
+    ],
     // Round 14: a bubble whose visibility flips before its fade-out, a card whose rotate comes
     // before its translate, and a notice animating left on a static box.
     [
@@ -571,6 +582,21 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
       );
       const once = await run("reference/nudge.html", ["--selector", ".notice"]);
       assert.match(once.out, /follows ease-out exactly in its path and its opacity/);
+    },
+  );
+
+  it(
+    "names a filter its fill holds at rest, and fits the filter as a channel (round 15)",
+    { timeout: 240_000 },
+    async () => {
+      const soft = await run("broken/focus.html", ["--selector", ".hero"]);
+      assert.match(soft.out, /follows ease-out exactly in its opacity and its filter/);
+      assert.match(
+        soft.out,
+        /warn held-filter .*`focus-in` ends on filter: blur\(0\.6px\) and its fill holds it at rest/,
+      );
+      const sharp = await run("reference/focus.html", ["--selector", ".hero"]);
+      assert.doesNotMatch(sharp.out, /held-filter|channel-step/, sharp.out);
     },
   );
 

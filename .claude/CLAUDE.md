@@ -454,6 +454,16 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   property the element also transitions (`held-by-fill` when an action changes nothing); `clip` is a
   channel; registration is probed by computing `initial`. `motion-heldout.test.ts` holds all 25. The
   set is tuned against now: the next such check needs new pages.
+- **A blur held at rest, a @keyframes name defined twice, a stagger with negative delays** (round 15,
+  `docs/reports/2026-11-02-motion-repair-v15.md`). At 1x Chromium draws a blur under 1px as no blur, so the
+  broken card's rest frame was byte-identical to its repair: only the computed style shows it. `filter` is a
+  channel; a finished animation whose fill holds a filter that changes the picture is `held-filter` (warn, an
+  identity filter is not); `duplicate-keyframes` names what each rule of one name animates (also the cause in
+  a direction fail); a target begun before 0ms and half through at the first frame is said so, not "does not
+  move"; `check animation`'s `duplicate-keyframes` (suspect), `negative-delay-entrance` and `held-filter`
+  (warn), 233 rules, none firing on the repo's 72 other animated pages; an expectation checked on some
+  targets is held and names the others; numbers in computed styles take exponents (`1.2e-05px` read as 5px);
+  `diff png` counts pixels that differ under the threshold (`below:`, `belowThreshold`).
 
 ## Generated figures (raster images)
 
@@ -1820,7 +1830,7 @@ case at 0.23.0.
 | `docs/reports/2026-08-06-gate-rule-cost-bench.md` | Measured gate/rule execution cost: where a ruleset's time goes, why per-rule cost is attributed rather than isolated, why suppression saves nothing |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
 | `docs/design/package-decomposition.md` | **Splitting vlmkit by layer** (collector / pure judge / driver / loop / diagrams): what was measured, phase 1 (`vlmkit-judge`) and the proposed phases 2-5 |
-| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 35 gates + 230 rules, behavior changes, what is deliberately not a gate |
+| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 35 gates + 233 rules, behavior changes, what is deliberately not a gate |
 | `docs/design/moonbit-boundary.md` | **TS ↔ MoonBit boundary**: what the positional FFI costs (61 commands, 233 args, 2 duplicated dispatch tables), the JSON boundary that replaces it for new logic, how to add a command, and which pure logic belongs in MoonBit versus which deliberately does not |
 | `docs/crater-css-status.md` | Crater CSS rendering verification status |
 | `docs/reset-css-comparison.md` | Reset CSS domain knowledge |
