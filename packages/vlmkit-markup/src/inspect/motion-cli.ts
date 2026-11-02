@@ -217,6 +217,11 @@ export async function measureTargets(
           const v = Number(conic[1]);
           sweepDeg = conic[2] === "%" ? v * 3.6 : conic[2] === "turn" ? v * 360 : v;
         }
+        // Its own transform's translation: a card that slides while it straightens carries its
+        // centre by that, not by turning about another point (round 14: turn-off-centre on a
+        // correct fly-in).
+        const ownTf = own.transform && own.transform !== "none" ? new DOMMatrixReadOnly(own.transform) : null;
+        const shift = ownTf ? [ownTf.e, ownTf.f] : [0, 0];
         // Its shadow, as numbers (each shadow's RGBA, then its offsets, blur and spread in px): a
         // card whose shadow deepened on hover was confirmed only by eye (round 13).
         const shadow: number[] = [];
@@ -484,6 +489,7 @@ export async function measureTargets(
           ...(stops.length > 0 ? { stops } : {}),
           ...(shadow.length > 0 ? { shadow } : {}),
           ...(sweepDeg !== undefined ? { sweepDeg } : {}),
+          shift,
           ...(heldByFill ? { heldByFill } : {}),
           ...(discreteBg ? { discreteBg: true } : {}),
           ...(el instanceof SVGElement && !(el instanceof SVGSVGElement) ? { svg: true } : {}),

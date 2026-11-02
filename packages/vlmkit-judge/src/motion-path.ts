@@ -169,6 +169,8 @@ export interface MotionSample {
     shadow?: number[];
     /** A conic gradient's first arc, in degrees from its start (it grows as a ring fills clockwise). */
     sweepDeg?: number;
+    /** Its own transform's translation (px): what carries its centre when it slides. */
+    shift?: number[];
     /** A finished animation's forwards fill still holds what it animated, and why that matters. */
     heldByFill?: string;
     /** It takes a click at its centre: an invisible target that does sits over what is behind it. */
@@ -1051,7 +1053,21 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
   const in3d = sorted.some((x) => x.dom?.rotated3d);
   if (turns && !in3d && !options.expectStill && ownMotion && geo.length >= 2) {
     const far = Math.max(...geo.map((p) => dist(p, geo[0]!)));
-    if (far >= floor) {
+    // What its own translation does not explain: a card that slides 200px while it straightens
+    // is carried by its translate, and turns about its own centre (round 14).
+    const shiftOf = (atMs: number) => sorted.find((x) => x.atMs === atMs)?.dom?.shift;
+    const s0 = shiftOf(geo[0]!.atMs);
+    const unexplained = s0
+      ? Math.max(
+          ...geo.map((p) => {
+            const s = shiftOf(p.atMs);
+            return s
+              ? Math.hypot(p.x - geo[0]!.x - (s[0]! - s0[0]!), p.y - geo[0]!.y - (s[1]! - s0[1]!))
+              : dist(p, geo[0]!);
+          }),
+        )
+      : far;
+    if (far >= floor && unexplained >= floor) {
       findings.push({
         rule: "turn-off-centre",
         severity: "warn",

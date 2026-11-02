@@ -1,5 +1,5 @@
 // Hidden from the agents: judges a repaired page against its brief.
-// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet|slidein|progress|accordion|dialog|hover|reveal|flip|interrupt|reduced|push|seam|draw|gradient|quote|dismiss|reading|gear|label|popin|rise|ring> <page.html>
+// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet|slidein|progress|accordion|dialog|hover|reveal|flip|interrupt|reduced|push|seam|draw|gradient|quote|dismiss|reading|gear|label|popin|rise|ring|hint|ticket|nudge> <page.html>
 import { chromium } from "playwright";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
@@ -776,6 +776,71 @@ if (kind === "notify") {
   ok("the number says 72%", label === "72%", label);
   const size = await rect(".ring");
   ok("the ring is still 140px", size[2] === 140 && size[3] === 140, size);
+} else if (kind === "hint") {
+  const help = await rect(".help");
+  const bubbleAt = (t) =>
+    page.evaluate((t) => {
+      const el = document.querySelector(".bubble");
+      const anims = el.getAnimations();
+      const d = Math.max(0, ...anims.map((a) => a.effect.getComputedTiming().endTime));
+      for (const a of anims) { a.pause(); a.currentTime = t; }
+      const cs = getComputedStyle(el);
+      const r = el.getBoundingClientRect();
+      return { d, n: anims.length, op: Number(cs.opacity), vis: cs.visibility, display: cs.display, x: r.x, y: r.y, w: r.width, bottom: r.bottom };
+    }, t);
+  const finish = () => page.evaluate(() => document.querySelector(".bubble").getAnimations().forEach((a) => a.finish()));
+  const shown = (b) => b.display !== "none" && b.vis === "visible" && b.op > 0.02;
+  const before = await bubbleAt(0);
+  ok("before the pointer: the bubble is not shown", !shown(before), before);
+  await page.mouse.move(help[0] + help[2] / 2, help[1] + help[3] / 2);
+  const in100 = await bubbleAt(100);
+  ok("pointer over: it fades in over about 200ms", in100.n > 0 && Math.abs(in100.d - 200) <= 20 && shown(in100) && in100.op > 0.3 && in100.op < 0.98, in100);
+  await finish();
+  const open = await bubbleAt(0);
+  ok("shown above the icon, 240px wide, fully opaque", shown(open) && open.op > 0.99 && Math.abs(open.w - 240) <= 1 && open.bottom <= help[1] - 8 && open.bottom >= help[1] - 12, { open, help });
+  await page.mouse.move(5, 5);
+  const out100 = await bubbleAt(100);
+  ok("pointer off: it fades out over about 200ms, still shown at 100ms", out100.n > 0 && Math.abs(out100.d - 200) <= 20 && shown(out100) && out100.op > 0.2 && out100.op < 0.8, out100);
+  await finish();
+  const gone = await bubbleAt(0);
+  ok("then gone", !shown(gone), gone);
+} else if (kind === "ticket") {
+  const poseAt = (t) =>
+    page.evaluate((t) => {
+      const el = document.querySelector(".ticket");
+      for (const a of document.getAnimations()) { a.pause(); a.currentTime = t; }
+      const r = el.getBoundingClientRect();
+      const tf = getComputedStyle(el).transform;
+      const m = new DOMMatrixReadOnly(tf === "none" ? undefined : tf);
+      return { cx: r.x + r.width / 2, cy: r.y + r.height / 2, deg: (Math.atan2(m.b, m.a) * 180) / Math.PI, op: Number(getComputedStyle(el).opacity) };
+    }, t);
+  const timing = await page.evaluate(() => { const a = document.querySelector(".ticket").getAnimations()[0]; const t = a?.effect.getComputedTiming(); return t ? { d: t.duration, delay: t.delay } : null; });
+  ok("one 500ms entrance at load", timing && Math.abs(timing.d - 500) <= 1 && timing.delay === 0, timing);
+  const rest = await poseAt(500);
+  const p = [];
+  for (const t of [0, 100, 200, 300, 400, 499]) p.push(await poseAt(t));
+  ok("at rest: in place, upright, opaque", Math.abs(rest.deg) < 0.5 && rest.op > 0.99 && Math.abs(rest.cx - 640) <= 2 && Math.abs(rest.cy - 400) <= 2, rest);
+  ok("starts 200px to the left, tilted 20° anticlockwise, transparent", Math.abs(p[0].cx - (rest.cx - 200)) <= 3 && Math.abs(p[0].deg + 20) <= 1 && p[0].op < 0.05, p[0]);
+  ok("travels horizontally the whole way: its centre stays within 2px of its resting height", p.every((x) => Math.abs(x.cy - rest.cy) <= 2), p.map((x) => [Math.round(x.cx), Math.round(x.cy)]));
+  ok("slowing at the end: past half its way at 200ms of 500", (p[2].cx - p[0].cx) / 200 > 0.55 && p[2].cx < rest.cx, p.map((x) => Math.round(x.cx)));
+} else if (kind === "nudge") {
+  const at2 = (t) =>
+    page.evaluate((t) => {
+      const el = document.querySelector(".notice");
+      for (const a of document.getAnimations()) { a.pause(); a.currentTime = t; }
+      const r = el.getBoundingClientRect();
+      return { x: r.x, y: r.y, w: r.width, op: Number(getComputedStyle(el).opacity) };
+    }, t);
+  const timing = await page.evaluate(() => { const a = document.querySelector(".notice").getAnimations()[0]; const t = a?.effect.getComputedTiming(); return t ? { d: t.duration } : null; });
+  ok("a 400ms entrance at load", timing && Math.abs(timing.d - 400) <= 1, timing);
+  const rest = await at2(400);
+  const s0 = await at2(0);
+  const s1 = await at2(160);
+  ok("at rest: in its place in the column, opaque", rest.op > 0.99 && Math.abs(rest.x - 304) <= 2, rest);
+  ok("starts 360px to the left of its place, transparent", Math.abs(s0.x - (rest.x - 360)) <= 3 && s0.op < 0.05 && Math.abs(s0.y - rest.y) <= 1, { s0, rest });
+  ok("slowing at the end: past half its way at 160ms of 400", (s1.x - s0.x) / 360 > 0.55 && s1.x < rest.x - 1, { s0, s1, rest });
+  const list = await rect("ul");
+  ok("the list below stays where it is", Math.abs(list[1] - (rest.y + 56 + 24)) <= 30, { list, rest });
 }
 await browser.close();
 const failed = checks.filter((c) => !c.pass);

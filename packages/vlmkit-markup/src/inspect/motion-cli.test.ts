@@ -429,6 +429,9 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
     assert.match(broken.out, /warn turn-off-centre .*carried up to \d+px .*transform-box: fill-box/);
     const fixed = await run("reference/gear.html", ["--selector", ".gear"]);
     assert.doesNotMatch(fixed.out, /turn-off-centre/);
+    // Round 14: a card that slides while it straightens is carried by its translate.
+    const slide = await run("reference/ticket.html", ["--selector", ".ticket"]);
+    assert.doesNotMatch(slide.out, /turn-off-centre/);
   });
 
   // Round 13, before any agent ran: both reference pages failed on these.

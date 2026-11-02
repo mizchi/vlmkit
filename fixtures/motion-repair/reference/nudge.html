@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Inbox</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #f1f5f9; color: #0f172a; overflow-x: hidden; }
+  main { max-width: 720px; margin: 48px auto; padding: 0 24px; }
+  .notice { position: relative; display: flex; gap: 12px; align-items: center; padding: 14px 18px; border-radius: 10px; background: #fff; border-left: 4px solid #0ea5e9; box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08); animation: nudge-in 400ms ease-out both; }
+  .notice strong { color: #0369a1; }
+  @keyframes nudge-in { from { left: -360px; opacity: 0; } to { left: 0; opacity: 1; } }
+  ul { list-style: none; padding: 0; margin: 24px 0 0; }
+  li { padding: 12px 0; border-bottom: 1px solid #e2e8f0; }
+</style></head>
+<body>
+  <main>
+    <div class="notice"><strong>New:</strong> 3 messages arrived while you were away.</div>
+    <ul>
+      <li>Kenji: the venue confirmed Friday</li>
+      <li>Ayumi: slides for the review</li>
+      <li>Billing: your October invoice</li>
+    </ul>
+  </main>
+</body></html>

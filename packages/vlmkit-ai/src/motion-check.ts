@@ -67,6 +67,8 @@ export interface MotionDom {
   shadow?: number[];
   /** A conic gradient's first arc, in degrees from its start (it grows as a ring fills clockwise). */
   sweepDeg?: number;
+  /** Its own transform's translation (px): what carries its centre when it slides. */
+  shift?: number[];
   /** A finished animation's forwards fill still holds what it animated, and why that matters. */
   heldByFill?: string;
   /** Its transition on background runs over a gradient (which steps: gradients do not interpolate). */

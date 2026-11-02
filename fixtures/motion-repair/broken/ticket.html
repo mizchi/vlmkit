@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Order</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #fefce8; color: #1c1917; display: grid; place-items: center; min-height: 100vh; overflow: hidden; }
+  .ticket { width: 360px; padding: 24px 28px; border-radius: 14px; background: #fff; box-shadow: 0 6px 20px rgba(28, 25, 23, 0.12); animation: fly-in 500ms ease-out both; }
+  .ticket h1 { margin: 0 0 4px; font-size: 20px; }
+  .ticket p { margin: 0; color: #57534e; }
+  .ticket .total { margin-top: 16px; font-size: 26px; font-weight: 700; }
+  @keyframes fly-in { from { opacity: 0; transform: rotate(-20deg) translateX(-200px); } to { opacity: 1; transform: none; } }
+</style></head>
+<body>
+  <section class="ticket">
+    <h1>Order confirmed</h1>
+    <p>#40211 · 3 items · arriving Thursday</p>
+    <div class="total">¥12,800</div>
+  </section>
+</body></html>
