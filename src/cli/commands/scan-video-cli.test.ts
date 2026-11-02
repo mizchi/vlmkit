@@ -128,7 +128,7 @@ describe("scan video → snapshot storyboard", () => {
     );
     const written = await writeStoryboard(scanned.manifestPath, { out: join(dir, "lossy-story"), lossy: true });
     const summary = execFileSync("cat", [written.files.summary]).toString();
-    assert.match(summary, /Decoded from h264, a lossy codec \(read with --lossy\)/);
+    assert.match(summary, /Decoded from h264, a lossy codec, compared through the noise band/);
   });
 
   test("a lossless recording's planted glitch and transient are found on their frames", async () => {

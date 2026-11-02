@@ -50,6 +50,7 @@ import {
   colorPlan,
   displayGeometry,
   filterChain,
+  gopNumbers,
   imageTimeline,
   LOSSLESS_CODECS,
   parseFrameTable,
@@ -656,7 +657,7 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
     "-select_streams",
     String(stream.index),
     "-show_entries",
-    "frame=best_effort_timestamp,pts,duration,key_frame,interlaced_frame,top_field_first,width,height",
+    "frame=best_effort_timestamp,pts,duration,key_frame,pkt_pos,interlaced_frame,top_field_first,width,height",
     "-of",
     "json",
     ...demuxer,
@@ -936,6 +937,7 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
         stable: true,
         index: f.index,
         key: f.key,
+        ...(f.gop !== undefined ? { gop: f.gop } : {}),
         ...(f.field !== undefined
           ? { field: f.field }
           : fieldOfPicture(f) !== undefined
@@ -1108,7 +1110,11 @@ function checkWritten(
 export interface ImportFramesOptions {
   /** A directory of PNGs another decoder wrote, one per frame, named so they sort in order. */
   dir: string;
-  /** One timestamp in seconds per line, in the frames' order (ffprobe's `best_effort_timestamp_time`). */
+  /**
+   * One timestamp in seconds per line, in the frames' order (ffprobe's `best_effort_timestamp_time`)
+   * — or, as ffprobe prints `key_frame,best_effort_timestamp_time,pkt_pos`, the keyframe flag (0 or
+   * 1) before it and the packet's position after it, so the frames know where the codec re-quantizes.
+   */
   pts?: string;
   /** A constant rate instead of a timestamp file. */
   fps?: number;
@@ -1141,21 +1147,59 @@ function pngSize(path: string): { width: number; height: number } {
 
 /** Timestamps from a sidecar: one number of seconds per line; ffprobe's csv may end each with a comma. */
 export function parsePtsFile(text: string, file: string): number[] {
-  const out: number[] = [];
+  return parsePtsTable(text, file).seconds;
+}
+
+/**
+ * A timestamp file as ffprobe writes it with `-of csv=p=0`: a time per line (`best_effort_timestamp_time`),
+ * or `key_frame,best_effort_timestamp_time[,pkt_pos]` — ffprobe prints a section's fields in its own
+ * order, whatever order -show_entries names them in. Trailing commas (side data) are dropped. Every
+ * line has the same fields; without the flag there are no keyframes to know.
+ */
+export function parsePtsTable(
+  text: string,
+  file: string,
+): { seconds: number[]; keys: boolean[] | null; pos: (number | undefined)[] | null } {
+  const seconds: number[] = [];
+  const keys: boolean[] = [];
+  const pos: (number | undefined)[] = [];
+  let fields: number | undefined;
+  const number = /^-?\d+(\.\d+)?(e[-+]?\d+)?$/i;
   for (const [i, raw] of text.split(/\r?\n/).entries()) {
     const line = raw.trim().replace(/,+$/, "").trim();
     if (!line) continue;
-    if (!/^-?\d+(\.\d+)?(e[-+]?\d+)?$/i.test(line) || !Number.isFinite(Number(line))) {
+    const parts = line.split(",").map((p) => p.trim());
+    const where = `${file}:${i + 1}`;
+    if (parts.length > 3) throw new UsageError(`${where}: "${raw.trim()}" has ${parts.length} fields, at most 3`);
+    if (fields !== undefined && parts.length !== fields) {
       throw new UsageError(
-        `${file}:${i + 1}: "${raw.trim()}" is not a timestamp in seconds` +
-          (/N\/A/i.test(line)
+        `${where}: ${parts.length} field${parts.length === 1 ? "" : "s"}, the lines before have ${fields}`,
+      );
+    }
+    fields = parts.length;
+    const time = parts.length === 1 ? parts[0]! : parts[1]!;
+    if (!number.test(time) || !Number.isFinite(Number(time))) {
+      throw new UsageError(
+        `${where}: "${raw.trim()}" is not a timestamp in seconds` +
+          (/N\/A/i.test(time)
             ? " (ffprobe prints N/A for pts_time on some streams; ask for best_effort_timestamp_time)"
             : ""),
       );
     }
-    out.push(Number(line));
+    seconds.push(Number(time));
+    if (parts.length > 1) {
+      if (parts[0] !== "0" && parts[0] !== "1") {
+        throw new UsageError(`${where}: "${parts[0]}" is not a keyframe flag (0 or 1, ffprobe's key_frame)`);
+      }
+      keys.push(parts[0] === "1");
+    }
+    if (parts.length > 2) {
+      const p = parts[2]!;
+      // ffprobe prints N/A, or nothing, where it does not know a packet's position.
+      pos.push(/^\d+$/.test(p) ? Number(p) : undefined);
+    }
   }
-  return out;
+  return { seconds, keys: fields !== undefined && fields > 1 ? keys : null, pos: fields === 3 ? pos : null };
 }
 
 /** Turn a directory of decoded frames plus their timestamps into a `vlmkit-frames/1` sequence (`frames.json` in that directory). */
@@ -1198,10 +1242,15 @@ export async function importFrames(
     throw new UsageError(`${options.dir}: ${names.length} frames, over ${MAX_SCAN_FRAMES}; import a shorter span`);
   }
   let seconds: number[];
+  let keys: boolean[] | null = null;
+  let positions: (number | undefined)[] | null = null;
   if (options.pts !== undefined) {
     const ptsPath = isAbsolute(options.pts) ? options.pts : resolve(options.pts);
     if (!existsSync(ptsPath)) throw new UsageError(`no such timestamp file: ${options.pts}`);
-    seconds = parsePtsFile(readFileSync(ptsPath, "utf8"), options.pts);
+    const table = parsePtsTable(readFileSync(ptsPath, "utf8"), options.pts);
+    seconds = table.seconds;
+    keys = table.keys;
+    positions = table.pos;
     const want = names.length + (options.loop !== undefined ? 1 : 0);
     if (seconds.length !== want) {
       throw new UsageError(
@@ -1271,7 +1320,32 @@ export async function importFrames(
     }
     loop = { plays, passFrames: once.length, passMs, passes };
   }
-  const frames: FrameEntry[] = played.map((f, n) => ({ n, file: f.file, atMs: f.atMs, stable: true, index: n }));
+  // Keyframes, when the timestamp file has ffprobe's key_frame: each frame's GOP counted in decode
+  // order (by pkt_pos when every frame has one), as scanVideo counts it. Not for a loop: one pass
+  // of an animation another tool composited has no GOPs to repeat.
+  const gops =
+    keys && passEnd === undefined
+      ? gopNumbers(
+          seconds.map((_, i) => ({
+            index: i,
+            ticks: i,
+            key: keys![i]!,
+            ...(positions?.[i] !== undefined ? { pos: positions[i] } : {}),
+          })),
+        )
+      : null;
+  const keyOf = new Map(shown.map((i, k) => [k, i]));
+  const frames: FrameEntry[] = played.map((f, n) => {
+    const at = gops ? keyOf.get(n) : undefined;
+    return {
+      n,
+      file: f.file,
+      atMs: f.atMs,
+      stable: true,
+      index: n,
+      ...(gops && at !== undefined ? { key: keys![at]!, gop: gops[at]! } : {}),
+    };
+  });
   const manifest: FramesManifest = {
     format: FRAMES_FORMAT,
     source: {

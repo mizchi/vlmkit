@@ -39,6 +39,7 @@ import {
   isVideoFile,
   onPath,
   parsePtsFile,
+  parsePtsTable,
   scanVideo,
 } from "./video-decode.ts";
 
@@ -100,6 +101,18 @@ test("isVideoFile: by extension, never a URL", () => {
   assert.equal(isVideoFile("p.html#a.mp4"), false);
 });
 
+test("parsePtsTable: ffprobe's key_frame and pkt_pos around the time, every line alike", () => {
+  assert.deepEqual(parsePtsTable("1,0.000000,\n0,0.033000\n", "pts.txt"), {
+    seconds: [0, 0.033],
+    keys: [true, false],
+    pos: null,
+  });
+  assert.deepEqual(parsePtsTable("1,0.000000,48\n0,0.033000,N/A\n", "pts.txt").pos, [48, undefined]);
+  assert.equal(parsePtsTable("0.0\n0.5\n", "pts.txt").keys, null);
+  assert.throws(() => parsePtsTable("1,0.0\n0.5\n", "pts.txt"), /pts\.txt:2: 1 field, the lines before have 2/);
+  assert.throws(() => parsePtsTable("yes,0.0\n", "pts.txt"), /not a keyframe flag/);
+});
+
 test("parsePtsFile: seconds per line, ffprobe's trailing commas, N/A named", () => {
   assert.deepEqual(parsePtsFile("0.000000,\n0.033333\n\n0.066667,\n", "pts.txt"), [0, 0.033333, 0.066667]);
   assert.throws(
@@ -127,12 +140,49 @@ describe("scanVideo with the user's ffmpeg", () => {
       [0, 10, 20],
       "keyframes every 10 (-g 10)",
     );
+    assert.deepEqual(
+      m.frames.map((f) => f.gop),
+      m.frames.map((f) => Math.floor(f.index! / 10)),
+      "closed GOPs: each frame in the GOP of the keyframe before it",
+    );
     assert.equal(m.source.video?.codec, "h264");
     assert.equal(m.source.video?.lossless, false);
     assert.deepEqual(m.source.viewport, { width: 64, height: 48 });
     assert.equal(m.source.deviceScaleFactor, 1);
     // Untagged: BT.601, limited range, both said to be assumed.
     assert.deepEqual(m.source.video?.color, { matrix: "bt601", range: "tv", assumed: ["matrix", "range"] });
+  });
+
+  test("GOP numbers: an open GOP's leading frames are counted where they are decoded, and a selection keeps them", async () => {
+    // I B B P B B P B B P B B I: with open GOPs, frames 10 and 11 are B-frames shown before keyframe
+    // 12 and decoded after it, predicted from it.
+    const file = numbered("open-gop.mkv", {
+      codec: ["-c:v", "libx264", "-g", "12", "-bf", "2", "-x264-params", "open-gop=1:scenecut=0:b-adapt=0"],
+    });
+    const all = await scanVideo({ file, out: join(dir, "open-gop") });
+    assert.deepEqual(
+      all.manifest.frames.filter((f) => f.key).map((f) => f.index),
+      [0, 12, 24],
+    );
+    assert.deepEqual(
+      all.manifest.frames.map((f) => f.gop),
+      all.manifest.frames.map((f) => (f.index! < 10 ? 0 : f.index! < 22 ? 1 : 2)),
+      "the two B-frames before each keyframe are in its GOP",
+    );
+    // A selection that skips every keyframe still carries where the GOPs change.
+    const between = await scanVideo({
+      file,
+      out: join(dir, "open-gop-at"),
+      selection: { kind: "at", atMs: [5, 11, 17].map((n) => (n * 1000) / 30 + 1) },
+    });
+    assert.deepEqual(
+      between.manifest.frames.map((f) => [f.index, f.key, f.gop]),
+      [
+        [5, false, 0],
+        [11, false, 1],
+        [17, false, 1],
+      ],
+    );
   });
 
   test("a span keeps the frames on screen during it; instants keep the frame showing at each", async () => {
@@ -344,7 +394,7 @@ describe("importFrames: frames another decoder wrote", () => {
       "-select_streams",
       String(i),
       "-show_entries",
-      "frame=best_effort_timestamp_time",
+      "frame=key_frame,best_effort_timestamp_time,pkt_pos",
       "-of",
       "csv=p=0",
       file,
@@ -391,13 +441,23 @@ describe("importFrames: frames another decoder wrote", () => {
     assert.deepEqual(r.manifest.source.viewport, { width: 64, height: 48 });
   });
 
-  test("numbered PNGs plus ffprobe's best_effort_timestamp_time, as the documented recipe writes them", async () => {
-    const file = numbered("import.mp4", { frames: 9 });
+  test("numbered PNGs plus ffprobe's key_frame, best_effort_timestamp_time and pkt_pos, as the documented recipe writes them", async () => {
+    const file = numbered("import.mp4", { frames: 30 });
     const frames = join(dir, "imported");
     await recipe(file, frames);
     const r = await importFrames({ dir: frames, pts: join(frames, "pts.txt") });
     const m = parseFramesManifest(readFileSync(r.manifestPath, "utf8"));
-    assert.equal(m.frames.length, 9);
+    assert.equal(m.frames.length, 30);
+    // The keyframes and GOPs scanVideo itself finds (-g 10): where the codec re-quantizes.
+    const scanned = await scanVideo({ file, out: join(dir, "imported-scan") });
+    assert.deepEqual(
+      m.frames.map((f) => [f.key, f.gop]),
+      scanned.manifest.frames.map((f) => [f.key, f.gop]),
+    );
+    assert.deepEqual(
+      m.frames.filter((f) => f.key).map((f) => f.n),
+      [0, 10, 20],
+    );
     m.frames.forEach((f, k) => {
       assert.equal(frameNumber(join(frames, f.file)), k);
       assert.ok(Math.abs(f.atMs - (k * 1000) / 30) < 0.01, `frame ${k} at ${f.atMs}`);
@@ -410,7 +470,7 @@ describe("importFrames: frames another decoder wrote", () => {
     writeFileSync(join(frames, "short.txt"), "0\n0.1\n");
     await assert.rejects(
       importFrames({ dir: frames, pts: join(frames, "short.txt") }),
-      (e: unknown) => e instanceof UsageError && /2 timestamps for 9 PNGs/.test((e as Error).message),
+      (e: unknown) => e instanceof UsageError && /2 timestamps for 30 PNGs/.test((e as Error).message),
     );
   });
 });

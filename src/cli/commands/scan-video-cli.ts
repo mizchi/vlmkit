@@ -55,7 +55,8 @@ function usage(): string {
     "  --background <c>       white or black: what transparent pixels are composited over (default white)",
     "  --ffmpeg <path>        Your ffmpeg (default VLMKIT_FFMPEG, else ffmpeg on PATH)",
     "  --ffprobe <path>       Your ffprobe (default VLMKIT_FFPROBE, else beside --ffmpeg, else on PATH)",
-    "  --pts <file>           With a directory: one timestamp in seconds per frame, in order",
+    "  --pts <file>           With a directory: one timestamp in seconds per frame, in order (or ffprobe's",
+    "                         key_frame,best_effort_timestamp_time,pkt_pos lines: the keyframes too)",
     "  --fps <rate>           With a directory: a constant frame rate instead of --pts",
     "  --lossless             With a directory: the frames are exactly what was recorded",
     "  --every-frame          With a directory: it holds every frame the recording shows (the recipe's",
@@ -68,7 +69,7 @@ function usage(): string {
     "time, then import them. Both halves name one stream <i>, the one scan video judges (its index is",
     "source.video.stream: vlmkit scan video rec.mp4 --at 0 --json); v:0 can be a one-frame cover track:",
     "  ffmpeg -i rec.mp4 -map 0:<i> -fps_mode passthrough frames/%06d.png",
-    "  ffprobe -v error -select_streams <i> -show_entries frame=best_effort_timestamp_time -of csv=p=0 rec.mp4 > frames/pts.txt",
+    "  ffprobe -v error -select_streams <i> -show_entries frame=key_frame,best_effort_timestamp_time,pkt_pos -of csv=p=0 rec.mp4 > frames/pts.txt",
     "  vlmkit scan video frames --pts frames/pts.txt --every-frame",
     "Plain ffmpeg writes interlaced frames woven and a GIF / APNG as one pass, and --every-frame would",
     "then vouch for frames that miss a field-rate or looped flash: scan those directly (an animation",
@@ -374,7 +375,7 @@ async function main(): Promise<void> {
   );
   if (!v.lossless) {
     console.log(
-      `  ${DIM}${v.decoder === "import" ? "not marked lossless (--lossless)" : `${v.codec} is lossy`}: snapshot storyboard compares pixels exactly and needs --lossy to read it${RESET}`,
+      `  ${DIM}${v.decoder === "import" ? "not marked lossless (--lossless)" : `${v.codec} is lossy`}: snapshot storyboard needs --lossy to read it (a noise band; exactly, codec noise is events)${RESET}`,
     );
   }
   console.log();
