@@ -103,7 +103,28 @@ odd.
 On the 88 other animated pages of the repo (`fixtures/` and `examples/`), `zero-duration-animation`
 does not fire, and `check animation` throws on none of them.
 
-## Deferred
+## Deferred, and fixed after the round (2026-11-02)
+
+Every item below is fixed.
+
+- **`check flash` on a scroll-driven page** now says what it did not judge: `not judged:
+  div.progress grow on a scroll timeline — it follows the scroll, which this sweep does not move`.
+  It also names where to check it. The sweep still moves time, not the scroll.
+- **`check integrity --viewport 1280x800`** is now one viewport of that size, not the default
+  sweep. `--viewport` with `--viewports` is refused. An option no gate knows is still warned about
+  on stderr, and now with the nearest option it has: `--viewprts → --viewports`.
+- **The run ledger outside a repository** is announced once, the first time it is written:
+  `created .vlmkit/run-ledger.jsonl — an append-only record of every gate run (--no-ledger turns it
+  off)`. Inside a repository the `.gitignore` advice is unchanged.
+- **A Jev `--target` on a button whose label changes** no longer reads `target-hidden`. A frame the
+  page measures as fully shown, but that the model reports as not shown, now counts as unknown, and
+  a `locate-unsure` warn says so. On the round's repaired page the run gave `no fail, 2 warn` (12
+  requests, $0.0015).
+- **The gear fixture's hub hole** is drawn at the gear's own centre (cy 27.5, was 24.5), on both
+  pages. On the reference page `inspect motion --selector ".gear circle"` now reads `travels 0px`,
+  and both oracle verdicts are unchanged.
+
+## Deferred (as written after the round)
 
 - `check flash` does not scroll, so a scroll-driven strobe is not judged.
 - `check integrity --viewport 1280x800` still reported at 375px, which an agent did not expect.

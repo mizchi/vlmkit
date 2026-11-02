@@ -403,7 +403,11 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   `--expect-direction clockwise|counterclockwise` checks it; a turn about another point is
   `turn-off-centre` (warn), or a `still-mismatch` naming `transform-box: fill-box` on SVG.
   `inspect interact` leaves scroll-timeline animations on in its motion-off snapshots, and `check
-  scroll` keeps a fixed element at `scaleX(0)`.
+  scroll` keeps a fixed element at `scaleX(0)`. Its deferred items: `check flash` says it did not
+  judge animations on a scroll timeline, `check integrity --viewport WxH` is one viewport, an unknown
+  gate option's warning names the nearest one, the ledger's creation is announced outside a git
+  repository too, and with `--jev` a frame the page shows fully but the model calls not shown is
+  unknown (`locate-unsure`), not `target-hidden`.
 
 ## Generated figures (raster images)
 

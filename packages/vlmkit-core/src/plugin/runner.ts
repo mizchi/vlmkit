@@ -576,6 +576,21 @@ export function unpinnedLiveInput(gate: AnyGateDefinition, argv: readonly string
  * whether the copy was checked (it was not; `check copy --manifest` is the gate that does).
  * Said, not refused: a gate whose `inputs` missed a flag it reads would otherwise break.
  */
+/** Levenshtein distance, for "did you mean" on a mistyped option. */
+function editDistance(a: string, b: string): number {
+  const row = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = row[0]!;
+    row[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cur = row[j]!;
+      row[j] = Math.min(row[j]! + 1, row[j - 1]! + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = cur;
+    }
+  }
+  return row[b.length]!;
+}
+
 export function unknownGateFlags(gate: AnyGateDefinition, argv: readonly string[]): string[] {
   const known = new Set<string>([...SHARED_GATE_FLAGS, "--har"]);
   for (const input of gate.inputs ?? []) {
@@ -606,8 +621,12 @@ export function unknownGateFlags(gate: AnyGateDefinition, argv: readonly string[
  */
 export function newOutputNotice(write: LedgerWrite | null, cwd: string): string | null {
   if (!write?.created) return null;
-  if (!isGitRepo(cwd) || isGitIgnored(cwd, write.path)) return null;
   const rel = relative(cwd, write.path).split("\\").join("/") || write.path;
+  // Outside a repository the .gitignore advice is noise, but the file is still news: an agent in
+  // a scratch directory saw its harness report a file it had not written (round 12).
+  if (!isGitRepo(cwd))
+    return `${DIM}  created ${rel} — an append-only record of every gate run (--no-ledger turns it off)${RESET}`;
+  if (isGitIgnored(cwd, write.path)) return null;
   // A relocated ledger gets advice about ITSELF. Printing the canned pair after
   // `--ledger runs/x.jsonl` would name two directories the run did not write and
   // omit the one it did — advice that does not apply is worse than none.
@@ -641,8 +660,16 @@ export async function runGateCli<Report, Options>(
   }
   const unknown = unknownGateFlags(gate, argv);
   if (unknown.length > 0) {
+    // The nearest option by name, when one is close: the warning alone was missed (round 12).
+    const near = unknown.flatMap((flag) => {
+      const best = (gate.inputs ?? [])
+        .map((i) => `--${i.name}`)
+        .map((name) => ({ name, d: editDistance(flag, name) }))
+        .sort((x, y) => x.d - y.d)[0];
+      return best && best.d <= 2 ? [`${flag} → ${best.name}`] : [];
+    });
     (options.err ?? ((text: string) => console.error(text)))(
-      `warn: ${unknown.join(", ")} ${unknown.length === 1 ? "is not an option" : "are not options"} of vlmkit ${gateCommandString(gate)} and ${unknown.length === 1 ? "was" : "were"} ignored (--help lists its options)`,
+      `warn: ${unknown.join(", ")} ${unknown.length === 1 ? "is not an option" : "are not options"} of vlmkit ${gateCommandString(gate)} and ${unknown.length === 1 ? "was" : "were"} ignored (--help lists its options)${near.length > 0 ? `; did you mean ${near.join(", ")}?` : ""}`,
     );
   }
   const outcome = await runGate(gate, argv, options);

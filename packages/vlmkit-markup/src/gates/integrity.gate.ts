@@ -48,7 +48,7 @@ import { formatInstant } from "@mizchi/vlmkit-judge/frames.ts";
  * This gate's own flags that take a value, so the value is not read as the page source:
  * `--timeline-at 0,150 page.html` read `0,150` as the page before these were listed.
  */
-const VALUE_FLAGS = ["--timeline-at", "--frames"];
+const VALUE_FLAGS = ["--timeline-at", "--frames", "--viewport"];
 
 /** Heights the CLI has always paired with its default sweep widths. */
 const VIEWPORT_HEIGHTS: Record<number, number> = { 1280: 800, 768: 900, 375: 700 };
@@ -137,6 +137,12 @@ ${ALLOW_HELP}`,
       description: "Sweep widths",
       defaultDescription: "1280,768,375",
     },
+    {
+      name: "viewport",
+      placeholder: "WxH",
+      kind: "string",
+      description: "One viewport instead of the sweep (1280x800): the size a brief names",
+    },
     { name: "max-findings", kind: "number", description: "Per-class report cap", defaultDescription: "12" },
     {
       name: "storage-state",
@@ -209,6 +215,16 @@ ${ALLOW_HELP}`,
     if (widths && widths.some((w) => w <= 0)) {
       throw new UsageError("--viewports must be positive px widths, e.g. --viewports 1280,768,375");
     }
+    // `--viewport 1280x800` was ignored and the sweep reported at 375px (round 12): one size.
+    const oneViewport = readFlag(argv, "viewport");
+    let only: { width: number; height: number } | undefined;
+    if (oneViewport !== undefined) {
+      const m = /^(\d+)x(\d+)$/.exec(oneViewport);
+      if (!m || Number(m[1]) <= 0 || Number(m[2]) <= 0)
+        throw new UsageError(`--viewport takes WxH, e.g. --viewport 1280x800; got "${oneViewport}"`);
+      if (widths) throw new UsageError("--viewport and --viewports: give one size, or the widths to sweep");
+      only = { width: Number(m[1]), height: Number(m[2]) };
+    }
     const maxFindings = optionalInt(argv, "max-findings", { min: 1 });
     const pageLoad = parsePageLoad(argv);
     const timeout = pageLoad.timeout;
@@ -226,9 +242,11 @@ ${ALLOW_HELP}`,
     }
     return {
       source,
-      ...(widths && widths.length > 0
-        ? { viewports: widths.map((width) => ({ width, height: VIEWPORT_HEIGHTS[width] ?? 800 })) }
-        : {}),
+      ...(only
+        ? { viewports: [only] }
+        : widths && widths.length > 0
+          ? { viewports: widths.map((width) => ({ width, height: VIEWPORT_HEIGHTS[width] ?? 800 })) }
+          : {}),
       ...(maxFindings !== undefined ? { maxFindings } : {}),
       ...(timeout !== undefined ? { timeout } : {}),
       ...(waitUntil ? { waitUntil } : {}),

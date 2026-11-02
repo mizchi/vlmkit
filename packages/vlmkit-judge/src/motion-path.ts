@@ -404,6 +404,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
   // another target shares is unknown too.
   const overlaps = (a: MotionBox, b: MotionBox) =>
     a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+  const unrecognised = new Set<number>();
   const seen = (s: MotionSample): number | null => {
     if (s.dom) {
       if (s.dom.opacity < 0.05) return 0;
@@ -415,6 +416,12 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       // target-lost (round 7). Unknown, not evidence. (Without Jev, present is the page's own.)
       if (s.present < thr && s.dom.opacity < sure && (s.dom.visible ?? 0) >= thr && s.present !== s.dom.visible)
         return null;
+      // Fully shown by the page and "not shown" by the model: it did not recognise the target from
+      // its description. A button whose label changed on click read target-hidden (round 12).
+      if (s.present < thr && s.dom.opacity >= sure && (s.dom.visible ?? 0) >= sure && s.present !== s.dom.visible) {
+        unrecognised.add(s.atMs);
+        return null;
+      }
       if (s.box && s.present >= thr && !overlaps(s.box, s.dom.box)) return null;
       return s.present;
     }
@@ -1097,6 +1104,20 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       severity: "fail",
       atMs: segments[0]!.startMs,
       message: `it runs ${say(iterations)}, not ${say(options.expectIterations)}: animation-iteration-count: ${options.expectIterations === null ? "infinite" : options.expectIterations}`,
+    });
+  }
+  if (unrecognised.size > 0) {
+    const at = [...unrecognised].sort((a, b) => a - b);
+    findings.push({
+      rule: "locate-unsure",
+      severity: "warn",
+      atMs: at[0]!,
+      message: `at ${at
+        .slice(0, 4)
+        .map(ms)
+        .join(
+          ", ",
+        )}${at.length > 4 ? ", …" : ""} the page shows it fully but the model did not find it from its description, so whether it can be seen there is the page's measure, not the model's: describe it by what it shows in every frame (a label that changes is not that)`,
     });
   }
   findings.sort((a, b) => a.atMs - b.atMs);
