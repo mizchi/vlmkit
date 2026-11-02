@@ -408,6 +408,18 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   gate option's warning names the nearest one, the ledger's creation is announced outside a git
   repository too, and with `--jev` a frame the page shows fully but the model calls not shown is
   unknown (`locate-unsure`), not `target-hidden`.
+- **A panel opened from display: none, a fill holding transform over :hover, an unregistered
+  custom property** (round 13, `docs/reports/2026-11-02-motion-repair-v13.md`). What plays at load
+  ends before the first `--click` / `--hover` / `--leave` (a card hovered in its entrance delay read
+  as a 12px jump on the broken page and its repair alike); a leading `--wait` or a first `--scroll`
+  keeps the old timing. A gradient's stop positions and angles are the `gradient` channel (a conic
+  ring filling read `target-static`). `snapped` from not rendered names `@starting-style`; a target
+  leaving by a `display` transition is seen where it is on screen (Chromium leaves it out of
+  hit-testing, and a correct close read "never seen"); `target-static` names a finished animation
+  whose forwards fill still holds what `:hover` sets; a target's timing is from an animation still
+  running (a finished, filled entrance gave a hover 400ms); `--expect-*` that no fitted path checked
+  are `not judged`, not `held`; "no animation" names a transition on a custom property no
+  `@property` registers. dynamic-markup fills entrances `backwards`, not `both`.
 
 ## Generated figures (raster images)
 

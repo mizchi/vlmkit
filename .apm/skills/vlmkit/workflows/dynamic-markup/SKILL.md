@@ -53,8 +53,13 @@ authoring motion — animations move pixels and make composition reports
 harder to read.
 
 One addition when animations are specified: author the entrance
-animation with `both`/`forwards` fill ending exactly at the static
-layout you converged, so the rest pose equals the screenshots.
+animation so it ends exactly at the static layout you converged, so the
+rest pose equals the screenshots. Fill it `backwards` (it holds its
+`from` pose through its delay), not `both`/`forwards`: a forwards fill
+keeps the last keyframe's value applied for good, and an animated value
+outranks every rule — a card's `:hover` lift and its transition on
+`transform` then never apply. The rest pose comes from the element's own
+style once the animation ends.
 
 ## Phase B — dynamic gates
 

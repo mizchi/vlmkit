@@ -106,7 +106,30 @@ export async function measureTargets(
         // and --expect-duration on a face printed nothing (round 9).
         let timed: Element | null = el;
         while (timed && timed.getAnimations().length === 0) timed = timed.parentElement;
-        for (const a of (timed ?? el).getAnimations()) {
+        // One still running comes first: a card hovered after its entrance ended with a forwards
+        // fill was judged by the entrance's 400ms, not the 150ms the hover ran (round 13).
+        const owned = (timed ?? el).getAnimations();
+        const live = owned.filter((a) => a.playState !== "finished");
+        // A finished animation whose fill still holds what it animated: an animated value outranks
+        // every rule, so a :hover transform under it never applies (round 13's cards).
+        let heldByFill: string | undefined;
+        for (const a of el.getAnimations()) {
+          const fill = a.effect?.getComputedTiming().fill;
+          if (a.playState !== "finished" || (fill !== "forwards" && fill !== "both")) continue;
+          const kf = (a.effect as KeyframeEffect | null)?.getKeyframes?.() ?? [];
+          const props = [
+            ...new Set(
+              kf.flatMap((k) =>
+                Object.keys(k).filter((p) => !["offset", "easing", "composite", "computedOffset"].includes(p)),
+              ),
+            ),
+          ];
+          if (props.length === 0) continue;
+          const name = (a as CSSAnimation).animationName || "an animation";
+          heldByFill = `\`${name}\` ended with animation-fill-mode: ${fill} and still holds ${props.join(", ")}: an animation's held value outranks every rule, so a :hover or class that sets ${props.length === 1 ? "it" : "them"} (and its transition) never applies — fill it backwards (it holds its from pose through its delay), or animate the separate translate / scale property`;
+          break;
+        }
+        for (const a of live.length > 0 ? live : owned) {
           const c = a.effect?.getComputedTiming();
           const d = Number(c?.duration);
           if (!c || !Number.isFinite(d) || d <= longest || c.localTime === null) continue;
@@ -309,6 +332,18 @@ export async function measureTargets(
           }
         }
         el.removeAttribute("data-vlmkit-probe");
+        // Leaving by a display transition (allow-discrete): Chromium draws it to the end but leaves
+        // it out of hit-testing, so every point read "covered by main" and a correct close was
+        // "never seen in any frame" (round 13's Share panel). What is on screen of it is seen.
+        let exiting = false;
+        for (let e: Element | null = el; e && !exiting; e = e.parentElement)
+          exiting = e
+            .getAnimations()
+            .some((a) => (a as CSSTransition).transitionProperty === "display" && a.playState !== "finished");
+        if (exiting && inView > 0) {
+          hits = inView;
+          missed = null;
+        }
         // Every point outside its shape: nothing was seen covering it.
         const visible = opacity < 0.05 ? 0 : inView === 0 ? (outside > 0 ? 1 : 0) : hits / inView;
         // Why it is not seen, named for the repair: round 1 of motion-repair found the cause by
@@ -423,6 +458,7 @@ export async function measureTargets(
           ...(m33 < -0.01 && !backHidden ? { mirrored: true } : {}),
           ...(paint.length > 0 ? { paint } : {}),
           ...(stops.length > 0 ? { stops } : {}),
+          ...(heldByFill ? { heldByFill } : {}),
           ...(discreteBg ? { discreteBg: true } : {}),
           ...(el instanceof SVGElement && !(el instanceof SVGSVGElement) ? { svg: true } : {}),
           catches,
@@ -535,7 +571,9 @@ an easing is checked on each channel that changes.
   --scroll <css|px>       takes it off every element ("--hover .card --leave" samples the card
                           settling back), --scroll brings an element's top to the viewport's
                           top (or scrolls to a y in px) — what a scroll-triggered reveal needs.
-                          Nothing animating while a --selector target changes is \`snapped\`
+                          Nothing animating while a --selector target changes is \`snapped\`.
+                          What plays at load ends before the first --click / --hover / --leave
+                          (a leading --wait says when instead)
   --wait <ms>             After an action: let only this long pass before the next one instead
                           of its whole motion — a change of mind mid-motion. "--click .menu-btn
                           --wait 100 --click .menu-btn" lands the second click 100ms into the
@@ -1163,6 +1201,43 @@ async function runAction(page: import("playwright").Page, act: MotionAction): Pr
   }
 }
 
+/**
+ * Elements whose transition lists a custom property that no `@property` rule registers: such a
+ * property has no type, so its transition never interpolates. Read from the stylesheets the page
+ * can read (a cross-origin sheet is skipped, so a property registered there reads unregistered).
+ */
+async function unregisteredTransitions(
+  page: import("playwright").Page,
+): Promise<{ selector: string; property: string }[]> {
+  return page.evaluate(() => {
+    const registered = new Set<string>();
+    const walk = (rules: CSSRuleList) => {
+      for (const r of [...rules]) {
+        if (typeof CSSPropertyRule !== "undefined" && r instanceof CSSPropertyRule) registered.add(r.name);
+        else if ("cssRules" in r) walk((r as CSSGroupingRule).cssRules);
+      }
+    };
+    for (const sheet of [...document.styleSheets]) {
+      try {
+        walk(sheet.cssRules);
+      } catch {}
+    }
+    const out: { selector: string; property: string }[] = [];
+    for (const el of [...document.querySelectorAll("*")]) {
+      const cs = getComputedStyle(el);
+      const durations = cs.transitionDuration.split(",").map((d) => parseFloat(d) || 0);
+      cs.transitionProperty.split(",").forEach((raw, i) => {
+        const prop = raw.trim();
+        if (!prop.startsWith("--") || registered.has(prop) || !(durations[i % durations.length]! > 0)) return;
+        const cls = [...el.classList].map((c) => `.${c}`).join("");
+        out.push({ selector: `${el.localName}${el.id ? `#${el.id}` : ""}${cls}`, property: prop });
+      });
+      if (out.length >= 8) break;
+    }
+    return out;
+  });
+}
+
 async function captureMotion(o: MotionCliOptions): Promise<Captured> {
   const { withBrowser } = await import("@mizchi/vlmkit-core/browser-launch.ts");
   const { sourceToUrl } = await import("@mizchi/vlmkit-core/page-open.ts");
@@ -1289,9 +1364,13 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
             causes.push(
               b.notRendered
                 ? `the action took it out of rendering (${b.hiddenBy?.replace(/^not rendered: /, "") ?? "display: none"}) in the same frame, so no exit animation can be drawn: let it leave first and hide it once it has (on animationend / transitionend), or transition display with transition-behavior: allow-discrete`
-                : paintStep >= 8 && d < 1 && op < 0.05 && (a.discreteBg || b.discreteBg)
-                  ? `only its colour changed, and its transition on background runs between two gradients, which do not interpolate (a gradient is an image: it steps at once). Build the gradient from registered colour properties (@property --c { syntax: "<color>"; … }) and transition those, or cross-fade a second gradient layer's opacity`
-                  : undefined,
+                : a.notRendered
+                  ? // From display: none there is no style to transition from (round 13's Share panel
+                    // read the interpolate-size causes, none of which applied).
+                    `it was not rendered (${a.hiddenBy?.replace(/^not rendered: /, "") ?? "display: none"}) before the action, and a transition from display: none has no style to start from, so it appears at its end state: give the shown state a @starting-style with the values it enters from (@starting-style { .open { opacity: 0; transform: … } }), or play its entrance as a @keyframes animation`
+                  : paintStep >= 8 && d < 1 && op < 0.05 && (a.discreteBg || b.discreteBg)
+                    ? `only its colour changed, and its transition on background runs between two gradients, which do not interpolate (a gradient is an image: it steps at once). Build the gradient from registered colour properties (@property --c { syntax: "<color>"; … }) and transition those, or cross-fade a second gradient layer's opacity`
+                    : undefined,
             );
             return [
               d >= 1 || op >= 0.05
@@ -1358,6 +1437,18 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
           if (zero.length > 0)
             throw new MotionUsageError(
               `no animation runs any time: ${[...new Set(zero)].map((n) => `\`${n}\``).join(", ")} ${zero.length === 1 ? "has" : "have"} a duration of 0s, so ${zero.length === 1 ? "it ends" : "they end"} as ${zero.length === 1 ? "it begins" : "they begin"} and ${zero.length === 1 ? "its" : "their"} fill holds the last keyframe from load. If it is meant to follow the scroll, \`animation-timeline\` has to come after the \`animation\` shorthand, which resets it to auto (and the duration to 0s); otherwise give it a duration`,
+            );
+          // A transition on a custom property nothing registers: it has no type, so it does not
+          // interpolate and the value steps at once (round 13's ring, "it's empty, then it's full").
+          const unregistered = await unregisteredTransitions(page).catch(() => []);
+          if (unregistered.length > 0)
+            throw new MotionUsageError(
+              `no animation or transition on the page${ranTo !== null ? `, at load or after its timers ran (to ${ranTo}ms)` : " at load"}: ${unregistered
+                .slice(0, 3)
+                .map((u) => `${u.selector} transitions ${u.property}`)
+                .join(
+                  ", ",
+                )}, a custom property no @property registers — an unregistered custom property has no type, so it does not interpolate and steps at once. Register it (@property ${unregistered[0]!.property} { syntax: "<percentage>"; inherits: false; initial-value: 0%; }, with the syntax of its values), and the transition runs`,
             );
           throw new MotionUsageError(
             `no animation or transition on the page${ranTo !== null ? `, at load or after its timers ran (to ${ranTo}ms)` : " at load"}: nothing to sample. If one should run, it never starts — check animation lists what does; a misspelt transition-property or animation-name, a transition to height: auto (which needs interpolate-size: allow-keywords), or a class added in the same frame as the style it transitions from, are the usual causes. If a click starts it, give --click <css>. To shoot the page anyway, give --end <ms> (with --start, or --at for the instants)`,
@@ -2281,9 +2372,23 @@ export async function runMotionCli(argv: string[]): Promise<number> {
                   : /direction/.test(flag)
                     ? "direction-mismatch"
                     : "still-mismatch";
-      const held = asked.filter((f) => !failed.has(ruleOf(f)));
+      // A path never fitted (never seen, or under 2px of travel) checked no easing, direction or
+      // origin: "held: --expect-direction up" sat under "travels 0px" on a card that never moved
+      // (round 13).
+      const unfitted = r.targets.every((t) => !("best" in t.easing));
+      const unjudged = (f: string) => unfitted && /easing|direction|origin/.test(f);
+      const held = asked.filter((f) => !failed.has(ruleOf(f)) && !unjudged(f));
+      const skipped = asked.filter((f) => !failed.has(ruleOf(f)) && unjudged(f));
       const at = lines.findIndex((l) => /^ {2}(no fail|\d+ fail)/.test(l));
-      if (held.length > 0) lines.splice(at < 0 ? lines.length : at, 0, `  held: ${held.join(", ")}`);
+      const notes = [
+        ...(held.length > 0 ? [`  held: ${held.join(", ")}`] : []),
+        ...(skipped.length > 0
+          ? [
+              `  not judged: ${skipped.join(", ")} — no path was fitted (see the target's line), so nothing checked ${skipped.length === 1 ? "it" : "them"}`,
+            ]
+          : []),
+      ];
+      if (notes.length > 0) lines.splice(at < 0 ? lines.length : at, 0, ...notes);
     }
     console.log(`${lines.join("\n")}\n  report: ${saved}`);
   }

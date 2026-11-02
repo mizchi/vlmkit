@@ -165,6 +165,8 @@ export interface MotionSample {
      * 255): a ring filling by its conic stop changes no colour (round 13).
      */
     stops?: number[];
+    /** A finished animation's forwards fill still holds what it animated, and why that matters. */
+    heldByFill?: string;
     /** It takes a click at its centre: an invisible target that does sits over what is behind it. */
     catches?: boolean;
     /** An SVG element inside an <svg>: its transform-origin is measured from the viewBox by default. */
@@ -1089,7 +1091,10 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       rule: "target-static",
       severity: "warn",
       atMs: firstMotion.atMs,
-      message: `fully shown from ${ms(firstMotion.atMs)} and moves under ${still}px in every frame: if it is meant to animate, its animation is not applying (a dropped rule, a misspelt animation-name)`,
+      message: `fully shown from ${ms(firstMotion.atMs)} and moves under ${still}px in every frame: if it is meant to animate, ${
+        sorted.find((x) => x.dom?.heldByFill)?.dom?.heldByFill ??
+        "its animation is not applying (a dropped rule, a misspelt animation-name)"
+      }`,
     });
   }
 

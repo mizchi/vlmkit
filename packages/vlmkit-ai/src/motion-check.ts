@@ -63,6 +63,8 @@ export interface MotionDom {
   paint?: number[];
   /** Its gradients' stop positions and angles, on paint's 0-255 scale (100% or a turn is 255). */
   stops?: number[];
+  /** A finished animation's forwards fill still holds what it animated, and why that matters. */
+  heldByFill?: string;
   /** Its transition on background runs over a gradient (which steps: gradients do not interpolate). */
   discreteBg?: boolean;
   /** It takes a click at its centre as the page is. */

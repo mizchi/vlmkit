@@ -446,6 +446,47 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
     },
   );
 
+  // Round 13's agents: each broken page names its cause, and a correct close is seen.
+  it(
+    "names @starting-style, a forwards fill under :hover and an unregistered custom property",
+    { timeout: 300_000 },
+    async () => {
+      const open = await run("broken/popin.html", ["--selector", ".panel", "--click", ".share-btn"]);
+      assert.equal(open.code, 1, open.out);
+      assert.match(
+        open.out,
+        /FAIL snapped: .*it was not rendered \(it is display: none\) before the action.*@starting-style/,
+      );
+      const close = await run("reference/popin.html", [
+        "--selector",
+        ".panel",
+        "--click",
+        ".share-btn",
+        "--click",
+        ".share-btn",
+        "--exits",
+      ]);
+      assert.equal(close.code, 0, close.out);
+      assert.match(close.out, /travels 8px upwards/);
+      const lift = await run("broken/rise.html", ["--selector", "#p2", "--hover", "#p2", "--expect-direction", "up"]);
+      assert.match(
+        lift.out,
+        /warn target-static .*`rise` ended with animation-fill-mode: both and still holds opacity, transform/,
+      );
+      assert.match(lift.out, /not judged: --expect-direction up/);
+      assert.doesNotMatch(lift.out, /held: --expect-direction/);
+      const errors: string[] = [];
+      const error = console.error;
+      console.error = (m: string) => errors.push(m);
+      try {
+        assert.equal((await run("broken/ring.html", ["--selector", ".ring"])).code, 2);
+      } finally {
+        console.error = error;
+      }
+      assert.match(errors.join("\n"), /div\.ring\.filled transitions --p, a custom property no @property registers/);
+    },
+  );
+
   it("samples the hold between two segments", () => {
     const plan = motionPlan([
       { startMs: 300, durationMs: 360, iterations: 1 },
