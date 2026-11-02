@@ -1061,6 +1061,18 @@ test("a transition on an unregistered custom property raises unregistered-proper
   assert.match(issues[0]!.message, /div\.ring transitions `--p`, a custom property no @property registers/);
 });
 
+test("an animation moving left on a static box raises inert-offset-animation (round 14)", () => {
+  const issues = deriveAnimationIssues({
+    evaluated: [],
+    settleMs: 0,
+    infinite: [],
+    unknownTransitions: [{ selector: "div.notice", name: "nudge-in", inertOffsets: ["left"] }],
+  });
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0]!.kind, "inert-offset-animation");
+  assert.match(issues[0]!.message, /div\.notice `nudge-in` animates left, but the element is position: static/);
+});
+
 test("a timer-started animation's start is the window between two sweep instants (round 13)", () => {
   assert.match(
     clockMotionSource({

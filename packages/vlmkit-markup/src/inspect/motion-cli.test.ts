@@ -220,6 +220,23 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
       ["--selector", ".toast", "--exits", "--expect-easing", "ease-out,ease-in"],
       /FAIL snap-back .*in the hold after 660ms/,
     ],
+    // Round 14: a bubble whose visibility flips before its fade-out, a card whose rotate comes
+    // before its translate, and a notice animating left on a static box.
+    [
+      "hint.html",
+      ["--selector", ".bubble", "--hover", ".help", "--leave", "--exits"],
+      /FAIL hidden-at-once .*shown before --leave .*visibility changes at once/,
+    ],
+    [
+      "ticket.html",
+      ["--selector", ".ticket", "--expect-direction", "right"],
+      /travels 200px rightwards \(and 68px upwards\)[\s\S]*FAIL direction-mismatch .*68px upwards on the way .*put the translate first/,
+    ],
+    [
+      "nudge.html",
+      ["--selector", ".notice", "--expect-direction", "right"],
+      /FAIL direction-mismatch .*it does not move .*`nudge-in` animates left, but the element is position: static/,
+    ],
     // Round 12: an SVG gear turning about its viewBox's centre, and a button whose label wraps
     // while its width eases.
     [
@@ -476,7 +493,11 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
         lift.out,
         /warn target-static .*`rise` ended with animation-fill-mode: both and still holds opacity, transform/,
       );
-      assert.match(lift.out, /not judged: --expect-direction up/);
+      // Expected to go up and it does not move: a fail since round 14, naming the fill.
+      assert.match(
+        lift.out,
+        /FAIL direction-mismatch .*it does not move .*`rise` ended with animation-fill-mode: both/,
+      );
       assert.doesNotMatch(lift.out, /held: --expect-direction/);
       const errors: string[] = [];
       const error = console.error;

@@ -129,6 +129,24 @@ export async function measureTargets(
           heldByFill = `\`${name}\` ended with animation-fill-mode: ${fill} and still holds ${props.join(", ")}: an animation's held value outranks every rule, so a :hover or class that sets ${props.length === 1 ? "it" : "them"} (and its transition) never applies — fill it backwards (it holds its from pose through its delay), or animate the separate translate / scale property`;
           break;
         }
+        // Offsets animated on a box that is position: static do nothing: a notice meant to slide in
+        // from the left animated `left` and only faded (round 14).
+        let inertOffsets: string | undefined;
+        if (getComputedStyle(el).position === "static")
+          for (const a of el.getAnimations()) {
+            const kf = (a.effect as KeyframeEffect | null)?.getKeyframes?.() ?? [];
+            const props = [
+              ...new Set(kf.flatMap((k) => Object.keys(k).filter((p) => /^(top|left|right|bottom|inset)/.test(p)))),
+            ];
+            const tp = (a as CSSTransition).transitionProperty;
+            if (tp && /^(top|left|right|bottom|inset)/.test(tp)) props.push(tp);
+            if (props.length === 0) continue;
+            const name = (a as CSSAnimation).animationName
+              ? `\`${(a as CSSAnimation).animationName}\``
+              : "its transition";
+            inertOffsets = `${name} animates ${props.join(", ")}, but the element is position: static, where ${props.length === 1 ? "that offset does" : "offsets do"} nothing — give it position: relative, or animate transform: translate() (or translate) instead`;
+            break;
+          }
         for (const a of live.length > 0 ? live : owned) {
           const c = a.effect?.getComputedTiming();
           const d = Number(c?.duration);
@@ -490,6 +508,7 @@ export async function measureTargets(
           ...(shadow.length > 0 ? { shadow } : {}),
           ...(sweepDeg !== undefined ? { sweepDeg } : {}),
           shift,
+          ...(inertOffsets ? { inertOffsets } : {}),
           ...(heldByFill ? { heldByFill } : {}),
           ...(discreteBg ? { discreteBg: true } : {}),
           ...(el instanceof SVGElement && !(el instanceof SVGSVGElement) ? { svg: true } : {}),
@@ -541,6 +560,7 @@ each forbidden statement is. vlmkit judges the motion from that:
   invisible-blocker at rest it is transparent and still takes clicks at its centre
   size-jump        its width or height steps in one frame while it eases (its text re-wrapping)
   turn-off-centre  it turns and its centre is carried round: another transform-origin (warn)
+  inert-offset     its animation moves top / left on a position: static box, where they do nothing (warn)
   channel-step     a colour, gradient or shadow changes all at once between two frames (fail in
                    one frame; warn when the frames are too far apart to tell)
   replayed         after rest, as the page's timers run (up to 10s), it is replaced by a new element that
@@ -1206,6 +1226,8 @@ interface Captured {
   forever?: boolean;
   /** The last action cut into the motion before it: the targets as they were just before it. */
   interrupt?: { atMs: number; action: string; before: (MotionDom | null)[] };
+  /** The --selector targets just before the last action, and that action. */
+  beforeLast?: { action: string; targets: (MotionDom | null)[] };
   /** The page's scroll position across the frames shot, when it moved (a clamp at the page's end). */
   scrolled?: { from: number; to: number };
   /**
@@ -1297,6 +1319,7 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
       let heldBefore = held.length;
       // The last action landed while the one before was still moving: its targets just before it.
       let interrupt: Captured["interrupt"];
+      let lastBefore: Captured["beforeLast"];
       if (o.actions.length > 0) {
         let beforeClick: Awaited<ReturnType<typeof measureTargets>> = [];
         const scrolled = () => page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }));
@@ -1336,6 +1359,7 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
         for (const [k, { act, waitAfter }] of steps.entries()) {
           if (k === steps.length - 1) {
             beforeClick = o.selectors.length > 0 ? await measureTargets(page, o.selectors) : [];
+            lastBefore = { action: describeAction(act), targets: beforeClick };
             scrollBefore = await scrolled();
             heldBefore = held.length;
             if (k > 0 && steps[k - 1]!.waitAfter !== undefined)
@@ -1784,6 +1808,7 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
         ...(replays.length > 0 ? { replays } : {}),
         ...(forever ? { forever: true } : {}),
         ...(interrupt ? { interrupt } : {}),
+        ...(lastBefore ? { beforeLast: lastBefore } : {}),
         ...(scrollYs.length > 1 && Math.max(...scrollYs) - Math.min(...scrollYs) >= 1
           ? { scrolled: { from: scrollYs[0]!, to: scrollYs[scrollYs.length - 1]! } }
           : {}),
@@ -1850,6 +1875,19 @@ async function readFrames(o: MotionCliOptions): Promise<Captured> {
   const startMs = o.startMs ?? frames[0]?.atMs ?? 0;
   const files = new Map(manifest.frames.map((f) => [f.atMs, join(dirname(path), f.file)]));
   return { frames, startMs, endMs: o.endMs!, segments: [{ startMs, endMs: o.endMs! }], manifest: path, files };
+}
+
+/**
+ * The part of a path across its way: "travels 200px rightwards" read as a straight slide for a
+ * card that came in 20° off, 68px upwards on the way (round 14).
+ */
+function acrossText(d: { way: string; from: { x: number; y: number }; to: { x: number; y: number } }): string {
+  const horizontal = d.way === "left" || d.way === "right";
+  const along = Math.abs(horizontal ? d.to.x - d.from.x : d.to.y - d.from.y);
+  const across = horizontal ? d.to.y - d.from.y : d.to.x - d.from.x;
+  if (Math.abs(across) < Math.max(4, along * 0.15)) return "";
+  const side = horizontal ? (across < 0 ? "upwards" : "downwards") : across < 0 ? "leftwards" : "rightwards";
+  return ` (and ${Math.round(Math.abs(across))}px ${side})`;
 }
 
 export function formatMotionReport(
@@ -1921,7 +1959,7 @@ export function formatMotionReport(
     );
     if (t.segments.length <= 1) {
       lines.push(
-        `  target ${JSON.stringify(t.target)}${begins(t)}: travels ${Math.round(t.travelPx)}px${t.segments[0]?.direction ? ` ${t.segments[0].direction.way}wards` : ""} over the frames measured${
+        `  target ${JSON.stringify(t.target)}${begins(t)}: travels ${Math.round(t.travelPx)}px${t.segments[0]?.direction ? ` ${t.segments[0].direction.way}wards${acrossText(t.segments[0].direction)}` : ""} over the frames measured${
           // A gear orbiting back to its start read "travels 0px" (round 12).
           t.excursionPx !== undefined && t.excursionPx >= Math.max(4, t.travelPx * 2)
             ? ` (ending where it began; ${Math.round(t.excursionPx)}px away at most, between)`
@@ -2354,6 +2392,25 @@ export async function runMotionCli(argv: string[]): Promise<number> {
       : {}),
     ...(captured.layoutMovers ? { layoutMovers: captured.layoutMovers } : {}),
   });
+  // Shown just before the last action and hidden from its first frame on: not "never seen". A help
+  // bubble whose visibility flipped at once as the pointer left read target-hidden, "never seen
+  // in any frame", while it had been on screen through the hover (round 14).
+  for (const [i, t] of r.targets.entries()) {
+    const before = captured.beforeLast?.targets[i];
+    if (!before || before.notRendered || before.opacity < 0.5 || (before.visible ?? 0) < 0.5) continue;
+    const hidden = t.findings.find((f) => f.rule === "target-hidden");
+    if (!hidden) continue;
+    const vis = /visibility: hidden/.test(hidden.message);
+    t.findings = t.findings.map((f) =>
+      f !== hidden
+        ? f
+        : {
+            ...f,
+            rule: "hidden-at-once" as typeof f.rule,
+            message: `shown before ${captured.beforeLast!.action} (opacity ${before.opacity.toFixed(2)}), and hidden from the first frame after it, so no exit is seen${hidden.message.includes(" — ") ? ` — ${hidden.message.split(" — ").slice(1).join(" — ")}` : ""}${vis ? `: visibility changes at once (it is discrete) while the opacity transition runs underneath it — list it in the transition (transition: opacity 200ms, visibility 200ms) so it stays visible until the fade ends` : ""}`,
+          },
+    );
+  }
   const jumps = [
     ...interruptJumps(captured, o.selectors),
     ...(captured.seams ?? []).map((s) => ({ ...s, rule: "loop-seam" })),
@@ -2445,7 +2502,13 @@ export async function runMotionCli(argv: string[]): Promise<number> {
           !("best" in t.easing) ||
           !(t.easing.channels ?? []).some((c) => ["position", "turn", "gradient"].includes(c.channel)),
       );
-      const unjudged = (f: string) => (unfitted && /easing/.test(f)) || (pathless && /direction|origin/.test(f));
+      // Never seen at all: nothing was checked, not even its timing ("held: --expect-duration 200ms"
+      // beside "never seen in any frame", round 14).
+      const unseen = r.targets.every((t) =>
+        t.findings.some((f) => f.rule === "target-hidden" || (f.rule as string) === "hidden-at-once"),
+      );
+      const unjudged = (f: string) =>
+        unseen || (unfitted && /easing/.test(f)) || (pathless && /direction|origin/.test(f));
       const held = asked.filter((f) => !failed.has(ruleOf(f)) && !unjudged(f));
       const skipped = asked.filter((f) => !failed.has(ruleOf(f)) && unjudged(f));
       const at = lines.findIndex((l) => /^ {2}(no fail|\d+ fail)/.test(l));
@@ -2453,7 +2516,7 @@ export async function runMotionCli(argv: string[]): Promise<number> {
         ...(held.length > 0 ? [`  held: ${held.join(", ")}`] : []),
         ...(skipped.length > 0
           ? [
-              `  not judged: ${skipped.join(", ")} — no path was fitted (see the target's line), so nothing checked ${skipped.length === 1 ? "it" : "them"}`,
+              `  not judged: ${skipped.join(", ")} — ${unseen ? "the target was not seen in any frame" : "no path was fitted (see the target's line)"}, so nothing checked ${skipped.length === 1 ? "it" : "them"}`,
             ]
           : []),
       ];

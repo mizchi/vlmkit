@@ -286,7 +286,9 @@ vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ea
   and a snap-back after it is the fail. Without the flag, each target's
   line still says `begins at …, runs …ms x3` / `and repeats forever`. Which way: "glides in
   from beyond the right edge" moves left — `--expect-direction left`
-  (every line says `travels 360px leftwards`). Motion a click starts:
+  (every line says `travels 360px leftwards`); it also fails a path more
+  than 10° off that axis ("slides straight across" that swoops up), and a
+  target expected to move that does not move at all. Motion a click starts:
   `--click <css>` (repeat for several) clicks on the held page first;
   if nothing animates and a `--selector` target changes anyway, that
   is `snapped` — the usual cause is a transition to `height: auto`,

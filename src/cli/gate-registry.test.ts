@@ -272,7 +272,9 @@ describe("composed built-in registry", () => {
     // shorthand reset its animation-timeline, and it sat full from load (round 12).
     // 228 → 229: `check animation` / `unregistered-property-transition` (suspect) — a usage ring's
     // `transition: --p` on a custom property nothing registers stepped at once (round 13).
-    assert.equal(total, 229);
+    // 229 → 230: `check animation` / `inert-offset-animation` (suspect) — a notice animating `left`
+    // on a static box only faded (round 14).
+    assert.equal(total, 230);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {

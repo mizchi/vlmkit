@@ -103,6 +103,12 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       docs: "A misspelt property (`widht`) computes as itself and its transition never runs: the property it meant changes in one frame, and with no animation on the page nothing else reports it.",
     },
     {
+      id: "inert-offset-animation",
+      title: "An animation moves top / left on a position: static box",
+      severity: "suspect",
+      docs: "Offsets do nothing on a static box, so a keyframe `left: -360px` never moves it: the rest of the animation (a fade) still shows and reads as visible. Give it position: relative, or animate transform: translate().",
+    },
+    {
       id: "unregistered-property-transition",
       title: "A transition on a custom property no @property registers",
       severity: "suspect",

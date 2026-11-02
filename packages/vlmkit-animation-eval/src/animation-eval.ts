@@ -268,6 +268,7 @@ export type AnimationEvalIssueKind =
   | "delayed-entrance"
   | "unknown-transition-property"
   | "unregistered-property-transition"
+  | "inert-offset-animation"
   | "reduced-motion-hides"
   | "layout-animation"
   | "loop-seam"
@@ -519,7 +520,7 @@ export interface DeriveIssuesInput {
   clockMotion?: ClockMotion;
   undefinedKeyframes?: { selector: string; name: string; reducedMotion: boolean }[];
   /** transition-property names no CSS property, with a duration over 0. */
-  unknownTransitions?: { selector: string; name: string; unregistered?: boolean }[];
+  unknownTransitions?: { selector: string; name: string; unregistered?: boolean; inertOffsets?: string[] }[];
   /** CSS animations with no duration: they end as they begin. */
   zeroDuration?: { selector: string; name: string }[];
   /** A transition on background over a gradient, which does not interpolate. */
@@ -639,6 +640,15 @@ export function deriveAnimationIssues(
   }
 
   for (const u of input.unknownTransitions ?? []) {
+    if (u.inertOffsets) {
+      issues.push({
+        kind: "inert-offset-animation",
+        severity: "suspect",
+        selector: u.selector,
+        message: `${u.selector} \`${u.name}\` animates ${u.inertOffsets.join(", ")}, but the element is position: static, where ${u.inertOffsets.length === 1 ? "that offset does" : "offsets do"} nothing: whatever else the animation does still shows, and the move it meant never happens. Give it position: relative, or animate transform: translate() (or translate) instead.`,
+      });
+      continue;
+    }
     if (u.unregistered) {
       issues.push({
         kind: "unregistered-property-transition",
@@ -1134,6 +1144,20 @@ ${ANIMATION_HELPERS_JS}
   }
   for (const el of document.querySelectorAll("*")) {
     const cs = getComputedStyle(el);
+    // An offset animated on a static box does nothing: a notice meant to slide in animated
+    // \`left\` and only faded, and \`check animation\` read it "visible" (round 14).
+    if (cs.position === "static" && out.length < 8) {
+      for (const a of el.getAnimations()) {
+        const kf = (a.effect && a.effect.getKeyframes) ? a.effect.getKeyframes() : [];
+        const offs = [...new Set(kf.flatMap((k) => Object.keys(k).filter((p) => /^(top|left|right|bottom|inset)/.test(p))))];
+        if (offs.length === 0) continue;
+        const selector = stableSelector(el);
+        const key = selector + "\u0000" + (a.animationName || "");
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ selector, name: a.animationName || "an animation", inertOffsets: offs });
+      }
+    }
     const props = cs.transitionProperty.split(",").map((p) => p.trim());
     const durations = cs.transitionDuration.split(",").map((d) => parseFloat(d) || 0);
     props.forEach((name, i) => {

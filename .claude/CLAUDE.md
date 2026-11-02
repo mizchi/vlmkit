@@ -428,6 +428,17 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   is at its own time 1, not the segment's clock; `--at` alone shoots a still page;
   `check animation`'s `unregistered-property-transition` (suspect, 229 rules) and a timer-started
   animation's start as a window between sweep instants.
+- **A fade-out hidden by visibility, a rotate before its translate, an offset on a static box**
+  (round 14, `docs/reports/2026-11-02-motion-repair-v14.md`). The targets are measured before the last
+  action, and one shown then and hidden from the next frame is `hidden-at-once` (naming `visibility`
+  left out of the transition), not "never seen"; `--expect-direction` fails a path more than 10° off
+  its axis (naming the transform order when it turns too) and a target that does not move; the target
+  line gives the path's part across its way (`rightwards (and 68px upwards)`); an own animation moving
+  `left` / `top` on a `position: static` box is `inert-offset` (warn) and the cause in a direction
+  fail, and `check animation`'s `inert-offset-animation` (suspect, 230 rules); `turn-off-centre` leaves
+  out a centre the target's own translate explains; when no target is seen every `--expect-*` is not
+  judged. The oracle replays an entrance before sampling: a `backwards` fill leaves a finished
+  animation off its element and out of `getAnimations()`.
 
 ## Generated figures (raster images)
 
@@ -1794,7 +1805,7 @@ case at 0.23.0.
 | `docs/reports/2026-08-06-gate-rule-cost-bench.md` | Measured gate/rule execution cost: where a ruleset's time goes, why per-rule cost is attributed rather than isolated, why suppression saves nothing |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
 | `docs/design/package-decomposition.md` | **Splitting vlmkit by layer** (collector / pure judge / driver / loop / diagrams): what was measured, phase 1 (`vlmkit-judge`) and the proposed phases 2-5 |
-| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 35 gates + 229 rules, behavior changes, what is deliberately not a gate |
+| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 35 gates + 230 rules, behavior changes, what is deliberately not a gate |
 | `docs/design/moonbit-boundary.md` | **TS ↔ MoonBit boundary**: what the positional FFI costs (61 commands, 233 args, 2 duplicated dispatch tables), the JSON boundary that replaces it for new logic, how to add a command, and which pure logic belongs in MoonBit versus which deliberately does not |
 | `docs/crater-css-status.md` | Crater CSS rendering verification status |
 | `docs/reset-css-comparison.md` | Reset CSS domain knowledge |

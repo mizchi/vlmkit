@@ -69,6 +69,8 @@ export interface MotionDom {
   sweepDeg?: number;
   /** Its own transform's translation (px): what carries its centre when it slides. */
   shift?: number[];
+  /** Its own animation offsets a box that is position: static, where top / left do nothing. */
+  inertOffsets?: string;
   /** A finished animation's forwards fill still holds what it animated, and why that matters. */
   heldByFill?: string;
   /** Its transition on background runs over a gradient (which steps: gradients do not interpolate). */

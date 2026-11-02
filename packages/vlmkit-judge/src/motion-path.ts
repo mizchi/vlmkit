@@ -171,6 +171,8 @@ export interface MotionSample {
     sweepDeg?: number;
     /** Its own transform's translation (px): what carries its centre when it slides. */
     shift?: number[];
+    /** Its own animation offsets a box that is position: static, where top / left do nothing. */
+    inertOffsets?: string;
     /** A finished animation's forwards fill still holds what it animated, and why that matters. */
     heldByFill?: string;
     /** It takes a click at its centre: an invisible target that does sits over what is behind it. */
@@ -299,7 +301,9 @@ export type MotionRule =
   | "invisible-blocker"
   | "size-jump"
   | "turn-off-centre"
-  | "channel-step";
+  | "channel-step"
+  | "inert-offset"
+  | "hidden-at-once";
 
 export interface MotionFinding {
   rule: MotionRule;
@@ -842,6 +846,61 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         message: `it moves ${towards(direction.way)} (centre ${Math.round(direction.from.x)},${Math.round(direction.from.y)} → ${Math.round(direction.to.x)},${Math.round(direction.to.y)}), not ${towards(options.expectDirection)}: where it starts is its first keyframe's (a translate with the wrong sign is the usual cause)`,
       });
     }
+    // The right way, but not straight: a card meant to slide across came in 20° off, swooping up
+    // 68px, and "--expect-direction right" held (round 14). Off the axis by more than tan 10°.
+    if (
+      k === 0 &&
+      options.expectDirection &&
+      !isTurnWay(options.expectDirection) &&
+      direction &&
+      direction.way === options.expectDirection
+    ) {
+      const horizontal = options.expectDirection === "left" || options.expectDirection === "right";
+      const along = Math.abs(horizontal ? direction.to.x - direction.from.x : direction.to.y - direction.from.y);
+      const across = horizontal ? direction.to.y - direction.from.y : direction.to.x - direction.from.x;
+      if (Math.abs(across) >= Math.max(4, along * Math.tan((10 * Math.PI) / 180))) {
+        const side = horizontal ? (across < 0 ? "upwards" : "downwards") : across < 0 ? "leftwards" : "rightwards";
+        const deg = Math.round((Math.atan2(Math.abs(across), along) * 180) / Math.PI);
+        const turnsToo = sorted.some((x) => Math.abs(x.dom?.turnDeg ?? 0) > 2);
+        findings.push({
+          rule: "direction-mismatch",
+          severity: "fail",
+          atMs: seg.startMs,
+          message: `it moves ${towards(direction.way)}, and ${Math.round(Math.abs(across))}px ${side} on the way (centre ${Math.round(direction.from.x)},${Math.round(direction.from.y)} → ${Math.round(direction.to.x)},${Math.round(direction.to.y)}, ${deg}° off ${horizontal ? "horizontal" : "vertical"}): it does not travel straight ${towards(options.expectDirection)}${turnsToo ? ". It turns as well, and a transform list applies right to left: a rotate() written before the translate() turns the translation with it — put the translate first" : ": its first keyframe's translate has a component across the way it should go"}`,
+        });
+      }
+    }
+    // Offsets animated on a static box, whatever was expected: the notice faded, so it was not
+    // static, and nothing reported the slide that never happened (round 14).
+    const inertHere = sorted.find((x) => x.dom?.inertOffsets)?.dom?.inertOffsets;
+    if (k === 0 && inertHere && travelPx < floor && !options.expectDirection)
+      findings.push({
+        rule: "inert-offset",
+        severity: "warn",
+        atMs: seg.startMs,
+        message: `it travels ${Math.round(travelPx)}px: ${inertHere}`,
+      });
+    // A way expected and no path at all: "slides in from the left" moved 0px and read "not judged",
+    // with no fail (round 14's notice, whose keyframes animated left on a static box).
+    if (
+      k === 0 &&
+      options.expectDirection &&
+      !isTurnWay(options.expectDirection) &&
+      !direction &&
+      travelPx < floor &&
+      frames.length >= 2 &&
+      sorted.some((x) => x.present >= thr)
+    ) {
+      const inert =
+        sorted.find((x) => x.dom?.inertOffsets)?.dom?.inertOffsets ??
+        sorted.find((x) => x.dom?.heldByFill)?.dom?.heldByFill;
+      findings.push({
+        rule: "direction-mismatch",
+        severity: "fail",
+        atMs: seg.startMs,
+        message: `it does not move (travels ${Math.round(travelPx)}px), so it does not go ${towards(options.expectDirection)}${inert ? `: ${inert}` : ": whatever was meant to move it is not applying"}`,
+      });
+    }
     return { ...seg, travelPx, easing, ...(origin ? { origin } : {}), ...(direction ? { direction } : {}) };
   });
   if (options.expectOrigin && !reports.some((x) => x.origin)) {
@@ -1162,6 +1221,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       atMs: firstMotion.atMs,
       message: `fully shown from ${ms(firstMotion.atMs)} and moves under ${still}px in every frame: if it is meant to animate, ${
         sorted.find((x) => x.dom?.heldByFill)?.dom?.heldByFill ??
+        sorted.find((x) => x.dom?.inertOffsets)?.dom?.inertOffsets ??
         "its animation is not applying (a dropped rule, a misspelt animation-name)"
       }`,
     });
