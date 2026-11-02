@@ -188,7 +188,9 @@ export interface ClockMotion {
     selector: string;
     name: string;
     kind: "transition" | "animation";
+    /** The sweep instant it was first seen at; `afterMs` is the instant before it, when it was not. */
     atMs: number;
+    afterMs?: number;
     durationMs?: number;
   }>;
   /**
@@ -214,13 +216,23 @@ export function clockUpdatesOnly(clock: Pick<ClockMotion, "runs" | "started" | "
   return r.timers > 0 && r.timers <= 5 * Math.max(1, clock.windowMs / 1000);
 }
 
+/**
+ * When a timer-started animation began, as far as the sweep's instants can say: "at 250ms" read
+ * as the start of a transition a timer began at 200ms (round 13), when 250 was only the first
+ * instant after it.
+ */
+const beganText = (s: { atMs: number; afterMs?: number }) =>
+  s.afterMs !== undefined && s.atMs - s.afterMs > 1000 / 60 + 1e-6
+    ? `between ${s.afterMs}ms and ${s.atMs}ms`
+    : `at ${s.atMs}ms`;
+
 /** Pure: what a clock sweep's motion is, named as far as the page let it be. */
 export function clockMotionSource(clock: Pick<ClockMotion, "started">): string {
   const started = clock.started ?? [];
   if (started.length === 0) return "requestAnimationFrame / timers";
   const named = started
     .slice(0, 3)
-    .map((s) => `${s.kind} \`${s.name}\` on ${s.selector} (begun at ${s.atMs}ms)`)
+    .map((s) => `${s.kind} \`${s.name}\` on ${s.selector} (begun ${beganText(s)})`)
     .join(", ");
   return `a timer started ${named}${started.length > 3 ? ` and ${started.length - 3} more` : ""}`;
 }
@@ -255,6 +267,7 @@ export type AnimationEvalIssueKind =
   | "motion-mostly-hidden"
   | "delayed-entrance"
   | "unknown-transition-property"
+  | "unregistered-property-transition"
   | "reduced-motion-hides"
   | "layout-animation"
   | "loop-seam"
@@ -506,7 +519,7 @@ export interface DeriveIssuesInput {
   clockMotion?: ClockMotion;
   undefinedKeyframes?: { selector: string; name: string; reducedMotion: boolean }[];
   /** transition-property names no CSS property, with a duration over 0. */
-  unknownTransitions?: { selector: string; name: string }[];
+  unknownTransitions?: { selector: string; name: string; unregistered?: boolean }[];
   /** CSS animations with no duration: they end as they begin. */
   zeroDuration?: { selector: string; name: string }[];
   /** A transition on background over a gradient, which does not interpolate. */
@@ -626,6 +639,15 @@ export function deriveAnimationIssues(
   }
 
   for (const u of input.unknownTransitions ?? []) {
+    if (u.unregistered) {
+      issues.push({
+        kind: "unregistered-property-transition",
+        severity: "suspect",
+        selector: u.selector,
+        message: `${u.selector} transitions \`${u.name}\`, a custom property no @property registers: an unregistered custom property has no type, so it does not interpolate and whatever it drives (a gradient stop, a width through calc()) changes in one frame. Register it — @property ${u.name} { syntax: "<percentage>"; inherits: false; initial-value: 0%; }, with the syntax of its values — and the transition runs.`,
+      });
+      continue;
+    }
     issues.push({
       kind: "unknown-transition-property",
       severity: "suspect",
@@ -1098,13 +1120,33 @@ const UNKNOWN_TRANSITION_PROPERTY_SCRIPT = `(() => {
 ${ANIMATION_HELPERS_JS}
   const out = [];
   const seen = new Set();
+  // Custom properties an @property rule registers (in the sheets the page can read): only those
+  // have a type, and a transition on any other one steps at once (round 13's ring).
+  const registered = new Set();
+  const walk = (rules) => {
+    for (const r of rules) {
+      if (typeof CSSPropertyRule !== "undefined" && r instanceof CSSPropertyRule) registered.add(r.name);
+      else if (r.cssRules) walk(r.cssRules);
+    }
+  };
+  for (const sheet of document.styleSheets) {
+    try { walk(sheet.cssRules); } catch {}
+  }
   for (const el of document.querySelectorAll("*")) {
     const cs = getComputedStyle(el);
     const props = cs.transitionProperty.split(",").map((p) => p.trim());
     const durations = cs.transitionDuration.split(",").map((d) => parseFloat(d) || 0);
     props.forEach((name, i) => {
-      if (!name || name === "all" || name === "none" || name.startsWith("--")) return;
+      if (!name || name === "all" || name === "none") return;
       if (!(durations[i % durations.length] > 0)) return;
+      if (name.startsWith("--")) {
+        if (registered.has(name)) return;
+        const selector = stableSelector(el);
+        if (seen.has(selector + "\u0000" + name) || out.length >= 8) return;
+        seen.add(selector + "\u0000" + name);
+        out.push({ selector, name, unregistered: true });
+        return;
+      }
       if (CSS.supports(name, "initial")) return;
       const selector = stableSelector(el);
       if (seen.has(selector + "\\u0000" + name) || out.length >= 8) return;
@@ -1423,6 +1465,7 @@ async function sampleClock(
   const known = new Set((await listStarted().catch(() => [])).map((a) => a.key));
   const started: NonNullable<ClockMotion["started"]> = [];
   const replays = new Map<string, { selector: string; name: string; atMs: number[]; newElement: boolean }>();
+  let prevT = 0;
   for (const t of times) {
     await advanceClock(page, t);
     for (const a of await listStarted().catch(() => [])) {
@@ -1440,9 +1483,11 @@ async function sampleClock(
         name: a.name,
         kind: a.kind,
         atMs: t,
+        afterMs: prevT,
         ...(a.durationMs !== null ? { durationMs: a.durationMs } : {}),
       });
     }
+    prevT = t;
     const frame = await shot(`${label}-${t}ms`);
     const delta = frameDelta(previous, frame, tolerance);
     frames.push(delta);
@@ -2074,7 +2119,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
           // it "requestAnimationFrame / timers" sent round 7's agents looking for a loop.
           for (const st of rmClock.started!)
             remaining.push({
-              selector: `${st.selector} (a ${st.kind} a timer started at ${st.atMs}ms)`,
+              selector: `${st.selector} (a ${st.kind} a timer started ${beganText(st)})`,
               name: st.name,
               // Its own duration: "shrink 500ms" was the clock window for a 300ms animation (round 9).
               durationMs: st.durationMs ?? lasted,
@@ -2207,7 +2252,11 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
           ? `script-driven change${where}: a timer updates it in place (${c.runs!.timers} run(s), no animation frame) — not motion${ruleTag("clock-motion-unsettled")}`
           : c.settledAtMs === null
             ? `script-driven motion${where}: still moving at ${c.windowMs}ms of virtual time${ruleTag("clock-motion-unsettled")}`
-            : `script-driven motion${where}: settles by ${c.settledAtMs}ms of virtual time${ruleTag("long-settle")}`,
+            : `script-driven motion${where}: settles by ${c.settledAtMs}ms of virtual time${ruleTag("long-settle")}${
+                (c.started ?? []).some((st) => (st.durationMs ?? 0) > 0)
+                  ? ` — the sweep's own frames only: what the timer started runs ${Math.max(...c.started!.map((st) => st.durationMs ?? 0))}ms on its own clock, so measure it with \`vlmkit inspect motion <page> --selector <el>\``
+                  : ""
+              }`,
     );
     if (c.visible && (c.started ?? []).length > 0)
       lines.push(`${DIM}  not a requestAnimationFrame loop: ${clockMotionSource(c)}${RESET}`);

@@ -4,6 +4,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  clockMotionSource,
   computeOscillation,
   computeSettleMs,
   deriveAnimationIssues,
@@ -1045,6 +1046,32 @@ test("a transition-property that is no CSS property raises unknown-transition-pr
   assert.equal(issues[0]!.kind, "unknown-transition-property");
   assert.equal(issues[0]!.severity, "suspect");
   assert.match(issues[0]!.message, /div\.bar transitions `widht`, which is no CSS property/);
+});
+
+test("a transition on an unregistered custom property raises unregistered-property-transition (round 13)", () => {
+  const issues = deriveAnimationIssues({
+    evaluated: [],
+    settleMs: 0,
+    infinite: [],
+    unknownTransitions: [{ selector: "div.ring", name: "--p", unregistered: true }],
+  });
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0]!.kind, "unregistered-property-transition");
+  assert.equal(issues[0]!.severity, "suspect");
+  assert.match(issues[0]!.message, /div\.ring transitions `--p`, a custom property no @property registers/);
+});
+
+test("a timer-started animation's start is the window between two sweep instants (round 13)", () => {
+  assert.match(
+    clockMotionSource({
+      started: [{ selector: "div.ring", name: "--p", kind: "transition", atMs: 250, afterMs: 125 }],
+    }),
+    /\(begun between 125ms and 250ms\)/,
+  );
+  assert.match(
+    clockMotionSource({ started: [{ selector: "div.ring", name: "--p", kind: "transition", atMs: 250 }] }),
+    /\(begun at 250ms\)/,
+  );
 });
 
 test(

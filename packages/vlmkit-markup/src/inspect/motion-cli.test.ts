@@ -483,9 +483,60 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
       } finally {
         console.error = error;
       }
-      assert.match(errors.join("\n"), /div\.ring\.filled transitions --p, a custom property no @property registers/);
+      assert.match(errors.join("\n"), /div\.ring(\.filled)? transitions --p, a custom property no @property registers/);
     },
   );
+
+  // Round 13's deferred items.
+  it("steps, sweeps, shadows, the action sampled and own time past the end", { timeout: 400_000 }, async () => {
+    const step = await run("broken/ring.html", ["--selector", ".ring", "--at", "150..300/1f"]);
+    assert.equal(step.code, 1, step.out);
+    assert.match(step.out, /FAIL channel-step at 200ms: its gradient steps between 183ms and 200ms, in one frame/);
+    const coarse = await run("broken/ring.html", ["--selector", ".ring", "--end", "1500"]);
+    assert.match(coarse.out, /warn channel-step .*two frames 150ms apart/);
+    assert.doesNotMatch(coarse.out, /follows overshoot/);
+    const sweep = await run("reference/ring.html", ["--selector", ".ring", "--expect-direction", "clockwise"]);
+    assert.equal(sweep.code, 0, sweep.out);
+    assert.match(sweep.out, /its conic arc sweeps clockwise \d+°[\s\S]*held: --expect-direction clockwise/);
+    const back = await run("reference/ring.html", ["--selector", ".ring", "--expect-direction", "counterclockwise"]);
+    assert.match(back.out, /FAIL direction-mismatch .*its conic arc sweeps clockwise/);
+    const shadow = await run("broken/rise.html", ["--selector", "#p2", "--hover", "#p2"]);
+    assert.match(shadow.out, /follows ease-out in its shadow/);
+    const cards = await run("reference/rise.html", ["--selector", "#p1", "--selector", "#p2", "--selector", "#p3"]);
+    assert.equal(
+      (cards.out.match(/travels 16px upwards over the frames measured, follows ease-out exactly/g) ?? []).length,
+      3,
+      cards.out,
+    );
+    const twice = await run("reference/popin.html", [
+      "--selector",
+      ".panel",
+      "--click",
+      ".share-btn",
+      "--click",
+      ".share-btn",
+      "--exits",
+    ]);
+    assert.match(
+      twice.out,
+      /sampled: the motion --click \.share-btn \(the last action\) starts; what --click \.share-btn started ran to its end unsampled/,
+    );
+  });
+
+  it("takes --no-ledger, and prints a usage error without the whole help", async () => {
+    assert.doesNotThrow(() => parseMotionArgs(["p.html", "--selector", ".t", "--no-ledger"]));
+    const errors: string[] = [];
+    const error = console.error;
+    console.error = (m: string) => errors.push(m);
+    try {
+      assert.equal(await runMotionCli(["p.html", "--selector", ".t", "--bogus"]), 2);
+    } finally {
+      console.error = error;
+    }
+    const out = errors.join("\n");
+    assert.match(out, /error: unknown option --bogus\n\(vlmkit inspect motion --help lists every option\)/);
+    assert.ok(out.split("\n").length < 10, out);
+  });
 
   it("samples the hold between two segments", () => {
     const plan = motionPlan([

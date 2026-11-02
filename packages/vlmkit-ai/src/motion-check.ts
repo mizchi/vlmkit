@@ -63,6 +63,10 @@ export interface MotionDom {
   paint?: number[];
   /** Its gradients' stop positions and angles, on paint's 0-255 scale (100% or a turn is 255). */
   stops?: number[];
+  /** Its box shadows: RGBA of each, then offsets, blur and spread (px). */
+  shadow?: number[];
+  /** A conic gradient's first arc, in degrees from its start (it grows as a ring fills clockwise). */
+  sweepDeg?: number;
   /** A finished animation's forwards fill still holds what it animated, and why that matters. */
   heldByFill?: string;
   /** Its transition on background runs over a gradient (which steps: gradients do not interpolate). */

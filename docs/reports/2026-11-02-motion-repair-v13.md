@@ -110,7 +110,52 @@ animation issues detected". The smaller ring agent made one remote call its brie
 On the other pages, nothing changed: the motion tests (73) pass, including every earlier round's
 `--hover` and `--click` cases.
 
-## Deferred
+## Deferred, and fixed after the round (2026-11-02)
+
+Every item below is fixed. `check animation` now has 229 rules.
+
+- **Two `--click`s.** A run with more than one action now says which motion was sampled:
+  `sampled: the motion --click .share-btn (the last action) starts; what --click .share-btn
+  started ran to its end unsampled — run without the later actions to measure it`.
+- **A step in a channel is `channel-step`, not a curve.** When 90% or more of a colour's,
+  gradient's or shadow's change falls between two neighbouring frames, nothing is fitted to it.
+  - Between frames one frame apart, it is a fail. With `--at 150..300/1f`, the broken ring reads
+    `FAIL channel-step at 200ms: its gradient steps between 183ms and 200ms, in one frame … needs
+    that property registered`.
+  - Between frames further apart, it is a warn that names the span to sample again. With
+    `--end 1500`: `two frames 150ms apart … sample that span closely (--at 150..300/1f)`.
+
+  Two smaller fixes came with it:
+  - `--at` alone now shoots a page with nothing animating, as `--end` does. The page is also
+    reopened when the timer search ran its clock and found nothing. Before, `--at` was refused,
+    and when it did shoot, its frames came after the timer had run.
+  - The unregistered-property error says how to shoot the page anyway.
+- **A conic arc's way.** `--selector` measures a conic gradient's first arc. The target's line
+  reads `its conic arc sweeps clockwise 259°`, and `--expect-direction clockwise |
+  counterclockwise` checks it: `FAIL direction-mismatch … its conic arc sweeps clockwise (259° over
+  the frames), not counterclockwise`.
+- **`check animation`: `unregistered-property-transition`** (suspect) names a transition on a
+  custom property that no `@property` registers. It fires on the broken ring and not on the repair.
+  The repo's other pages that use custom properties only as values (kanban, solitaire) are
+  unaffected. Under `--virtual-time`, a timer-started animation's start is now the window between
+  two sweep instants (`begun between 0ms and 250ms`). "settles by 250ms" now says that it covers
+  only the sweep's own frames, gives how long what the timer started runs, and points to
+  `inspect motion`. The 9x17 box was that, too.
+- **`box-shadow` is a channel.** On the broken rise the hover now reads `follows ease-out in its
+  shadow`. It stays out of `target-static`, which still names the fill. `--expect-direction`
+  and `--expect-origin` count as judged only when a path, a turn or a conic sweep was fitted, not a
+  shadow or a colour.
+- **`inspect motion --no-ledger`** is taken (it writes no ledger), and a usage error prints the
+  two usage lines and the error instead of the whole help.
+- **Own time past the end.** A fill other than forwards takes a finished animation off its element,
+  so the frames after it had no own time and fell back to the segment's clock. Such a frame is now
+  at its own time 1, and one before its start at 0. On the same frames, the repaired cards now
+  read `follows ease-out exactly`, as the broken ones did. This explains the fitted-wording
+  difference.
+- **The rise fixture** folds to one column under 720px, on both pages. `check integrity` is now
+  clean, and both oracle verdicts are unchanged.
+
+## Deferred (as written after the round)
 
 - Two `--click`s sample only the last action's motion. Nothing says the first one's motion (the
   open) was not sampled. One popin agent had to run the command again to see it.

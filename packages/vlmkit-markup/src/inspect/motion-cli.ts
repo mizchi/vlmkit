@@ -207,6 +207,30 @@ export async function measureTargets(
                         : v,
             );
           }
+        // A conic gradient's first arc, in degrees from its start: a ring filling clockwise grows it,
+        // and --expect-direction clockwise read "it does not turn" (round 13).
+        let sweepDeg: number | undefined;
+        const conic = /conic-gradient\((?:from [^,]+, )?(?:at [^,]+, )?rgba?\([^)]*\) (-?\d*\.?\d+)(%|deg|turn)/.exec(
+          own.backgroundImage,
+        );
+        if (conic) {
+          const v = Number(conic[1]);
+          sweepDeg = conic[2] === "%" ? v * 3.6 : conic[2] === "turn" ? v * 360 : v;
+        }
+        // Its shadow, as numbers (each shadow's RGBA, then its offsets, blur and spread in px): a
+        // card whose shadow deepened on hover was confirmed only by eye (round 13).
+        const shadow: number[] = [];
+        if (own.boxShadow && own.boxShadow !== "none") {
+          for (const m of own.boxShadow.matchAll(/rgba?\(([^)]*)\)/g)) {
+            const c = m[1]!
+              .split(/[\s,/]+/)
+              .filter(Boolean)
+              .map(Number);
+            shadow.push(c[0] ?? 0, c[1] ?? 0, c[2] ?? 0, Math.round((c[3] ?? 1) * 255));
+          }
+          for (const m of own.boxShadow.replace(/rgba?\([^)]*\)/g, "").matchAll(/(-?\d*\.?\d+)px/g))
+            shadow.push(Number(m[1]));
+        }
         // A transition on background over a gradient: a gradient does not interpolate, so it steps.
         const durations = own.transitionDuration.split(",").map((d) => parseFloat(d) || 0);
         const discreteBg =
@@ -458,6 +482,8 @@ export async function measureTargets(
           ...(m33 < -0.01 && !backHidden ? { mirrored: true } : {}),
           ...(paint.length > 0 ? { paint } : {}),
           ...(stops.length > 0 ? { stops } : {}),
+          ...(shadow.length > 0 ? { shadow } : {}),
+          ...(sweepDeg !== undefined ? { sweepDeg } : {}),
           ...(heldByFill ? { heldByFill } : {}),
           ...(discreteBg ? { discreteBg: true } : {}),
           ...(el instanceof SVGElement && !(el instanceof SVGSVGElement) ? { svg: true } : {}),
@@ -509,6 +535,8 @@ each forbidden statement is. vlmkit judges the motion from that:
   invisible-blocker at rest it is transparent and still takes clicks at its centre
   size-jump        its width or height steps in one frame while it eases (its text re-wrapping)
   turn-off-centre  it turns and its centre is carried round: another transform-origin (warn)
+  channel-step     a colour, gradient or shadow changes all at once between two frames (fail in
+                   one frame; warn when the frames are too far apart to tell)
   replayed         after rest, as the page's timers run (up to 10s), it is replaced by a new element that
                    plays its animation again (a re-render); the same element starting again is a warn
   stroke-incomplete a stroke drawing itself ends part drawn (a dash shorter than its line)
@@ -820,6 +848,10 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
         viewport = { width: Number(m[1]), height: Number(m[2]) };
         break;
       }
+      // inspect motion writes no run ledger (it is not a gate); a gate's flag is taken, not refused
+      // with the whole help (round 13).
+      case "--no-ledger":
+        break;
       // --out is what other commands call it: an agent reached for it and got "unknown option" (round 11).
       case "--frames":
       case "--out":
@@ -1397,7 +1429,10 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
             held = await timeline.animations();
           }
         }
-        if (held.length > 0) {
+        // Opened afresh whenever the search ran the clock: found, to shoot from 0; not found, so
+        // --at's instants are not shot after the timers had already run (a ring whose step came
+        // at 200ms read unchanged at every frame of --at 150..300/1f, round 13).
+        if (held.length > 0 || ranTo !== null) {
           await page.close();
           page = await browser.newPage({ viewport: o.viewport, deviceScaleFactor: 1 });
           timeline = await openHeldTimeline(page, url);
@@ -1420,7 +1455,9 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
       // what an agent brings it (round 6).
       const infinite = held.filter((a) => a.iterations === null && a.durationMs > 0);
       let forever: { startMs: number; endMs: number } | null = null;
-      if (o.endMs === undefined && plan.segments.length === 0) {
+      // --at alone shoots the page at those instants, as --end does: the reason given for a page
+      // that animates nothing said to pass --at, and it was refused all the same (round 13).
+      if (o.endMs === undefined && !o.at && plan.segments.length === 0) {
         if (infinite.length === 0) {
           // A 0s animation is there and runs no time: an `animation` shorthand after
           // `animation-timeline` resets both (round 12's reading bar, full from load).
@@ -1448,7 +1485,7 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
                 .map((u) => `${u.selector} transitions ${u.property}`)
                 .join(
                   ", ",
-                )}, a custom property no @property registers — an unregistered custom property has no type, so it does not interpolate and steps at once. Register it (@property ${unregistered[0]!.property} { syntax: "<percentage>"; inherits: false; initial-value: 0%; }, with the syntax of its values), and the transition runs`,
+                )}, a custom property no @property registers — an unregistered custom property has no type, so it does not interpolate and steps at once. Register it (@property ${unregistered[0]!.property} { syntax: "<percentage>"; inherits: false; initial-value: 0%; }, with the syntax of its values), and the transition runs. To shoot the page as it is, give --end <ms> or --at <instants>`,
             );
           throw new MotionUsageError(
             `no animation or transition on the page${ranTo !== null ? `, at load or after its timers ran (to ${ranTo}ms)` : " at load"}: nothing to sample. If one should run, it never starts — check animation lists what does; a misspelt transition-property or animation-name, a transition to height: auto (which needs interpolate-size: allow-keywords), or a class added in the same frame as the style it transitions from, are the usual causes. If a click starts it, give --click <css>. To shoot the page anyway, give --end <ms> (with --start, or --at for the instants)`,
@@ -1457,8 +1494,9 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
         const s0 = Math.min(...infinite.map((a) => a.startMs));
         forever = { startMs: s0, endMs: s0 + Math.min(4000, 3 * Math.max(...infinite.map((a) => a.durationMs))) };
       }
-      const given = o.endMs !== undefined;
-      const endMs = o.endMs ?? forever?.endMs ?? plan.endMs;
+      const atOnly = o.endMs === undefined && !!o.at && plan.segments.length === 0 && !forever;
+      const given = o.endMs !== undefined || atOnly;
+      const endMs = o.endMs ?? (atOnly ? Math.max(...o.at!) : (forever?.endMs ?? plan.endMs));
       const startMs = o.startMs ?? (given ? 0 : (forever?.startMs ?? plan.startMs));
       // --at chooses the frames; the segments are still the page's own spans of motion.
       const segments = given || forever ? [{ startMs, endMs }] : plan.segments;
@@ -1889,6 +1927,10 @@ export function formatMotionReport(
                 `, turns over ${Math.round(Math.abs(t.turn.deg))}° in 3D`
               : `, turns ${t.turn.deg > 0 ? "clockwise" : "counterclockwise"} ${Math.round(Math.abs(t.turn.deg))}° (${Math.round(Math.abs(t.turn.perSecond))}°/s${Math.abs(t.turn.perSecond) >= 1 ? `, a turn every ${Math.round(360000 / Math.abs(t.turn.perSecond))}ms` : ""})`
             : ""
+        }${
+          t.sweepDeg !== undefined
+            ? `, its conic arc sweeps ${t.sweepDeg > 0 ? "clockwise" : "counterclockwise"} ${Math.round(Math.abs(t.sweepDeg))}°`
+            : ""
         }, ${fitText(t.easing, broken)}${t.segments[0] ? grows(t.segments[0]) : ""}`,
       );
     } else {
@@ -2221,9 +2263,10 @@ export async function runMotionCli(argv: string[]): Promise<number> {
     o = parseMotionArgs(argv);
   } catch (e) {
     if (!(e instanceof MotionUsageError) && !(e instanceof Error && e.name === "UsageError")) throw e;
-    // The error last: printed above an 80-line help, it scrolled off and read as "printed only
-    // the help" (round 4).
-    console.error(`${MOTION_USAGE}\n\nerror: ${(e as Error).message}`);
+    // The usage lines and the error, not the whole help: 100 lines for one mistyped flag buried it
+    // (round 13), and printed below them it scrolled off (round 4).
+    const usage = MOTION_USAGE.split("\n\n")[0];
+    console.error(`${usage}\n\nerror: ${(e as Error).message}\n(vlmkit inspect motion --help lists every option)`);
     return 2;
   }
   // Refused before a browser starts: without a key nothing could answer.
@@ -2332,6 +2375,20 @@ export async function runMotionCli(argv: string[]): Promise<number> {
   if (o.json) console.log(JSON.stringify(json, null, 2));
   else {
     const lines = formatMotionReport(o.source, captured, r, o.forbid).split("\n");
+    // Only the last action's motion is sampled: two --click on a panel measured its close, and
+    // nothing said its open had not been (round 13).
+    const acts = o.actions.filter((a) => a.kind !== "wait");
+    if (acts.length > 1)
+      lines.splice(
+        1,
+        0,
+        `  sampled: the motion ${describeAction(acts[acts.length - 1]!)} (the last action) starts; what ${acts
+          .slice(0, -1)
+          .map(describeAction)
+          .join(
+            ", ",
+          )} started ran${o.actions.some((a) => a.kind === "wait") ? " (as far as --wait let it)" : " to its end"} unsampled — run without the later actions to measure it`,
+      );
     if (jumps.length > 0 || warnsAfter.length > 0) {
       // Into the report, above its tally, and counted in it: "no fail" printed above a FAIL line.
       const at = lines.findIndex((l) => /^ {2}(no fail|\d+ fail)/.test(l));
@@ -2376,7 +2433,13 @@ export async function runMotionCli(argv: string[]): Promise<number> {
       // origin: "held: --expect-direction up" sat under "travels 0px" on a card that never moved
       // (round 13).
       const unfitted = r.targets.every((t) => !("best" in t.easing));
-      const unjudged = (f: string) => unfitted && /easing|direction|origin/.test(f);
+      // Direction and origin are the path's: a shadow or a colour fitted moves nothing.
+      const pathless = r.targets.every(
+        (t) =>
+          !("best" in t.easing) ||
+          !(t.easing.channels ?? []).some((c) => ["position", "turn", "gradient"].includes(c.channel)),
+      );
+      const unjudged = (f: string) => (unfitted && /easing/.test(f)) || (pathless && /direction|origin/.test(f));
       const held = asked.filter((f) => !failed.has(ruleOf(f)) && !unjudged(f));
       const skipped = asked.filter((f) => !failed.has(ruleOf(f)) && unjudged(f));
       const at = lines.findIndex((l) => /^ {2}(no fail|\d+ fail)/.test(l));

@@ -270,7 +270,9 @@ describe("composed built-in registry", () => {
     // deferred items).
     // 227 → 228: `check animation` / `zero-duration-animation` (suspect) — a reading bar's
     // shorthand reset its animation-timeline, and it sat full from load (round 12).
-    assert.equal(total, 228);
+    // 228 → 229: `check animation` / `unregistered-property-transition` (suspect) — a usage ring's
+    // `transition: --p` on a custom property nothing registers stepped at once (round 13).
+    assert.equal(total, 229);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {

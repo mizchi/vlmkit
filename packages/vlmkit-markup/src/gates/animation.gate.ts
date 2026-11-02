@@ -103,6 +103,12 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       docs: "A misspelt property (`widht`) computes as itself and its transition never runs: the property it meant changes in one frame, and with no animation on the page nothing else reports it.",
     },
     {
+      id: "unregistered-property-transition",
+      title: "A transition on a custom property no @property registers",
+      severity: "suspect",
+      docs: "An unregistered custom property has no type, so `transition: --p 1s` never interpolates: whatever reads it (a conic-gradient stop, a width through calc()) changes in one frame, and with no animation on the page nothing else reports it. Register it with @property and the syntax of its values.",
+    },
+    {
       id: "reduced-motion-hides",
       title: "Under reduced motion an element rests hidden or out of place",
       severity: "suspect",

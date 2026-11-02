@@ -419,7 +419,15 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   whose forwards fill still holds what `:hover` sets; a target's timing is from an animation still
   running (a finished, filled entrance gave a hover 400ms); `--expect-*` that no fitted path checked
   are `not judged`, not `held`; "no animation" names a transition on a custom property no
-  `@property` registers. dynamic-markup fills entrances `backwards`, not `both`.
+  `@property` registers. dynamic-markup fills entrances `backwards`, not `both`. Its deferred
+  items: with more than one action the output says only the last one's motion was sampled;
+  `channel-step` (fail in one frame, warn across a wider gap) replaces a curve fitted to a colour,
+  gradient or shadow that changes all at once; a conic gradient's first arc is measured, so
+  `--expect-direction clockwise` checks a ring that sweeps; `box-shadow` is a channel (`target-static`
+  ignores it); a frame past a target's own end, where a non-forwards fill took the animation off,
+  is at its own time 1, not the segment's clock; `--at` alone shoots a still page;
+  `check animation`'s `unregistered-property-transition` (suspect, 229 rules) and a timer-started
+  animation's start as a window between sweep instants.
 
 ## Generated figures (raster images)
 
@@ -1786,7 +1794,7 @@ case at 0.23.0.
 | `docs/reports/2026-08-06-gate-rule-cost-bench.md` | Measured gate/rule execution cost: where a ruleset's time goes, why per-rule cost is attributed rather than isolated, why suppression saves nothing |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
 | `docs/design/package-decomposition.md` | **Splitting vlmkit by layer** (collector / pure judge / driver / loop / diagrams): what was measured, phase 1 (`vlmkit-judge`) and the proposed phases 2-5 |
-| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 35 gates + 228 rules, behavior changes, what is deliberately not a gate |
+| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 35 gates + 229 rules, behavior changes, what is deliberately not a gate |
 | `docs/design/moonbit-boundary.md` | **TS ↔ MoonBit boundary**: what the positional FFI costs (61 commands, 233 args, 2 duplicated dispatch tables), the JSON boundary that replaces it for new logic, how to add a command, and which pure logic belongs in MoonBit versus which deliberately does not |
 | `docs/crater-css-status.md` | Crater CSS rendering verification status |
 | `docs/reset-css-comparison.md` | Reset CSS domain knowledge |

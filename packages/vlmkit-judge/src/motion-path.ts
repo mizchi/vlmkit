@@ -165,6 +165,10 @@ export interface MotionSample {
      * 255): a ring filling by its conic stop changes no colour (round 13).
      */
     stops?: number[];
+    /** Its box shadows: RGBA of each, then offsets, blur and spread (px). */
+    shadow?: number[];
+    /** A conic gradient's first arc, in degrees from its start (it grows as a ring fills clockwise). */
+    sweepDeg?: number;
     /** A finished animation's forwards fill still holds what it animated, and why that matters. */
     heldByFill?: string;
     /** It takes a click at its centre: an invisible target that does sits over what is behind it. */
@@ -292,7 +296,8 @@ export type MotionRule =
   | "pushed"
   | "invisible-blocker"
   | "size-jump"
-  | "turn-off-centre";
+  | "turn-off-centre"
+  | "channel-step";
 
 export interface MotionFinding {
   rule: MotionRule;
@@ -303,7 +308,7 @@ export interface MotionFinding {
 }
 
 /** What an easing was fitted to: the path, or with the element measured, its opacity or scale. */
-export type EasingChannel = "position" | "opacity" | "scale" | "turn" | "drawn" | "colour" | "gradient";
+export type EasingChannel = "position" | "opacity" | "scale" | "turn" | "drawn" | "colour" | "gradient" | "shadow";
 
 export type ChannelFit = EasingFit & { channel: EasingChannel };
 
@@ -377,6 +382,8 @@ export interface MotionPathReport {
   excursionPx?: number;
   /** How far it turns over the frames (degrees, clockwise positive) and how fast, when it turns. */
   turn?: { deg: number; perSecond: number; in3d?: boolean };
+  /** How far a conic gradient's first arc grows over the frames (degrees, clockwise positive). */
+  sweepDeg?: number;
   easing: SegmentEasing;
 }
 
@@ -602,14 +609,27 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       .map((x) => x.dom?.t)
       .filter((t): t is number => typeof t === "number");
     if (ts.length < 2) return null;
-    const lo = Math.min(...ts);
-    const hi = Math.max(...ts);
+    const inSeg = sorted.filter((x) => x.atMs >= seg.startMs && x.atMs <= seg.endMs);
+    const firstTimed = inSeg.findIndex((x) => typeof x.dom?.t === "number");
+    const lastTimed = inSeg.length - 1 - [...inSeg].reverse().findIndex((x) => typeof x.dom?.t === "number");
+    // Frames past its end (or before its start) with no own time stand at 1 (or 0): see timeOf.
+    const lo = Math.min(...ts, ...(firstTimed > 0 ? [0] : []));
+    const hi = Math.max(...ts, ...(lastTimed < inSeg.length - 1 ? [1] : []));
     return hi - lo >= 0.05 ? { lo, hi } : null;
   };
   const timeOf = (atMs: number, seg: MotionSegment) => {
     const own = sorted.find((x) => x.atMs === atMs)?.dom?.t;
     const range = ownRange(seg);
     if (typeof own === "number" && range) return (own - range.lo) / (range.hi - range.lo);
+    // Past its own animation's end, a fill other than forwards takes it off the element, so the
+    // frame has no own time: it is at its end, not at the segment's clock. On the same frames a
+    // backwards-filled card fitted "2.1x better than ease" and a both-filled one "exactly" (round 13).
+    if (range) {
+      const timed = sorted.filter((x) => x.atMs >= seg.startMs && x.atMs <= seg.endMs && typeof x.dom?.t === "number");
+      // Its own time is then 1 (or 0 before it began), normalised like every other frame's.
+      if (timed.length > 0 && atMs > timed[timed.length - 1]!.atMs) return (1 - range.lo) / (range.hi - range.lo);
+      if (timed.length > 0 && atMs < timed[0]!.atMs) return (0 - range.lo) / (range.hi - range.lo);
+    }
     return Math.min(1, Math.max(0, (atMs - seg.startMs) / Math.max(seg.endMs - seg.startMs, 1)));
   };
 
@@ -675,6 +695,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       for (const [key, name] of [
         ["paint", "colour"],
         ["stops", "gradient"],
+        ["shadow", "shadow"],
       ] as const) {
         const first = sorted.find((y) => y.dom?.[key]);
         const painted = sorted.filter(
@@ -694,6 +715,27 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
           t: timeOf(x.atMs, seg),
           s: x.dom![key]!.reduce((acc, v, i) => acc + (v - p0[i]!) * d[i]!, 0) / len,
         }));
+        // Nearly all of the change between two neighbouring frames is a step, not a curve: a ring
+        // whose unregistered --p jumped to 72% read "follows overshoot in its gradient" (round 13).
+        let big = 1;
+        for (let i = 2; i < pts.length; i++)
+          if (Math.abs(pts[i]!.s - pts[i - 1]!.s) > Math.abs(pts[big]!.s - pts[big - 1]!.s)) big = i;
+        const stepShare = Math.abs(pts[big]!.s - pts[big - 1]!.s) / len;
+        if (stepShare >= 0.9) {
+          const a = painted[big - 1]!.atMs;
+          const b = painted[big]!.atMs;
+          const oneFrame = b - a <= (2 * 1000) / 60 + 1e-6;
+          if (!findings.some((f) => f.rule === "channel-step" && f.message.startsWith(`its ${name}`)))
+            findings.push({
+              rule: "channel-step",
+              severity: oneFrame ? "fail" : "warn",
+              atMs: b,
+              message: oneFrame
+                ? `its ${name} steps between ${ms(a)} and ${ms(b)}, in one frame (${Math.round(stepShare * 100)}% of its change): it does not interpolate. ${name === "gradient" ? "A gradient built on a custom property needs that property registered (@property --p { syntax: … }); a gradient itself does not interpolate" : name === "colour" ? "A transition between two gradients does not interpolate (a gradient is an image)" : "The transition does not run"}`
+                : `its ${name} changes by ${Math.round(stepShare * 100)}% of its change between ${ms(a)} and ${ms(b)}, two frames ${Math.round(b - a)}ms apart: a step or a fast change the frames do not resolve — sample that span closely (--at ${Math.round(a)}..${Math.round(b)}/1f) before reading a curve into it`,
+            });
+          continue;
+        }
         const fit = fitEasingAffine(pts);
         if (Number.isFinite(fit.errors[fit.best])) fits.push({ ...fit, channel: name });
       }
@@ -978,9 +1020,20 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       };
   }
   const turns = turnReport !== undefined;
+  // A conic arc that grows or shrinks sweeps a way without anything turning (a usage ring).
+  const swept = sorted.filter((x) => Number.isFinite(x.dom?.sweepDeg ?? NaN));
+  const sweep = swept.length >= 2 ? swept[swept.length - 1]!.dom!.sweepDeg! - swept[0]!.dom!.sweepDeg! : 0;
   if (options.expectDirection && isTurnWay(options.expectDirection)) {
     const way = turnReport && !turnReport.in3d ? (turnReport.deg > 0 ? "clockwise" : "counterclockwise") : null;
-    if (way !== options.expectDirection) {
+    const sweepWay = !way && Math.abs(sweep) >= 10 ? (sweep > 0 ? "clockwise" : "counterclockwise") : null;
+    if (sweepWay && sweepWay !== options.expectDirection)
+      findings.push({
+        rule: "direction-mismatch",
+        severity: "fail",
+        atMs: segments[0]!.startMs,
+        message: `its conic arc sweeps ${sweepWay} (${Math.round(Math.abs(sweep))}° over the frames), not ${options.expectDirection}: the arc's stop ${sweep > 0 ? "grows" : "shrinks"}`,
+      });
+    else if (!sweepWay && way !== options.expectDirection) {
       findings.push({
         rule: "direction-mismatch",
         severity: "fail",
@@ -1146,6 +1199,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     travelPx: first.travelPx,
     ...(geo.length >= 2 ? { excursionPx: Math.max(...geo.map((p) => dist(p, geo[0]!))) } : {}),
     ...(turnReport ? { turn: turnReport } : {}),
+    ...(Math.abs(sweep) >= 10 ? { sweepDeg: sweep } : {}),
     easing: first.easing,
     ...(startsAtMs !== undefined ? { startsAtMs } : {}),
     ...(durationMs !== undefined ? { durationMs } : {}),
