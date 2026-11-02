@@ -135,6 +135,14 @@ test("apm.yml explicitly publishes only the vlmkit package", async () => {
   assert.match(manifest, /^includes:\n  - \.apm\/skills\/vlmkit\/$/m);
 });
 
+// APM installs from git, so this number is what it shows as the installed skill's version. It
+// sat at 0.9.0 from 0.9 to 0.24 because nothing tied it to the release.
+test("apm.yml carries the release version", async () => {
+  const manifest = await readFile(join(repoRoot, "apm.yml"), "utf8");
+  const { version } = JSON.parse(await readFile(join(repoRoot, "package.json"), "utf8"));
+  assert.match(manifest, new RegExp(`^version: ${version.replaceAll(".", "\\.")}$`, "m"));
+});
+
 test("the local development shell pins the current APM release", async () => {
   const apmNix = await readFile(join(repoRoot, "apm.nix"), "utf8");
   assert.match(apmNix, /version \? "0\.27\.0"/);
