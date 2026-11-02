@@ -1,5 +1,5 @@
 // Hidden from the agents: judges a repaired page against its brief.
-// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet|slidein|progress|accordion|dialog|hover|reveal|flip|interrupt|reduced|push|seam|draw|gradient|quote|dismiss|reading|gear|label|popin|rise|ring|hint|ticket|nudge> <page.html>
+// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet|slidein|progress|accordion|dialog|hover|reveal|flip|interrupt|reduced|push|seam|draw|gradient|quote|dismiss|reading|gear|label|popin|rise|ring|hint|ticket|nudge|focus|fadeup|queue> <page.html>
 import { chromium } from "playwright";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
@@ -853,6 +853,57 @@ if (kind === "ticket") {
   ok("slowing at the end: past half its way at 160ms of 400", (s1.x - s0.x) / 360 > 0.55 && s1.x < rest.x - 1, { s0, s1, rest });
   const list = await rect("ul");
   ok("the list below stays where it is", Math.abs(list[1] - (rest.y + 56 + 24)) <= 30, { list, rest });
+} else if (kind === "focus" || kind === "fadeup" || kind === "queue") {
+  // Each entrance played again from its start and its handles kept: a finished animation with a
+  // fill other than forwards is off its element.
+  const sel = { focus: ".hero", fadeup: ".note", queue: ".row" }[kind];
+  await page.evaluate((sel) => {
+    for (const el of document.querySelectorAll(sel)) {
+      el.style.animation = "none";
+      void el.offsetWidth;
+      el.style.animation = "";
+    }
+    window.__oAnims = document.getAnimations();
+    for (const a of window.__oAnims) a.pause();
+  }, sel);
+  const at = (t) =>
+    page.evaluate(
+      ({ t, sel }) => {
+        for (const a of window.__oAnims) { a.pause(); a.currentTime = t; }
+        return [...document.querySelectorAll(sel)].map((el) => {
+          const cs = getComputedStyle(el);
+          const r = el.getBoundingClientRect();
+          const blur = /blur\(([\d.]+)px\)/.exec(cs.filter);
+          return { y: r.y, op: Number(cs.opacity), blur: blur ? Number(blur[1]) : 0, filter: cs.filter };
+        });
+      },
+      { t, sel },
+    );
+  const rest = await at(2000);
+  if (kind === "focus") {
+    const [s0] = await at(0), [s1] = await at(300), [r] = rest;
+    ok("at rest: fully opaque and perfectly sharp (no blur left)", r.op > 0.99 && r.blur === 0, r);
+    ok("starts blurred (6px or more) and transparent", s0.blur >= 6 && s0.op < 0.05, s0);
+    ok("half way: still a little blurred and fading in", s1.blur > 0.3 && s1.op > 0.3 && s1.op < 0.99, s1);
+    const d = await page.evaluate(() => Math.max(...window.__oAnims.map((a) => a.effect.getComputedTiming().endTime)));
+    ok("over about 600ms", Math.abs(d - 600) <= 20, d);
+  } else if (kind === "fadeup") {
+    for (const [i, delay] of [0, 60, 120].entries()) {
+      const s0 = (await at(delay))[i], s1 = (await at(delay + 120))[i], r = rest[i];
+      ok(`note ${i + 1}: starts 12px below its place, transparent, at ${delay}ms`, Math.abs(s0.y - (r.y + 12)) <= 1 && s0.op < 0.05, { s0, r });
+      ok(`note ${i + 1}: rising and fading in at ${delay + 120}ms`, s1.y < r.y + 11 && s1.y > r.y + 0.5 && s1.op > 0.2 && s1.op < 0.99, { s1, r });
+      ok(`note ${i + 1}: in place at rest`, r.op > 0.99, r);
+    }
+  } else {
+    for (let k = 0; k < 4; k++) {
+      const before = k > 0 ? (await at(k * 80 - 10))[k] : null;
+      const mid = (await at(k * 80 + 100))[k];
+      const r = rest[k];
+      if (before) ok(`row ${k + 1}: not visible before its turn (${k * 80 - 10}ms)`, before.op < 0.05, before);
+      ok(`row ${k + 1}: rising and fading in at ${k * 80 + 100}ms`, mid.op > 0.2 && mid.op < 0.99 && mid.y > r.y + 0.5 && mid.y < r.y + 12, { mid, r });
+      ok(`row ${k + 1}: settled at rest`, r.op > 0.99, r);
+    }
+  }
 }
 await browser.close();
 const failed = checks.filter((c) => !c.pass);
