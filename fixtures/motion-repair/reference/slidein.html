@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Orders</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #f4f6f8; color: #1d2228; overflow-x: hidden; }
+  main { max-width: 760px; margin: 48px auto; padding: 0 24px; }
+  .panel { position: fixed; top: 0; right: 0; bottom: 0; width: 360px; padding: 28px; background: #fff;
+           box-shadow: -12px 0 32px rgba(0,0,0,.12);
+           animation: enter 320ms cubic-bezier(0, 0, 0.58, 1) 250ms both; }
+  @keyframes enter { from { transform: translateX(100%); opacity: 0; } to { transform: none; opacity: 1; } }
+  .panel dt { color: #6b7380; font-size: 13px; } .panel dd { margin: 0 0 14px; }
+</style></head>
+<body>
+  <main><h1>Orders</h1><p>Order #48213 selected.</p></main>
+  <aside class="panel" aria-label="Order details">
+    <h2>Order #48213</h2>
+    <dl><dt>Customer</dt><dd>Aiko Tanaka</dd><dt>Total</dt><dd>¥12,400</dd><dt>Status</dt><dd>Packed</dd></dl>
+  </aside>
+</body></html>

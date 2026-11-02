@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Lamps</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #faf8f5; color: #22201c; }
+  main { max-width: 1040px; margin: 40px auto; padding: 0 24px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; list-style: none; padding: 0; margin: 0; }
+  .card { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); transition: transform 150ms ease-out, box-shadow 150ms ease-out; }
+  .card .img { height: 180px; border-radius: 8px; background: linear-gradient(135deg, #e9dcc8, #cbb495); }
+  .card h2 { font-size: 16px; margin: 12px 0 4px; }
+  .card p { margin: 0; color: #6b655c; }
+  .card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0, 0, 0, 0.14); }
+</style></head>
+<body>
+  <main>
+    <h1>Lamps</h1>
+    <ul class="grid">
+      <li class="card" id="c1"><div class="img"></div><h2>Arc floor lamp</h2><p>¥24,000</p></li>
+      <li class="card" id="c2"><div class="img"></div><h2>Paper pendant</h2><p>¥9,800</p></li>
+      <li class="card" id="c3"><div class="img"></div><h2>Brass desk lamp</h2><p>¥15,500</p></li>
+    </ul>
+  </main>
+</body></html>

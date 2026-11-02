@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Markets</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; background: #f4f6f9; color: #111827; display: grid; place-items: center; min-height: 100vh; }
+  .card { width: 380px; padding: 28px 32px; border-radius: 16px; background: #fff; box-shadow: 0 2px 10px rgba(17, 24, 39, 0.08); }
+  .card h1 { font-size: 15px; font-weight: 600; color: #6b7280; margin: 0 0 6px; letter-spacing: 0.02em; }
+  .price { display: block; font: 700 44px/1.1 ui-monospace, SFMono-Regular, Menlo, monospace; animation: rise 400ms ease-out both; }
+  .change { display: block; margin-top: 6px; color: #059669; font-weight: 600; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+</style></head>
+<body>
+  <div class="card">
+    <h1>ACME Corp · NASDAQ</h1>
+    <div class="quote"><span class="price"></span><span class="change"></span></div>
+  </div>
+  <script>
+    const price = document.querySelector(".price");
+    const change = document.querySelector(".change");
+    let n = 0;
+    const render = () => {
+      price.textContent = `$${(182.4 + 0.05 * n).toFixed(2)}`;
+      change.textContent = `+${(0.05 * n).toFixed(2)} today`;
+      n++;
+    };
+    render();
+    setInterval(render, 1000);
+  </script>
+</body></html>

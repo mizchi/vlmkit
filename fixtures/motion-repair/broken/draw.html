@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Payment received</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; background: #f4f7f5; color: #1b2420; display: grid; place-items: center; min-height: 100vh; }
+  .card { width: 420px; padding: 40px 32px; background: #fff; border-radius: 16px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08); text-align: center; }
+  .tick { width: 104px; height: 104px; margin: 0 auto 16px; display: block; }
+  .tick circle { fill: #e6f4ea; }
+  .tick path { fill: none; stroke: #1e8e3e; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 40; stroke-dashoffset: 40; animation: draw 600ms ease-out 200ms forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  p { margin: 0; color: #56635d; }
+</style></head>
+<body>
+  <div class="card">
+    <svg class="tick" viewBox="0 0 104 104" role="img" aria-label="Done"><circle cx="52" cy="52" r="52"/><path d="M28 54 L46 72 L78 36"/></svg>
+    <h1>Payment received</h1>
+    <p>¥12,400 to Kumo Studio. A receipt is on its way to your email.</p>
+  </div>
+</body></html>

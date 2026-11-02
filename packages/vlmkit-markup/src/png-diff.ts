@@ -403,6 +403,17 @@ function attachSelectorCandidates(regions: DiffRegion[], elements: RegionElement
 }
 
 export async function runPngDiff(options: PngDiffCliOptions) {
+  // A page given where a screenshot goes died in pngjs's "unrecognised content at end of stream"
+  // with a stack trace (round 10). Say what the file is, and where a page goes.
+  for (const path of [options.baselinePath, options.currentPath]) {
+    const head = (await readFile(path)).subarray(0, 8);
+    if (!head.equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
+      const { UsageError } = await import("@mizchi/vlmkit-judge/errors.ts");
+      throw new UsageError(
+        `${path} is not a PNG. diff png compares two screenshots; for two pages use \`vlmkit diff html <before.html> <after.html>\`, and to map a screenshot diff onto a page's elements add --elements-html <page.html>.`,
+      );
+    }
+  }
   if (!options.skipHeatmap) {
     await mkdir(options.outputDir, { recursive: true });
   }
@@ -652,8 +663,8 @@ function formatSizeDelta(value: number): string {
 }
 
 if (isCliEntry(import.meta.url, "png-diff")) {
-  runPngDiffCli().catch((error) => {
-    console.error(error);
-    process.exit(1);
+  runPngDiffCli().catch(async (error) => {
+    const { handleCliError } = await import("@mizchi/vlmkit-core/cli-error.ts");
+    handleCliError(error);
   });
 }

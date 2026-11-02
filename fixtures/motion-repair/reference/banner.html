@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Inbox</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #f5f6f8; color: #1f2329; }
+  .banner { position: fixed; top: 0; left: 0; right: 0; height: 48px; display: flex; align-items: center; justify-content: center;
+            background: #2f6fde; color: #fff; font-weight: 600;
+            animation: leave 300ms cubic-bezier(0.42, 0, 1, 1) 2000ms forwards; }
+  @keyframes leave { from { transform: none; } to { transform: translateY(-100%); } }
+  main { max-width: 720px; margin: 80px auto; padding: 0 24px; }
+  .msg { background: #fff; border-radius: 8px; padding: 14px 18px; margin-bottom: 10px; }
+</style></head>
+<body>
+  <div class="banner" role="status">You're back online</div>
+  <main>
+    <h1>Inbox</h1>
+    <div class="msg">Invoice #2041 is ready</div>
+    <div class="msg">Your weekly summary</div>
+  </main>
+</body></html>

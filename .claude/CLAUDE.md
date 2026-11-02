@@ -314,9 +314,100 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   entries "cascading" at one delay both passed every rule. Each line now names when the target's
   own animation begins (frame time less `elapsedMs`, the active time of its longest animation)
   and the point of its box a scale keeps in place (`o = (box - k B) / (1 - k)` against the
-  largest-scale frame, median over frames scaled 10%+). `--expect-origin`, `--expect-start` and
+  largest-scale frame, median over frames scaled 2%+). `--expect-origin`, `--expect-start` and
   `--expect-stagger` turn them into `origin-mismatch` / `start-mismatch`. A transparent target
   names the ancestor whose opacity does it, and whether anything animates it.
+- **Briefs never name the flag, and agents map them anyway** (round 5,
+  `docs/reports/2026-10-19-motion-repair-v5.md`: "unfolds like a blind", "a wave in reading
+  order", "straight away" → `--expect-origin top` / `--expect-stagger` / `--expect-start 0`, 6/6).
+  Scale is read per axis (`scaleX`/`scaleY`): a `scaleY` drop-down read 1 from the matrix's first
+  column and had no origin; one axis names an edge and is checked on that axis only. What needs
+  no brief is a rule: `check animation`'s `delayed-entrance` (warn) — first keyframe hidden,
+  backwards fill, delay ≥1000ms.
+- **How long and how often** (round 6, `docs/reports/2026-10-21-motion-repair-v6.md`): a sheet
+  rising in 1400ms for 280ms and a badge throbbing forever for three times passed every rule.
+  The element's own timing gives `runs Nms` / `xN` / `repeats forever`; `--expect-duration` and
+  `--expect-iterations` fail on them. A page whose animations are all infinite is sampled over
+  its first three runs (4s at most) with no rest frame, instead of refused. With `--exits`, frames
+  from the last segment on are leaving, not lost.
+- **Which way, and after a click** (round 7, `docs/reports/2026-10-21-motion-repair-v7.md`): a
+  panel entering from the wrong side, a `widht` transition and an accordion snapping open on
+  `height: auto` passed every gate. Each segment names its direction (`--expect-direction`);
+  `--click` drives the held page before sampling, and with nothing animating a changed target is
+  `snapped`; timers are run to find a transition a script starts, its start put on the frame after
+  the timer; `check animation`'s `unknown-transition-property` (suspect) names a property CSS does
+  not know.
+- **What a pointer or a scroll starts, and a placement the animation replaces** (round 8,
+  `docs/reports/2026-10-21-motion-repair-v8.md`): a dialog whose keyframe `transform` dropped its
+  `translate(-50%, -50%)`, a card whose transition was declared only on `:hover`, and a reveal whose
+  `threshold: 1` never fires for a section taller than the screen. `check animation` passed all three
+  (it sees motion from load only, and now says so). `--hover` / `--leave` / `--scroll` are actions
+  beside `--click`, in order, each before the last run to its end; a jump from a target held still
+  off its place names the replaced transform; `--expect-still` fails a centre that moves. With
+  `--selector` an easing is fitted from 2px (a 4px lift read "static") and a scale's point is solved
+  from 2% (a 96% dialog read "not checked"). `check integrity` exempts text hidden by an element wholly below the fold
+  that is set to fade (a scroll reveal waiting for its scroll); on screen and transparent stays a fail.
+- **A change of mind, a card turned over, and reduced motion that hides** (round 9,
+  `docs/reports/2026-10-22-motion-repair-v9.md`): a menu whose second click restarted a
+  `@keyframes` from fully open, a flip card without `backface-visibility: hidden`, and tiles left at
+  opacity 0 by `animation: none` under reduce passed every gate (the last read "reduced-motion:
+  honored"). `--wait <ms>` lets the next action land mid-motion and `interrupt-jump` fails a target
+  that jumps as it does; facing is the z of the normal through every transform up the tree, so a
+  face turned away is `mirrored` when its back is drawn, not judged edge-on, and not "absent" at
+  rest, and a rotation is no longer read as a scale (3D column norms); `check animation`'s
+  `reduced-motion-hides` (suspect, 222 rules) compares each animated element's rest with and
+  without the preference. The timer search steps frame by frame (a click at 100ms and its reversal
+  at 200ms in one jump read "no animation"). Its deferred items: `stress media`'s reduced-motion
+  variant and `check integrity --reduced-motion` look at what is left on screen under reduce, `check
+  motion` counts motion declared but not active at load, `--exit <css>` marks one target as leaving,
+  and a target's turn (its normal's angle in 3D, else its 2D rotation) is fitted as a channel.
+- **What moves something else, a seam at every loop, a stroke left unfinished** (round 10,
+  `docs/reports/2026-10-23-motion-repair-v10.md`): a notice animating `margin-top` that shoves the
+  article, a spinner ending at 350deg, and a check mark whose dash is shorter than its line. A
+  target with no animation of its own that moves is `pushed` (warn, naming the layout property
+  animated elsewhere) and `--still <css>` makes it a fail; `loop-seam` compares a repeating
+  animation's pose either side of the end of a run; a dashed stroke's drawn share comes from its
+  dash pattern, is a channel, and `stroke-incomplete` fails one that ends part drawn. Points of a
+  target's box outside its own shape (a turned round box's corners, the empty part of a stroke's box)
+  are not counted as covered. Its deferred items: `check animation` names all three with no target
+  (`layout-animation` warn — the boxes of elements with no animation of their own at the start and
+  end of an in-flow layout animation's first run; `loop-seam` and `stroke-incomplete` suspect; 225
+  rules), `infinite-animation` on a loading indicator says it is meant to run forever, `snapshot
+  storyboard` groups repeating returns into `loops`, integrity's ink counts a surface 3 levels off the
+  page (a white card on `#f5f6f8` read as a near-empty render), and `diff html` says an absent Crater
+  in one dim line.
+- **A colour that steps, an entrance replayed by a re-render, an exit hidden before it plays**
+  (round 11, `docs/reports/2026-10-27-motion-repair-v11.md`): a hover gradient on `transition:
+  background`, a quote re-rendered by `innerHTML` every second, and a banner set `hidden` in the same
+  task that starts its exit. `--selector` measures every colour a target paints and fits it as a
+  channel, and a colour changed in one frame is `snapped` (a transition over a gradient is named);
+  `check animation`'s `discrete-transition` (warn, 226 rules); after rest the page's timers run on
+  3s and a target replaced by a new element that animates again is `replayed`; a target with no
+  layout box is not rendered (not a box at 0,0) and a `snapped` one says the action hid it; a
+  transparent target that still takes clicks at rest is `invisible-blocker`; a pass lists the
+  `--expect-*` that held. Its deferred items: `check animation --virtual-time` names an animation a
+  timer begins again (`animation-replayed`, suspect on a new element; 227 rules), and a sweep whose
+  changes come only from a slow timer with no animation frame is an update, not motion (the virtual
+  clock counts `runs()`: frames and timers), so a one-second ticker is not reduced-motion motion; an
+  `inspect interact` frames step writes `before.png` (`source.before`) and `snapshot storyboard` says
+  what changed before frame 0, and names a change largest at its start as an entrance played again;
+  `check motion` marks a transition over a gradient; `replayed` looks up to 10s past rest.
+- **A scroll timeline reset by a shorthand, an SVG turning about its viewBox, a label wrapping
+  mid-widen** (round 12, `docs/reports/2026-10-27-motion-repair-v12.md`). A target on a scroll
+  timeline is judged by sweeping the scroll (0..100% and back to 50%: progress per step,
+  `scroll-static` / `scroll-mismatch`), not the clock. `check animation` lists scroll-driven
+  animations instead of seeking them (seeking threw), and `zero-duration-animation` (suspect, 228
+  rules) names a 0s animation: an `animation` shorthand after `animation-timeline` resets both. A
+  point of an SVG group's box counts only where one of its shapes is. `size-jump` fails a box that
+  steps in one frame while it eases (a label wrapping). A turn is reported with its way and rate, and
+  `--expect-direction clockwise|counterclockwise` checks it; a turn about another point is
+  `turn-off-centre` (warn), or a `still-mismatch` naming `transform-box: fill-box` on SVG.
+  `inspect interact` leaves scroll-timeline animations on in its motion-off snapshots, and `check
+  scroll` keeps a fixed element at `scaleX(0)`. Its deferred items: `check flash` says it did not
+  judge animations on a scroll timeline, `check integrity --viewport WxH` is one viewport, an unknown
+  gate option's warning names the nearest one, the ledger's creation is announced outside a git
+  repository too, and with `--jev` a frame the page shows fully but the model calls not shown is
+  unknown (`locate-unsure`), not `target-hidden`.
 
 ## Generated figures (raster images)
 
@@ -561,7 +652,9 @@ States and events from the pixels alone, relative to an anchor (the frame of the
 **glitch** one frame off and back; **transient** back within 5000ms whatever it held (a toast is
 one); **change** not back, ending at the first 100ms of byte-identical frames — the next state, whose frame
 is the anchor from then on (an earlier state's own frame when the hold is within its floor);
-**drift** a change no step of which, inside its box, crosses the floor (a channel moving by more than 8). Pure half
+**drift** a change no step of which, inside its box, crosses the floor (a channel moving by more than 8);
+a **loop** three or more returns from one state over one box, of one length, one period apart (a
+spinner read as a transient a second, every second — `story.json` `loops`, the events kept). Pure half
 `@mizchi/vlmkit-judge/storyboard.ts` (`buildStoryboard`, `storyboardSummary`, `storyboardBrief`);
 CLI `src/cli/commands/storyboard-cli.ts` (an artifact command on the SPECS path, exits 0, no verdict:
 the brief is for the agent's own vision and nothing reads its answer back). Measured building it,
@@ -1681,7 +1774,7 @@ case at 0.23.0.
 | `docs/reports/2026-08-06-gate-rule-cost-bench.md` | Measured gate/rule execution cost: where a ruleset's time goes, why per-rule cost is attributed rather than isolated, why suppression saves nothing |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
 | `docs/design/package-decomposition.md` | **Splitting vlmkit by layer** (collector / pure judge / driver / loop / diagrams): what was measured, phase 1 (`vlmkit-judge`) and the proposed phases 2-5 |
-| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 35 gates + 219 rules, behavior changes, what is deliberately not a gate |
+| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 35 gates + 228 rules, behavior changes, what is deliberately not a gate |
 | `docs/design/moonbit-boundary.md` | **TS ↔ MoonBit boundary**: what the positional FFI costs (61 commands, 233 args, 2 duplicated dispatch tables), the JSON boundary that replaces it for new logic, how to add a command, and which pure logic belongs in MoonBit versus which deliberately does not |
 | `docs/crater-css-status.md` | Crater CSS rendering verification status |
 | `docs/reset-css-comparison.md` | Reset CSS domain knowledge |

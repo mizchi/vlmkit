@@ -29,6 +29,7 @@ import {
   type PaintNode,
   type PaintTreeChange,
 } from "@mizchi/vlmkit-capture/crater-client.ts";
+import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { compareScreenshots, generateDiffReport } from "@mizchi/vlmkit-core/heatmap.ts";
 import { createScopedVrtDiff, normalizeVrtDiffRegions } from "@mizchi/vlmkit-core/diff-regions.ts";
 import { classifyVisualDiff } from "@mizchi/vlmkit-markup/visual-semantic.ts";
@@ -503,6 +504,8 @@ interface BreakpointDiscoveryStatus {
   requestedBackend: BreakpointDiscoveryBackend;
   backendUsed: "regex" | "crater";
   fallbackReason?: string;
+  /** The fallback is the usual case (an optional Crater not running), said without a warning. */
+  fallbackExpected?: boolean;
   breakpoints: ResponsiveBreakpoint[];
   diagnostics?: BreakpointDiscoveryDiagnosticsSummary;
 }
@@ -1013,7 +1016,11 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     console.log();
     console.log(`  ${DIM}Breakpoint discovery: ${breakpointDiscoveryStatus.backendUsed}${RESET}`);
     if (breakpointDiscoveryStatus.fallbackReason) {
-      console.log(`  ${YELLOW}! ${breakpointDiscoveryStatus.fallbackReason}${RESET}`);
+      console.log(
+        breakpointDiscoveryStatus.fallbackExpected
+          ? `  ${DIM}${breakpointDiscoveryStatus.fallbackReason}${RESET}`
+          : `  ${YELLOW}! ${breakpointDiscoveryStatus.fallbackReason}${RESET}`,
+      );
     }
     if (breakpointDiscoveryStatus.breakpoints.length > 0) {
       console.log();
@@ -1137,6 +1144,9 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       } else {
         await page.setContent(baselineHtml, { waitUntil: "networkidle" });
       }
+      // Finite entrances run to their end before anything is read: captured mid-fade, a staggered
+      // feed's four entries read as 8 layout-shifts with margin fixes (motion-repair round 4).
+      await settlePage(page, 0);
       if (options.maskSelectors?.length) maskTally.add(await applyMask(page, options.maskSelectors));
       const path = join(outputDir, `${baselineName}-${vp.label}.png`);
       await page.screenshot({ path, fullPage: true });
@@ -1359,6 +1369,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         } else {
           await page.setContent(variantHtml, { waitUntil: "networkidle" });
         }
+        await settlePage(page, 0);
         if (options.maskSelectors?.length) maskTally.add(await applyMask(page, options.maskSelectors));
 
         if (variantSanityEnabled) {
@@ -2847,10 +2858,15 @@ export async function discoverResponsiveBreakpointsForHtmlDocuments(
     if (backend === "crater") {
       throw new Error(`Crater breakpoint discovery failed: ${String(error)}`);
     }
+    // Crater is optional under `auto`: not running is the usual case, not a warning.
+    const notRunning = /ECONNREFUSED|ENOTFOUND|ECONNRESET/u.test(String(error));
     return {
       requestedBackend: backend,
       backendUsed: "regex",
-      fallbackReason: `Crater breakpoint discovery unavailable, falling back to regex: ${String(error)}`,
+      fallbackReason: notRunning
+        ? `Crater is not running at ${craterUrl} (optional) — breakpoints read from the pages' own @media rules`
+        : `Crater breakpoint discovery unavailable, falling back to regex: ${String(error)}`,
+      ...(notRunning ? { fallbackExpected: true } : {}),
       breakpoints: regexBreakpoints,
     };
   }

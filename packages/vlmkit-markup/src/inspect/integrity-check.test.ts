@@ -832,6 +832,22 @@ describe("S14b mutation battery", () => {
     assert.match(jsError!.message, /after load/);
   });
 
+  test("a white card on a near-white page is painted, not a near-empty render", { timeout: 120_000 }, async () => {
+    // motion-repair round 10: #fff on #f5f6f8 differs by 10, under the default ink tolerance of 12,
+    // so a 360px card with a spinner read `degenerate-render` (and on the reference page too).
+    const file = page(
+      "card.html",
+      `<body style="margin:0;background:#f5f6f8;display:grid;place-items:center;min-height:100vh">
+      <div style="width:360px;padding:32px;background:#fff;border-radius:14px;text-align:center">
+      <h1 style="font-size:18px;margin:0 0 6px">Uploading 3 photos…</h1><p style="margin:0">Keep this tab open.</p></div></body>`,
+    );
+    const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+    assert.equal(
+      report.findings.find((f) => f.kind === "degenerate-render"),
+      undefined,
+    );
+  });
+
   test("M3 404 image: broken-image fail with src evidence", { timeout: 120_000 }, async () => {
     const file = page(
       "m3.html",

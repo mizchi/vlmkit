@@ -925,9 +925,14 @@ describe("the run ledger as a declared output", () => {
     assert.equal(newOutputNotice({ path: join(cwd, ".vlmkit", "run-ledger.jsonl"), created: true }, cwd), null);
   });
 
-  it("stays silent outside a git repo, where .gitignore advice would be noise", () => {
+  it("says it once, with no .gitignore advice, outside a git repo", () => {
     const cwd = work();
-    assert.equal(newOutputNotice({ path: join(cwd, ".vlmkit", "run-ledger.jsonl"), created: true }, cwd), null);
+    const note = newOutputNotice({ path: join(cwd, ".vlmkit", "run-ledger.jsonl"), created: true }, cwd);
+    assert.match(
+      note!,
+      /created \.vlmkit\/run-ledger\.jsonl — an append-only record of every gate run \(--no-ledger turns it off\)/,
+    );
+    assert.doesNotMatch(note!, /gitignore/);
   });
 });
 

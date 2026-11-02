@@ -148,11 +148,36 @@ export interface MotionSample {
     t?: number | null;
     /** What keeps it from being seen, when the page could tell: "clipped by …", "covered by …". */
     hiddenBy?: string;
+    /** Turned in 3D (its box is the turned shape's bounds); within 15° of edge-on; facing away
+     * with its back face drawn (so it shows mirrored). */
+    rotated3d?: boolean;
+    edgeOn?: boolean;
+    facingAway?: boolean;
+    /** How far it is turned (degrees): from its normal in 3D, or its 2D rotation. */
+    turnDeg?: number;
+    /** A dashed stroke: the share of its line its dashes draw (0-1), and the pattern, for the message. */
+    drawn?: number;
+    dashNote?: string;
+    /** Every colour it paints (RGBA in order): fitted as a channel when it changes. */
+    paint?: number[];
+    /** It takes a click at its centre: an invisible target that does sits over what is behind it. */
+    catches?: boolean;
+    /** An SVG element inside an <svg>: its transform-origin is measured from the viewBox by default. */
+    svg?: boolean;
+    mirrored?: boolean;
     /**
      * How long its own animation has been in its active phase (ms; negative in its delay). The
      * frame's time less this is when that animation begins: what a stagger is made of.
      */
     elapsedMs?: number | null;
+    /** Share of its box where it is the topmost thing painted, measured by the page (0-1). */
+    visible?: number;
+    /** One run of its own longest animation (ms), and how many runs (null: infinite). */
+    durationMs?: number;
+    iterations?: number | null;
+    /** Each axis's scale, when it differs: a scaleY drop-down has scaleX 1. */
+    scaleX?: number;
+    scaleY?: number;
   };
   /** The box may be another element's (it coincides with another target's): left out of geometry. */
   unsure?: boolean;
@@ -178,6 +203,15 @@ const originAt = (name: OriginName) => ({
 const originCss = (name: OriginName) => (name === "center" ? "center" : name.replace("-", " "));
 /** The fixed point named when it is within this (a fraction of the box) of one. */
 const ORIGIN_SNAP = 0.15;
+/** Which way a segment moves, by the larger of its two components. */
+export const MOTION_DIRECTIONS = ["left", "right", "up", "down", "clockwise", "counterclockwise"] as const;
+export type MotionDirection = (typeof MOTION_DIRECTIONS)[number];
+/** A turn's way, not a path's: a gear "turning clockwise" had no flag (round 12). */
+const isTurnWay = (d: MotionDirection) => d === "clockwise" || d === "counterclockwise";
+const directionOf = (dx: number, dy: number): MotionDirection =>
+  Math.abs(dx) >= Math.abs(dy) ? (dx < 0 ? "left" : "right") : dy < 0 ? "up" : "down";
+const towards = (d: MotionDirection) => `${d}wards`;
+
 /** A start this far (ms) from the expected one is a mismatch: one 60fps frame. */
 const START_TOLERANCE_MS = 17;
 
@@ -217,6 +251,15 @@ export interface MotionPathOptions {
   expectOrigin?: OriginName;
   /** When its own animation must begin (page ms): measured from the element's animation time. */
   expectStartMs?: number;
+  /** Which way the first segment's motion must go. */
+  expectDirection?: MotionDirection;
+  /** How long one run must take (ms), and how many runs (null: infinite). */
+  expectDurationMs?: number;
+  expectIterations?: number | null;
+  /** Its centre must not move: only its size, opacity or colour change (a dialog that stays centred). */
+  expectStill?: boolean;
+  /** Animations on the page that change layout, named ("div.notice animates margin-top"). */
+  layoutMovers?: readonly string[];
 }
 
 export type MotionRule =
@@ -232,7 +275,17 @@ export type MotionRule =
   | "origin-mismatch"
   | "origin-unchecked"
   | "start-mismatch"
-  | "start-unchecked";
+  | "start-unchecked"
+  | "duration-mismatch"
+  | "iterations-mismatch"
+  | "direction-mismatch"
+  | "still-mismatch"
+  | "mirrored"
+  | "stroke-incomplete"
+  | "pushed"
+  | "invisible-blocker"
+  | "size-jump"
+  | "turn-off-centre";
 
 export interface MotionFinding {
   rule: MotionRule;
@@ -243,7 +296,7 @@ export interface MotionFinding {
 }
 
 /** What an easing was fitted to: the path, or with the element measured, its opacity or scale. */
-export type EasingChannel = "position" | "opacity" | "scale";
+export type EasingChannel = "position" | "opacity" | "scale" | "turn" | "drawn" | "colour";
 
 export type ChannelFit = EasingFit & { channel: EasingChannel };
 
@@ -254,13 +307,41 @@ export type SegmentEasing =
 
 /** The point of the box a scale keeps in place, as fractions of the box at full size; named when near one. */
 export interface ScaleOrigin {
-  fx: number;
-  fy: number;
+  /** Null on an axis it does not scale along (a scaleY drop-down has no point across). */
+  fx: number | null;
+  fy: number | null;
   name: OriginName | null;
+  /** The frame it is best seen in: the most opaque one scaled 2% or more from full size. */
+  atMs: number;
 }
 
 /** "its top-right corner", "its centre", "the point 30% across and 80% down its box". */
-export function describeOrigin(o: ScaleOrigin): string {
+export function describeOrigin(o: Pick<ScaleOrigin, "fx" | "fy" | "name">): string {
+  // A point far outside the box is no transform-origin: the box moves as well as it scales (a
+  // keyframe transform replacing a centring translate read "the point 1857% across", round 8).
+  const outside = (v: number | null) => v !== null && (v < -0.5 || v > 1.5);
+  if (outside(o.fx) || outside(o.fy)) return "no point of its box (it moves as well as it scales)";
+  if (o.fx === null || o.fy === null) {
+    // One axis: an edge (or the line through its middle) stays put, not a point.
+    const across = o.fy === null;
+    const v = (across ? o.fx : o.fy) ?? 0.5;
+    const side =
+      Math.abs(v) <= ORIGIN_SNAP
+        ? across
+          ? "left"
+          : "top"
+        : Math.abs(v - 1) <= ORIGIN_SNAP
+          ? across
+            ? "right"
+            : "bottom"
+          : Math.abs(v - 0.5) <= ORIGIN_SNAP
+            ? "middle"
+            : null;
+    if (!side) return `the line ${Math.round(v * 100)}% ${across ? "across" : "down"} its box`;
+    return side === "middle"
+      ? `the line through its middle (it scales ${across ? "across" : "up and down"} only)`
+      : `its ${side} edge`;
+  }
   if (!o.name) return `the point ${Math.round(o.fx * 100)}% across and ${Math.round(o.fy * 100)}% down its box`;
   if (o.name === "center") return "its centre";
   return o.name.includes("-") ? `its ${o.name} corner` : `the middle of its ${o.name} edge`;
@@ -271,11 +352,24 @@ export interface MotionPathReport {
   /** Positions of the frames the target is shown in, motion and rest; `edge` = put back from a clipped box. */
   path: { atMs: number; x: number; y: number; rest: boolean; edge: boolean }[];
   /** Per segment: its span, how far the target travels in it, the fit or why there is none. */
-  segments: (MotionSegment & { travelPx: number; easing: SegmentEasing; origin?: ScaleOrigin })[];
+  segments: (MotionSegment & {
+    travelPx: number;
+    easing: SegmentEasing;
+    origin?: ScaleOrigin;
+    /** Which way it moves, and from where to where (centres), when it travels the floor or more. */
+    direction?: { way: MotionDirection; from: { x: number; y: number }; to: { x: number; y: number } };
+  })[];
   /** When its own animation begins (page ms), measured: absent without --selector or an animation. */
   startsAtMs?: number;
+  /** One run of its own animation (ms) and how many runs (null: infinite), measured. */
+  durationMs?: number;
+  iterations?: number | null;
   /** The first segment's travel and fit (the whole motion when there is one segment). */
   travelPx: number;
+  /** The farthest its centre gets from where it starts: a gear orbiting back read "travels 0px" (round 12). */
+  excursionPx?: number;
+  /** How far it turns over the frames (degrees, clockwise positive) and how fast, when it turns. */
+  turn?: { deg: number; perSecond: number; in3d?: boolean };
   easing: SegmentEasing;
 }
 
@@ -293,7 +387,10 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
   const exact = samples.length > 0 && samples.every((x) => x.dom !== undefined);
   const floor = options.jumpFloorPx ?? (exact ? 6 : 24);
   const ratio = options.jumpRatio ?? 3;
-  const minTravel = options.minFitTravelPx ?? (exact ? 6 : 60);
+  // Measured, a 4px card lift is a real path: under 6px it read "too short to fit" and
+  // "moves under 6px … its animation is not applying" (motion-repair round 8).
+  const minTravel = options.minFitTravelPx ?? (exact ? 2 : 60);
+  const still = exact ? 1 : floor;
   const segments = options.segments?.length
     ? [...options.segments]
     : [{ startMs: options.startMs, endMs: options.endMs }];
@@ -307,9 +404,24 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
   // another target shares is unknown too.
   const overlaps = (a: MotionBox, b: MotionBox) =>
     a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+  const unrecognised = new Set<number>();
   const seen = (s: MotionSample): number | null => {
     if (s.dom) {
       if (s.dom.opacity < 0.05) return 0;
+      // Edge-on, a turning card has next to no area, and a face turned away is not meant to be
+      // seen (if it is drawn, that is `mirrored`): neither seen nor lost (round 9).
+      if (s.dom.edgeOn || s.dom.facingAway) return null;
+      // A model's "not shown" on a frame the page measures as mid-fade and on screen is the
+      // fade, not a loss: Jev read a panel at opacity 0.45 as 0.23 and a correct page failed
+      // target-lost (round 7). Unknown, not evidence. (Without Jev, present is the page's own.)
+      if (s.present < thr && s.dom.opacity < sure && (s.dom.visible ?? 0) >= thr && s.present !== s.dom.visible)
+        return null;
+      // Fully shown by the page and "not shown" by the model: it did not recognise the target from
+      // its description. A button whose label changed on click read target-hidden (round 12).
+      if (s.present < thr && s.dom.opacity >= sure && (s.dom.visible ?? 0) >= sure && s.present !== s.dom.visible) {
+        unrecognised.add(s.atMs);
+        return null;
+      }
       if (s.box && s.present >= thr && !overlaps(s.box, s.dom.box)) return null;
       return s.present;
     }
@@ -347,7 +459,9 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     return { x, y };
   };
 
-  const path = sorted.filter(shown).map((s) => ({ atMs: s.atMs, ...position(s), rest: isRest(s), edge: atEdge(s) }));
+  const path = sorted
+    .filter(shown)
+    .map((s) => ({ atMs: s.atMs, ...position(s), rest: isRest(s), edge: !s.dom && atEdge(s) }));
   const motion = path.filter((p) => !p.rest);
 
   // Presence: absent between two frames that show it, or gone once it stops. A faint frame whose
@@ -386,7 +500,11 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       const s = judged[i]!;
       // Measured, the visible share already leaves out what is off-screen, so a box at the edge is
       // no excuse: a toast that snaps back off-screen between two frames that show it is lost.
-      if (!shown(s) && (s.dom !== undefined || !atEdge(s))) {
+      // Meant to leave: not shown from the last segment on is the exit working, even when a
+      // later frame shows it back (that return is the snap-back, judged below). A banner that
+      // slid away and snapped back read as lost too, beside the snap-back (round 6).
+      const leaving = options.exits && s.atMs >= segments[segments.length - 1]!.startMs;
+      if (!shown(s) && !leaving && (s.dom !== undefined || !atEdge(s))) {
         const before = [...judged.slice(0, i)].reverse().find(shown)!;
         const after = judged.slice(i + 1).find(shown)!;
         findings.push({
@@ -398,7 +516,9 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       }
     }
     const restSamples = judged.filter(isRest);
-    const goneAtRest = restSamples.length > 0 && restSamples.every((s) => !shown(s));
+    // A face turned away at rest is the far side of what turned, not a loss.
+    const goneAtRest =
+      restSamples.length > 0 && restSamples.every((s) => !shown(s)) && !restSamples.some((s) => s.dom?.facingAway);
     if (goneAtRest && motion.length > 0 && !options.exits) {
       findings.push({
         rule: "absent-at-rest",
@@ -430,7 +550,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
   const geoRest = all.filter((p) => p.rest);
 
   // A model's box that lands far off and is back the next frame is another element's, not a jump.
-  const unsureAt = sorted.filter((s) => seen(s) === null).map((s) => s.atMs);
+  const unsureAt = sorted.filter((s) => seen(s) === null && !s.dom?.edgeOn && !s.dom?.facingAway).map((s) => s.atMs);
   if (!exact) {
     const out = new Set<number>();
     for (let k = 1; k < geo.length - 1; k++) {
@@ -494,10 +614,15 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     const tag = segments.length > 1 ? ` in ${ms(seg.startMs)}..${ms(seg.endMs)}` : "";
     let easing: SegmentEasing;
     // Measured, a fade or a scale has an easing too: fit every channel that changes.
-    const channel = (key: "opacity" | "scale", least: number) => {
-      const xs = sorted.filter((x) => x.dom && x.atMs >= seg.startMs && x.atMs <= seg.endMs);
+    const channel = (key: "opacity" | "scale" | "turnDeg" | "drawn", least: number) => {
+      const xs = sorted.filter(
+        (x) => x.dom && x.atMs >= seg.startMs && x.atMs <= seg.endMs && Number.isFinite(x.dom[key] ?? NaN),
+      );
       if (xs.length < 4) return null;
-      const v = xs.map((x) => x.dom![key]);
+      const v = xs.map((x) => x.dom![key]!);
+      // A 2D turn reads -180..180: unwrapped, so a spinner past 180° is not a step back of 350°.
+      if (key === "turnDeg")
+        for (let k = 1; k < v.length; k++) v[k] = v[k]! - 360 * Math.round((v[k]! - v[k - 1]!) / 360);
       const delta = v[v.length - 1]! - v[0]!;
       if (Math.abs(delta) < least) return null;
       return xs.map((x, i) => ({ t: timeOf(x.atMs, seg), s: Math.sign(delta) * v[i]! }));
@@ -526,13 +651,39 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       else skipped = "the frames' times do not spread across the segment: nothing to fit";
     }
     if (exact) {
+      // A card turning over moves no centre: its turn is the channel (round 9 fitted nothing).
       for (const [key, least] of [
         ["opacity", 0.2],
         ["scale", 0.02],
+        ["turnDeg", 10],
+        ["drawn", 0.2],
       ] as const) {
         const pts = channel(key, least);
         const fit = pts ? fitEasingAffine(pts) : null;
-        if (fit && Number.isFinite(fit.errors[fit.best])) fits.push({ ...fit, channel: key });
+        if (fit && Number.isFinite(fit.errors[fit.best]))
+          fits.push({ ...fit, channel: key === "turnDeg" ? "turn" : key });
+      }
+      // Its colours, as one channel: how far each frame has gone from the first towards the last.
+      const painted = sorted.filter(
+        (x) =>
+          x.dom?.paint &&
+          x.atMs >= seg.startMs &&
+          x.atMs <= seg.endMs &&
+          x.dom.paint.length === sorted.find((y) => y.dom?.paint)!.dom!.paint!.length,
+      );
+      if (painted.length >= 4) {
+        const p0 = painted[0]!.dom!.paint!;
+        const p1 = painted[painted.length - 1]!.dom!.paint!;
+        const d = p1.map((v, i) => v - p0[i]!);
+        const len = Math.hypot(...d);
+        if (Math.max(...d.map(Math.abs)) >= 8) {
+          const pts = painted.map((x) => ({
+            t: timeOf(x.atMs, seg),
+            s: x.dom!.paint!.reduce((acc, v, i) => acc + (v - p0[i]!) * d[i]!, 0) / len,
+          }));
+          const fit = fitEasingAffine(pts);
+          if (Number.isFinite(fit.errors[fit.best])) fits.push({ ...fit, channel: "colour" });
+        }
       }
     }
     easing = fits[0] ? { ...fits[0], channels: fits } : { skipped: skipped ?? "nothing about it changes" };
@@ -580,12 +731,16 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         if (neighbours.length === 0) return;
         const local = Math.max(...neighbours.map((n) => n.speed));
         const times = st.speed / Math.max(local, 1e-3);
-        if (st.px >= floor && times > ratio) {
+        // Out of its delay, unseen, into its first keyframe: the base style and the keyframe differ
+        // where nobody can see it (a tile at opacity 0 "jumped" 10px into its rise, round 9).
+        const from = sorted.find((x) => x.atMs === frames[i]!.atMs)?.dom;
+        const unseenDelay = from !== undefined && (from.elapsedMs ?? 0) < 0 && from.opacity < 0.05;
+        if (st.px >= floor && times > ratio && !unseenDelay) {
           findings.push({
             rule: "jump",
             severity: "fail",
             atMs: frames[i + 1]!.atMs,
-            message: `moves ${Math.round(st.px)}px between ${ms(frames[i]!.atMs)} and ${ms(frames[i + 1]!.atMs)}, ${times.toFixed(1)}x as fast as the steps around it: a discontinuity in the keyframes`,
+            message: `moves ${Math.round(st.px)}px between ${ms(frames[i]!.atMs)} and ${ms(frames[i + 1]!.atMs)}, ${times.toFixed(1)}x as fast as the steps around it: a discontinuity — a gap between keyframes, or a property changed with no transition or animation for it`,
           });
         }
       });
@@ -593,23 +748,52 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     const origin = exact ? scaleOrigin(sorted, seg, last ? sorted.filter(isRest) : []) : null;
     if (options.expectOrigin && origin) {
       const want = originAt(options.expectOrigin);
-      if (Math.abs(origin.fx - want.fx) > ORIGIN_SNAP || Math.abs(origin.fy - want.fy) > ORIGIN_SNAP) {
+      // Only the axes it scales along: "top-left" is met by a scaleY whose top edge stays put.
+      const off = (got: number | null, w: number) => got !== null && Math.abs(got - w) > ORIGIN_SNAP;
+      if (off(origin.fx, want.fx) || off(origin.fy, want.fy)) {
         findings.push({
           rule: "origin-mismatch",
           severity: "fail",
-          atMs: seg.startMs,
-          message: `the scale${tag} grows from ${describeOrigin(origin)} (that point of its box stays put), not ${describeOrigin({ ...want, name: options.expectOrigin })}: transform-origin: ${originCss(options.expectOrigin)}`,
+          atMs: origin.atMs,
+          message: `the scale${tag} grows from ${describeOrigin(origin)}${describeOrigin(origin).startsWith("no point") ? "" : ` (that ${origin.fx === null || origin.fy === null ? "edge" : "point"} of its box stays put)`}, not ${describeOrigin({ fx: origin.fx === null ? null : want.fx, fy: origin.fy === null ? null : want.fy, name: options.expectOrigin })}: transform-origin: ${originCss(options.expectOrigin)}`,
         });
       }
     }
-    return { ...seg, travelPx, easing, ...(origin ? { origin } : {}) };
+    // Which way: from the segment's first frame to where it ends (its last frame, or the held rest
+    // for the last segment). A panel meant to come in from the right edge came from mid-page,
+    // moving rightwards, and "travels 360px" read the same for both (round 7).
+    let direction: MotionPathReport["segments"][number]["direction"];
+    if (frames.length >= 2) {
+      const a = frames[0]!;
+      const restHere = last ? geoRest[0] : undefined;
+      const z = restHere && dist(restHere, a) > floor ? restHere : frames[frames.length - 1]!;
+      // Not from a target that holds still and jumps at the end: "travels 0px leftwards" (round 8).
+      if (travelPx >= Math.min(floor, minTravel) && dist(a, z) >= Math.min(floor, minTravel)) {
+        direction = { way: directionOf(z.x - a.x, z.y - a.y), from: { x: a.x, y: a.y }, to: { x: z.x, y: z.y } };
+      }
+    }
+    if (
+      k === 0 &&
+      options.expectDirection &&
+      !isTurnWay(options.expectDirection) &&
+      direction &&
+      direction.way !== options.expectDirection
+    ) {
+      findings.push({
+        rule: "direction-mismatch",
+        severity: "fail",
+        atMs: seg.startMs,
+        message: `it moves ${towards(direction.way)} (centre ${Math.round(direction.from.x)},${Math.round(direction.from.y)} → ${Math.round(direction.to.x)},${Math.round(direction.to.y)}), not ${towards(options.expectDirection)}: where it starts is its first keyframe's (a translate with the wrong sign is the usual cause)`,
+      });
+    }
+    return { ...seg, travelPx, easing, ...(origin ? { origin } : {}), ...(direction ? { direction } : {}) };
   });
   if (options.expectOrigin && !reports.some((x) => x.origin)) {
     findings.push({
       rule: "origin-unchecked",
       severity: "warn",
       atMs: segments[0]!.startMs,
-      message: `${options.expectOrigin} was expected but not checked: ${exact ? "its scale changes by less than 10% in every segment" : "only an element measured from the page (--selector) has a scale to read"}`,
+      message: `${options.expectOrigin} was expected but not checked: ${exact ? "its scale changes by less than 2% in every segment" : "only an element measured from the page (--selector) has a scale to read"}`,
     });
   }
 
@@ -683,13 +867,184 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
               atMs: r.atMs,
               message: `ends near where it started (${Math.round(dist(r, geo[0]!))}px from it, ${Math.round(off)}px from the last motion frame): the final keyframe is not held — add animation-fill-mode: forwards (or both), or give the element its end state`,
             }
-          : {
-              rule: "jump",
-              severity: "fail",
-              atMs: r.atMs,
-              message: `jumps ${Math.round(off)}px when the motion ends (${ms(last.atMs)} → ${ms(r.atMs)}): the end state differs from the last keyframe`,
-            },
+          : travel < floor
+            ? {
+                // Held still off its place the whole time, then put there: the animation sets what
+                // places the element. The dialog of round 8 read "the end state differs from the
+                // last keyframe", and both agents found the overridden translate in the CSS.
+                rule: "jump",
+                severity: "fail",
+                atMs: r.atMs,
+                message: `sits ${Math.round(off)}px off where it rests (${Math.round(r.x - last.x)},${Math.round(r.y - last.y)}) through the whole motion, and jumps there when it ends: the animation overrides what places the element — most often a keyframe \`transform\` that replaces the element's own (a \`translate(-50%, -50%)\` centring): repeat that translate in every keyframe, or animate \`scale\` / \`translate\` (the separate properties) instead`,
+              }
+            : {
+                rule: "jump",
+                severity: "fail",
+                atMs: r.atMs,
+                message: `jumps ${Math.round(off)}px when the motion ends (${ms(last.atMs)} → ${ms(r.atMs)}): the end state differs from the last keyframe`,
+              },
       );
+    }
+  }
+
+  // A face turned past edge-on with its back face drawn is seen backwards: the question side of
+  // a flip card, mirrored over its answer, read "shown 1.00" (round 9).
+  const backwards = sorted.find((s) => s.dom?.mirrored && !s.dom.edgeOn && s.present >= thr);
+  if (backwards) {
+    findings.push({
+      rule: "mirrored",
+      severity: "fail",
+      atMs: backwards.atMs,
+      message: `seen mirrored at ${ms(backwards.atMs)}: it faces away from you (turned past edge-on) and its back face is drawn — give it backface-visibility: hidden (on each face of a flip card)`,
+    });
+  }
+
+  // A stroke that draws itself must end drawn: a dash shorter than the line leaves part of it off
+  // for good (a check mark stopped half way up its long arm, round 10).
+  const drawnAt = sorted.filter((s) => typeof s.dom?.drawn === "number");
+  if (drawnAt.length >= 2) {
+    const restDrawn = drawnAt.filter(isRest);
+    const endFrame = restDrawn[restDrawn.length - 1] ?? drawnAt[drawnAt.length - 1]!;
+    const changes =
+      Math.max(...drawnAt.map((s) => s.dom!.drawn!)) - Math.min(...drawnAt.map((s) => s.dom!.drawn!)) > 0.05;
+    const early = drawnAt.find((s) => (s.dom!.elapsedMs ?? 0) < 0 && s.dom!.drawn! > 0.02);
+    if (changes && endFrame.dom!.drawn! < 0.98 && !options.exits) {
+      findings.push({
+        rule: "stroke-incomplete",
+        severity: "fail",
+        atMs: endFrame.atMs,
+        message: `its stroke ends ${Math.round(endFrame.dom!.drawn! * 100)}% drawn at ${ms(endFrame.atMs)}${early ? `, and ${Math.round(early.dom!.drawn! * 100)}% of it shows at ${ms(early.atMs)}, before its draw begins` : ""}: ${endFrame.dom!.dashNote ?? "its dash pattern"} — a dash shorter than the line leaves the rest of it off. Set stroke-dasharray and stroke-dashoffset to at least the line's length (or pathLength="1" with 1 and 1)`,
+      });
+    }
+  }
+
+  // Gone from sight but still taking clicks: a banner faded to opacity 0 and left in place sits
+  // over whatever is behind it (round 11's brief: "nothing on the page can be clicked through it").
+  const blocking = sorted.filter(isRest).find((s) => s.dom?.catches && s.dom.opacity < 0.05);
+  if (blocking) {
+    const b = blocking.dom!.box;
+    findings.push({
+      rule: "invisible-blocker",
+      severity: "fail",
+      atMs: blocking.atMs,
+      message: `at rest (${ms(blocking.atMs)}) it is transparent (opacity ${blocking.dom!.opacity.toFixed(2)}) but still takes the clicks at its centre (${Math.round(b.x + b.width / 2)},${Math.round(b.y + b.height / 2)}): whatever is behind it cannot be clicked. Once it has left, take it out (display: none, or the hidden attribute, on animationend) or give it pointer-events: none`,
+    });
+  }
+
+  // Moved with no animation of its own: something else in the flow pushed it. An article followed
+  // a notice's margin-top down 56px and read "follows ease-out exactly, no fail" (round 10).
+  // Known only when the page said so: every frame's own animation time explicitly null.
+  const ownMotion = !(sorted.length > 0 && sorted.every((s) => s.dom !== undefined && s.dom.elapsedMs === null));
+  const movers = options.layoutMovers ?? [];
+  const pushedBy = `it has no animation of its own, so something else in the layout moves it — ${movers.length > 0 ? `${movers.join("; ")}: ` : ""}an animated layout property (margin, height, top, padding) on an element before it in the flow reflows everything after; animate transform (or take the element out of the flow) instead`;
+  if (exact && !ownMotion && !options.expectStill) {
+    const pts = geo.filter((p) => !p.rest).concat(geoRest);
+    const travel = pts.length >= 2 ? Math.max(...pts.map((p) => dist(p, pts[0]!))) : 0;
+    if (travel >= floor) {
+      findings.push({
+        rule: "pushed",
+        severity: "warn",
+        atMs: pts[0]!.atMs,
+        message: `moves ${Math.round(travel)}px while ${pushedBy}. If it is meant to make room (an accordion opening above it), this is that; if not, give it --still to make it a fail`,
+      });
+    }
+  }
+
+  // How far it turns, and which way: a gear "clockwise, one turn every 2s" had nothing to say it.
+  const turned = sorted.filter((x) => Number.isFinite(x.dom?.turnDeg ?? NaN));
+  let turnReport: { deg: number; perSecond: number; in3d?: boolean } | undefined;
+  if (turned.length >= 2) {
+    const v = turned.map((x) => x.dom!.turnDeg!);
+    for (let k = 1; k < v.length; k++) v[k] = v[k]! - 360 * Math.round((v[k]! - v[k - 1]!) / 360);
+    const deg = v[v.length - 1]! - v[0]!;
+    const span = turned[turned.length - 1]!.atMs - turned[0]!.atMs;
+    if (Math.abs(deg) >= 10 && span > 0)
+      turnReport = {
+        deg,
+        perSecond: (deg * 1000) / span,
+        ...(turned.some((x) => x.dom?.rotated3d) ? { in3d: true } : {}),
+      };
+  }
+  const turns = turnReport !== undefined;
+  if (options.expectDirection && isTurnWay(options.expectDirection)) {
+    const way = turnReport && !turnReport.in3d ? (turnReport.deg > 0 ? "clockwise" : "counterclockwise") : null;
+    if (way !== options.expectDirection) {
+      findings.push({
+        rule: "direction-mismatch",
+        severity: "fail",
+        atMs: segments[0]!.startMs,
+        message: way
+          ? `it turns ${way} (${Math.round(Math.abs(turnReport!.deg))}° over the frames), not ${options.expectDirection}: a rotate() with the wrong sign`
+          : `it does not turn (under 10° over the frames), so it does not turn ${options.expectDirection}`,
+      });
+    }
+  }
+
+  // Turning, with its centre carried round: it turns about some other point. Without
+  // --expect-still nothing said so for a gear orbiting its SVG's centre (round 12).
+  // Not in 3D: a card turning over has a box that is a turned shape's bounds under perspective.
+  const in3d = sorted.some((x) => x.dom?.rotated3d);
+  if (turns && !in3d && !options.expectStill && ownMotion && geo.length >= 2) {
+    const far = Math.max(...geo.map((p) => dist(p, geo[0]!)));
+    if (far >= floor) {
+      findings.push({
+        rule: "turn-off-centre",
+        severity: "warn",
+        atMs: segments[0]!.startMs,
+        message: `it turns, and its centre is carried up to ${Math.round(far)}px from where it starts: it turns about a point that is not its own centre (transform-origin)${sorted.some((x) => x.dom?.svg) ? ` — on an SVG element transform-origin is measured from the <svg>'s viewBox unless transform-box: fill-box` : ""}. If it should turn in place, give it --expect-still to make this a fail`,
+      });
+    }
+  }
+
+  // Its size stepping at once while it eases: a button widening over 300ms grew 20px taller in one
+  // frame and back, as its new label wrapped in the still-narrow box (round 12). Measured only.
+  if (exact) {
+    const boxes = sorted.filter(
+      (x) => !isRest(x) && x.dom && !x.dom.rotated3d && x.dom.opacity >= 0.05 && x.dom.box.width > 0,
+    );
+    for (const dim of ["height", "width"] as const) {
+      const steps = boxes
+        .slice(1)
+        .map((x, k) => ({ at: x.atMs, from: boxes[k]!, d: x.dom!.box[dim] - boxes[k]!.dom!.box[dim] }));
+      if (steps.length < 3) continue;
+      const big = steps.reduce((a, b) => (Math.abs(b.d) > Math.abs(a.d) ? b : a));
+      const others = steps.filter((s) => s !== big).map((s) => Math.abs(s.d));
+      const usual = Math.max(0.5, median(others));
+      if (Math.abs(big.d) >= 4 && Math.abs(big.d) > 4 * usual) {
+        const a = big.from.dom!.box[dim];
+        findings.push({
+          rule: "size-jump",
+          severity: "fail",
+          atMs: big.at,
+          message: `its ${dim} steps ${Math.round(a)} → ${Math.round(a + big.d)}px between ${ms(big.from.atMs)} and ${ms(big.at)} in one frame (other frames ${usual.toFixed(1)}px): nothing animates it, its content re-flows — text wrapping while the box is still narrow (white-space: nowrap on it), or content swapped in at once`,
+        });
+        break;
+      }
+    }
+  }
+
+  // Turned in 3D, a box's centre is the bounds of a turned shape under perspective, not a place.
+  const turnedAt = new Set(sorted.filter((s) => s.dom?.rotated3d).map((s) => s.atMs));
+  if (options.expectStill && geo.length > 0) {
+    const anchor = geoRest[0] ?? geo[geo.length - 1]!;
+    const far = [...geo, ...geoRest]
+      .filter((p) => !turnedAt.has(p.atMs))
+      .concat(anchor)
+      .reduce((a, b) => (dist(b, anchor) > dist(a, anchor) ? b : a));
+    if (dist(far, anchor) >= Math.max(2, still)) {
+      findings.push({
+        rule: "still-mismatch",
+        severity: "fail",
+        atMs: far.atMs,
+        message: `its centre is at ${Math.round(far.x)},${Math.round(far.y)} at ${ms(far.atMs)}, ${Math.round(dist(far, anchor))}px from ${Math.round(anchor.x)},${Math.round(anchor.y)} where it rests, though only its size and opacity may change: ${
+          !ownMotion
+            ? pushedBy
+            : turns
+              ? // A gear orbiting its SVG's centre read "a scale whose transform-origin…" (round 12).
+                `it turns about a point that is not its own centre (transform-origin)${sorted.some((x) => x.dom?.svg) ? ": on an SVG element transform-origin is measured from the <svg>'s viewBox unless transform-box: fill-box — give it transform-box: fill-box with transform-origin: center" : ""}`
+              : "a keyframe `transform` that replaces the element's own placement, or a scale whose transform-origin is not its centre"
+        }`,
+      });
     }
   }
 
@@ -697,16 +1052,24 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
   const firstMotion = sorted.find((s) => !isRest(s));
   if (
     firstMotion &&
+    !options.expectStill &&
+    // Nothing of its own to apply: an element no animation drives is still by design.
+    ownMotion &&
     firstMotion.present >= sure &&
     sorted.every((s) => shown(s)) &&
     geo.length >= 2 &&
-    Math.max(...geo.map((p) => dist(p, geo[0]!))) < floor &&
+    Math.max(...geo.map((p) => dist(p, geo[0]!))) < still &&
     !(
       exact &&
       sorted.some(
         (x) =>
           Math.abs(x.dom!.opacity - sorted[0]!.dom!.opacity) > 0.05 ||
-          Math.abs(x.dom!.scale - sorted[0]!.dom!.scale) > 0.01,
+          Math.abs(x.dom!.scale - sorted[0]!.dom!.scale) > 0.01 ||
+          // A spinner turns in place: static by its centre, not by its turn; a stroke draws in place.
+          Math.abs((x.dom!.turnDeg ?? 0) - (sorted[0]!.dom!.turnDeg ?? 0)) > 2 ||
+          Math.abs((x.dom!.drawn ?? 0) - (sorted[0]!.dom!.drawn ?? 0)) > 0.05 ||
+          // A colour that fades in place: a hover gradient read "target-static" (round 11).
+          (x.dom!.paint ?? []).some((v, i) => Math.abs(v - (sorted[0]!.dom!.paint?.[i] ?? v)) >= 8),
       )
     )
   ) {
@@ -714,26 +1077,69 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       rule: "target-static",
       severity: "warn",
       atMs: firstMotion.atMs,
-      message: `fully shown from ${ms(firstMotion.atMs)} and moves under ${floor}px in every frame: if it is meant to animate, its animation is not applying (a dropped rule, a misspelt animation-name)`,
+      message: `fully shown from ${ms(firstMotion.atMs)} and moves under ${still}px in every frame: if it is meant to animate, its animation is not applying (a dropped rule, a misspelt animation-name)`,
     });
   }
 
-  findings.sort((a, b) => a.atMs - b.atMs);
   const first = reports.find((x) => "best" in x.easing) ?? reports[0]!;
+  // How long a run takes and how many there are, from the element's own timing.
+  const timed = sorted.filter((x) => typeof x.dom?.durationMs === "number");
+  const durationMs = timed.length > 0 ? median(timed.map((x) => x.dom!.durationMs!)) : undefined;
+  const iterations = timed.find((x) => x.dom!.iterations !== undefined)?.dom!.iterations;
+  if (options.expectDurationMs !== undefined && durationMs !== undefined) {
+    const off = Math.abs(durationMs - options.expectDurationMs);
+    if (off > Math.max(START_TOLERANCE_MS, options.expectDurationMs * 0.05)) {
+      findings.push({
+        rule: "duration-mismatch",
+        severity: "fail",
+        atMs: segments[0]!.startMs,
+        message: `one run takes ${ms(durationMs)}, not ${ms(options.expectDurationMs)} (${(durationMs / options.expectDurationMs).toFixed(1)}x): its animation-duration decides it`,
+      });
+    }
+  }
+  if (options.expectIterations !== undefined && iterations !== undefined && iterations !== options.expectIterations) {
+    const say = (n: number | null) => (n === null ? "forever" : `${n} time${n === 1 ? "" : "s"}`);
+    findings.push({
+      rule: "iterations-mismatch",
+      severity: "fail",
+      atMs: segments[0]!.startMs,
+      message: `it runs ${say(iterations)}, not ${say(options.expectIterations)}: animation-iteration-count: ${options.expectIterations === null ? "infinite" : options.expectIterations}`,
+    });
+  }
+  if (unrecognised.size > 0) {
+    const at = [...unrecognised].sort((a, b) => a - b);
+    findings.push({
+      rule: "locate-unsure",
+      severity: "warn",
+      atMs: at[0]!,
+      message: `at ${at
+        .slice(0, 4)
+        .map(ms)
+        .join(
+          ", ",
+        )}${at.length > 4 ? ", …" : ""} the page shows it fully but the model did not find it from its description, so whether it can be seen there is the page's measure, not the model's: describe it by what it shows in every frame (a label that changes is not that)`,
+    });
+  }
+  findings.sort((a, b) => a.atMs - b.atMs);
+
   return {
     findings,
     path,
     segments: reports,
     travelPx: first.travelPx,
+    ...(geo.length >= 2 ? { excursionPx: Math.max(...geo.map((p) => dist(p, geo[0]!))) } : {}),
+    ...(turnReport ? { turn: turnReport } : {}),
     easing: first.easing,
     ...(startsAtMs !== undefined ? { startsAtMs } : {}),
+    ...(durationMs !== undefined ? { durationMs } : {}),
+    ...(iterations !== undefined ? { iterations } : {}),
   };
 }
 
 /**
  * The point of the box a scale keeps in place. Box = o + k (B - o) for the full-size box B and
  * relative scale k, so o = (box - k B) / (1 - k) on each axis; the median over every frame scaled
- * 10% or more from the largest. Full size is the largest scale in the segment (and its rest, for
+ * 2% or more from the largest. Full size is the largest scale in the segment (and its rest, for
  * the last): an entrance grows to it, an exit shrinks from it. A translate in the same keyframes
  * moves the point with it — it is then what the motion reads as, not the CSS property.
  */
@@ -746,22 +1152,41 @@ function scaleOrigin(
     (x) => x.dom && x.dom.scale > 0 && x.dom.box.width > 0 && x.dom.box.height > 0,
   );
   if (xs.length < 2) return null;
-  const ref = xs.reduce((a, b) => (b.dom!.scale > a.dom!.scale ? b : a));
-  const R = ref.dom!.box;
-  const fx: number[] = [];
-  const fy: number[] = [];
-  for (const x of xs) {
-    const k = x.dom!.scale / ref.dom!.scale;
-    if (k > 0.9) continue;
-    const b = x.dom!.box;
-    fx.push(((b.x - k * R.x) / (1 - k) - R.x) / R.width);
-    fy.push(((b.y - k * R.y) / (1 - k) - R.y) / R.height);
-  }
-  if (fx.length === 0) return null;
-  const o = { fx: median(fx), fy: median(fy) };
+  // Each axis on its own: a scaleY(0.2) drop-down read scale 1 from the matrix's first column,
+  // and no origin at all (motion-repair round 5).
+  const sx = (x: MotionSample) => x.dom!.scaleX ?? x.dom!.scale;
+  const sy = (x: MotionSample) => x.dom!.scaleY ?? x.dom!.scale;
+  const axis = (k: (x: MotionSample) => number, pos: "x" | "y", size: "width" | "height") => {
+    const ref = xs.reduce((a, b) => (k(b) > k(a) ? b : a));
+    const R = ref.dom!.box;
+    const out: number[] = [];
+    const used: MotionSample[] = [];
+    for (const x of xs) {
+      const r = k(x) / k(ref);
+      // 2% is the floor: a dialog growing 96% → 100% is the common case and read "less than 10%,
+      // not checked" (round 8). Measured boxes are exact enough to solve it.
+      if (r > 0.98) continue;
+      const b = x.dom!.box;
+      out.push(((b[pos] - r * R[pos]) / (1 - r) - R[pos]) / R[size]);
+      used.push(x);
+    }
+    return { f: out.length > 0 ? median(out) : null, used };
+  };
+  const ax = axis(sx, "x", "width");
+  const ay = axis(sy, "y", "height");
+  if (ax.f === null && ay.f === null) return null;
+  // The frame to look at: the most opaque of the scaled ones (at the segment's start a fade-in is
+  // at opacity 0, and "the first fail's own frame" showed nothing, round 4).
+  const shownAt = [...ax.used, ...ay.used].reduce((a, b) => (b.dom!.opacity > a.dom!.opacity ? b : a)).atMs;
+  const near = (got: number | null, w: number) => got === null || Math.abs(got - w) <= ORIGIN_SNAP;
+  // On one axis the name is its edge's ("top"), the other axis taken as the middle.
   const name =
     ORIGIN_NAMES.find(
-      (n) => Math.abs(originAt(n).fx - o.fx) <= ORIGIN_SNAP && Math.abs(originAt(n).fy - o.fy) <= ORIGIN_SNAP,
+      (n) =>
+        near(ax.f, originAt(n).fx) &&
+        near(ay.f, originAt(n).fy) &&
+        (ax.f !== null || originAt(n).fx === 0.5) &&
+        (ay.f !== null || originAt(n).fy === 0.5),
     ) ?? null;
-  return { ...o, name };
+  return { fx: ax.f, fy: ay.f, atMs: shownAt, name };
 }

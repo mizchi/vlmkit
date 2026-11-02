@@ -76,6 +76,10 @@ export interface AnimationTimingSample {
   palindromic: boolean;
   /** The properties its keyframes animate (camelCase, as getKeyframes names them). */
   properties?: string[];
+  /** animation-fill-mode as computed: none / forwards / backwards / both / auto. */
+  fill?: string;
+  /** Its first keyframe leaves the element unseen (opacity 0 or visibility hidden). */
+  startsHidden?: boolean;
 }
 
 export interface OscillationInfo {
@@ -176,6 +180,49 @@ export interface ClockMotion {
   settledAtMs: number | null;
   /** Exceptions thrown by page callbacks while the clock advanced (they do not stop it). */
   errors: string[];
+  /**
+   * CSS transitions and animations that came into being while the clock advanced — begun by a
+   * timer or a script, so the sweep's motion may be theirs and not a requestAnimationFrame loop.
+   */
+  started?: Array<{
+    selector: string;
+    name: string;
+    kind: "transition" | "animation";
+    atMs: number;
+    durationMs?: number;
+  }>;
+  /**
+   * An animation already seen begun again while the clock ran — on a new element (a re-render
+   * replaced it) or on the same one. A quote whose innerHTML was rebuilt every second replayed
+   * its price's entrance, and under --virtual-time it read "visible" and nothing else (round 11).
+   */
+  replays?: Array<{ selector: string; name: string; atMs: number[]; newElement: boolean }>;
+  /**
+   * What the clock ran in the window: animation-frame callbacks and timer runs. With no frame
+   * callback and timers at most 5 a second, the pixels change only when a timer updates the page
+   * (a clock, a live value): updates, not motion.
+   */
+  runs?: { frames: number; timers: number };
+}
+
+/** Pure: the sweep's pixels changed only as a slow timer updated the page (no animation frames). */
+export function clockUpdatesOnly(clock: Pick<ClockMotion, "runs" | "started" | "replays" | "windowMs">): boolean {
+  const r = clock.runs;
+  if (!r || r.frames > 0) return false;
+  // An animation a timer began, or began again, is motion.
+  if ((clock.started ?? []).length > 0 || (clock.replays ?? []).length > 0) return false;
+  return r.timers > 0 && r.timers <= 5 * Math.max(1, clock.windowMs / 1000);
+}
+
+/** Pure: what a clock sweep's motion is, named as far as the page let it be. */
+export function clockMotionSource(clock: Pick<ClockMotion, "started">): string {
+  const started = clock.started ?? [];
+  if (started.length === 0) return "requestAnimationFrame / timers";
+  const named = started
+    .slice(0, 3)
+    .map((s) => `${s.kind} \`${s.name}\` on ${s.selector} (begun at ${s.atMs}ms)`)
+    .join(", ");
+  return `a timer started ${named}${started.length > 3 ? ` and ${started.length - 3} more` : ""}`;
 }
 
 /** Pure: the settle instant of a clock sweep — null when its last interval still moved. */
@@ -205,7 +252,16 @@ export type AnimationEvalIssueKind =
   | "seek-ineffective"
   | "clock-motion-unsettled"
   | "undefined-keyframes"
-  | "motion-mostly-hidden";
+  | "motion-mostly-hidden"
+  | "delayed-entrance"
+  | "unknown-transition-property"
+  | "reduced-motion-hides"
+  | "layout-animation"
+  | "loop-seam"
+  | "stroke-incomplete"
+  | "discrete-transition"
+  | "animation-replayed"
+  | "zero-duration-animation";
 
 export interface AnimationEvalIssue {
   kind: AnimationEvalIssueKind;
@@ -218,10 +274,12 @@ export interface AnimationEvalReport {
   source: string;
   viewport: { width: number; height: number };
   animationCount: number;
+  /** Animations on a scroll timeline: listed, not evaluated (inspect motion sweeps the scroll). */
+  scrollDriven?: { selector: string; name: string; timeline: string }[];
   evaluated: EvaluatedAnimation[];
   /** Max over finite animations of delay + duration × iterations; null when an infinite animation is present. */
   settleMs: number | null;
-  infinite: { selector: string; name: string }[];
+  infinite: { selector: string; name: string; indicator?: string }[];
   /** Present unless the reduced-motion pass was skipped or there were no animations. */
   reducedMotion?: {
     remainingCount: number;
@@ -429,16 +487,65 @@ export function computeSettleMs(animations: AnimationTimingSample[]): number | n
   return settle;
 }
 
+/** An element that rests seen without reduced motion and hidden (or moved) with it. */
+export interface ReducedHidden {
+  selector: string;
+  opacity: number;
+  reducedOpacity: number;
+  /** How far its centre rests from where it rests without the preference (px). */
+  offPx: number;
+}
+
 export interface DeriveIssuesInput {
   evaluated: EvaluatedAnimation[];
   settleMs: number | null;
-  infinite: { selector: string; name: string }[];
+  infinite: { selector: string; name: string; indicator?: string }[];
   reducedMotion?: { remainingCount: number; remaining: ReducedMotionRemaining[] };
   uncontrolledMotion?: FrameDeltaStat;
   virtualTime?: boolean;
   clockMotion?: ClockMotion;
   undefinedKeyframes?: { selector: string; name: string; reducedMotion: boolean }[];
+  /** transition-property names no CSS property, with a duration over 0. */
+  unknownTransitions?: { selector: string; name: string }[];
+  /** CSS animations with no duration: they end as they begin. */
+  zeroDuration?: { selector: string; name: string }[];
+  /** A transition on background over a gradient, which does not interpolate. */
+  discreteTransitions?: { selector: string; name: string; image: string }[];
+  /** Seen at rest without the preference, hidden or out of place at rest under reduce. */
+  reducedHidden?: ReducedHidden[];
+  /** What an animation does beyond its own box (`MOTION_SHAPE_SCRIPT`). */
+  shapes?: MotionShapes;
 }
+
+export interface MotionShapes {
+  /** An in-flow element animating a layout property, and what that moved. */
+  pushes: {
+    selector: string;
+    name: string;
+    props: string[];
+    moved: { selector: string; dx: number; dy: number }[];
+    count: number;
+  }[];
+  /** A repeating animation whose run ends off the pose the next begins on. */
+  seams: {
+    selector: string;
+    name: string;
+    channel: string;
+    step: number;
+    usual: number;
+    unit: string;
+    prop: string;
+    from: string | null;
+    to: string | null;
+  }[];
+  /** A dashed stroke drawing itself that rests part drawn. */
+  strokes: { selector: string; name: string; drawn: number; note: string }[];
+  /** A looping animation on a loading indicator, and why it reads as one. */
+  indicators: { index: number; selector: string; name: string; why: string }[];
+}
+
+/** A delay this long (ms) at least, with the element held unseen through it, is a `delayed-entrance`. */
+export const DELAYED_ENTRANCE_MS = 1000;
 
 export function deriveAnimationIssues(
   input: DeriveIssuesInput,
@@ -449,6 +556,83 @@ export function deriveAnimationIssues(
   // is the number the gate actually measures against.
   const durationFloor = options.reducedMotionDurationFloorMs ?? 100;
   const issues: AnimationEvalIssue[] = [];
+
+  // Round 9: `animation: none` under reduce on a tile whose base style is opacity 0 left a page
+  // empty below its heading, and every gate called the preference honoured.
+  for (const h of input.reducedHidden ?? []) {
+    const gone = h.reducedOpacity < 0.05;
+    issues.push({
+      kind: "reduced-motion-hides",
+      severity: "suspect",
+      selector: h.selector,
+      message: gone
+        ? `${h.selector} rests at opacity ${h.reducedOpacity.toFixed(2)} under prefers-reduced-motion: reduce, and at ${h.opacity.toFixed(2)} without it: the reduce rule took its animation away, and with it the fill that showed it. Give it its end state in that rule (opacity: 1, transform: none), or make the hidden state the first keyframe's (fill: both) instead of the element's own.`
+        : `${h.selector} rests ${Math.round(h.offPx)}px from its place under prefers-reduced-motion: reduce: the reduce rule took its animation away and left the element where the animation started. Give it its end state in that rule (transform: none).`,
+    });
+  }
+
+  // Round 10: a notice animating margin-top shoved the article below it, a spinner keyed to
+  // 350deg jumped every second, and a check mark's dash stopped half way: every gate passed all
+  // three, because each defect is outside the animated element's own box or outside one run.
+  for (const push of input.shapes?.pushes ?? []) {
+    const moved = push.moved.map((m) => `${m.selector} ${Math.round(Math.hypot(m.dx, m.dy))}px`).join(", ");
+    issues.push({
+      kind: "layout-animation",
+      severity: "warn",
+      selector: push.selector,
+      message: `${push.selector} \`${push.name}\` animates ${push.props.map((p) => p.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)).join(", ")}, a layout property, in the flow, so it moves ${push.count} element(s) that have no animation of their own: ${moved}${push.count > push.moved.length ? ", …" : ""}. If they are meant to stay put, animate transform instead (or take ${push.selector} out of the flow); if pushing them is the design (an accordion opening), this is it.`,
+    });
+  }
+  for (const seam of input.shapes?.seams ?? []) {
+    const keyed = seam.from !== null && seam.to !== null ? ` (its keyframes run from ${seam.from} to ${seam.to})` : "";
+    const what = seam.channel === "turn" ? "turns" : seam.channel === "opacity" ? "fades" : "jumps";
+    issues.push({
+      kind: "loop-seam",
+      severity: "suspect",
+      selector: seam.selector,
+      message: `${seam.selector} \`${seam.name}\` ${what} ${seam.step.toFixed(1)}${seam.unit} in one step at the end of every run, against ${seam.usual.toFixed(2)}${seam.unit} a ms either side${keyed}: the run ends off the pose the next begins on. End it on the same pose it starts on (360deg for a turn, a whole copy for a ticker).`,
+    });
+  }
+  for (const stroke of input.shapes?.strokes ?? []) {
+    issues.push({
+      kind: "stroke-incomplete",
+      severity: "suspect",
+      selector: stroke.selector,
+      message: `${stroke.selector} \`${stroke.name}\` draws its stroke and rests ${Math.round(stroke.drawn * 100)}% drawn: ${stroke.note}. A dash shorter than the line leaves the rest of it off; make the dash (and the offset it starts from) at least the line's length, or set pathLength and use that.`,
+    });
+  }
+
+  // Round 11: a hover gradient with `transition: background 300ms` snapped, and every gate passed
+  // it — the transition is declared, has a duration, and never shows a frame between.
+  // Round 12: `animation-timeline: scroll(); animation: grow linear both;` — the shorthand after
+  // the timeline reset it to auto and the duration to 0s, so the bar was full from load. "1
+  // animation (evaluated 0)" and nothing else.
+  for (const z of input.zeroDuration ?? []) {
+    issues.push({
+      kind: "zero-duration-animation",
+      severity: "suspect",
+      selector: z.selector,
+      message: `${z.selector} \`${z.name}\` has no duration (0s): it ends the moment it begins, and its fill holds its last keyframe from the start. If it is meant to follow the scroll, \`animation-timeline\` has to come after the \`animation\` shorthand, which resets it to auto (and the duration to 0s); otherwise give it a duration.`,
+    });
+  }
+
+  for (const u of input.discreteTransitions ?? []) {
+    issues.push({
+      kind: "discrete-transition",
+      severity: "warn",
+      selector: u.selector,
+      message: `${u.selector} transitions \`${u.name}\` over a gradient (${u.image}): a gradient is an image and does not interpolate, so a change to another gradient steps at once with no frame between. To fade it, build the gradient from registered colour properties (@property --c { syntax: "<color>"; inherits: false; initial-value: … }) and transition those, or cross-fade a second gradient layer's opacity. If the gradient never changes, this transition does nothing.`,
+    });
+  }
+
+  for (const u of input.unknownTransitions ?? []) {
+    issues.push({
+      kind: "unknown-transition-property",
+      severity: "suspect",
+      selector: u.selector,
+      message: `${u.selector} transitions \`${u.name}\`, which is no CSS property, so that transition never runs and the property it meant changes in one frame. Check the spelling in transition / transition-property.`,
+    });
+  }
 
   for (const u of input.undefinedKeyframes ?? []) {
     issues.push({
@@ -461,6 +645,24 @@ export function deriveAnimationIssues(
           ? " — whatever that rule was meant to do for reduced-motion users (hide, settle) does not happen."
           : "."),
     });
+  }
+
+  // Held unseen through a long delay by a backwards fill: the page is there and this is not.
+  // Chips that should fade in "straight away" waited 1200ms, and every gate passed them
+  // (motion-repair round 5). A warn: a toast that appears after a second does this on purpose.
+  for (const anim of input.evaluated) {
+    if (
+      anim.startsHidden &&
+      anim.delayMs >= DELAYED_ENTRANCE_MS &&
+      (anim.fill === "backwards" || anim.fill === "both")
+    ) {
+      issues.push({
+        kind: "delayed-entrance",
+        severity: "warn",
+        selector: anim.selector,
+        message: `${anim.selector} is held unseen for the first ${Math.round(anim.delayMs)}ms: \`${anim.name}\` waits ${Math.round(anim.delayMs)}ms (animation-delay) and its fill (${anim.fill}) keeps its first, hidden keyframe until then. If it should appear with the page, drop the delay; if the wait is meant, this is its design.`,
+      });
+    }
   }
 
   for (const anim of input.evaluated) {
@@ -522,24 +724,52 @@ export function deriveAnimationIssues(
       // mentions the CSS-level option (bound the iteration count), which is what I
       // did." The page-side fix goes first now; the harness ones stay for the case
       // where the animation is meant to run forever.
-      message:
-        `${anim.selector} animation \`${anim.name}\` runs forever — the page never settles.` +
-        ` To fix the page, give it a bounded \`animation-iteration-count\` (or stop it once its work is done).` +
-        ` If it is meant to run forever, the capture side has to absorb it instead:` +
-        ` mask it with \`vlmkit snapshot <url> --mask "${anim.selector}"\` (that flag belongs to \`snapshot\` / \`diff html\`, not to this gate)` +
-        ` or pause animations before screenshots.`,
+      message: anim.indicator
+        ? // A spinner's brief says it turns forever; leading with "bound it" contradicted it (round 10).
+          `${anim.selector} animation \`${anim.name}\` runs forever, on what reads as a loading indicator (${anim.indicator}), which is meant to: that is not a defect of the page.` +
+          ` The capture side absorbs it: mask it with \`vlmkit snapshot <url> --mask "${anim.selector}"\` (that flag belongs to \`snapshot\` / \`diff html\`, not to this gate) or pause animations before screenshots.` +
+          ` If it should stop once its work is done, give it a bounded \`animation-iteration-count\` or remove it then.`
+        : `${anim.selector} animation \`${anim.name}\` runs forever — the page never settles.` +
+          ` To fix the page, give it a bounded \`animation-iteration-count\` (or stop it once its work is done).` +
+          ` If it is meant to run forever, the capture side has to absorb it instead:` +
+          ` mask it with \`vlmkit snapshot <url> --mask "${anim.selector}"\` (that flag belongs to \`snapshot\` / \`diff html\`, not to this gate)` +
+          ` or pause animations before screenshots.`,
     });
   }
 
   const clock = input.clockMotion;
-  if (clock?.visible && clock.settledAtMs === null) {
+  // An animation begun again as the clock ran. On a new element it is a re-render replaying an
+  // entrance (round 11's quote, every second); on the same one, a class toggled on a timer.
+  for (const r of clock?.replays ?? []) {
+    const when = r.atMs
+      .slice(0, 3)
+      .map((t) => `${t}ms`)
+      .join(", ");
+    issues.push({
+      kind: "animation-replayed",
+      severity: r.newElement ? "suspect" : "warn",
+      selector: r.selector,
+      message: r.newElement
+        ? `${r.selector} \`${r.name}\` plays again by ${when}${r.atMs.length > 3 ? ", …" : ""} of virtual time on a new element: the page replaced it (a re-render — innerHTML, a framework re-keying the node), and each new one plays its entrance again. Update what it shows (textContent, an attribute) instead of re-creating it.`
+        : `${r.selector} \`${r.name}\` begins again by ${when}${r.atMs.length > 3 ? ", …" : ""} of virtual time on the same element (a class or animation-name toggled on a timer). If it should play once, nothing should start it again.`,
+    });
+  }
+  const updatesOnly = clock ? clockUpdatesOnly(clock) : false;
+  if (clock?.visible && clock.settledAtMs === null && updatesOnly) {
+    const b = clock.motionBbox!;
+    issues.push({
+      kind: "clock-motion-unsettled",
+      severity: "warn",
+      message: `The page at (${b.x},${b.y}) ${b.width}x${b.height} changes only when a timer updates it (${clock.runs!.timers} timer run(s) in ${clock.windowMs}ms of virtual time, no animation frame): a value updated in place (a clock, a live price) is not motion, and needs nothing under reduced motion. It does keep captures from being still: mask the region in them.`,
+    });
+  } else if (clock?.visible && clock.settledAtMs === null) {
     const b = clock.motionBbox!;
     issues.push({
       kind: "clock-motion-unsettled",
       severity: "warn",
       message:
         `Script-driven motion at (${b.x},${b.y}) ${b.width}x${b.height} is still changing at ${clock.windowMs}ms of virtual time` +
-        ` — a requestAnimationFrame / timer loop that never stops, so the page never settles.` +
+        ` — ${(clock.started ?? []).length > 0 ? `${clockMotionSource(clock)}, and it` : "a requestAnimationFrame / timer loop that"} never stops, so the page never settles.` +
         ` Stop the loop once its work is done, and check \`matchMedia("(prefers-reduced-motion: reduce)")\` in the script;` +
         ` if it is meant to run forever, mask the region in captures.`,
     });
@@ -598,7 +828,13 @@ export function deriveAnimationIssues(
         ` If an element only reaches its place through an animation (an entrance from off-screen or from opacity 0), give it that end state in the same rule — \`animation: none\` alone leaves it where the animation started.` +
         (input.reducedMotion.remaining.some((r) => r.selector.startsWith("(script-driven"))
           ? ` For the script-driven motion, read \`matchMedia("(prefers-reduced-motion: reduce)")\` and skip or shorten the loop.`
-          : ""),
+          : "") +
+        (input.reducedMotion.remaining.some((r) => r.selector.includes(" a transition a timer started"))
+          ? ` For a transition a timer started, \`transition: none\` on it in that rule reduces it too.`
+          : "") +
+        // Every agent of four motion-repair rounds met this on a brief that says nothing about
+        // reduced motion, and none could reach exit 0 without adding behaviour nobody asked for.
+        ` When the task's brief sets no reduced-motion policy, this is WCAG 2.3.3 (AAA) advice rather than a defect of the repair: say so and judge the rest with \`--rule reduced-motion-ignored=off\`.`,
     });
   }
 
@@ -625,7 +861,7 @@ const ANIMATION_HELPERS_JS = `
   ${STABLE_SELECTOR_JS}
 
   function describeTiming(anim) {
-    let timing = { duration: 0, delay: 0, iterations: 1, direction: "normal", easing: "linear" };
+    let timing = { duration: 0, delay: 0, iterations: 1, direction: "normal", easing: "linear", fill: "none", startsHidden: false };
     try {
       const computed = anim.effect && anim.effect.getComputedTiming ? anim.effect.getComputedTiming() : null;
       if (computed) {
@@ -639,6 +875,14 @@ const ANIMATION_HELPERS_JS = `
           iterations: computed.iterations,
           direction: computed.direction || "normal",
           easing: computed.easing && computed.easing !== "linear" ? computed.easing : keyed.join(" / ") || "linear",
+          fill: computed.fill || "none",
+          // Its first keyframe leaves it unseen (opacity 0 or visibility hidden): held there
+          // through a delay by a backwards fill, the element is not on screen until it starts.
+          startsHidden: (() => {
+            const first = anim.effect.getKeyframes ? anim.effect.getKeyframes()[0] : null;
+            if (!first) return false;
+            return (first.opacity !== undefined && Number(first.opacity) <= 0.05) || first.visibility === "hidden";
+          })(),
         };
       }
     } catch {}
@@ -719,6 +963,7 @@ ${ANIMATION_HELPERS_JS}
     const target = event.target;
     if (!target || !target.getAnimations) return;
     for (const anim of target.getAnimations()) {
+      if (anim.timeline && !(anim.timeline instanceof DocumentTimeline)) continue;
       const name = animationName(anim);
       if (event.animationName !== undefined && name !== event.animationName) continue;
       const timing = describeTiming(anim);
@@ -746,7 +991,16 @@ ${ANIMATION_HELPERS_JS}
 
 const COLLECT_ANIMATIONS_SCRIPT = `(() => {
 ${ANIMATION_HELPERS_JS}
-  const anims = document.getAnimations ? document.getAnimations({ subtree: true }) : [];
+  // On a scroll timeline an animation's time is a share of the scroll, not ms: seeking it threw
+  // "not supported for progress based animations" (round 12). It is listed, not evaluated.
+  const all = document.getAnimations ? document.getAnimations({ subtree: true }) : [];
+  const anims = all.filter((a) => !a.timeline || a.timeline instanceof DocumentTimeline);
+  window.__vlmkitScrollDriven = all
+    .filter((a) => a.timeline && !(a.timeline instanceof DocumentTimeline))
+    .map((a) => {
+      const el = a.effect && a.effect.target;
+      return { selector: el ? stableSelector(el) : "(no target)", name: animationName(a), timeline: el ? getComputedStyle(el).animationTimeline : "" };
+    });
   window.__vlmkitAnims = anims;
   return anims.map((anim, index) => {
     const timing = describeTiming(anim);
@@ -775,6 +1029,8 @@ ${ANIMATION_HELPERS_JS}
       durationMs: timing.duration,
       delayMs: timing.delay,
       easing: timing.easing,
+      fill: timing.fill,
+      startsHidden: timing.startsHidden,
       iterations: Number.isFinite(timing.iterations) ? timing.iterations : null,
       playState,
       currentTimeMs,
@@ -811,6 +1067,231 @@ const NOT_MOTION = new Set([
   "boxShadow",
   "textShadow",
 ]);
+
+// A transition-property no browser knows: \`widht\` computes as itself and the transition never
+// runs, so a progress bar jumped to 70% and every gate passed it (motion-repair round 7).
+/**
+ * Every animated element at rest — each finite animation finished — with the opacity it renders
+ * at and the centre of its box: the targets the page's animations had (null), or those given.
+ */
+const restStateScript = (selectors: readonly string[] | null) => `(() => {
+  ${STABLE_SELECTOR_JS}
+  const given = ${JSON.stringify(selectors)};
+  const els = new Set();
+  if (given) for (const sel of given) { const el = document.querySelector(sel); if (el) els.add(el); }
+  else {
+    for (const a of document.getAnimations()) if (a.effect && a.effect.target) els.add(a.effect.target);
+    for (const r of window.__vlmkitStarted || []) { try { const el = document.querySelector(r.selector); if (el) els.add(el); } catch {} }
+  }
+  for (const a of document.getAnimations()) {
+    try { if (Number.isFinite(a.effect.getComputedTiming().endTime)) a.finish(); } catch {}
+  }
+  return [...els].map((el) => {
+    let op = getComputedStyle(el).visibility === "hidden" ? 0 : 1;
+    for (let n = el; n; n = n.parentElement) op *= Number(getComputedStyle(n).opacity);
+    const r = el.getBoundingClientRect();
+    return { selector: given ? given[[...els].indexOf(el)] ?? stableSelector(el) : stableSelector(el), opacity: op, x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  });
+})()`;
+
+const UNKNOWN_TRANSITION_PROPERTY_SCRIPT = `(() => {
+${ANIMATION_HELPERS_JS}
+  const out = [];
+  const seen = new Set();
+  for (const el of document.querySelectorAll("*")) {
+    const cs = getComputedStyle(el);
+    const props = cs.transitionProperty.split(",").map((p) => p.trim());
+    const durations = cs.transitionDuration.split(",").map((d) => parseFloat(d) || 0);
+    props.forEach((name, i) => {
+      if (!name || name === "all" || name === "none" || name.startsWith("--")) return;
+      if (!(durations[i % durations.length] > 0)) return;
+      if (CSS.supports(name, "initial")) return;
+      const selector = stableSelector(el);
+      if (seen.has(selector + "\\u0000" + name) || out.length >= 8) return;
+      seen.add(selector + "\\u0000" + name);
+      out.push({ selector, name });
+    });
+  }
+  return out;
+})()`;
+
+/**
+ * What an animation does beyond its own box, read from the held animations themselves
+ * (motion-repair round 10, where each of these passed every gate):
+ * - `pushes`: an in-flow element animating a layout property (`margin-top`) moves the elements
+ *   after it — their boxes at the start and the end of its first run differ.
+ * - `seams`: a repeating animation whose run does not end on the pose the next one begins on
+ *   (a spinner keyed to 350deg jumps 10deg a second). The step across the end of a run against
+ *   the steps either side of it; `steps()` timing is left out (every step jumps by design).
+ * - `strokes`: a dashed SVG stroke drawing itself that rests part drawn (a dash shorter than
+ *   its line), from the dash pattern along the path's length.
+ * - `indicators`: a looping animation on a loading indicator (role progressbar / status,
+ *   aria-busy, or named spin / load / busy), which is meant to run forever.
+ * Each animation's time is put back as it was found.
+ */
+const MOTION_SHAPE_SCRIPT = `(() => {
+${ANIMATION_HELPERS_JS}
+  const anims = window.__vlmkitAnims || [];
+  const LAYOUT = /^(margin|padding|width|height|minWidth|minHeight|maxWidth|maxHeight|borderWidth|border(Top|Right|Bottom|Left)Width|fontSize|lineHeight|flexBasis|gap|rowGap|columnGap|gridTemplate)/;
+  const nums = (v) => (String(v).match(/-?\\d*\\.?\\d+(e-?\\d+)?/g) || []).map(Number);
+  const pose = (el, props) => {
+    const cs = getComputedStyle(el);
+    const out = {};
+    for (const p of props) {
+      if (p === "transform") {
+        const m = new DOMMatrix(cs.transform === "none" ? undefined : cs.transform);
+        out.turn = (Math.atan2(m.b, m.a) * 180) / Math.PI;
+        out.x = m.e;
+        out.y = m.f;
+        out.scale = Math.hypot(m.a, m.b) * 100;
+      } else if (p === "opacity") out.opacity = Number(cs.opacity) * 100;
+      else nums(cs[p]).forEach((n, i) => { out[p + i] = n; });
+    }
+    return out;
+  };
+  const diff = (a, b) => {
+    const d = {};
+    for (const k of Object.keys(a)) {
+      let v = Math.abs((b[k] ?? 0) - a[k]);
+      if (k === "turn") v = Math.min(v, 360 - v);
+      d[k] = v;
+    }
+    return d;
+  };
+  const unit = (k) => (k === "turn" ? "°" : k === "opacity" || k === "scale" ? "%" : "px");
+  const describe = (el) => {
+    let n = el, why = null;
+    for (let depth = 0; n && depth < 4 && !why; n = n.parentElement, depth++) {
+      const role = n.getAttribute && n.getAttribute("role");
+      if (role === "progressbar" || role === "status") why = 'role="' + role + '"';
+      else if (n.getAttribute && n.getAttribute("aria-busy") === "true") why = 'aria-busy="true"';
+    }
+    return why;
+  };
+  const out = { pushes: [], seams: [], strokes: [], indicators: [] };
+  anims.forEach((anim, index) => {
+    const el = anim.effect && anim.effect.target;
+    if (!el || !anim.effect.getComputedTiming) return;
+    const t = anim.effect.getComputedTiming();
+    const d = typeof t.duration === "number" ? t.duration : 0;
+    if (!(d > 0)) return;
+    const delay = t.delay || 0;
+    const props = keyframeProps(anim);
+    const saved = anim.currentTime;
+    const selector = stableSelector(el);
+    const name = animationName(anim);
+    try {
+      const repeats = !Number.isFinite(t.iterations) || t.iterations > 1;
+      if (repeats) {
+        const why = describe(el) || (/spin|load|busy|progress/i.test(name + " " + (el.className && el.className.baseVal !== undefined ? el.className.baseVal : el.className)) ? "named " + name : null);
+        if (why) out.indicators.push({ index, selector, name, why });
+      }
+      const frames = anim.effect.getKeyframes ? anim.effect.getKeyframes() : [];
+      const stepped = [t.easing || "", ...frames.map((k) => k.easing || "")].some((e) => /steps|step-/.test(e));
+      if (repeats && !stepped && !String(t.direction).startsWith("alternate") && props.length > 0) {
+        const at = (ms) => { anim.currentTime = ms; return pose(el, props); };
+        const end = delay + d;
+        const a = at(end - 2), b = at(end - 1), c = at(end + 0.001), e = at(end + 1);
+        const before = diff(a, b), across = diff(b, c), after = diff(c, e);
+        for (const k of Object.keys(across)) {
+          const usual = Math.max(before[k], after[k]);
+          if (across[k] >= 2 && across[k] > 4 * usual + 0.5) {
+            const first = frames[0], last = frames[frames.length - 1];
+            const prop = k === "turn" || k === "x" || k === "y" || k === "scale" ? "transform" : k.replace(/\\d+$/, "");
+            out.seams.push({
+              selector, name, channel: k, step: across[k], usual, unit: unit(k),
+              from: first && first[prop] !== undefined ? String(first[prop]) : null,
+              to: last && last[prop] !== undefined ? String(last[prop]) : null,
+              prop,
+            });
+            break;
+          }
+        }
+      }
+      const cs = getComputedStyle(el);
+      const inFlow = cs.position !== "absolute" && cs.position !== "fixed";
+      const layoutProps = props.filter((p) => LAYOUT.test(p));
+      if (inFlow && layoutProps.length > 0) {
+        const skip = new Set();
+        for (let n = el; n; n = n.parentElement) skip.add(n);
+        const others = [...document.body.querySelectorAll("*")].filter((n) => !skip.has(n) && !el.contains(n)).slice(0, 2000);
+        const rects = () => others.map((n) => n.getBoundingClientRect());
+        anim.currentTime = delay;
+        const start = rects();
+        anim.currentTime = delay + d - 0.001;
+        const finish = rects();
+        const moved = [];
+        others.forEach((n, i) => {
+          const s0 = start[i], s1 = finish[i];
+          if (s0.width === 0 && s0.height === 0 && s1.width === 0 && s1.height === 0) return;
+          const dx = s1.x - s0.x, dy = s1.y - s0.y;
+          if (Math.hypot(dx, dy) < 2) return;
+          // Only the outermost of what moved together: a moved paragraph's text moves with it.
+          const parent = n.parentElement;
+          const pi = parent ? others.indexOf(parent) : -1;
+          if (pi >= 0) {
+            const pdx = finish[pi].x - start[pi].x, pdy = finish[pi].y - start[pi].y;
+            if (Math.abs(pdx - dx) < 1 && Math.abs(pdy - dy) < 1) return;
+          }
+          moved.push({ selector: stableSelector(n), dx, dy });
+        });
+        if (moved.length > 0) out.pushes.push({ selector, name, props: layoutProps, moved: moved.slice(0, 3), count: moved.length });
+      }
+      if (el instanceof SVGGeometryElement && Number.isFinite(t.iterations) && props.some((p) => p === "strokeDashoffset" || p === "strokeDasharray")) {
+        const drawnShare = () => {
+          const st = getComputedStyle(el);
+          if (!st.strokeDasharray || st.strokeDasharray === "none") return 1;
+          const dash = st.strokeDasharray.split(/[ ,]+/).map(parseFloat).filter((v) => Number.isFinite(v));
+          const pattern = dash.length % 2 === 1 ? [...dash, ...dash] : dash;
+          const period = pattern.reduce((x, y) => x + y, 0);
+          const len = el.getTotalLength();
+          const attr = Number(el.getAttribute("pathLength"));
+          const scaleLen = Number.isFinite(attr) && attr > 0 ? attr / len : 1;
+          const off = parseFloat(st.strokeDashoffset) || 0;
+          if (!(period > 0 && len > 0)) return 1;
+          let on = 0;
+          const step = len / 400;
+          for (let x = step / 2; x < len; x += step) {
+            let ph = (((x * scaleLen + off) % period) + period) % period;
+            for (let k = 0; k < pattern.length; k++) {
+              if (ph < pattern[k]) { if (k % 2 === 0) on++; break; }
+              ph -= pattern[k];
+            }
+          }
+          return { drawn: on / 400, note: "stroke-dasharray " + st.strokeDasharray + " with stroke-dashoffset " + st.strokeDashoffset + " on a line " + (len * scaleLen).toFixed(1) + " long" };
+        };
+        anim.currentTime = delay;
+        const first = drawnShare();
+        anim.currentTime = delay + d * t.iterations;
+        const rest = drawnShare();
+        const fd = typeof first === "number" ? first : first.drawn;
+        if (typeof rest !== "number" && Math.abs(rest.drawn - fd) > 0.05 && rest.drawn > 0.02 && rest.drawn < 0.98) {
+          out.strokes.push({ selector, name, drawn: rest.drawn, note: rest.note });
+        }
+      }
+    } catch {}
+    anim.currentTime = saved;
+  });
+  return out;
+})()`;
+
+const DISCRETE_TRANSITION_SCRIPT = `(() => {
+${ANIMATION_HELPERS_JS}
+  const out = [];
+  for (const el of document.querySelectorAll("*")) {
+    const cs = getComputedStyle(el);
+    if (!/gradient\\(/.test(cs.backgroundImage)) continue;
+    const props = cs.transitionProperty.split(",").map((p) => p.trim());
+    const durations = cs.transitionDuration.split(",").map((d) => parseFloat(d) || 0);
+    // Named, not \`all\`: a gradient button with \`transition: all\` for its hover lift was 4 of 5
+    // findings on the repo's pages, and its gradient never changes.
+    const i = props.findIndex((p, k) => /^(background|background-image)$/.test(p) && durations[k % durations.length] > 0);
+    if (i < 0 || out.length >= 8) continue;
+    const image = cs.backgroundImage.length > 60 ? cs.backgroundImage.slice(0, 57) + "..." : cs.backgroundImage;
+    out.push({ selector: stableSelector(el), name: props[i], image });
+  }
+  return out;
+})()`;
 
 const UNDEFINED_KEYFRAMES_SCRIPT = `(() => {
 ${ANIMATION_HELPERS_JS}
@@ -900,8 +1381,68 @@ async function sampleClock(
   const frames: FrameDeltaStat[] = [];
   let previous = baseline;
   let motionBbox: ClockMotion["motionBbox"] = null;
+  // Every animation present at virtual 0 is held; one that appears while the clock runs was
+  // begun by a timer or a script (round 7: a setTimeout adding a class read "script-driven").
+  const listStarted = () =>
+    page.evaluate(`(() => {
+      ${STABLE_SELECTOR_JS}
+      const seen = (window.__vlmkitSeenAnims = window.__vlmkitSeenAnims || new WeakSet());
+      const targets = (window.__vlmkitSeenTargets = window.__vlmkitSeenTargets || new WeakSet());
+      return document.getAnimations().map((a) => {
+        const el = a.effect && a.effect.target;
+        const fresh = !seen.has(a);
+        seen.add(a);
+        const newElement = !!el && !targets.has(el);
+        if (el) targets.add(el);
+        const kind = typeof a.transitionProperty === "string" ? "transition" : "animation";
+        const name = kind === "transition" ? a.transitionProperty : (a.animationName || a.id || "(el.animate)");
+        let durationMs = null;
+        try { durationMs = Number(a.effect.getComputedTiming().duration) || null; } catch {}
+        return { key: (el ? stableSelector(el) : "(no target)") + "\\u0000" + kind + "\\u0000" + name, selector: el ? stableSelector(el) : "(no target)", name, kind, durationMs, fresh, newElement };
+      });
+    })()`) as Promise<
+      Array<{
+        key: string;
+        selector: string;
+        name: string;
+        kind: "transition" | "animation";
+        durationMs: number | null;
+        fresh: boolean;
+        newElement: boolean;
+      }>
+    >;
+  const readRuns = () =>
+    page
+      .evaluate(() => {
+        const c = (window as unknown as { __vlmkitClock?: { runs?: () => { frames: number; timers: number } } })
+          .__vlmkitClock;
+        return c?.runs ? c.runs() : null;
+      })
+      .catch(() => null);
+  const runsBefore = await readRuns();
+  const known = new Set((await listStarted().catch(() => [])).map((a) => a.key));
+  const started: NonNullable<ClockMotion["started"]> = [];
+  const replays = new Map<string, { selector: string; name: string; atMs: number[]; newElement: boolean }>();
   for (const t of times) {
     await advanceClock(page, t);
+    for (const a of await listStarted().catch(() => [])) {
+      if (known.has(a.key) && a.fresh && a.kind === "animation") {
+        const r = replays.get(a.key) ?? { selector: a.selector, name: a.name, atMs: [], newElement: false };
+        r.atMs.push(t);
+        r.newElement ||= a.newElement;
+        replays.set(a.key, r);
+        continue;
+      }
+      if (known.has(a.key)) continue;
+      known.add(a.key);
+      started.push({
+        selector: a.selector,
+        name: a.name,
+        kind: a.kind,
+        atMs: t,
+        ...(a.durationMs !== null ? { durationMs: a.durationMs } : {}),
+      });
+    }
     const frame = await shot(`${label}-${t}ms`);
     const delta = frameDelta(previous, frame, tolerance);
     frames.push(delta);
@@ -911,6 +1452,7 @@ async function sampleClock(
   const errors = await page.evaluate(() => [
     ...(window as unknown as { __vlmkitClock: { errors: string[] } }).__vlmkitClock.errors,
   ]);
+  const runsAfter = await readRuns();
   return {
     windowMs,
     times,
@@ -919,11 +1461,18 @@ async function sampleClock(
     visible: frames.some((f) => f.changedPixels >= minChangedPixels),
     settledAtMs: clockSettledAt(times, frames, minChangedPixels),
     errors: errors.slice(0, 5),
+    ...(started.length > 0 ? { started } : {}),
+    ...(replays.size > 0 ? { replays: [...replays.values()] } : {}),
+    ...(runsBefore && runsAfter
+      ? { runs: { frames: runsAfter.frames - runsBefore.frames, timers: runsAfter.timers - runsBefore.timers } }
+      : {}),
   };
 }
 
 export async function runAnimationEval(options: AnimationEvalOptions): Promise<AnimationEvalReport> {
-  const viewport = options.viewport ?? { width: 1280, height: 720 };
+  // 1280x800, as check integrity and inspect motion: five motion-repair rounds of agents met
+  // 1280x720 here beside 1280x800 there, and a brief at 800 compared with frames at 720.
+  const viewport = options.viewport ?? { width: 1280, height: 800 };
   const samples = Math.max(1, options.samples ?? 4);
   const maxAnimations = options.maxAnimations ?? 8;
   const tolerance = options.tolerance ?? 8;
@@ -971,7 +1520,23 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
     await loadPage(page);
 
     const timings = await collectAnimations(page);
+    const scrollDriven = (await page.evaluate(
+      () => (window as unknown as { __vlmkitScrollDriven?: unknown[] }).__vlmkitScrollDriven ?? [],
+    )) as { selector: string; name: string; timeline: string }[];
+    const zeroDuration = timings
+      .filter((t) => t.type === "css-animation" && t.durationMs === 0)
+      .map((t) => ({ selector: t.selector, name: t.name }));
+    const shapes = (await page.evaluate(MOTION_SHAPE_SCRIPT)) as MotionShapes;
+    const discreteTransitions = (await page.evaluate(DISCRETE_TRANSITION_SCRIPT)) as {
+      selector: string;
+      name: string;
+      image: string;
+    }[];
     const undefinedOnPage = (await page.evaluate(UNDEFINED_KEYFRAMES_SCRIPT)) as { selector: string; name: string }[];
+    const unknownTransitions = (await page.evaluate(UNKNOWN_TRANSITION_PROPERTY_SCRIPT)) as {
+      selector: string;
+      name: string;
+    }[];
     // Settle / never-settles are about motion the page performs on its own, so a
     // paused animation does not count. `finished` used to be excluded here too,
     // on the reasoning that it is "visually static" — which quietly made the
@@ -993,7 +1558,10 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
     const settleMs = computeSettleMs(selfDriven);
     const infinite = selfDriven
       .filter((t) => t.iterations === null)
-      .map((t) => ({ selector: t.selector, name: t.name }));
+      .map((t) => {
+        const indicator = shapes.indicators.find((i) => i.index === t.index)?.why;
+        return { selector: t.selector, name: t.name, ...(indicator ? { indicator } : {}) };
+      });
 
     // Returns what the Animation reports right after the seek, so a seek that did not take is
     // visible to the caller instead of being photographed as if it had. `null` = it took.
@@ -1419,6 +1987,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
     // tricks (`animation-duration: 0.01ms`) count as honored.
     let reducedMotion: AnimationEvalReport["reducedMotion"];
     let undefinedUnderReduce: { selector: string; name: string }[] = [];
+    let reducedHidden: ReducedHidden[] = [];
     // Also when the only motion is script-driven: that page has no WAAPI animation to count,
     // and skipping the pass there would make a rAF loop that ignores the preference pass.
     if (!options.skipReducedMotion && (timings.length > 0 || clockMotion?.visible)) {
@@ -1427,6 +1996,32 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       await rmPage.emulateMedia({ reducedMotion: "reduce" });
       await loadPage(rmPage);
       const rmTimings = await collectAnimations(rmPage);
+      // Where each animated element rests with and without the preference: honouring it by taking
+      // the animation away can take the element's end state with it.
+      {
+        const restPage = await browser.newPage({ viewport });
+        try {
+          await loadPage(restPage);
+          type Rest = { selector: string; opacity: number; x: number; y: number };
+          const plain = (await restPage.evaluate(restStateScript(null))) as Rest[];
+          const seenPlain = plain.filter((r) => r.opacity >= 0.5);
+          if (seenPlain.length > 0) {
+            const reduced = (await rmPage.evaluate(restStateScript(seenPlain.map((r) => r.selector)))) as Rest[];
+            reducedHidden = seenPlain.flatMap((a) => {
+              const b = reduced.find((r) => r.selector === a.selector);
+              if (!b) return [];
+              const offPx = Math.hypot(b.x - a.x, b.y - a.y);
+              return b.opacity < 0.05 || offPx >= 8
+                ? [{ selector: a.selector, opacity: a.opacity, reducedOpacity: b.opacity, offPx }]
+                : [];
+            });
+          }
+        } catch {
+          reducedHidden = [];
+        } finally {
+          await restPage.close();
+        }
+      }
       undefinedUnderReduce = (await rmPage.evaluate(UNDEFINED_KEYFRAMES_SCRIPT)) as {
         selector: string;
         name: string;
@@ -1474,7 +2069,19 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       if (rmClock?.visible && rmClock.motionBbox) {
         const b = rmClock.motionBbox;
         const lasted = rmClock.settledAtMs ?? rmClock.windowMs;
-        if (lasted >= durationFloor) {
+        if (lasted >= durationFloor && (rmClock.started ?? []).length > 0) {
+          // A transition a timer began is CSS motion, and `transition: none` reduces it: naming
+          // it "requestAnimationFrame / timers" sent round 7's agents looking for a loop.
+          for (const st of rmClock.started!)
+            remaining.push({
+              selector: `${st.selector} (a ${st.kind} a timer started at ${st.atMs}ms)`,
+              name: st.name,
+              // Its own duration: "shrink 500ms" was the clock window for a 300ms animation (round 9).
+              durationMs: st.durationMs ?? lasted,
+            });
+        } else if (lasted >= durationFloor && !clockUpdatesOnly(rmClock)) {
+          // A value a slow timer updates in place is not motion: the quote's one-second ticker
+          // read "2 animation(s) still running" under reduce (round 11).
           remaining.push({
             selector: `(script-driven motion at ${b.x},${b.y} ${b.width}x${b.height})`,
             name: "requestAnimationFrame / timers",
@@ -1501,6 +2108,11 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         ...(options.virtualTime ? { virtualTime: true } : {}),
         ...(clockMotion ? { clockMotion } : {}),
         ...(undefinedKeyframes.length > 0 ? { undefinedKeyframes } : {}),
+        ...(unknownTransitions.length > 0 ? { unknownTransitions } : {}),
+        ...(discreteTransitions.length > 0 ? { discreteTransitions } : {}),
+        ...(zeroDuration.length > 0 ? { zeroDuration } : {}),
+        ...(reducedHidden.length > 0 ? { reducedHidden } : {}),
+        shapes,
       },
       {
         settleThresholdMs: options.settleThresholdMs,
@@ -1512,6 +2124,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       source: options.source,
       viewport,
       animationCount: timings.length,
+      ...(scrollDriven.length > 0 ? { scrollDriven } : {}),
       evaluated,
       settleMs,
       infinite,
@@ -1539,6 +2152,11 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
   lines.push(`status: ${status}`);
   lines.push(
     `animations: ${report.animationCount} (evaluated ${report.evaluated.length}, infinite ${report.infinite.length})`,
+    ...(report.scrollDriven
+      ? [
+          `scroll-driven: ${report.scrollDriven.map((s) => `${s.selector} \`${s.name}\` on ${s.timeline}`).join(", ")} — its time is the scroll's, so it is not evaluated here: \`vlmkit inspect motion <page> --selector <el>\` sweeps the scroll`,
+        ]
+      : []),
   );
   // The status block reads like the most important part of the output, so a line in
   // it that carries no rule id sends the reader hunting. A dogfood agent: "`settle:
@@ -1566,7 +2184,7 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
   if (report.reducedMotion) {
     lines.push(
       report.reducedMotion.remainingCount === 0
-        ? `reduced-motion: honored`
+        ? `reduced-motion: honored${report.issues.some((i) => i.kind === "reduced-motion-hides") ? ` — but ${report.issues.filter((i) => i.kind === "reduced-motion-hides").length} element(s) rest hidden or out of place under it${ruleTag("reduced-motion-hides")}` : ""}`
         : `reduced-motion: ${report.reducedMotion.remainingCount} animation(s) still running${ruleTag("reduced-motion-ignored")}`,
     );
   }
@@ -1585,10 +2203,14 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
     lines.push(
       !c.visible
         ? `script-driven motion: none in ${c.windowMs}ms of virtual time`
-        : c.settledAtMs === null
-          ? `script-driven motion${where}: still moving at ${c.windowMs}ms of virtual time${ruleTag("clock-motion-unsettled")}`
-          : `script-driven motion${where}: settles by ${c.settledAtMs}ms of virtual time${ruleTag("long-settle")}`,
+        : c.settledAtMs === null && clockUpdatesOnly(c)
+          ? `script-driven change${where}: a timer updates it in place (${c.runs!.timers} run(s), no animation frame) — not motion${ruleTag("clock-motion-unsettled")}`
+          : c.settledAtMs === null
+            ? `script-driven motion${where}: still moving at ${c.windowMs}ms of virtual time${ruleTag("clock-motion-unsettled")}`
+            : `script-driven motion${where}: settles by ${c.settledAtMs}ms of virtual time${ruleTag("long-settle")}`,
     );
+    if (c.visible && (c.started ?? []).length > 0)
+      lines.push(`${DIM}  not a requestAnimationFrame loop: ${clockMotionSource(c)}${RESET}`);
     if (c.errors.length > 0)
       lines.push(`${DIM}  page callbacks threw while the clock advanced: ${c.errors.join(" | ")}${RESET}`);
   }
@@ -1609,7 +2231,11 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
       // checkable — duration alone hides a 2x frequency difference between
       // `alternate` and palindromic-keyframe implementations.
       const oscLabel = osc.oscillating
-        ? ` (${anim.direction.startsWith("alternate") ? anim.direction : "palindromic keyframes"}, leg ${Math.round(osc.legMs)}ms)`
+        ? anim.direction.startsWith("alternate")
+          ? ` (${anim.direction}, leg ${Math.round(osc.legMs)}ms)`
+          : // One run goes out and back: say so, or a brief giving one throb's length (600ms)
+            // read the 300ms leg as the thing to fix (motion-repair round 6).
+            ` (palindromic keyframes: each ${Math.round(anim.durationMs)}ms run goes out and back, ${Math.round(osc.legMs)}ms each way)`
         : "";
       lines.push(
         `  - ${anim.selector} \`${anim.name}\` ${Math.round(anim.durationMs)}ms${anim.delayMs ? ` after ${Math.round(anim.delayMs)}ms` : ""}${anim.easing ? ` ${anim.easing}` : ""} x${anim.iterations ?? "∞"}${oscLabel}: ${visibility}, motion region ${bbox}, peak frame delta ${(anim.maxFrameRatio * 100).toFixed(2)}%`,
@@ -1628,6 +2254,11 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
   } else if (note === undefined) {
     lines.push("");
     lines.push(`${GREEN}No animation issues detected.${RESET}`);
+    // Round 8: a dialog a click opens, a card's :hover exit and a scroll reveal each passed here
+    // with "animations: 0", and every agent had to find out why.
+    lines.push(
+      `${DIM}Only motion that runs from load is evaluated: a transition or animation started by a click, a :hover or a scroll is not — \`vlmkit inspect motion <page> --selector <el> --click/--hover/--leave/--scroll <css>\` samples it.${RESET}`,
+    );
   }
   if (note) {
     lines.push("");
@@ -1642,7 +2273,7 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
         ? f.instants.map(formatInstant).join("/")
         : `${formatInstant(f.instants[0]!)}–${formatInstant(f.instants.at(-1)!)}`;
     // The viewport is named because it is easy to miss: a target at 1280x800 compared with
-    // frames at the default 1280x720 differed by 11% before anything else was looked at.
+    // frames at the old default 1280x720 differed by 11% before anything else was looked at.
     lines.push(
       `Frames: ${f.count} written to ${f.dir} at ${at}ms of page time` +
         ` (clock and animations held${f.reducedMotion ? ", prefers-reduced-motion: reduce" : ""}),` +

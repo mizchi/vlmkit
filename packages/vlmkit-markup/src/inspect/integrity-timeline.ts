@@ -141,6 +141,7 @@ export async function sampleIntegrityTimeline(
   options: {
     at?: readonly number[];
     storageState?: string;
+    reducedMotion?: boolean;
     har?: string;
     timeout?: number;
     waitUntil?: "domcontentloaded" | "load" | "networkidle";
@@ -150,6 +151,7 @@ export async function sampleIntegrityTimeline(
   collectors: Parameters<typeof judgeIntegrityInstant>[2],
 ): Promise<TimelineSweep> {
   const page = await browser.newPage(withAuthState({ viewport }, options.storageState));
+  if (options.reducedMotion) await page.emulateMedia({ reducedMotion: "reduce" });
   try {
     const timeline = await openHeldTimeline(page, url, options);
     const held = await timeline.animations();

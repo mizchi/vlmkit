@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Upload</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #fff; color: #1e2227; }
+  main { max-width: 640px; margin: 64px auto; padding: 0 24px; }
+  .track { height: 12px; border-radius: 6px; background: #e8ebef; overflow: hidden; }
+  .bar { height: 100%; width: 0; background: #2f7de1; transition: widht 600ms cubic-bezier(0, 0, 0.58, 1); }
+  .loaded .bar { width: 70%; }
+</style></head>
+<body>
+  <main>
+    <h1>Uploading report.pdf</h1>
+    <div class="track" role="progressbar" aria-valuenow="70" aria-valuemin="0" aria-valuemax="100"><div class="bar"></div></div>
+    <p>70% — about 20 seconds left</p>
+  </main>
+  <script>
+    setTimeout(() => document.querySelector("main").classList.add("loaded"), 100);
+  </script>
+</body></html>

@@ -58,6 +58,98 @@ describe("judgeMotionPath", () => {
     const ok = judgeMotionPath(samples, { startMs: 300, endMs: 400, expectOrigin: "top-right", expectStartMs: 300 });
     expect(ok.findings).toEqual([]);
   });
+
+  // Round 8 of motion-repair.
+  it("solves the point of a 96% → 100% scale, and fits a 4px lift instead of calling it static", () => {
+    // A 400x200 dialog centred on (640,400), growing about its centre.
+    const dlg = (atMs: number, k: number) => {
+      const box = { x: 640 - 200 * k, y: 400 - 100 * k, width: 400 * k, height: 200 * k };
+      return { atMs, present: 1, box, dom: { box, opacity: 1, scale: k } };
+    };
+    const grow = [0, 0.25, 0.5, 0.75, 1].map((t, i) => dlg(i * 50, 0.96 + 0.04 * easingAt("ease-out", t)));
+    const g = judgeMotionPath([...grow, dlg(500, 1)], {
+      startMs: 0,
+      endMs: 200,
+      expectOrigin: "center",
+      expectStill: true,
+    });
+    expect(g.segments[0]!.origin).toMatchObject({ name: "center" });
+    expect(g.findings).toEqual([]);
+    // A card lifting 4px with ease-out: a path, not "moves under 6px … not applying".
+    const lift = Array.from({ length: 11 }, (_, i) => {
+      const b = box(300, 105 - 4 * easingAt("ease-out", i / 10));
+      return { atMs: i * 15, present: 1, box: b, dom: { box: b, opacity: 1, scale: 1 } };
+    });
+    const rest = { ...lift[10]!, atMs: 450 };
+    const l = judgeMotionPath([...lift, rest], { startMs: 0, endMs: 150, expectEasing: "ease-out" });
+    expect(l.findings).toEqual([]);
+    expect(l.segments[0]!.direction?.way).toBe("up");
+  });
+
+  it("fails a face seen turned away, and judges neither edge-on frames nor a far side at rest (round 9)", () => {
+    const b = box(400, 200);
+    const face = (
+      atMs: number,
+      present: number,
+      dom: { edgeOn?: boolean; facingAway?: boolean; mirrored?: boolean },
+    ) => ({
+      atMs,
+      present,
+      box: b,
+      dom: { box: b, opacity: 1, scale: 1, visible: present, ...dom },
+    });
+    // The question side of a flip card, turning away: edge-on at 250ms, away from 300ms on.
+    const hidden = [
+      face(0, 1, {}),
+      face(100, 1, {}),
+      face(250, 0, { edgeOn: true }),
+      face(300, 0, { facingAway: true }),
+      face(499, 0, { facingAway: true }),
+      face(800, 0, { facingAway: true }),
+    ];
+    expect(judgeMotionPath(hidden, { startMs: 0, endMs: 500 }).findings).toEqual([]);
+    // The same with its back face drawn: seen mirrored.
+    const drawn = hidden.map((f) => (f.dom.facingAway ? face(f.atMs, 1, { facingAway: true, mirrored: true }) : f));
+    expect(judgeMotionPath(drawn, { startMs: 0, endMs: 500 }).findings.map((f) => f.rule)).toEqual(["mirrored"]);
+  });
+
+  it("names a keyframe transform that replaces the element's placement", () => {
+    // Off by (200,98) through the whole opening, at its place only once it stops.
+    const at = (atMs: number, dx: number, op: number) => {
+      const b = { x: 440 + dx, y: 300 + 98 * Math.sign(dx), width: 400, height: 200 };
+      return { atMs, present: 1, box: b, dom: { box: b, opacity: op, scale: 1 } };
+    };
+    const samples = [
+      at(0, 200, 0.2),
+      at(50, 200, 0.5),
+      at(100, 200, 0.7),
+      at(150, 200, 0.9),
+      at(199, 200, 1),
+      at(500, 0, 1),
+    ];
+    const r = judgeMotionPath(samples, { startMs: 0, endMs: 200, expectStill: true });
+    expect(r.findings.map((f) => f.rule).sort()).toEqual(["jump", "still-mismatch"]);
+    expect(r.findings.find((f) => f.rule === "jump")!.message).toMatch(
+      /sits 223px off where it rests .*translate\(-50%, -50%\)/,
+    );
+    expect(r.segments[0]!.direction).toBeUndefined();
+  });
+
+  it("names the edge a one-axis scale keeps, and checks only that axis", () => {
+    // A 300x60 box hanging from y = 100: scaleY about its bottom edge (y = 160).
+    const at = (atMs: number, k: number) => {
+      const box = { x: 100, y: 160 - 60 * k, width: 300, height: 60 * k };
+      return { atMs, present: 1, box, dom: { box, opacity: 1, scale: k, scaleX: 1, scaleY: k } };
+    };
+    const samples = [at(300, 0.2), at(330, 0.5), at(360, 0.8), at(390, 1), at(700, 1)];
+    const r = judgeMotionPath(samples, { startMs: 300, endMs: 400, expectOrigin: "top" });
+    expect(r.segments[0]!.origin).toMatchObject({ fx: null, name: "bottom" });
+    expect(r.findings.map((f) => f.message)).toEqual([
+      expect.stringMatching(/grows from its bottom edge .*not its top edge/),
+    ]);
+    // "bottom-left" asks the bottom edge along y; across, it does not scale, so nothing to check.
+    expect(judgeMotionPath(samples, { startMs: 300, endMs: 400, expectOrigin: "bottom-left" }).findings).toEqual([]);
+  });
   it("passes every intact easing, and names it", () => {
     for (const e of EASING_NAMES) {
       const s = run((t) => 40 + 480 * easingAt(e, t));
@@ -293,5 +385,46 @@ describe("what motion-repair round 1 passed", () => {
     const found = new Set(r.findings.map((f) => f.rule));
     assert.ok(found.has("target-lost"), JSON.stringify(r.findings));
     assert.ok(found.has("snap-back"), "the hold frames are back where the entrance began");
+  });
+
+  it("fits a colour that fades in place, and fails a transparent target that still takes clicks at rest", () => {
+    // A button whose gradient eases between two looks over 300ms; its box never moves.
+    const times = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 600];
+    const paintAt = (t: number) => {
+      const e = easingAt("ease", Math.min(1, t / 300));
+      return [
+        37 + (147 - 37) * e,
+        99 + (51 - 99) * e,
+        235,
+        255,
+        79 + (219 - 79) * e,
+        70 + (39 - 70) * e,
+        229 + (119 - 229) * e,
+        255,
+      ];
+    };
+    const colour = times.map((t) => ({
+      atMs: t,
+      present: 1,
+      box: box(300),
+      dom: { box: box(300), opacity: 1, scale: 1, paint: paintAt(t), elapsedMs: t },
+    }));
+    const c = judgeMotionPath(colour, { startMs: 0, endMs: 300 });
+    expect(c.findings).toEqual([]);
+    expect("best" in c.easing && [c.easing.best, c.easing.channel]).toEqual(["ease", "colour"]);
+    // A banner faded to opacity 0 and left where it was: gone from sight, still over the page.
+    const fade = times.map((t) => {
+      const e = easingAt("ease-in", Math.min(1, t / 300));
+      return {
+        atMs: t,
+        present: 1 - e,
+        box: box(300, 200 + 16 * e),
+        dom: { box: box(300, 200 + 16 * e), opacity: 1 - e, scale: 1, elapsedMs: t, catches: true },
+      };
+    });
+    const f = judgeMotionPath(fade, { startMs: 0, endMs: 300, exits: true });
+    expect(f.findings.map((x) => [x.rule, x.severity])).toEqual([["invisible-blocker", "fail"]]);
+    const gone = fade.map((x) => ({ ...x, dom: { ...x.dom, catches: x.atMs < 300 } }));
+    expect(judgeMotionPath(gone, { startMs: 0, endMs: 300, exits: true }).findings).toEqual([]);
   });
 });

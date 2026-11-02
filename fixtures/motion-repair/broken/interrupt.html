@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Orders</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #f6f7f9; color: #1d2026; }
+  main { max-width: 880px; margin: 40px auto; padding: 0 24px; }
+  .bar { position: relative; display: flex; gap: 12px; align-items: center; }
+  .filters { font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid #c9ced6; background: #fff; cursor: pointer; }
+  .menu { position: absolute; top: 48px; left: 0; width: 280px; padding: 12px; background: #fff; border: 1px solid #dde1e7; border-radius: 10px; box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12); transform-origin: top; transform: scaleY(0); opacity: 0; }
+  .menu label { display: block; padding: 6px 4px; }
+  .menu.open { animation: grow 300ms ease-out forwards; }
+  .menu.closing { animation: shrink 300ms ease-out forwards; }
+  @keyframes grow { from { transform: scaleY(0); opacity: 0; } to { transform: scaleY(1); opacity: 1; } }
+  @keyframes shrink { from { transform: scaleY(1); opacity: 1; } to { transform: scaleY(0); opacity: 0; } }
+  table { width: 100%; margin-top: 24px; border-collapse: collapse; background: #fff; }
+  td, th { text-align: left; padding: 10px 12px; border-bottom: 1px solid #eef0f3; }
+</style></head>
+<body>
+  <main>
+    <h1>Orders</h1>
+    <div class="bar">
+      <button type="button" class="filters" aria-expanded="false">Filters</button>
+      <div class="menu" role="group" aria-label="Filters">
+        <label><input type="checkbox"> Paid</label>
+        <label><input type="checkbox"> Shipped</label>
+        <label><input type="checkbox"> Refunded</label>
+        <label><input type="checkbox"> On hold</label>
+      </div>
+    </div>
+    <table>
+      <tr><th>Order</th><th>Customer</th><th>Total</th></tr>
+      <tr><td>#1042</td><td>Hana Kato</td><td>¥12,400</td></tr>
+      <tr><td>#1041</td><td>Leo Tanaka</td><td>¥3,980</td></tr>
+      <tr><td>#1040</td><td>Mai Suzuki</td><td>¥27,100</td></tr>
+    </table>
+  </main>
+  <script>
+    const menu = document.querySelector(".menu");
+    const button = document.querySelector(".filters");
+    button.addEventListener("click", () => {
+      const opening = !menu.classList.contains("open");
+      menu.classList.toggle("open", opening);
+      menu.classList.toggle("closing", !opening);
+      button.setAttribute("aria-expanded", String(opening));
+    });
+  </script>
+</body></html>

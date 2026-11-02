@@ -35,6 +35,16 @@ export function classifyVisualDiff(diff: VrtDiff): VisualSemanticDiff {
 }
 
 function classifyRegion(region: DiffRegion, diff: VrtDiff): VisualSemanticChange {
+  // Edge rendering only (antialiasing, compositing) and nothing moved: not a change of
+  // content. Two rest captures of one page read "4 element-added, 1 icon-change" (round 5).
+  if (region.edgeOnly && !(region.shift && (region.shift.dx !== 0 || region.shift.dy !== 0))) {
+    return {
+      type: "render-noise",
+      region,
+      confidence: 0.8,
+      description: `Edge rendering differs at (${region.x}, ${region.y}), ${region.width}x${region.height}: a 5x5 average removes most of it and it lightens as much as it darkens (antialiasing or layer compositing) — not a change of content`,
+    };
+  }
   // A measured translation beats the shape/color heuristics: a moved
   // element samples near-identical colors on both sides, which the
   // policy would misread as element-added (A/B validation v1/v2).
@@ -111,6 +121,8 @@ function describeChange(type: VisualChangeType, region: DiffRegion, diff: VrtDif
       return `Change at ${where}, ${dims}`;
     case "element-removed":
       return `Element disappeared at ${where}, ${dims}${formatColorSample(region)}`;
+    case "render-noise":
+      return `Edge rendering differs at ${where}, ${dims}`;
   }
 }
 

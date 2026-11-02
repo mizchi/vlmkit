@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Plans</title>
+<style>
+  * { box-sizing: border-box; }
+  @property --from { syntax: "<color>"; inherits: false; initial-value: #2563eb; }
+  @property --to { syntax: "<color>"; inherits: false; initial-value: #4f46e5; }
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; background: #0f1222; color: #e8eaf6; display: grid; place-items: center; min-height: 100vh; }
+  .plan { width: 420px; padding: 36px; border-radius: 18px; background: #181c33; text-align: center; }
+  .plan h1 { font-size: 26px; margin: 0 0 8px; }
+  .plan p { margin: 0 0 28px; color: #a9afd1; }
+  .upgrade { display: inline-block; padding: 16px 44px; border: 0; border-radius: 999px; color: #fff; font: 600 17px system-ui, sans-serif; cursor: pointer;
+    --from: #2563eb; --to: #4f46e5;
+    background: linear-gradient(90deg, var(--from), var(--to)); transition: --from 300ms ease, --to 300ms ease; }
+  .upgrade:hover { --from: #9333ea; --to: #db2777; }
+</style></head>
+<body>
+  <div class="plan">
+    <h1>Pro</h1>
+    <p>Unlimited projects, priority support, and the new timeline view.</p>
+    <button class="upgrade" type="button">Upgrade</button>
+  </div>
+</body></html>

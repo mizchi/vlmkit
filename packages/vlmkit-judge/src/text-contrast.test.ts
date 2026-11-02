@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
-import { describe, it } from "vite-plus/test";
-import { TEXT_CONTRAST_MAX_CANDIDATES, textContrastCandidates, type TextContrastSample } from "./integrity.ts";
+import { describe, expect, it } from "vite-plus/test";
+import {
+  TEXT_CONTRAST_MAX_CANDIDATES,
+  judgeTextContrast,
+  textContrastCandidates,
+  type TextContrastSample,
+} from "./integrity.ts";
 
 /**
  * The loop `COLLECT_TEXT_CONTRAST` used to run inside the page, now over its samples.
@@ -51,5 +56,44 @@ describe("textContrastCandidates", () => {
     const [c] = textContrastCandidates([grey(1, { disabled: true, shadowed: true })]).candidates;
     assert.equal(c!.disabled, true);
     assert.equal(c!.shadowed, true);
+  });
+});
+
+describe("text composited away by a transparent ancestor", () => {
+  it("names its own colour and the ancestor, not the composited white on white (motion-repair round 3)", () => {
+    const { candidates, skippedComposite } = textContrastCandidates([
+      {
+        selector: "div.shell > main > div",
+        text: "Quarterly report.pdf",
+        color: [27, 36, 48, 1],
+        backgrounds: [[255, 255, 255, 1]],
+        opacity: 0,
+        transparentBy: "div.shell",
+      },
+    ]);
+    const { findings } = judgeTextContrast(candidates, skippedComposite, 1280);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]!.kind).toBe("invisible-text");
+    expect(findings[0]!.message).toMatch(
+      /"Quarterly report\.pdf" \(rgb\(27, 36, 48\)\) at opacity 0\.00 because div\.shell is transparent — nothing of it is painted/,
+    );
+  });
+
+  it("exempts a section below the fold that is set to fade in: a scroll reveal (round 8)", () => {
+    const sample = {
+      selector: "section.reveal.team > h2",
+      text: "Team",
+      color: [29, 31, 34, 1] as [number, number, number, number],
+      backgrounds: [[251, 251, 250, 1] as [number, number, number, number]],
+      opacity: 0,
+      transparentBy: "section.reveal.team",
+    };
+    const waiting = textContrastCandidates([{ ...sample, revealPending: true }]);
+    const r = judgeTextContrast(waiting.candidates, waiting.skippedComposite, 1280);
+    expect(r.findings).toEqual([]);
+    expect(r.exempted[0]!.reason).toMatch(/scroll reveal .*--scroll section\.reveal\.team/);
+    // On screen and still transparent is the defect itself.
+    const shown = textContrastCandidates([sample]);
+    expect(judgeTextContrast(shown.candidates, shown.skippedComposite, 1280).findings).toHaveLength(1);
   });
 });

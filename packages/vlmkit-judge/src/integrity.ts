@@ -950,6 +950,11 @@ export interface ContrastCandidate {
   large?: boolean;
   /** The applicable floor: 3 for large text, 4.5 otherwise. */
   floor?: number;
+  /**
+   * Present when the text is composited away by an ancestor's opacity: its own colour before
+   * compositing, the opacity it renders at, and the ancestor that makes it transparent.
+   */
+  transparent?: { declared: string; opacity: number; by?: string; revealPending?: boolean };
 }
 
 /**
@@ -968,6 +973,13 @@ export interface TextContrastSample {
   backgrounds?: Rgba[];
   /** Product of the element's and its ancestors' opacity. */
   opacity?: number;
+  /** The outermost ancestor whose own opacity is under 0.05, when one is: what hides the text. */
+  transparentBy?: string;
+  /**
+   * What hides it lies wholly below the fold and is set to fade (an opacity transition, or an
+   * animation): a scroll reveal still waiting for its scroll, not text that is never shown.
+   */
+  revealPending?: boolean;
   fontSizePx?: number;
   fontWeight?: number;
   disabled?: boolean;
@@ -1014,6 +1026,16 @@ export function textContrastCandidates(samples: readonly TextContrastSample[]): 
       fontSizePx: Math.round(m.fontSizePx * 10) / 10,
       large: m.large,
       floor: m.floor,
+      ...((sample.opacity ?? 1) < 0.05
+        ? {
+            transparent: {
+              declared: formatRgb((sample.color ?? [0, 0, 0, 1]).slice(0, 3) as [number, number, number]),
+              opacity: Math.round((sample.opacity ?? 0) * 100) / 100,
+              ...(sample.transparentBy ? { by: sample.transparentBy } : {}),
+              ...(sample.revealPending ? { revealPending: true } : {}),
+            },
+          }
+        : {}),
     });
   }
   return { candidates, skippedComposite };
@@ -1060,6 +1082,16 @@ export function judgeTextContrast(
       });
       continue;
     }
+    if (c.ratio < 1.15 && c.transparent?.revealPending) {
+      const who = c.transparent.by ?? c.selector;
+      exempted.push({
+        kind: "invisible-text",
+        viewport,
+        selector: c.selector,
+        reason: `below the fold, transparent and set to fade: a scroll reveal waiting for its scroll — \`vlmkit inspect motion <page> --selector ${who} --scroll ${who}\` judges whether it arrives`,
+      });
+      continue;
+    }
     if (c.ratio < 1.15) {
       // `invisible-text` stays per element: it is a `fail`, and an invisible element
       // is a defect at that element rather than a colour choice to revisit.
@@ -1069,8 +1101,10 @@ export function judgeTextContrast(
         severity: "fail",
         viewport,
         selector: c.selector,
-        message: `${c.selector} renders "${clip(c.text)}" in ${c.fg} on ${c.bg} (contrast ${c.ratio.toFixed(2)}:1) — the text is effectively invisible.`,
-        evidence: { ratio: c.ratio, fg: c.fg, bg: c.bg },
+        message: c.transparent
+          ? `${c.selector} renders "${clip(c.text)}" (${c.transparent.declared}) at opacity ${c.transparent.opacity.toFixed(2)}${c.transparent.by ? ` because ${c.transparent.by} is transparent` : ""} — nothing of it is painted; its colours are not the cause.`
+          : `${c.selector} renders "${clip(c.text)}" in ${c.fg} on ${c.bg} (contrast ${c.ratio.toFixed(2)}:1) — the text is effectively invisible.`,
+        evidence: { ratio: c.ratio, fg: c.fg, bg: c.bg, ...(c.transparent ? { transparent: c.transparent } : {}) },
       });
       continue;
     }
@@ -1218,6 +1252,8 @@ export interface OcclusionCandidate {
   selector: string;
   text: string;
   occluder: string;
+  /** The text faces away from the viewer (turned past edge-on) with its back face drawn. */
+  facesAway?: boolean;
   /** occluded sample points / total sampled points, 0..1 */
   coverage: number;
   sampled: number;
@@ -1261,7 +1297,9 @@ export function findOccludedText(
       severity: "fail",
       viewport,
       selector: c.selector,
-      message: `"${clip(c.text)}" (${c.selector}) is painted over by an opaque element ${c.occluder} @${viewport} — ${Math.round(c.coverage * 100)}% of sampled glyph points hit the occluder instead of the text. Move or shrink the covering element, or reorder the stacking so the text stays readable.`,
+      message: c.facesAway
+        ? `"${clip(c.text)}" (${c.selector}) faces away from you, turned past edge-on with its back face drawn, behind ${c.occluder} @${viewport}: the far side of a flip card. Give the faces backface-visibility: hidden — reordering the stacking would show it mirrored.`
+        : `"${clip(c.text)}" (${c.selector}) is painted over by an opaque element ${c.occluder} @${viewport} — ${Math.round(c.coverage * 100)}% of sampled glyph points hit the occluder instead of the text. Move or shrink the covering element, or reorder the stacking so the text stays readable.`,
       evidence: { text: c.text, occluder: c.occluder, coverage: c.coverage },
     });
   }

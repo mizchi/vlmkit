@@ -31,6 +31,7 @@
  * through a noise band instead (`NoiseFloor`, `LOSSY_NOISE`): as neighbourhood means, a hold within
  * `still` of its first frame, a keyframe that only re-quantizes the picture read again.
  */
+import { edgeOnlyDelta } from "./edge-noise.ts";
 import { formatInstant, frameTimeMs, type FrameEntry, type FramesSource } from "./frames.ts";
 import { UsageError } from "./errors.ts";
 
@@ -595,6 +596,15 @@ export interface StoryEvent {
   maxStepDelta: number;
   /** Its frames whose capture never agreed: motion the capture did not hold. */
   unstable: number;
+  /**
+   * change / drift: between the state it left and the state it settled in, only edge rendering
+   * differs inside its box (antialiasing, a layer composited differently): not a change of
+   * content. A badge drawn on its own layer during an animation's delay read as a change into a
+   * new state at its start (motion-repair round 6).
+   */
+  edgeOnly?: true;
+  /** change / drift: how far the state it settled in differs from the state it left, over the floor. */
+  endOver?: number;
 }
 
 export interface StoryState {
@@ -652,6 +662,82 @@ export interface Storyboard {
    * still page departed at, a return after an event, or a change settling back.
    */
   reread?: (FrameRef & { state: string; as: "keyframe" | "return" | "settle" })[];
+  /**
+   * Returns that repeat one motion: three or more glitches or transients from one state, over one
+   * box, lasting the same frames (±1), one period apart (±20 ms and 5%). A spinner
+   * read as one "transient" a second, every second (motion-repair round 10); it is one loop.
+   */
+  loops?: StoryLoop[];
+  /** The page just before the action differs from frame 0 by this, over the floor. */
+  beforeFirst?: { over: number; box: Box | null };
+}
+
+export interface StoryLoop {
+  /** The events it groups, in order. */
+  events: string[];
+  /** The state each run leaves and comes back to. */
+  state: string;
+  /** Median time from one run's first frame to the next's. */
+  periodMs: number;
+  box: Box;
+}
+
+/** Repeating returns grouped as loops (`Storyboard.loops`). */
+export function findLoops(events: readonly StoryEvent[]): StoryLoop[] {
+  const loops: StoryLoop[] = [];
+  const sameBox = (a: Box, b: Box) =>
+    Math.abs(a.x - b.x) <= 2 &&
+    Math.abs(a.y - b.y) <= 2 &&
+    Math.abs(a.width - b.width) <= 4 &&
+    Math.abs(a.height - b.height) <= 4;
+  let run: StoryEvent[] = [];
+  const flush = () => {
+    if (run.length >= 3) {
+      const gaps = run
+        .slice(1)
+        .map((e, i) => e.first.atMs - run[i]!.first.atMs)
+        .sort((a, b) => a - b);
+      const box = run.reduce<Box | null>((b, e) => unionBox(b, e.box), null)!;
+      loops.push({
+        events: run.map((e) => e.id),
+        state: run[0]!.from,
+        periodMs: gaps[Math.floor(gaps.length / 2)]!,
+        box,
+      });
+    }
+    run = [];
+  };
+  for (const e of events) {
+    const returns = (e.kind === "glitch" || e.kind === "transient") && e.back !== undefined;
+    const prev = run[run.length - 1];
+    if (
+      returns &&
+      prev !== undefined &&
+      e.from === prev.from &&
+      sameBox(e.box, prev.box) &&
+      Math.abs(e.frames - prev.frames) <= 1 &&
+      (run.length < 2 ||
+        (() => {
+          const period = run[1]!.first.atMs - run[0]!.first.atMs;
+          return Math.abs(e.first.atMs - prev.first.atMs - period) <= 20 + period * 0.05;
+        })())
+    ) {
+      run.push(e);
+      continue;
+    }
+    // A period that broke off: the event before may still begin the next run with this one.
+    const carry =
+      returns &&
+      prev !== undefined &&
+      run.length < 3 &&
+      e.from === prev.from &&
+      sameBox(e.box, prev.box) &&
+      Math.abs(e.frames - prev.frames) <= 1;
+    flush();
+    if (returns) run = carry ? [prev!, e] : [e];
+  }
+  flush();
+  return loops;
 }
 
 export interface StoryboardOptions {
@@ -660,6 +746,12 @@ export interface StoryboardOptions {
   settleMs?: number;
   /** Boxes, in the frames' pixels, no comparison looks at: a video, a clock the capture cannot hold. */
   ignore?: readonly Box[];
+  /**
+   * The page just before the action the frames follow (`inspect interact`'s `before.png`), in the
+   * frames' size. A hover whose colour snapped had changed by frame 0, and the frames read "No
+   * events" (round 11): a difference here is what happened before the first frame.
+   */
+  before?: Uint8Array;
   /** Compare as neighbourhood means with a noise band (a lossy recording); its floor replaces `floor`. */
   noise?: NoiseFloor;
 }
@@ -2395,8 +2487,9 @@ export function buildStoryboard(
       spanStart = -1;
       break;
     }
+    const endOver = vsAnchor(settled).over;
     const to = stateOf(settled, s, m.box);
-    events.push({ ...event, to, settled: ref(settled) });
+    events.push({ ...event, to, settled: ref(settled), endOver });
     timeline.push({ event: id, from: ref(s), to: ref(settled) });
     state = to;
     // The anchor is the state's own frame, on a return to an earlier state too: anchored on the
@@ -2409,6 +2502,12 @@ export function buildStoryboard(
     j = settled + 1;
   }
   if (spanStart !== -1) timeline.push({ state, from: ref(spanStart), to: ref(count - 1) });
+  for (const e of events) {
+    if (!e.settled || (e.kind !== "change" && e.kind !== "drift")) continue;
+    const fromFrame = states.find((st) => st.id === e.from)!.frame.n;
+    const img = (n: number) => ({ width, height, data: pixels.pixels(n) });
+    if (edgeOnlyDelta(img(fromFrame), img(e.settled.n), e.box).edgeOnly) e.edgeOnly = true;
+  }
 
   return {
     format: STORYBOARD_FORMAT,
@@ -2440,6 +2539,15 @@ export function buildStoryboard(
     states,
     events,
     timeline,
+    ...(() => {
+      const loops = findLoops(events);
+      return loops.length > 0 ? { loops } : {};
+    })(),
+    ...(() => {
+      if (!options.before || options.before.length !== width * height * 4) return {};
+      const d = frameDelta(options.before, pixels.pixels(0), width, height, { floor, mask });
+      return d.over > 0 ? { beforeFirst: { over: d.over, box: d.box } } : {};
+    })(),
     ...(noise?.keyframe !== undefined ? { reread } : {}),
   };
 }
@@ -2543,13 +2651,22 @@ export function storyboardSummary(
     "",
     "## Events",
     "",
+    ...(story.beforeFirst
+      ? [
+          `Before frame 0: the page just before the action (before.png) differs from frame 0 by ${story.beforeFirst.over} px${story.beforeFirst.box ? ` over ${boxText(story.beforeFirst.box)}` : ""}. That change was done by the first frame — in one step, a snap, unless an event below goes on with it.`,
+          "",
+        ]
+      : []),
   ];
   if (story.events.length === 0) {
     const again = story.reread?.length ?? 0;
     lines.push(
       again > 0
         ? `None: every frame is within the floor of ${story.states[0]!.id}'s picture, read again at ${again} frame${again === 1 ? "" : "s"}.`
-        : `None: every frame is within the floor of frame 0 (${story.states[0]!.id}).`,
+        : `None: every frame is within the floor of frame 0 (${story.states[0]!.id}).` +
+            (r.channelFloor >= 8
+              ? ` A change between two near colours can sit under it (white on #f7f7f8 moves 8): \`--floor 2\` sees it.`
+              : ""),
     );
   } else {
     lines.push(
@@ -2565,6 +2682,15 @@ export function storyboardSummary(
       "",
       "Began: between the last frame that showed the state and the first that did not. Ended: between the last frame that differed and the first back (glitch, transient), or between the last frame that moved and the first of the hold (change, drift). Box: every pixel the event moved over the floor, in the frames' pixels.",
     );
+  }
+  if (story.loops && story.loops.length > 0) {
+    lines.push("", "## Loops", "");
+    for (const loop of story.loops) {
+      const span = `${loop.events[0]}–${loop.events[loop.events.length - 1]}`;
+      lines.push(
+        `- ${span} (${loop.events.length} runs) repeat one motion every ${ms(loop.periodMs)} ms over ${boxText(loop.box)} px, leaving ${loop.state} and coming back to it: one loop, not ${loop.events.length} departures. Whether each run ends on the pose the next begins on is not in these pixels at this floor; \`check animation\` (loop-seam) measures it.`,
+      );
+    }
   }
   lines.push("", "## States", "", "| State | Frame | Visits |", "|---|---|---|");
   for (const s of story.states) lines.push(`| ${s.id} | ${ms(s.frame.atMs)} ms (n ${s.frame.n}) | ${s.visits} |`);
@@ -2607,6 +2733,11 @@ export function storyboardSummary(
           : `${e.id}: its pixels were last ${exactly} ${e.from}'s at ${ms(e.movedAfter.atMs)} ms, and moved below the floor until it showed.`,
       );
     }
+    if (e.edgeOnly) {
+      notes.push(
+        `${e.id}: between ${e.from}'s frame and ${e.to}'s, only edge rendering differs inside its box (a 5x5 average removes most of it, and it lightens as much as it darkens) — antialiasing or a layer composited differently, not a change of content.`,
+      );
+    }
     if (e.noHold) {
       notes.push(
         `${e.id} reached no hold: the last frame (${ms(f.toMs)} ms) differs from the one before it, and what came after is not in the sequence.`,
@@ -2623,6 +2754,19 @@ export function storyboardSummary(
       );
     }
     if (e.unstable > 0) notes.push(`${e.id}: ${e.unstable} of its frames never captured the same twice.`);
+    // Largest at its first frame and less after: what was there went at once and came back over
+    // the event. A quote re-rendered every second read only as a "change" (round 11).
+    if (
+      e.kind === "change" &&
+      e.frames >= 3 &&
+      e.endOver !== undefined &&
+      e.peak.n - e.first.n <= Math.max(2, Math.floor(e.frames * 0.2)) &&
+      e.peak.over >= 2 * Math.max(1, e.endOver)
+    ) {
+      notes.push(
+        `${e.id}: it differs most near its start (${e.peak.over} px at ${ms(e.peak.atMs)} ms) and ends ${e.endOver} px from ${e.from}: what was in its box went at once and came back over ${ms(e.settled!.atMs - e.first.atMs)} ms — an entrance playing again (an element re-created, a class reset), not a move.`,
+      );
+    }
   }
   const reread = story.reread ?? [];
   if (reread.length > 0) {

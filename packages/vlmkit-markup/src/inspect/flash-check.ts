@@ -207,6 +207,8 @@ export interface FlashReport {
     manifest?: string;
     /** A recording's decoding: codec, decoder, colour, which frames. */
     video?: FramesVideo;
+    /** Animations on a scroll timeline, not judged: they follow the scroll, which the sweep does not move. */
+    scrollDriven?: { selector: string; name: string }[];
   };
   /** Every number the verdict rests on, printed so a reader sees each assumption. */
   criteria: {
@@ -638,6 +640,8 @@ interface Captured {
   still: boolean;
   navigations: number;
   url: string;
+  /** Animations on a scroll timeline: the sweep moves time, not the scroll, so they never move. */
+  scrollDriven?: { selector: string; name: string }[];
 }
 
 /** What the held clock had queued once the page loaded (`VIRTUAL_CLOCK_SCRIPT`'s `pending()`). */
@@ -659,6 +663,22 @@ async function sweepPage(
   await page.addInitScript(MEDIA_HOLD_SCRIPT);
   const timeline = await openHeldTimeline(page, url, options);
   await timeline.at(0);
+  // A reading bar on a scroll timeline "passed" as still (round 12): the sweep never scrolls.
+  const scrollDriven = (await page
+    .evaluate(() =>
+      document
+        .getAnimations()
+        .filter((a) => a.timeline && !(a.timeline instanceof DocumentTimeline))
+        .map((a) => {
+          const el = (a.effect as KeyframeEffect | null)?.target as Element | null;
+          const name = el
+            ? el.tagName.toLowerCase() +
+              (typeof el.className === "string" && el.className.trim() ? `.${el.className.trim().split(/\s+/)[0]}` : "")
+            : "(no target)";
+          return { selector: name, name: (a as CSSAnimation).animationName || "an animation" };
+        }),
+    )
+    .catch(() => [])) as { selector: string; name: string }[];
   const held = await timeline.animations();
   // Every frame's: an iframe's delayed strobe or pending timer sets the window as the page's would.
   const pending: ClockPending = await timeline.pending();
@@ -823,6 +843,7 @@ async function sweepPage(
     url,
     unmeasured: merged,
     counted,
+    ...(scrollDriven.length > 0 ? { scrollDriven } : {}),
   };
 }
 
@@ -1293,6 +1314,7 @@ export async function runFlashCheck(options: FlashCheckOptions): Promise<FlashRe
           viewport,
           cssPerPx: captured.cssPerPx,
           clock: "held",
+          ...(captured.scrollDriven ? { scrollDriven: captured.scrollDriven } : {}),
           ...(keep ? { manifest: join(keep, "frames.json") } : {}),
         },
         criteria: criteria(),
@@ -1677,6 +1699,11 @@ export function formatFlashReport(report: FlashReport, rules?: RuleView): string
   const lines = [
     `check flash: ${report.source.path}`,
     flashHeadline(report),
+    ...(report.source.scrollDriven
+      ? [
+          `not judged: ${report.source.scrollDriven.map((s) => `${s.selector} \`${s.name}\``).join(", ")} on a scroll timeline — it follows the scroll, which this sweep does not move. A strobe tied to the scroll flashes as fast as someone scrolls: check it by its keyframes, or sweep it with \`vlmkit inspect motion <page> --selector <el>\``,
+        ]
+      : []),
     ...(v
       ? [
           `recording: ${v.codec}${v.decoder === "import" ? "" : v.lossless ? " (lossless)" : " (lossy)"} decoded by ${v.decoder}, shown at ${report.source.viewport.width}x${report.source.viewport.height} CSS px (${Number(report.source.cssPerPx.toFixed(4))} frame px per CSS px: --display-width sets it)${v.color?.assumed.length ? `; ${v.color.assumed.join(" and ")} not tagged, assumed ${v.color.matrix} ${v.color.range === "tv" ? "limited" : "full"} (--color-matrix / --color-range override)` : ""}`,

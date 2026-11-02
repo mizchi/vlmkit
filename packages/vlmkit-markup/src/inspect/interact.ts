@@ -214,6 +214,11 @@ export interface FrameSequenceEntry extends FramesWritten {
    * to the real one.
    */
   cancelled: number;
+  /**
+   * The longest any frame was shot after its offset, in ms. A timer's or a script's work runs on
+   * the real clock, so its frames place it to within this; held CSS motion is exact regardless.
+   */
+  maxLagMs?: number;
 }
 
 /** Where a `click` with `describe` landed, so the run says what it clicked. */
@@ -597,7 +602,9 @@ export const INTERACTION_HOLD_SCRIPT = `(() => {
       const spans = [];
       for (const [anim, e] of entries) {
         const state = anim.playState;
-        if (state === "idle") { if (!quiet.has(anim)) cancelled.add(anim); continue; }
+        // One the seek already took to its end is not cancelled: a banner hidden on its animationend
+        // removes the finished animation, and read "cancelled or replaced mid-window" (round 11).
+        if (state === "idle") { if (!quiet.has(anim) && !endAt.has(anim)) cancelled.add(anim); continue; }
         if (state === "finished") continue;
         const begin = e.pre ? e.origin - anchor : Math.max(0, e.origin - anchor);
         const span = Number.isFinite(e.end) ? (e.rate > 0 ? e.end - e.from : e.from) / Math.abs(e.rate) : Infinity;
@@ -776,7 +783,7 @@ async function settleMotion(page: Page): Promise<void> {
 async function recordFrames(
   page: Page,
   options: { dir: string; armedDoc: string; offsets: readonly number[]; source: FramesSource },
-): Promise<FramesWritten & { navigatedAtMs?: number; cancelled: number; error?: string }> {
+): Promise<FramesWritten & { navigatedAtMs?: number; cancelled: number; error?: string; maxLagMs?: number }> {
   await ensureHold(page);
   const start = await liveEval(
     page,
@@ -808,6 +815,7 @@ async function recordFrames(
   let docId = start.docId;
   let navigatedAtMs: number | undefined = docId !== options.armedDoc ? 0 : undefined;
   let cancelled = 0;
+  let maxLagMs: number | undefined;
   const writer = await frameWriter(options.dir, options.source);
   const clock = () => liveEval(page, (a) => (window as unknown as InteractWindow).__vlmkitInteract!.now() - a, anchor);
   // A new document (a link, a reload, a redirect): armed, so its motion is held on the same clock.
@@ -841,6 +849,7 @@ async function recordFrames(
     ...(navigatedAtMs !== undefined ? { navigatedAtMs } : {}),
     cancelled,
     ...(error !== undefined ? { error } : {}),
+    ...(maxLagMs !== undefined ? { maxLagMs } : {}),
   };
 
   async function frameAt(atMs: number): Promise<void> {
@@ -862,6 +871,7 @@ async function recordFrames(
     cancelled = Math.max(cancelled, result.cancelled);
     const { png, stable, at } = await captureStable(page, { clock });
     await writer.add(png, { atMs, stable, shotMs: Math.round(at ?? 0) });
+    if (at !== undefined) maxLagMs = Math.max(maxLagMs ?? 0, Math.round(at - atMs));
     // A document that committed while this frame was shot: say so from this offset on.
     await checkDocument(atMs);
   }
@@ -869,7 +879,23 @@ async function recordFrames(
 
 const firstLine = (thrown: unknown) => String(thrown instanceof Error ? thrown.message : thrown).split("\n")[0]!;
 
-const MOTION_OFF_CSS = `*, *::before, *::after { transition: none !important; animation: none !important; }`;
+// An animation on a scroll timeline is left on: it is where the scroll is, not motion in time, and
+// `animation: none` showed a reading bar full at every scroll position (round 12). Its element is
+// marked first (`markScrollDriven`); `:where` keeps the rule at `*`'s specificity, so with nothing
+// marked it is the same rule.
+const MOTION_OFF_CSS = `*, *::before, *::after { transition: none !important; } :where(:not([data-vlmkit-scroll-driven])), :where(:not([data-vlmkit-scroll-driven]))::before, :where(:not([data-vlmkit-scroll-driven]))::after { animation: none !important; }`;
+
+async function markScrollDriven(page: Page): Promise<void> {
+  await page
+    .evaluate(() => {
+      for (const a of document.getAnimations()) {
+        if (!a.timeline || a.timeline instanceof DocumentTimeline) continue;
+        const el = (a.effect as KeyframeEffect | null)?.target as Element | null;
+        el?.setAttribute("data-vlmkit-scroll-driven", "");
+      }
+    })
+    .catch(() => {});
+}
 
 async function loadSource(page: Page, source: string): Promise<void> {
   if (isUrl(source)) {
@@ -911,6 +937,7 @@ async function recordFramesStep(
     // On every document from the start, so a navigation in the window keeps it. Inert until armed.
     await page.addInitScript(INTERACTION_HOLD_SCRIPT);
     await loadSource(page, options.source);
+    await markScrollDriven(page);
     const off = await page.addStyleTag({ content: MOTION_OFF_CSS });
     for (const prior of options.steps.slice(0, options.index - 1)) {
       if (prior.action === "snapshot" || prior.action === "frames") continue;
@@ -929,6 +956,13 @@ async function recordFramesStep(
       () => (window as unknown as InteractWindow).__vlmkitInteract!.arm(),
       undefined,
     );
+    // The page just before the action: a change done by the first frame (a hover colour that
+    // snapped) is told from it, beside the frames (round 11).
+    const before = await captureStable(page).catch(() => null);
+    if (before) {
+      await mkdir(options.dir, { recursive: true });
+      await writeFile(join(options.dir, "before.png"), before.png);
+    }
     let actionError: string | undefined;
     try {
       await executeStep(page, action);
@@ -946,6 +980,7 @@ async function recordFramesStep(
         ...facts,
         clock: "wall",
         step: options.name,
+        ...(before ? { before: "before.png" } : {}),
       },
     });
     return { ...written, ...entry, ...(actionError !== undefined ? { actionError } : {}) };
@@ -972,7 +1007,15 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
   await mkdir(outputDir, { recursive: true });
 
   const sequenceText = await readFile(resolve(options.sequencePath), "utf-8");
-  const sequence: Sequence = JSON.parse(sequenceText);
+  // A bare array of steps is a sequence too: given one, `sequence.steps` was undefined and the
+  // run died in a TypeError (motion-repair round 7). Anything else names the schema.
+  const parsed = JSON.parse(sequenceText) as Sequence | Sequence["steps"];
+  const sequence: Sequence = Array.isArray(parsed) ? { steps: parsed } : parsed;
+  if (!sequence || !Array.isArray(sequence.steps)) {
+    throw new Error(
+      `${options.sequencePath}: a sequence is { "steps": [ … ] } (or a bare array of steps); see --help for the step schema`,
+    );
+  }
   const viewport = sequence.viewport ?? { width: 1280, height: 720 };
   const threshold = options.threshold ?? 0.03;
 
@@ -1036,6 +1079,7 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
   await withBrowser(async (browser) => {
     const page = await browser.newPage({ viewport });
     await loadSource(page, options.source);
+    await markScrollDriven(page);
     await page.addStyleTag({ content: MOTION_OFF_CSS });
 
     // The run every sequence gets, frames steps or not: motion off, so snapshots, transitions and
@@ -1241,9 +1285,13 @@ export function formatInteractReport(
       );
     }
   }
+  // How much each step changed the page, not whether it was right: a ✓ beside every scroll of a
+  // broken reveal read as a pass (motion-repair round 8). Nothing here is a verdict.
+  if (report.transitions.length > 0)
+    lines.push(`  ${DIM}pixels changed between snapshots (a measurement, not a verdict):${RESET}`);
   for (const t of report.transitions) {
     const pct = (t.diffRatio * 100).toFixed(2);
-    const icon = t.diffRatio === 0 ? `${YELLOW}~${RESET}` : `${GREEN}✓${RESET}`;
+    const icon = t.diffRatio === 0 ? `${YELLOW}=${RESET}` : `${CYAN}Δ${RESET}`;
     const summary = t.actions.map(summarizeAction).join(", ");
     lines.push(`  ${icon} ${t.from} → ${t.to}  ${pct.padStart(6)}%  ${DIM}${summary}${RESET}`);
   }
@@ -1278,6 +1326,12 @@ function frameSequenceNotes(f: FrameSequenceEntry): string[] {
     ...(f.unstable > 0
       ? [
           `${f.unstable} frame(s) never captured the same twice: something moved that the step did not hold (script-driven motion on the real clock, or CSS in an iframe)`,
+        ]
+      : []),
+    // Round 7: an agent could not tell how far a timer's frames could be trusted.
+    ...(f.maxLagMs !== undefined && f.count > 0
+      ? [
+          `CSS motion is seeked, so exact; a timer's or a script's work runs on the real clock, and these frames were shot up to ${f.maxLagMs}ms after their offsets (\`shotMs\` in frames.json): place such work to within that`,
         ]
       : []),
     ...(f.navigatedAtMs !== undefined
@@ -1538,6 +1592,13 @@ export async function runInteractCli(cliArgs: readonly string[], options: { cwd?
     );
     console.log("                   // ... + frames.json (vlmkit-frames/1), recorded on a page of its own: the steps");
     console.log("                   // before it run again there, so snapshots are as they are without it.");
+    // Round 9: two agents recorded a click, a wait and a second click here and got the menu fully
+    // open at 0ms on both pages — the earlier steps replay with motion off.
+    console.log("                   // Those steps replay with motion OFF, so an action that cuts into an earlier");
+    console.log("                   // one's motion (a second click mid-opening) cannot be recorded here: use");
+    console.log(
+      "                   // inspect motion --click X --wait 100 --click X. Give at, or everyMs/forMs, not both.",
+    );
     console.log("  click | hover    { selector: string }");
     console.log('  click            { describe: string }   // e.g. "the Save button": found on a screenshot');
     console.log("                   // by TypeSafe Jev (TYPESAFEAI_API_KEY), clicked at its centre; for canvas apps");

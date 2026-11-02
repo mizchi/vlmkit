@@ -1,3 +1,4 @@
+import { edgeOnlyDelta } from "@mizchi/vlmkit-judge/edge-noise.ts";
 import type {
   VrtDiff,
   VrtSnapshot,
@@ -379,7 +380,19 @@ function attachRegionColorSamples(regions: DiffRegion[], baseline: PngData, curr
   for (const region of regions) {
     const sample = sampleRegionColorSample(baseline, current, region);
     if (sample) region.colorSample = sample;
+    const delta = regionDelta(baseline, current, region);
+    region.maxChannelDelta = delta.max;
+    if (delta.edgeOnly) region.edgeOnly = true;
   }
+}
+
+/** Edge-only test over a region: `@mizchi/vlmkit-judge/edge-noise.ts`. */
+export function regionDelta(
+  baseline: PngData,
+  current: PngData,
+  region: DiffRegion,
+): { max: number; edgeOnly: boolean } {
+  return edgeOnlyDelta(baseline, current, region);
 }
 
 function attachRegionShiftEstimates(regions: DiffRegion[], baseline: PngData, current: PngData): void {

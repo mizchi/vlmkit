@@ -22,6 +22,13 @@ function makeDiff(regions: DiffRegion[], totalPixels = 1_000_000): VrtDiff {
 }
 
 describe("classifyVisualDiff", () => {
+  it("calls an edge-only region with no shift render-noise, not an added element (motion-repair round 5)", () => {
+    const diff = makeDiff([{ x: 128, y: 128, width: 64, height: 64, diffPixelCount: 70, edgeOnly: true }]);
+    const result = classifyVisualDiff(diff);
+    assert.equal(result.changes[0].type, "render-noise");
+    assert.match(result.summary, /1 render-noise/);
+  });
+
   it("should classify small square as icon-change", () => {
     const diff = makeDiff([{ x: 10, y: 10, width: 32, height: 32, diffPixelCount: 800 }]);
     const result = classifyVisualDiff(diff);

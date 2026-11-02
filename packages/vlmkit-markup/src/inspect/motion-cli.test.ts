@@ -220,6 +220,133 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
       ["--selector", ".toast", "--exits", "--expect-easing", "ease-out,ease-in"],
       /FAIL snap-back .*in the hold after 660ms/,
     ],
+    // Round 12: an SVG gear turning about its viewBox's centre, and a button whose label wraps
+    // while its width eases.
+    [
+      "gear.html",
+      ["--selector", ".gear", "--expect-still", "--expect-direction", "clockwise"],
+      /turns clockwise \d+° \(180°\/s, a turn every 2000ms\)[\s\S]*FAIL still-mismatch .*it turns about a point that is not its own centre .*transform-box: fill-box/,
+    ],
+    [
+      "label.html",
+      ["--selector", ".add", "--click", ".add"],
+      /FAIL size-jump at \d+ms: its height steps 64 → 44px .*text wrapping while the box is still narrow/,
+    ],
+    // Round 11: a hover gradient that steps, a quote re-rendered every second, and a banner taken
+    // out of rendering before its exit can play.
+    [
+      "gradient.html",
+      ["--selector", ".upgrade", "--hover", ".upgrade"],
+      /FAIL snapped: \.upgrade: its colour, by up to \d+ of 255 a channel, in one frame: only its colour changed, .*two gradients, which do not interpolate/,
+    ],
+    [
+      "quote.html",
+      ["--selector", ".price"],
+      /FAIL replayed: \.price after it came to rest: the page replaced it with a new element by 1000ms, 2000ms/,
+    ],
+    [
+      "dismiss.html",
+      ["--selector", ".consent", "--click", ".dismiss", "--exits"],
+      /FAIL snapped: \.consent: .* → 0x0 .*: the action took it out of rendering \(it is display: none \(the hidden attribute\)\) in the same frame/,
+    ],
+    // Round 10: a notice whose margin-top shoves the article, a spinner one turn short of a loop,
+    // and a check mark whose dash is shorter than its line.
+    [
+      "push.html",
+      ["--selector", ".notice", "--selector", "article h1", "--still", "article h1"],
+      /FAIL still-mismatch .*it has no animation of its own, .*div\.notice animates margin-top/,
+    ],
+    [
+      "seam.html",
+      ["--selector", ".spinner"],
+      /FAIL loop-seam: \.spinner `spin` turns 10\.\d° in one step at every loop/,
+    ],
+    [
+      "draw.html",
+      ["--selector", ".tick path"],
+      /FAIL stroke-incomplete .*its stroke ends 54% drawn .*stroke-dasharray 40px/,
+    ],
+    // Round 9: a flip card's faces with their back faces drawn, and a second click that lands
+    // while the menu is still unfolding.
+    [
+      "flip.html",
+      ["--click", ".flip", "--selector", ".back", "--selector", ".front"],
+      /FAIL mirrored .*give it backface-visibility: hidden/,
+    ],
+    [
+      "interrupt.html",
+      ["--selector", ".menu", "--click", ".filters", "--wait", "100", "--click", ".filters", "--exits"],
+      /FAIL interrupt-jump: \.menu jumps the moment --click \.filters lands .*a @keyframes animation always starts from its `from`/,
+    ],
+    // Round 8: a keyframe transform replacing the centring, a :hover-only transition, a reveal
+    // whose observer never fires for a section taller than the screen.
+    [
+      "dialog.html",
+      ["--click", ".delete", "--selector", ".dialog", "--expect-still", "--expect-origin", "center"],
+      /FAIL still-mismatch [\s\S]*FAIL origin-mismatch .*no point of its box \(it moves as well as it scales\), not its centre[\s\S]*FAIL jump .*sits 223px off where it rests .*translate\(-50%, -50%\)/,
+    ],
+    [
+      "hover.html",
+      ["--selector", "#c2", "--hover", "#c2", "--leave", "--expect-duration", "150", "--expect-easing", "ease-out"],
+      /after --hover #c2, --leave, no animation[\s\S]*FAIL snapped: #c2: .*a transition declared only in the :hover rule/,
+    ],
+    ["reveal.html", ["--selector", ".studio", "--scroll", ".studio"], /FAIL target-hidden .*rendered at opacity 0\.00/],
+    // Round 7: a panel from the wrong side, and a click that snaps a panel open.
+    [
+      "slidein.html",
+      ["--selector", ".panel", "--expect-direction", "left"],
+      /FAIL direction-mismatch .*moves rightwards .*not leftwards/,
+    ],
+    [
+      "accordion.html",
+      ["--click", ".toggle", "--selector", ".panel", "--selector", ".after"],
+      /FAIL snapped: \.panel: 592x0 .* → 592x116 .*in one frame/,
+    ],
+    // Round 6: an exit not held (no target-lost beside it), a run 5x too long, a pulse that never stops.
+    [
+      "banner.html",
+      ["--selector", ".banner", "--exits", "--expect-easing", "ease-in"],
+      /^(?![\s\S]*target-lost)[\s\S]*FAIL snap-back at 2600ms/,
+    ],
+    [
+      "sheet.html",
+      ["--selector", ".sheet", "--expect-duration", "280ms"],
+      /FAIL duration-mismatch .*one run takes 1400ms, not 280ms \(5\.0x\)/,
+    ],
+    [
+      "badge.html",
+      ["--selector", ".badge", "--expect-iterations", "3"],
+      /every animation repeats forever[\s\S]*FAIL iterations-mismatch .*it runs forever, not 3 times/,
+    ],
+    // Round 5: a scaleY drop-down (one axis), a wave in reverse, and a start held back.
+    [
+      "tooltip.html",
+      ["--selector", ".tip", "--expect-origin", "top"],
+      /FAIL origin-mismatch .*grows from its bottom edge .*transform-origin: top/,
+    ],
+    [
+      "tiles.html",
+      [
+        "--selector",
+        ".t1",
+        "--selector",
+        ".t2",
+        "--selector",
+        ".t3",
+        "--selector",
+        ".t4",
+        "--expect-start",
+        "240",
+        "--expect-stagger",
+        "60",
+      ],
+      /FAIL start-mismatch .*begins at 420ms, not 240ms/,
+    ],
+    [
+      "chips.html",
+      ["--selector", ".chips", "--expect-start", "0"],
+      /FAIL start-mismatch .*begins at 1200ms, not 0ms: late by 1200ms/,
+    ],
     // Round 3: an ancestor's opacity 0 named, a scale's fixed point, and a stagger that is not one.
     [
       "drawer.html",
@@ -245,7 +372,7 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
         "--expect-stagger",
         "80",
       ],
-      /FAIL start-mismatch .*begins at 200ms, not 280ms[\s\S]*begins: li\.a1 200ms, li\.a2 200ms, li\.a3 200ms, li\.a4 200ms — all within one frame/,
+      /FAIL start-mismatch .*begins at 200ms, not 280ms.*; set by `li:nth-child\(2\) \{ animation-delay: 200ms \}`[\s\S]*begins: li\.a1 200ms, li\.a2 200ms, li\.a3 200ms, li\.a4 200ms — all within one frame/,
     ],
     [
       "stagger.html",
@@ -274,6 +401,36 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
     });
   }
 
+  it("judges a scroll-driven bar against the scroll, and names a 0s animation", { timeout: 120_000 }, async () => {
+    // Round 12: the reading bar on a scroll timeline, and the one whose shorthand reset it.
+    const fixed = await run("reference/reading.html", ["--selector", ".progress"]);
+    assert.equal(fixed.code, 0, fixed.out);
+    assert.match(
+      fixed.out,
+      /driven by the scroll[\s\S]*progress 0\.00 at 0%, 0\.20 at 20%, 0\.50 at 50%, 0\.80 at 80%, 1\.00 at 100%; back at 50% 0\.50, at 0% 0\.00; scaleX 0\.00 → 1\.00/,
+    );
+    const errors: string[] = [];
+    const error = console.error;
+    console.error = (m: string) => errors.push(m);
+    try {
+      const broken = await run("broken/reading.html", ["--selector", ".progress"]);
+      assert.equal(broken.code, 2);
+    } finally {
+      console.error = error;
+    }
+    assert.match(
+      errors.join("\n"),
+      /`grow` has a duration of 0s, .*`animation-timeline` has to come after the `animation` shorthand/,
+    );
+  });
+
+  it("names a turn off its centre without --expect-still", { timeout: 120_000 }, async () => {
+    const broken = await run("broken/gear.html", ["--selector", ".gear"]);
+    assert.match(broken.out, /warn turn-off-centre .*carried up to \d+px .*transform-box: fill-box/);
+    const fixed = await run("reference/gear.html", ["--selector", ".gear"]);
+    assert.doesNotMatch(fixed.out, /turn-off-centre/);
+  });
+
   it("samples the hold between two segments", () => {
     const plan = motionPlan([
       { startMs: 300, durationMs: 360, iterations: 1 },
@@ -285,12 +442,31 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
     );
   });
 
-  it("points --out at --frames", () => {
-    assert.throws(() => parseMotionArgs(["p.html", "--selector", ".a", "--out", "x"]), /did you mean --frames <dir>/);
+  it("takes --out as --frames", () => {
+    // Refused with "did you mean --frames", it was still the flag an agent reached for (round 11).
+    assert.equal(parseMotionArgs(["p.html", "--selector", ".a", "--out", "x"]).frames, "x");
   });
 });
 
 describe("inspect motion after motion-repair round 3", () => {
+  it(
+    "names whose fade a target's opacity follows when its own never changes (round 4)",
+    { timeout: 120_000 },
+    async () => {
+      const lines: string[] = [];
+      const log = console.log;
+      console.log = (m: string) => lines.push(m);
+      try {
+        const frames = await mkdtemp(join(tmpdir(), "vlmkit-motion-fade-"));
+        const page = join(import.meta.dirname, "../../../../fixtures/motion-repair/reference/drawer.html");
+        assert.equal(await runMotionCli([page, "--selector", ".drawer", "--frames", frames]), 0);
+      } finally {
+        console.log = log;
+      }
+      assert.match(lines.join("\n"), /in its opacity \(div\.shell's fade: its own opacity does not change\)/);
+    },
+  );
+
   it("parses --expect-origin in either word order, and checks the counts", () => {
     assert.deepEqual(parseMotionArgs(["p.html", "--selector", ".t", "--expect-origin", "left bottom"]).expectOrigin, [
       "bottom-left",
@@ -300,6 +476,21 @@ describe("inspect motion after motion-repair round 3", () => {
     ]);
     assert.throws(() => parseMotionArgs(["p.html", "--selector", ".t", "--expect-origin", "middle"]), MotionUsageError);
     assert.throws(() => parseMotionArgs(["p.html", "--selector", ".t", "--expect-stagger", "80"]), MotionUsageError);
+    // In the order given, duplicates kept: parseInstants sorted "400,0" into "0,400" (round 4).
+    assert.deepEqual(
+      parseMotionArgs([
+        "p.html",
+        "--selector",
+        ".a",
+        "--selector",
+        ".b",
+        "--selector",
+        ".c",
+        "--expect-start",
+        "400,0,0",
+      ]).expectStartMs,
+      [400, 0, 0],
+    );
     assert.throws(
       () => parseMotionArgs(["p.html", "--selector", ".t", "--expect-start", "200,280"]),
       /2 --expect-start times for 1 targets/,
@@ -330,8 +521,8 @@ describe("inspect motion after motion-repair round 2", () => {
         console.log = log;
       }
       const out = lines.join("\n");
-      assert.match(out, /300\.\.660ms: travels \d+px, follows ease-in/, out);
-      assert.match(out, /the first fail's own frame \(1160ms\): .*0\d{3}-t001160\.png/);
+      assert.match(out, /300\.\.660ms: travels \d+px( \w+wards)?, follows ease-in/, out);
+      assert.match(out, /the first fail's own frame \(1160ms, [^)]*\): .*0\d{3}-t001160\.png/);
     },
   );
 });

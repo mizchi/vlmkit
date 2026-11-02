@@ -34,6 +34,25 @@ describe("analyzeMotionSamples", () => {
     assert.ok(report.issues.some((issue) => issue.kind === "running-animation"));
   });
 
+  it("counts motion the stylesheet declares that no element runs at load (round 9)", () => {
+    const css = ".menu.open { animation: grow 300ms ease-out forwards; } @keyframes grow { from { opacity: 0; } }";
+    const latent = analyzeMotionSamples({ source: "inline", cssText: css, samples: [] });
+    assert.match(
+      latent.issues.find((issue) => issue.kind === "missing-reduced-motion")?.message ?? "",
+      /none active at load/,
+    );
+    const reduced = analyzeMotionSamples({
+      source: "inline",
+      cssText: `${css} @media (prefers-reduced-motion: reduce) { .menu.open { animation: none; } }`,
+      samples: [],
+    });
+    assert.deepEqual(reduced.issues, []);
+    assert.deepEqual(
+      analyzeMotionSamples({ source: "inline", cssText: ".a { transition: none; }", samples: [] }).issues,
+      [],
+    );
+  });
+
   it("does not call a finite entrance running at load non-settling", () => {
     const sample = (count: string) => ({
       selector: ".hero",

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Checkout</title>
+<style>
+  * { box-sizing: border-box; }
+  :root { interpolate-size: allow-keywords; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #f7f7f8; color: #1f2125; }
+  main { max-width: 640px; margin: 48px auto; padding: 0 24px; }
+  section { background: #fff; border-radius: 10px; margin-bottom: 12px; }
+  .toggle { display: block; width: 100%; text-align: left; font: inherit; font-weight: 600; padding: 16px 20px; border: 0; background: none; cursor: pointer; }
+  .panel { height: 0; overflow: hidden; transition: height 250ms cubic-bezier(0, 0, 0.58, 1); }
+  .open .panel { height: auto; }
+  .panel p { margin: 0; padding: 0 20px 16px; }
+  .after { padding: 16px 20px; background: #fff; border-radius: 10px; }
+</style></head>
+<body>
+  <main>
+    <h1>Checkout</h1>
+    <section id="shipping">
+      <button class="toggle" type="button" aria-expanded="false" aria-controls="ship-panel">Shipping details</button>
+      <div class="panel" id="ship-panel"><p>Standard delivery, 2-4 working days.</p><p>Free over ¥5,000. Tracking by email.</p><p>Returns within 30 days.</p></div>
+    </section>
+    <div class="after">Order total: ¥8,200</div>
+  </main>
+  <script>
+    const s = document.getElementById("shipping");
+    s.querySelector(".toggle").addEventListener("click", (e) => {
+      const open = s.classList.toggle("open");
+      e.currentTarget.setAttribute("aria-expanded", String(open));
+    });
+  </script>
+</body></html>

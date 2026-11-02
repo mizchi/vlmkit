@@ -52,14 +52,14 @@ import {
 function usage(): string {
   return [
     "Usage:",
-    "  vlmkit snapshot storyboard <frames.json> [--out dir] [--ignore x,y,w,h ...] [--max-events N]",
+    "  vlmkit snapshot storyboard <frames.json> [--out dir] [--ignore x,y,w,h ...] [--floor N] [--max-events N]",
     "                             [--lossy | --noise still,floor[,radius]] [--json]",
     "",
     "Segments a vlmkit-frames/1 sequence into still states and events, from the pixels alone:",
     "  glitch     one frame off the state, then back",
     "  transient  more than one frame off, back within 5000 ms (whatever it held in between)",
     "  change     not back within 5000 ms; ends at the first 100 ms of identical frames (the next state)",
-    "  drift      a change no frame-to-frame step of which, inside its box, moves a channel by more than 8 of 255",
+    "  drift      a change no frame-to-frame step of which, inside its box, moves a channel by more than the floor",
     `             (--lossy: one picture is every 3x3 mean within ${LOSSY_NOISE.still} of the hold's first frame and the`,
     `             mean over the change's box within ${LOSSY_NOISE.holdMean}; a step reaches back 50 ms and differs past ${LOSSY_NOISE.floor})`,
     "",
@@ -70,6 +70,9 @@ function usage(): string {
     "  --out <dir>          Where to write (default: storyboard/ beside frames.json)",
     "  --ignore <x,y,w,h>   A box, in the frames' pixels, no comparison looks at — a video, a clock the",
     "                       capture cannot hold. Repeatable",
+    "  --floor <n>          A pixel differs when a channel moves by more than n of 255 (default 8). Lower it",
+    "                       for a change between two near colours: white on #f7f7f8 moves 8 and reads as",
+    "                       no change at the default; --floor 2 sees it. 0 compares exactly",
     "  --max-events <n>     Events on the sheet and in the brief (default 20); SUMMARY.md has them all",
     `  --lossy              Frames decoded from a lossy recording (scan video): compare each pixel as the`,
     `                       mean of its ${2 * LOSSY_NOISE.radius + 1}x${2 * LOSSY_NOISE.radius + 1} neighbourhood, a pixel differs past ${LOSSY_NOISE.floor}, and a keyframe that only`,
@@ -94,6 +97,7 @@ export interface StoryboardArgs {
   manifest: string;
   out?: string;
   ignore: Box[];
+  floor?: number;
   maxEvents: number;
   lossy: boolean;
   /** --noise: the band to compare through (implies lossy). */
@@ -157,6 +161,7 @@ export function parseArgs(argv: string[]): StoryboardArgs {
   let out: string | undefined;
   const ignore: Box[] = [];
   let maxEvents = 20;
+  let floor: number | undefined;
   let lossy = false;
   let noise: NoiseFloor | undefined;
   let json = false;
@@ -171,6 +176,12 @@ export function parseArgs(argv: string[]): StoryboardArgs {
       case "--ignore":
         ignore.push(parseBox(argv[++i]));
         break;
+      case "--floor": {
+        const raw = argv[++i];
+        floor = whole(raw) ?? -1;
+        if (floor < 0 || floor > 254) throw new UsageError(`--floor expects a whole number 0-254, got "${raw ?? ""}"`);
+        break;
+      }
       case "--max-events": {
         const raw = argv[++i];
         maxEvents = whole(raw) ?? 0;
@@ -205,6 +216,7 @@ export function parseArgs(argv: string[]): StoryboardArgs {
     manifest,
     ...(out !== undefined ? { out } : {}),
     ignore,
+    ...(floor !== undefined ? { floor } : {}),
     maxEvents,
     lossy,
     ...(noise ? { noise } : {}),
@@ -353,7 +365,14 @@ export interface StoryboardWritten {
 /** Segment `manifestPath`'s sequence and write the four outputs. */
 export async function writeStoryboard(
   manifestPath: string,
-  options: { out?: string; ignore?: Box[]; maxEvents?: number; lossy?: boolean; noise?: NoiseFloor } = {},
+  options: {
+    out?: string;
+    ignore?: Box[];
+    floor?: number;
+    maxEvents?: number;
+    lossy?: boolean;
+    noise?: NoiseFloor;
+  } = {},
 ): Promise<StoryboardWritten> {
   const manifestFile = resolve(manifestPath);
   if (!existsSync(manifestFile)) throw new UsageError(`no such frames.json: ${manifestPath}`);
@@ -371,8 +390,12 @@ export async function writeStoryboard(
   const dir = dirname(manifestFile);
   const paths = manifest.frames.map((f) => resolve(dir, f.file));
   const pixels = framesOnDisk(paths);
+  const beforeFile = manifest.source.before ? resolve(dir, manifest.source.before) : null;
+  const before = beforeFile && existsSync(beforeFile) ? decode(beforeFile) : null;
   const story = buildStoryboard(manifest.frames, pixels, {
+    ...(before && before.width === pixels.width && before.height === pixels.height ? { before: before.data } : {}),
     ignore: options.ignore ?? [],
+    ...(options.floor !== undefined ? { floor: options.floor } : {}),
     // --lossy is for lossy frames: on vlmkit's own captures and lossless recordings it changes
     // nothing, as before it had a band to apply. --noise is a band asked for, on any frames.
     ...(options.noise ? { noise: options.noise } : options.lossy && lossyFrames ? { noise: LOSSY_NOISE } : {}),
@@ -398,6 +421,8 @@ export async function writeStoryboard(
       keyframes: eventKeyframes(e).map((k) => ({ roles: k.roles, ...k.frame, file: manifest.frames[k.frame.n]!.file })),
     })),
     timeline: story.timeline,
+    ...(story.loops ? { loops: story.loops } : {}),
+    ...(story.beforeFirst ? { beforeFirst: story.beforeFirst } : {}),
     ...(story.reread ? { reread: story.reread } : {}),
   };
   const files = {
@@ -515,6 +540,7 @@ async function main(): Promise<void> {
   const written = await writeStoryboard(args.manifest, {
     ...(args.out !== undefined ? { out: args.out } : {}),
     ignore: args.ignore,
+    ...(args.floor !== undefined ? { floor: args.floor } : {}),
     maxEvents: args.maxEvents,
     lossy: args.lossy,
     ...(args.noise ? { noise: args.noise } : {}),
@@ -536,6 +562,11 @@ async function main(): Promise<void> {
   console.log(
     `  ${DIM}${plural(f.count, "frame")} of ${f.width}x${f.height} px, ${formatInstant(f.fromMs)}–${formatInstant(f.toMs)} ms${f.sampling.everyFrame && written.manifest.source.clock !== "stream" ? ", every 60 fps frame" : ""}${RESET}`,
   );
+  if (story.beforeFirst) {
+    console.log(
+      `  Before frame 0: the page just before the action differs from frame 0 by ${story.beforeFirst.over} px — done by the first frame`,
+    );
+  }
   if (written.lossyIgnored) {
     console.log(
       `  ${DIM}--lossy: these frames are not from a lossy recording, so they were compared exactly (--noise applies a band to any frames)${RESET}`,
@@ -551,6 +582,11 @@ async function main(): Promise<void> {
   } else {
     console.log(`  ${plural(story.events.length, "event")}, ${plural(story.states.length, "state")}:`);
     for (const e of story.events) console.log(`    ${eventLine(e)}`);
+  }
+  for (const loop of story.loops ?? []) {
+    console.log(
+      `  ${loop.events[0]}–${loop.events[loop.events.length - 1]}: one loop of ${loop.events.length} runs, every ${formatInstant(loop.periodMs)} ms (check animation's loop-seam judges where runs meet)`,
+    );
   }
   if (f.unstable.length > 0) {
     console.log(

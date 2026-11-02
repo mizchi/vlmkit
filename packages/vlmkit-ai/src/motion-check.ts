@@ -18,6 +18,7 @@ import {
   judgeMotionPath,
   type EasingName,
   type OriginName,
+  type MotionDirection,
   type MotionPathReport,
   type MotionSample,
   type MotionSegment,
@@ -46,6 +47,26 @@ export interface MotionDom {
   hiddenBy?: string;
   /** How long its own animation has been active (ms, negative in its delay): when it begins. */
   elapsedMs?: number | null;
+  scaleX?: number;
+  scaleY?: number;
+  durationMs?: number;
+  iterations?: number | null;
+  /** The share of its box inside the viewport (0-1). */
+  onScreen?: number;
+  /** Its own opacity, before its ancestors': unchanged while it fades, the fade is theirs. */
+  ownOpacity?: number;
+  /** The ancestor with the lowest opacity under 1 at this frame. */
+  fadeBy?: string;
+  /** No layout box at all (display: none on it or an ancestor). */
+  notRendered?: boolean;
+  /** Every colour it paints (background stops, text, border), RGBA in order. */
+  paint?: number[];
+  /** Its transition on background runs over a gradient (which steps: gradients do not interpolate). */
+  discreteBg?: boolean;
+  /** It takes a click at its centre as the page is. */
+  catches?: boolean;
+  /** An SVG element inside an <svg> (transform-origin from the viewBox by default). */
+  svg?: boolean;
 }
 
 export interface MotionFrame {
@@ -67,6 +88,8 @@ export interface MotionCheckOptions {
   segments?: readonly MotionSegment[];
   /** The targets are meant to leave by the end (a dismissed toast): gone at rest is not a fail. */
   exits?: boolean;
+  /** Per target in order: this one is meant to leave (a flip card's front face, turned away). */
+  exitsFor?: readonly boolean[];
   /** The timing function the author meant, for every segment or per segment in order. */
   expectEasing?: EasingName | readonly EasingName[];
   /** Per target, in order, overriding `expectEasing` for that target (cards ease-out, a bar ease-in-out). */
@@ -80,6 +103,17 @@ export interface MotionCheckOptions {
    * first target's (or its --expect-start) plus k times this.
    */
   expectStaggerMs?: number;
+  /** How long one run takes (ms) and how many runs (null: infinite): one for all, or per target. */
+  expectDurationMs?: readonly number[];
+  expectIterations?: readonly (number | null)[];
+  /** Which way each target's first segment moves: one for all, or per target. */
+  expectDirection?: readonly MotionDirection[];
+  /** Every target's centre must not move: only its size and opacity change. */
+  expectStill?: boolean;
+  /** Per target in order: this one's centre must not move. */
+  expectStillFor?: readonly boolean[];
+  /** Animations that change layout on the page ("div.notice animates margin-top"). */
+  layoutMovers?: readonly string[];
   /** A statement is true at or above this (default 0.5). */
   threshold?: number;
   /** Within this of the threshold an answer is `uncertain` (default 0.3). */
@@ -296,6 +330,9 @@ export async function checkMotionFrames(
   }
   const domAt = new Map(frames.map((f) => [f.atMs, f.dom]));
 
+  // One value is every target's; several are the targets' in order.
+  const perTarget = <T>(xs: readonly T[] | undefined, i: number): T | undefined =>
+    xs === undefined ? undefined : xs.length === 1 ? xs[0] : xs[i];
   const originFor = (i: number) =>
     typeof options.expectOrigin === "string" ? options.expectOrigin : options.expectOrigin?.[i];
   // A stagger is relative to the first target: its own expected start if given, else where it
@@ -322,12 +359,23 @@ export async function checkMotionFrames(
         ...(options.segments ? { segments: options.segments } : {}),
         ...(frameSize ? { frame: frameSize } : {}),
         presenceThreshold: threshold,
-        ...(options.exits ? { exits: true } : {}),
+        ...(options.exits || options.exitsFor?.[i] ? { exits: true } : {}),
         ...((options.targetEasing?.[i] ?? options.expectEasing)
           ? { expectEasing: (options.targetEasing?.[i] ?? options.expectEasing)! }
           : {}),
         ...(originFor(i) ? { expectOrigin: originFor(i)! } : {}),
         ...(startFor(i) !== undefined ? { expectStartMs: startFor(i)! } : {}),
+        ...(perTarget(options.expectDurationMs, i) !== undefined
+          ? { expectDurationMs: perTarget(options.expectDurationMs, i)! }
+          : {}),
+        ...(perTarget(options.expectDirection, i) !== undefined
+          ? { expectDirection: perTarget(options.expectDirection, i)! }
+          : {}),
+        ...(perTarget(options.expectIterations, i) !== undefined
+          ? { expectIterations: perTarget(options.expectIterations, i)! }
+          : {}),
+        ...(options.expectStill || options.expectStillFor?.[i] ? { expectStill: true } : {}),
+        ...(options.layoutMovers ? { layoutMovers: options.layoutMovers } : {}),
       }),
     };
     if (i === 0) staggerFrom ??= judged.startsAtMs;

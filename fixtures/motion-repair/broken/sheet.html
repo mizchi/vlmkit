@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Share</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #eceff3; color: #1c1f24; min-height: 100vh; }
+  main { max-width: 640px; margin: 48px auto; padding: 0 24px; }
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; height: 280px; padding: 24px 32px; background: #fff;
+           border-radius: 16px 16px 0 0; box-shadow: 0 -8px 24px rgba(0,0,0,.12);
+           animation: rise 1400ms cubic-bezier(0, 0, 0.58, 1) 200ms both; }
+  @keyframes rise { from { transform: translateY(100%); } to { transform: none; } }
+  .sheet button { display: block; width: 100%; font: inherit; text-align: left; padding: 12px 0; border: 0; border-bottom: 1px solid #eee; background: none; }
+</style></head>
+<body>
+  <main><h1>Photo.jpg</h1><p>Taken 3 June, 2.4 MB.</p></main>
+  <div class="sheet" role="dialog" aria-label="Share">
+    <strong>Share</strong>
+    <button type="button">Copy link</button><button type="button">Email</button><button type="button">Messages</button>
+  </div>
+</body></html>

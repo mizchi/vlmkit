@@ -46,8 +46,8 @@ page clock and every animation are held for them, with or without
 \`--virtual-time\`. \`--at\` picks the instants, for --frames and for the strip's
 columns: \`--at 0,150,300\`, \`--at 0..1s/100ms\`, \`--at 1.5s\`, \`--at 6f\` (frame
 6 of the 60fps clock). Without it, frames are taken at each animation's start,
-middle and end plus 0/250/500/1000/2000ms. The frames are --viewport's size (1280x720 unless
-given): pass the target's, \`--viewport 1280x800\`, before diffing a frame against it.
+middle and end plus 0/250/500/1000/2000ms. The frames are --viewport's size (1280x800 unless
+given, as check integrity and inspect motion): pass the target's before diffing a frame against it.
 \`--frames-reduced-motion\` captures them with prefers-reduced-motion: reduce emulated,
 to look at what that visitor gets.
 
@@ -97,6 +97,60 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       docs: "Its motion region covered under a quarter of the element's own box at rest, so most of the element is likely clipped (an ancestor's overflow) or covered (a stacking context). `inspect motion --selector` names which.",
     },
     {
+      id: "unknown-transition-property",
+      title: "transition-property names no CSS property",
+      severity: "suspect",
+      docs: "A misspelt property (`widht`) computes as itself and its transition never runs: the property it meant changes in one frame, and with no animation on the page nothing else reports it.",
+    },
+    {
+      id: "reduced-motion-hides",
+      title: "Under reduced motion an element rests hidden or out of place",
+      severity: "suspect",
+      docs: "Seen at rest without prefers-reduced-motion and at opacity 0 (or 8px+ from its place) at rest with it: `animation: none` in the reduce rule removed the animation and the fill that held its end state, so its base style (opacity 0, a start transform) shows. The preference is honoured and the content is gone.",
+    },
+    {
+      id: "zero-duration-animation",
+      title: "A CSS animation has no duration",
+      severity: "suspect",
+      docs: "animation-duration 0s: it ends as it begins and its fill holds its last keyframe from load. The usual cause is an `animation` shorthand written after `animation-timeline`, which resets the timeline to auto and the duration to 0s.",
+    },
+    {
+      id: "animation-replayed",
+      title: "An animation begins again as the page's timers run",
+      severity: "suspect",
+      docs: "With --virtual-time: an animation already seen started again on a new element (a re-render replaced it — innerHTML, a framework re-keying the node — and its entrance plays again; suspect), or on the same one (a class toggled on a timer; warn).",
+    },
+    {
+      id: "discrete-transition",
+      title: "A transition on a gradient background, which steps",
+      severity: "warn",
+      docs: "transition-property names background (or background-image) on an element whose background-image is a gradient (`all` is left out: it is usually there for something else). A gradient does not interpolate, so a change to another gradient steps at once. Transition registered colour properties (@property) the gradient is built from, or cross-fade a layer.",
+    },
+    {
+      id: "layout-animation",
+      title: "An animated layout property moves other elements",
+      severity: "warn",
+      docs: "An in-flow element animating margin, padding, width, height or font size reflows what comes after it: their boxes differ between the start and the end of its first run, with no animation of their own. A warn: an accordion pushing the content below it is meant. Otherwise animate transform.",
+    },
+    {
+      id: "loop-seam",
+      title: "A repeating animation jumps where one run meets the next",
+      severity: "suspect",
+      docs: "The pose 1ms before the end of a run against the pose as the next begins, next to the steps 1ms either side. A spinner keyed to 350deg turns 10deg in one step every second. `steps()` timing and `alternate` are left out.",
+    },
+    {
+      id: "stroke-incomplete",
+      title: "A stroke drawing itself rests part drawn",
+      severity: "suspect",
+      docs: "A dashed SVG stroke whose dash pattern (stroke-dasharray, stroke-dashoffset, pathLength) changes over the animation and leaves 2-98% of its line drawn at rest: a dash shorter than the line.",
+    },
+    {
+      id: "delayed-entrance",
+      title: "An element is held unseen through a long animation-delay",
+      severity: "warn",
+      docs: "Its first keyframe hides it (opacity 0, visibility hidden), its fill is backwards or both, and its delay is 1000ms or more: the page is on screen and it is not. Intended for a late toast; a lag for anything meant to appear with the page.",
+    },
+    {
       id: "clock-motion-unsettled",
       title: "Script-driven motion still changing at the end of the virtual-time window",
       severity: "warn",
@@ -112,7 +166,7 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       positional: 0,
       required: true,
     },
-    { name: "viewport", placeholder: "WxH", kind: "string", description: "Viewport", defaultDescription: "1280x720" },
+    { name: "viewport", placeholder: "WxH", kind: "string", description: "Viewport", defaultDescription: "1280x800" },
     { name: "samples", kind: "number", description: "Sample points per animation", defaultDescription: "4" },
     {
       name: "max-animations",

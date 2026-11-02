@@ -21,7 +21,7 @@ below are Playwright + pixel/DOM math — no AI API, no key.
 ## Invocation
 
 ```bash
-node --experimental-strip-types src/cli/vlmkit.ts <command...>
+npx vlmkit <command...>        # installed; in this repository's checkout: node dist/vlmkit.mjs <command...>
 ```
 
 ## Inputs — how behavior requirements arrive
@@ -139,15 +139,21 @@ Evaluates every authored animation by rendered frames:
   line by line: count, target selector, duration, iterations
   (`x1` vs `x∞`), and — for oscillating animations — the **leg time**
   must all match. The report annotates oscillation as `(alternate,
-  leg 1200ms)` or `(palindromic keyframes, leg 600ms)`: a brief saying
-  "1.2s per leg" is satisfied by `alternate` at 1.2s but NOT by a
-  palindromic 0%/50%/100% cycle at 1.2s (that runs each leg in 600ms —
-  double speed, identical duration). The brief is the spec; the report
-  is the measurement.
+  leg 1200ms)` or `(palindromic keyframes: each 1200ms run goes out and
+  back, 600ms each way)`: a brief saying "1.2s per leg" is satisfied by
+  `alternate` at 1.2s but NOT by a palindromic 0%/50%/100% cycle at 1.2s
+  (that runs each leg in 600ms — double speed, identical duration). A
+  brief that gives one throb or one pulse its length ("each throb
+  600ms") means the whole out-and-back run, so a palindromic 600ms is
+  right. The brief is the spec; the report is the measurement.
 - **`reduced-motion-ignored` (suspect)** — the brief's reduced-motion
   clause is not honored: add the `@media (prefers-reduced-motion:
   reduce)` override (auto-markup keeps colors in variables; keep
-  motion behind this media the same way).
+  motion behind this media the same way). When the brief has **no**
+  reduced-motion clause, it is not a defect of the repair: say so in
+  the report, and run the proof with `--rule reduced-motion-ignored=off`
+  rather than adding behaviour nobody asked for (every agent of four
+  motion-repair rounds met this, and split between the two).
 - **`infinite-animation` (warn)** — expected when the brief says
   "forever": confirm the selector matches the brief, note the
   suggested `--mask`, and carry it into Phase C.
@@ -172,10 +178,11 @@ Evaluates every authored animation by rendered frames:
 - **`check animation` lists an animation `visible` when any pixel moved.** A
   `motion-mostly-hidden` warn says only a sliver of the element did (a clipped card moved
   320x8 of its 320x104 box): run `inspect motion --selector` on it for the cause.
-- **Frames are `--viewport`'s size, 1280x720 unless given.** Pass the
-  target's (`--viewport 1280x800`) before diffing a frame against it: at
-  the default, a toast's 1500ms frame differed from its 1280x800 target by
-  11% with nothing wrong. A target drawn mid-motion (the toast in its hold)
+- **Frames are `--viewport`'s size, 1280x800 unless given** (as
+  `check integrity` and `inspect motion`; it was 1280x720, and a toast's
+  1500ms frame differed from its 1280x800 target by 11% with nothing
+  wrong). Pass the target's size when it is another before diffing a
+  frame against it. A target drawn mid-motion (the toast in its hold)
   is compared this way, not with `verify markup`, whose pixel diff is of
   the rest pose. `--frames-reduced-motion` captures the same frames with
   `prefers-reduced-motion: reduce` emulated, so the reduced-motion brief is
@@ -258,11 +265,75 @@ vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ea
   them. A popover that must grow out of its button: `--expect-origin bottom-left`
   (`origin-mismatch` names the `transform-origin` to set). Entries that must cascade: one
   `--selector` per entry in order and `--expect-stagger 80` (or `--expect-start 200,280,360,440`);
-  the `begins:` line says when siblings start together. In motion-repair round 3 a wrong
+  the `begins:` line says when siblings start together. Without an
+  expectation both are facts under "no fail", never a fail: map the
+  brief's words to the flag yourself: "grows from / hangs from / unfolds
+  out of X" is `--expect-origin` (one-axis drop-downs keep an edge:
+  `top`); "one after another", "a wave across the row", "each a beat
+  later" is one `--selector` per element in the brief's order plus
+  `--expect-stagger`; "straight away", "with no wait", "as the page
+  appears" is `--expect-start 0`. Round 5's briefs used those words and
+  never the flags' names, and all six agents mapped them. How long and how
+  often are the same: "within about a quarter of a second", "snappy",
+  "crawls" is `--expect-duration 280ms`; "three times, then it sits
+  still" is `--expect-iterations 3` (an infinite animation is now sampled
+  over its first runs instead of refused); "gone for good" is `--exits`,
+  and a snap-back after it is the fail. Without the flag, each target's
+  line still says `begins at …, runs …ms x3` / `and repeats forever`. Which way: "glides in
+  from beyond the right edge" moves left — `--expect-direction left`
+  (every line says `travels 360px leftwards`). Motion a click starts:
+  `--click <css>` (repeat for several) clicks on the held page first;
+  if nothing animates and a `--selector` target changes anyway, that
+  is `snapped` — the usual cause is a transition to `height: auto`,
+  which needs `interpolate-size: allow-keywords` (Chromium only; `grid-template-rows:
+  0fr → 1fr` runs in every engine). Motion a pointer or a scroll starts: `--hover <css>`,
+  `--leave` and `--scroll <css>` are actions too, run in order, each one before the last let
+  run to its end — "settles back when the pointer moves off" is `--hover .card --leave`
+  (`snapped` there names a transition declared only in the `:hover` rule), and "fades up as it
+  scrolls into view" is `--scroll .section`. `check animation` evaluates motion that runs from
+  load only: it passes a page whose motion all waits for a click, a hover or a scroll. "Stays
+  dead centre", "only its size and opacity change" is `--expect-still`; a target that sits off
+  its place through the whole motion and jumps there at the end is a keyframe `transform`
+  replacing the element's own (a `translate(-50%, -50%)` centring). A change of mind — "if it is
+  clicked again while still unfolding, it folds back from where it is" — is `--click X --wait 100
+  --click X`: `--wait` lets only that long pass before the next action, and a target that jumps
+  as it lands is `interrupt-jump` (a `@keyframes` animation restarts from its `from`; a transition
+  reverses from where it is). A card that "turns over" is `--click` and a `--selector` per face:
+  a face turned past edge-on with its back face drawn is `mirrored`, edge-on frames are not
+  judged, and a face turned away at rest is not "absent". Under reduced motion, `check animation`
+  compares where every animated element rests with and without the preference:
+  `reduced-motion-hides` (suspect) is `animation: none` leaving the element at its base style
+  (opacity 0, a start transform) — "honored" alone never meant the content is there; look with
+  `--frames-reduced-motion`, or judge the page under it with `check integrity --reduced-motion`.
+  A flip card is one run: a `--selector` per face and `--exit` on the face that turns away; its
+  turn is fitted like position (`follows ease-in-out in its turn`). "The article never moves" is a
+  `--selector` on the article with `--still` on it: a target with no animation of its own that moves
+  is `pushed` (warn) and names the layout property animated elsewhere (`margin-top` — animate
+  `transform` instead). A repeating animation whose run does not end on the pose the next begins on
+  is `loop-seam` (a 350deg spin). A stroke that draws itself is measured by its dash pattern, fitted
+  as its "drawn length", and fails `stroke-incomplete` when it ends part drawn. `check animation`
+  names the same three with no target: `layout-animation` (warn: an in-flow element animating
+  margin / height moves elements with no animation of their own), `loop-seam` and
+  `stroke-incomplete` (suspect). Its `infinite-animation` on a loading indicator (`role="progressbar"`,
+  `aria-busy`, a `spin` / `load` name) says the spinner is meant to run forever; a brief that says it
+  turns forever is not contradicted by it. A hover that changes only a colour is measured too: a
+  `--selector` target's colours are a channel (`follows ease in its colour`), a colour changed in
+  one frame is `snapped` (a gradient does not interpolate — `check animation`'s
+  `discrete-transition`), and a page that re-renders the target on a timer is `replayed`. A brief's
+  "nothing can be clicked through it" is `--exits` on the target: transparent and still taking
+  clicks at rest is `invisible-blocker`. A bar that follows the scroll (`animation-timeline:
+  scroll()` / `view()`) is judged against the scroll, not the clock: `inspect motion --selector <el>`
+  sweeps the scroller 0..100% and back and prints the progress at each step. Write
+  `animation-timeline` after the `animation` shorthand, which resets it (`check animation` names a
+  0s animation as `zero-duration-animation`). An SVG part that turns "in place" needs
+  `transform-box: fill-box` (a `still-mismatch` / `turn-off-centre` says so); "turns clockwise" is
+  `--expect-direction clockwise`. A box whose height steps while it eases (a label wrapping as a
+  button widens) is `size-jump`. In motion-repair round 3 a wrong
   `transform-origin` and a stagger that was not one both read "follows ease-out exactly, no fail"
   until these existed.
 - **What it does not judge**: fps or jank, a target it is not told about, and anything under
-  the 6px / 0.2-opacity floors with `--selector` (60px for a `--jev` target without one). A pass is "nothing looked
+  the floors with `--selector` — a jump under 6px, a path under 2px, an opacity change under 0.2,
+  a scale under 2% (60px for a `--jev` target without one). A pass is "nothing looked
   broken in these frames", not "matches the brief" — compare durations with B3's list.
 
 ### B4. `check motion attempt.html`

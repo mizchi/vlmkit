@@ -118,6 +118,22 @@ export const COLLECT_OCCLUSIONS = `(() => {
     if (!el || SKIP.has(el.tagName)) continue;
     const style = getComputedStyle(el);
     if (style.visibility === "hidden" || style.display === "none" || style.opacity === "0") continue;
+    // The far side of a flip card: turned away with backface-visibility: hidden, it is not painted,
+    // so nothing covers it (an answer face read "painted over by" its question, round 9).
+    const normalZ = (e) => {
+      let M = new DOMMatrix();
+      for (let n = e; n && n !== document.documentElement; n = n.parentElement) {
+        const tf = getComputedStyle(n).transform;
+        if (tf && tf !== "none") M = new DOMMatrix(tf).multiply(M);
+      }
+      return M.m33;
+    };
+    let facesAwayHidden = false;
+    for (let p = el; p && p !== document.documentElement && !facesAwayHidden; p = p.parentElement) {
+      if (getComputedStyle(p).backfaceVisibility === "hidden" && normalZ(p) < -0.01) facesAwayHidden = true;
+    }
+    if (facesAwayHidden) continue;
+    const facesAway = normalZ(el) < -0.01;
     const range = document.createRange();
     range.selectNodeContents(node);
     const rects = Array.from(range.getClientRects()).filter((r) => r.width >= 4 && r.height >= 4);
@@ -180,6 +196,7 @@ export const COLLECT_OCCLUSIONS = `(() => {
         sampled,
         ariaHidden: !!el.closest('[aria-hidden="true"]'),
         pinnedEscapable,
+        ...(facesAway ? { facesAway: true } : {}),
       });
     }
   }
@@ -567,6 +584,29 @@ export const COLLECT_TEXT_CONTRAST = `(() => {
       color: parseColor(style.color) || [0, 0, 0, 1],
       backgrounds: resolved.layers,
       opacity: inheritedOpacity(el),
+      // The outermost ancestor that is itself (nearly) transparent: under it the text is
+      // composited away, and the colours read "white on white" for text declared #1b2430
+      // (motion-repair round 3). Named so the finding points at the opacity, not the colours.
+      ...(() => {
+        let by = null;
+        for (let p = el.parentElement; p && p !== document.documentElement; p = p.parentElement) {
+          const po = parseFloat(getComputedStyle(p).opacity);
+          if (Number.isFinite(po) && po < 0.05) by = p;
+        }
+        // Wholly below the fold, transparent, and set to fade: a scroll reveal still waiting for
+        // its scroll. A correct reveal page failed here on every section (motion-repair round 8).
+        const owner = by || (parseFloat(getComputedStyle(el).opacity) < 0.05 ? el : null);
+        let revealPending = false;
+        if (owner) {
+          const os = getComputedStyle(owner);
+          const r = owner.getBoundingClientRect();
+          const props = os.transitionProperty.split(",").map((x) => x.trim());
+          const durs = os.transitionDuration.split(",").map((x) => parseFloat(x) || 0);
+          const fades = props.some((x, i) => (x === "opacity" || x === "all") && (durs[i % durs.length] || 0) > 0);
+          revealPending = r.top >= innerHeight && (fades || os.animationName !== "none");
+        }
+        return { ...(by ? { transparentBy: stableSelector(by) } : {}), ...(revealPending ? { revealPending: true } : {}) };
+      })(),
       fontSizePx: parseFloat(style.fontSize) || 16,
       fontWeight: parseFloat(style.fontWeight) || (/bold/i.test(style.fontWeight) ? 700 : 400),
       disabled: el.closest("[disabled], [aria-disabled='true']") != null,
@@ -664,6 +704,8 @@ export interface IntegrityOptions {
    * `frames`, each instant is also captured into `<frames>/<width>/` as a `vlmkit-frames/1` sequence.
    */
   timeline?: { at?: readonly number[]; frames?: string };
+  /** Load every page with prefers-reduced-motion: reduce emulated. */
+  reducedMotion?: boolean;
 }
 
 export const DEFAULT_INTEGRITY_VIEWPORTS = [
@@ -718,6 +760,8 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
     for (let vi = 0; vi < viewports.length; vi++) {
       const viewport = viewports[vi]!;
       const page = await browser.newPage(withAuthState({ viewport }, options.storageState));
+      // Round 9: tiles a reduce rule left at opacity 0 were invisible text no gate could reach.
+      if (options.reducedMotion) await page.emulateMedia({ reducedMotion: "reduce" });
       // Through `applyHar`, not a local `routeFromHAR`: the shared helper reads the
       // recording and can therefore tell a request the fixture never held from a
       // resource the page actually broke. Without that, an out-of-date HAR reads as
@@ -932,7 +976,9 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
       // A2 — pixel side, last (after webfont/img settling)
       const shot = PNG.sync.read(await page.screenshot({ fullPage: true }));
       const components = extractComponentsFromRgba(shot.data, shot.width, shot.height);
-      const inkRatio = measureInkRatio(shot.data, shot.width, shot.height);
+      // A browser's own screenshot is lossless, so a surface a few levels off the page counts: a
+      // white card on #f5f6f8 differs by 10 and read as a near-empty render at the default 12.
+      const inkRatio = measureInkRatio(shot.data, shot.width, shot.height, 3);
       const render = judgeRender(
         { componentCount: components.length, inkRatio, textBlocks: blocks.length },
         viewport.width,
@@ -982,6 +1028,7 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
             ...(options.timeline.at ? { at: options.timeline.at } : {}),
             ...(options.timeline.frames ? { frames: options.timeline.frames } : {}),
             ...(options.storageState ? { storageState: options.storageState } : {}),
+            ...(options.reducedMotion ? { reducedMotion: true } : {}),
             ...(options.har ? { har: options.har } : {}),
             ...(options.timeout !== undefined ? { timeout: options.timeout } : {}),
             ...(options.waitUntil ? { waitUntil: options.waitUntil } : {}),

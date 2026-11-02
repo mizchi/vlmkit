@@ -136,6 +136,9 @@ export const VIRTUAL_CLOCK_SCRIPT = `(() => {
 
   // A throwing callback must not stop the clock for everything else on the page.
   const errors = [];
+  // How many animation-frame callbacks and timer runs the clock has made: a value a timer updates
+  // once a second (a live price) is not motion, and read "script-driven motion" under reduce.
+  const runs = { frames: 0, timers: 0 };
   const invoke = (callback, args) => {
     try {
       if (typeof callback === "function") callback(...args);
@@ -173,6 +176,7 @@ export const VIRTUAL_CLOCK_SCRIPT = `(() => {
           entry.level = runLevel + 1;
         } else timers.delete(id);
         level = runLevel;
+        runs.timers += 1;
         invoke(entry.callback, entry.args || []);
         // Microtasks the callback queued are part of its task, so what they schedule nests too.
         await drain();
@@ -181,6 +185,7 @@ export const VIRTUAL_CLOCK_SCRIPT = `(() => {
         frames += 1;
         const queue = rafQueue;
         rafQueue = [];
+        if (queue.length > 0) runs.frames += 1;
         for (const entry of queue) invoke(entry.callback, [now]);
         await drain();
       }
@@ -201,6 +206,7 @@ export const VIRTUAL_CLOCK_SCRIPT = `(() => {
     now: () => now,
     advanceTo,
     errors,
+    runs: () => ({ ...runs }),
     // What is still to come. intervals: how many of the timers repeat; latestTimerMs: the due time
     // of the last one-shot timer, or null; seekListeners: the page's vlmkit:seek listeners on
     // window, so a caller can tell a page that draws on seek from a still one.

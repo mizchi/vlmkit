@@ -7,6 +7,7 @@ import {
   computeOscillation,
   computeSettleMs,
   deriveAnimationIssues,
+  clockUpdatesOnly,
   formatAnimationEvalReport,
   frameDelta,
   restTimeForAnimation,
@@ -176,7 +177,7 @@ test("formatAnimationEvalReport annotates oscillating animations with the leg ti
   };
   const text = formatAnimationEvalReport(report);
   assert.match(text, /`pulse` 1200ms x∞ \(alternate, leg 1200ms\)/);
-  assert.match(text, /`blink` 1200ms x∞ \(palindromic keyframes, leg 600ms\)/);
+  assert.match(text, /`blink` 1200ms x∞ \(palindromic keyframes: each 1200ms run goes out and back, 600ms each way\)/);
 });
 
 test("a visually dead animation raises no-visible-effect", () => {
@@ -680,7 +681,8 @@ test("runAnimationEval: --frames writes a vlmkit-frames/1 sequence", { timeout: 
   const manifest = parseFramesManifest(await readFile(join(dir, "frames.json"), "utf8"));
   assert.equal(manifest.source.tool, "check animation");
   assert.equal(manifest.source.clock, "held");
-  assert.deepEqual(manifest.source.viewport, { width: 1280, height: 720 });
+  // The default is 1280x800, the size check integrity and inspect motion use (motion-repair).
+  assert.deepEqual(manifest.source.viewport, { width: 1280, height: 800 });
   assert.equal(manifest.source.deviceScaleFactor, 1);
   assert.match(manifest.source.browser ?? "", /^chromium \d+\./);
   assert.deepEqual(
@@ -1015,5 +1017,187 @@ test(
       !(await kinds("../integrity-timeline/fade-in.html")).includes("motion-mostly-hidden"),
       "a block heading hits across its whole box",
     );
+  },
+);
+
+test("an element held unseen through a long delay raises delayed-entrance (warn); a short or visible one does not", () => {
+  const issues = (over: Parameters<typeof evaluated>[0]) =>
+    deriveAnimationIssues({ evaluated: [evaluated(over)], settleMs: 1400, infinite: [] }).filter(
+      (i) => i.kind === "delayed-entrance",
+    );
+  const held = issues({ delayMs: 1200, fill: "both", startsHidden: true });
+  assert.equal(held.length, 1);
+  assert.equal(held[0]!.severity, "warn");
+  assert.match(held[0]!.message, /held unseen for the first 1200ms/);
+  assert.equal(issues({ delayMs: 400, fill: "both", startsHidden: true }).length, 0);
+  assert.equal(issues({ delayMs: 1200, fill: "forwards", startsHidden: true }).length, 0);
+  assert.equal(issues({ delayMs: 1200, fill: "both", startsHidden: false }).length, 0);
+});
+
+test("a transition-property that is no CSS property raises unknown-transition-property (suspect)", () => {
+  const issues = deriveAnimationIssues({
+    evaluated: [],
+    settleMs: 0,
+    infinite: [],
+    unknownTransitions: [{ selector: "div.bar", name: "widht" }],
+  });
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0]!.kind, "unknown-transition-property");
+  assert.equal(issues[0]!.severity, "suspect");
+  assert.match(issues[0]!.message, /div\.bar transitions `widht`, which is no CSS property/);
+});
+
+test(
+  "runAnimationEval: an element reduced motion leaves at opacity 0 raises reduced-motion-hides (suspect)",
+  { timeout: 180_000 },
+  async () => {
+    // fixtures/motion-repair round 9: `animation: none` under reduce on tiles whose base style is
+    // opacity 0. Every gate called the preference honoured; the page was empty below its heading.
+    const dir = join(import.meta.dirname, "../../../fixtures/motion-repair");
+    const run = (file: string) => runAnimationEval({ source: join(dir, file), viewport: { width: 1280, height: 800 } });
+    const broken = (await run("broken/reduced.html")).issues.filter((i) => i.kind === "reduced-motion-hides");
+    assert.equal(broken.length, 3);
+    assert.equal(broken[0]!.severity, "suspect");
+    assert.match(
+      broken[0]!.message,
+      /rests at opacity 0\.00 under prefers-reduced-motion: reduce, and at 1\.00 without it/,
+    );
+    const fixed = await run("reference/reduced.html");
+    assert.deepEqual(
+      fixed.issues.map((i) => i.kind),
+      [],
+    );
+  },
+);
+
+test(
+  "runAnimationEval: a layout property animated in the flow, a loop seam and a short dash are each named",
+  { timeout: 300_000 },
+  async () => {
+    // fixtures/motion-repair round 10: every gate passed all three without a target.
+    const dir = join(import.meta.dirname, "../../../fixtures/motion-repair");
+    const kinds = async (file: string) =>
+      (await runAnimationEval({ source: join(dir, file), viewport: { width: 1280, height: 800 } })).issues.filter(
+        (i) => i.kind !== "reduced-motion-ignored",
+      );
+    const push = await kinds("broken/push.html");
+    assert.deepEqual(
+      push.map((i) => [i.kind, i.severity]),
+      [["layout-animation", "warn"]],
+    );
+    assert.match(
+      push[0]!.message,
+      /animates margin-top, a layout property, in the flow, so it moves 1 element\(s\) .*article.* 56px/,
+    );
+    const seam = await kinds("broken/seam.html");
+    assert.deepEqual(
+      seam.map((i) => i.kind),
+      ["loop-seam", "infinite-animation"],
+    );
+    assert.match(seam[0]!.message, /turns 10\.\d° in one step at the end of every run, .*rotate\(350deg\)/);
+    // A spinner is meant to run forever: the warn says so before anything about bounding it.
+    assert.match(
+      seam[1]!.message,
+      /runs forever, on what reads as a loading indicator \(role="progressbar"\), which is meant to/,
+    );
+    const draw = await kinds("broken/draw.html");
+    assert.deepEqual(
+      draw.map((i) => [i.kind, i.severity]),
+      [["stroke-incomplete", "suspect"]],
+    );
+    assert.match(draw[0]!.message, /rests 54% drawn: stroke-dasharray 40px .* on a line 73\.6 long/);
+    for (const file of ["reference/push.html", "reference/draw.html"]) assert.deepEqual(await kinds(file), [], file);
+    assert.deepEqual(
+      (await kinds("reference/seam.html")).map((i) => i.kind),
+      ["infinite-animation"],
+    );
+  },
+);
+
+test(
+  "runAnimationEval: a transition on a gradient background is named, one on registered colours is not",
+  { timeout: 180_000 },
+  async () => {
+    // fixtures/motion-repair round 11: `transition: background 300ms` between two gradients snapped.
+    const dir = join(import.meta.dirname, "../../../fixtures/motion-repair");
+    const run = (file: string) => runAnimationEval({ source: join(dir, file), viewport: { width: 1280, height: 800 } });
+    const broken = (await run("broken/gradient.html")).issues;
+    assert.deepEqual(
+      broken.map((i) => [i.kind, i.severity]),
+      [["discrete-transition", "warn"]],
+    );
+    assert.match(broken[0]!.message, /button\.upgrade transitions `background` over a gradient .*does not interpolate/);
+    assert.deepEqual((await run("reference/gradient.html")).issues, []);
+  },
+);
+
+test("clockUpdatesOnly: a slow timer with no animation frame is an update, not motion", () => {
+  const w = { windowMs: 2000 };
+  assert.equal(clockUpdatesOnly({ ...w, runs: { frames: 0, timers: 2 } }), true);
+  assert.equal(clockUpdatesOnly({ ...w, runs: { frames: 120, timers: 2 } }), false, "a requestAnimationFrame loop");
+  assert.equal(clockUpdatesOnly({ ...w, runs: { frames: 0, timers: 125 } }), false, "setInterval(move, 16)");
+  assert.equal(
+    clockUpdatesOnly({
+      ...w,
+      runs: { frames: 0, timers: 2 },
+      replays: [{ selector: "s", name: "rise", atMs: [1000], newElement: true }],
+    }),
+    false,
+    "an entrance the timer replays is motion",
+  );
+  assert.equal(clockUpdatesOnly({ ...w }), false, "no counts: not known");
+});
+
+test(
+  "runAnimationEval --virtual-time: an entrance a re-render replays is named, a ticker updating in place is not motion",
+  { timeout: 300_000 },
+  async () => {
+    // fixtures/motion-repair round 11's deferred items: under --virtual-time the broken quote read
+    // "visible" and nothing else, and the one-second ticker of both pages read as script-driven
+    // motion still running under reduced motion.
+    const dir = join(import.meta.dirname, "../../../fixtures/motion-repair");
+    const run = (file: string) =>
+      runAnimationEval({ source: join(dir, file), viewport: { width: 1280, height: 800 }, virtualTime: true });
+    const broken = await run("broken/quote.html");
+    const replay = broken.issues.find((i) => i.kind === "animation-replayed");
+    assert.equal(replay?.severity, "suspect");
+    assert.match(replay!.message, /span\.price `rise` plays again by 1000ms, 2000ms of virtual time on a new element/);
+    const fixed = await run("reference/quote.html");
+    assert.equal(
+      fixed.issues.find((i) => i.kind === "animation-replayed"),
+      undefined,
+    );
+    assert.match(
+      fixed.issues.find((i) => i.kind === "clock-motion-unsettled")!.message,
+      /changes only when a timer updates it .*not motion/,
+    );
+    assert.deepEqual(
+      fixed.reducedMotion?.remaining.map((r) => r.name),
+      ["rise"],
+      "the entrance, not the ticker",
+    );
+  },
+);
+
+test(
+  "runAnimationEval: a scroll-driven animation is listed, not seeked, and a 0s animation is named",
+  { timeout: 180_000 },
+  async () => {
+    // fixtures/motion-repair round 12: seeking the reading bar's scroll-timeline animation threw
+    // "not supported for progress based animations", and the 0s one read "No animation issues".
+    const dir = join(import.meta.dirname, "../../../fixtures/motion-repair");
+    const run = (file: string) => runAnimationEval({ source: join(dir, file), viewport: { width: 1280, height: 800 } });
+    const fixed = await run("reference/reading.html");
+    assert.deepEqual(
+      fixed.scrollDriven?.map((s) => s.name),
+      ["grow"],
+    );
+    assert.deepEqual(fixed.issues, []);
+    const broken = await run("broken/reading.html");
+    assert.deepEqual(
+      broken.issues.map((i) => [i.kind, i.severity]),
+      [["zero-duration-animation", "suspect"]],
+    );
+    assert.match(broken.issues[0]!.message, /`animation-timeline` has to come after the `animation` shorthand/);
   },
 );

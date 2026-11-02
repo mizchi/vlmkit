@@ -71,6 +71,7 @@ const story = (frames: readonly Uint8Array[], options: Parameters<typeof sequenc
   return buildStoryboard(s.entries, s.pixels, { ignore });
 };
 
+const SOURCE = { tool: "t", url: "u", viewport: { width: W, height: H }, deviceScaleFactor: 1, clock: "held" as const };
 const blank = frame([]);
 const dot: Paint = { x: 5, y: 6, w: 4, h: 3, rgb: [0, 0, 0] };
 const repeat = (f: Uint8Array, n: number) => Array.from({ length: n }, () => f);
@@ -178,9 +179,76 @@ describe("buildStoryboard: the planted cases", () => {
             assert.equal(e.frames, onFrames, label);
             assert.equal(e.kind, onFrames === 1 ? "glitch" : "transient", label);
           }
+          // Three or more at one period are also one loop, the events kept as they are.
+          const loops = story(frames).loops ?? [];
+          if (k >= 3) {
+            assert.equal(loops.length, 1, label);
+            assert.deepEqual(
+              loops[0]!.events,
+              events.map((e) => e.id),
+              label,
+            );
+            assert.ok(Math.abs(loops[0]!.periodMs - frameTimeMs(onFrames + offFrames)) < 1e-6, label);
+          } else assert.equal(loops.length, 0, label);
         }
       }
     }
+  });
+
+  test("a change done before frame 0 is told from the page before the action", () => {
+    // A hover colour that snapped: every frame already shows it, so the frames hold no event.
+    const after = frame([dot]);
+    const s = sequence(repeat(after, 10));
+    const story = buildStoryboard(s.entries, s.pixels, { before: blank });
+    assert.equal(story.events.length, 0);
+    assert.deepEqual(story.beforeFirst, { over: 12, box: { x: 5, y: 6, width: 4, height: 3 } });
+    assert.match(
+      storyboardSummary(story, SOURCE, s.entries),
+      /Before frame 0: the page just before the action \(before\.png\) differs from frame 0 by 12 px over 5,6 4x3/,
+    );
+    assert.equal(buildStoryboard(s.entries, s.pixels, { before: after }).beforeFirst, undefined);
+  });
+
+  test("a change that is largest at its start and settles near where it began is named an entrance played again", () => {
+    // Text A (a wide block) goes at once, and text B, almost as wide, fades in over 6 frames.
+    const a = frame([{ x: 4, y: 4, w: 30, h: 8, rgb: [0, 0, 0] }]);
+    const b = (k: number) =>
+      frame([
+        { x: 4, y: 4, w: 30, h: 8, rgb: [255 - k * 40, 255 - k * 40, 255 - k * 40] },
+        { x: 34, y: 4, w: 2, h: 8, rgb: [0, 0, 0] },
+      ]);
+    const frames = [
+      ...repeat(a, 8),
+      b(1),
+      b(2),
+      b(3),
+      b(4),
+      b(5),
+      b(6),
+      ...repeat(frame([{ x: 4, y: 4, w: 32, h: 8, rgb: [0, 0, 0] }]), 10),
+    ];
+    const s = sequence(frames);
+    const story = buildStoryboard(s.entries, s.pixels);
+    const summary = storyboardSummary(story, SOURCE, s.entries);
+    assert.match(summary, /E1: it differs most near its start .* an entrance playing again/);
+  });
+
+  test("blinks at changing intervals, or over different boxes, are not a loop", () => {
+    const on = frame([dot]);
+    const elsewhere = frame([{ ...dot, x: 25, y: 18 }]);
+    const frames = repeat(blank, 5);
+    for (const [f, off] of [
+      [on, 2],
+      [on, 9],
+      [on, 3],
+      [on, 14],
+    ] as const) {
+      frames.push(f, f, ...repeat(blank, off));
+    }
+    assert.equal(story(frames).loops, undefined, "periods 4, 11, 5 frames");
+    const mixed = repeat(blank, 5);
+    for (const f of [on, elsewhere, on, elsewhere]) mixed.push(f, f, blank, blank);
+    assert.equal(story(mixed).loops, undefined, "two boxes");
   });
 
   test("a slow fade is a drift, with the frames it moved below the floor named", () => {
@@ -960,6 +1028,31 @@ S0 0–33.33 · E1 50 · S0 66.67–316.67 · E2 333.33–383.33 · S1 383.33–
 - E3: the hold it settled in is the sequence's last 33.33 ms, shorter than 100 ms; it may still have been moving.
 - E3: only 50 ms followed its first frame; a return later than that is not in the sequence.
 `;
+
+describe("a change that is only edge rendering", () => {
+  // Stems one pixel wide, re-rendered half a pixel over: each lightens one column as much as it
+  // darkens the next. A recoloured stem is the control.
+  const stems = (cols: readonly number[], v: number): Paint[] =>
+    cols.map((x) => ({ x, y: 5, w: 1, h: 20, rgb: [v, v, v] }));
+  const hold = (f: Uint8Array, n: number) => Array.from({ length: n }, () => f);
+  test("is marked edgeOnly and noted, and a recolour is not", () => {
+    const before = frame(stems([10, 20, 30], 0));
+    const after = frame([...stems([10, 11, 20, 21, 30, 31], 128)]);
+    const s = sequence([...hold(before, 4), ...hold(after, 12)]);
+    const b = buildStoryboard(s.entries, s.pixels);
+    assert.equal(b.events.length, 1);
+    assert.equal(b.events[0]!.kind, "change");
+    assert.equal(b.events[0]!.edgeOnly, true);
+    const md = storyboardSummary(
+      b,
+      { tool: "t", url: "u", viewport: { width: W, height: H }, deviceScaleFactor: 1, clock: "held" },
+      s.entries,
+    );
+    assert.match(md, /E1: between S0's frame and S1's, only edge rendering differs/);
+    const recolour = story([...hold(before, 4), ...hold(frame(stems([10, 20, 30], 100)), 12)]);
+    assert.equal(recolour.events[0]!.edgeOnly, undefined);
+  });
+});
 
 /** `f` with every channel of every pixel moved by a seeded value in [-amp, amp], clamped. */
 function noisy(f: Uint8Array, seed: number, amp: number): Uint8Array {

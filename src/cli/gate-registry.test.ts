@@ -253,8 +253,24 @@ describe("composed built-in registry", () => {
     //       while the toast it was meant to hide never left (a dynamic-markup run).
     // 218 → 219: `check animation` / `motion-mostly-hidden` (warn) — a clipped card and a covered
     //       menu were listed "visible" on a sliver of motion (motion-repair rounds 1 and 2).
+    // 219 → 220: `check animation` / `delayed-entrance` (warn) — chips meant to fade in with the
+    //       page waited 1200ms at opacity 0 and every gate passed them (motion-repair round 5).
+    // 220 → 221: `check animation` / `unknown-transition-property` (suspect) — a `widht` transition
+    //       never ran and the bar jumped to 70% with no animation for any gate to see (round 7).
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 219);
+    // 221 → 222: `check animation` / `reduced-motion-hides` (suspect) — tiles left at opacity 0 by
+    // `animation: none` under reduce, which every gate called honoured (motion-repair round 9).
+    // 222 → 225: `check animation` / `layout-animation` (warn), `loop-seam` and `stroke-incomplete`
+    // (suspect) — a margin-top notice shoving the article, a 350deg spinner and a dash shorter than
+    // its line passed every gate without a target (motion-repair round 10).
+    // 225 → 226: `check animation` / `discrete-transition` (warn) — a hover gradient with
+    // `transition: background` snapped, and every gate passed it (motion-repair round 11).
+    // 226 → 227: `check animation` / `animation-replayed` (suspect) — a quote re-rendered by
+    // innerHTML replayed its entrance every second and --virtual-time read it "visible" (round 11's
+    // deferred items).
+    // 227 → 228: `check animation` / `zero-duration-animation` (suspect) — a reading bar's
+    // shorthand reset its animation-timeline, and it sat full from load (round 12).
+    assert.equal(total, 228);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {

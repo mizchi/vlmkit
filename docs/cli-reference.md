@@ -450,6 +450,7 @@ rects instead of a page — no browser, no DOM:
 
 ```bash
 vlmkit check integrity --elements elements.json --image frame.png
+vlmkit check integrity page.html --reduced-motion   # the page as prefers-reduced-motion: reduce leaves it
 ```
 
 `elements.json` is the same schema `diff png --elements-json` accepts (`path`, `tag`,
@@ -1051,7 +1052,17 @@ vlmkit inspect motion   <html|url> --selector .toast [--target "the green Saved 
   # over text). vlmkit judges target-lost, absent-at-rest, snap-back, jump, easing-mismatch,
   # target-static, locate-unsure. --selector takes geometry, opacity, scale and the element's own
   # animation time from the page (use it on your own page). Frames + motion-report.json in
-  # --frames (default test-results/inspect-motion). Exit 0 / 1 fail / 2 usage. Advisory.
+  # --frames (default test-results/inspect-motion/<page>). Exit 0 / 1 fail / 2 usage: an inspect
+  # leaf, not a registered gate, but its exit is a verdict. Expectations: --expect-easing, -origin,
+  # -start, -stagger, -duration, -iterations, -direction, --expect-still. Actions on the held page
+  # first, in order (each before the last run to its end): --click, --hover, --leave, --scroll <css|px>.
+  # "--hover .card --leave" samples a card settling back; "--scroll .section" a scroll reveal.
+  # --wait <ms> after an action lets the next one land mid-motion ("--click .btn --wait 100 --click
+  # .btn"): a target that jumps as it lands is interrupt-jump. A face turned past edge-on with its
+  # back drawn is mirrored (backface-visibility). --exit <css> marks one target as leaving; a turn
+  # (rotateY, rotate) is fitted as its own channel. --still <css>: one target must not move (pushed
+  # names a layout property animated elsewhere); loop-seam: a repeating run that does not close;
+  # stroke-incomplete: a dashed stroke that ends part drawn.
 # Checks.
 vlmkit check motion <html|url>                 # CSS motion / reduced-motion detection (declarations)
 vlmkit check animation <html|url>              # Frame-sampled animation evaluation: pause + seek each
@@ -1060,6 +1071,17 @@ vlmkit check animation <html|url>              # Frame-sampled animation evaluat
                                                # report motion bbox, settle time, infinite animations (VRT
                                                # mask hints), behavioral prefers-reduced-motion parity, and
                                                # uncontrolled motion (rAF/video/GIF) that WAAPI can't pause
+                                               # Motion from load only: what a click, a :hover or a scroll
+                                               # starts is inspect motion's (--click/--hover/--scroll).
+                                               # Beyond an animation's own box: layout-animation (an
+                                               # in-flow margin/height animation moving other elements),
+                                               # loop-seam (a repeating run that does not close),
+                                               # stroke-incomplete (a dash shorter than its line),
+                                               # discrete-transition (background over a gradient);
+                                               # --virtual-time: animation-replayed (a re-render
+                                               # plays an entrance again); zero-duration-animation (a
+                                               # shorthand after animation-timeline). Scroll-driven
+                                               # animations are listed: inspect motion sweeps the scroll
 vlmkit check flash <html|url|frames.json|video>  # WCAG 2.3.1 Three Flashes: every 60fps frame of page time on
                                                # the held clock, per-pixel transitions (ΔL ≥ 0.1, darker
                                                # < 0.8; saturated red), >6 in 1s over >21,824 CSS px² of a
@@ -1518,6 +1540,7 @@ fires `transitionend`, so the page's own handler runs between frames.
 vlmkit check animation page.html --at 0..1s/1f --frames out/f   # every frame of the first second
 vlmkit snapshot storyboard out/f/frames.json                     # → out/f/storyboard/
 vlmkit snapshot storyboard out/f/frames.json --ignore 960,40,320,180 --out story   # a video in that box
+vlmkit snapshot storyboard out/f/frames.json --floor 2          # count channel moves over 2, not 8 (white → #f7f7f8 is 8)
 vlmkit snapshot storyboard rec.mp4.frames/frames.json --lossy    # a lossy recording (scan video), through the noise band
 ```
 

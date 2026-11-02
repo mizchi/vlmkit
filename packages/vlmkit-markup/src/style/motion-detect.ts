@@ -37,6 +37,10 @@ export interface MotionComputedSample {
   transitionProperty: string;
   transitionDuration: string;
   transitionDelay: string;
+  /** `animation-timeline` when not auto: the animation runs on a scroll or view timeline. */
+  animationTimeline?: string;
+  /** Its background-image is a gradient: a transition on background then steps (round 11). */
+  gradientBackground?: boolean;
 }
 
 export type MotionIssueKind = "missing-reduced-motion" | "unreadable-stylesheet" | "running-animation";
@@ -100,7 +104,9 @@ function hasActiveAnimation(sample: MotionComputedSample): boolean {
   return (
     sample.animationName.trim() !== "none" &&
     sample.animationName.trim() !== "" &&
-    maxCssTime(sample.animationDuration) > 0
+    // On a scroll timeline its duration is the scroll's, not a time: a reading bar read
+    // "active animations: 0" (round 12).
+    (maxCssTime(sample.animationDuration) > 0 || sample.animationTimeline !== undefined)
   );
 }
 
@@ -129,7 +135,23 @@ export function analyzeMotionSamples(input: MotionDetectionInput): MotionDetecti
 
   const unreadable = input.unreadableStylesheets ?? [];
   const issues: MotionIssue[] = [];
-  if (!hasReducedMotionRule && (activeAnimationSamples.length > 0 || activeTransitionSamples.length > 0)) {
+  const active = activeAnimationSamples.length > 0 || activeTransitionSamples.length > 0;
+  // Declared but not active at load: a menu's @keyframes that a click's class applies, a :hover
+  // transition. The page has motion all the same, and it read "No motion issues detected" (round 9).
+  const latent =
+    !active &&
+    (/@keyframes\b/i.test(input.cssText) ||
+      /\banimation(?:-name)?\s*:\s*(?!none\b|initial\b|unset\b)[a-z-]/i.test(input.cssText) ||
+      /\btransition(?:-duration)?\s*:\s*(?!none\b|0m?s\b|initial\b|unset\b)[\w.]/i.test(input.cssText));
+  if (!hasReducedMotionRule && latent && unreadable.length === 0) {
+    issues.push({
+      kind: "missing-reduced-motion",
+      severity: "suspect",
+      message:
+        "The stylesheet declares animations or transitions — none active at load (a class, :hover or a script applies them) — but no `prefers-reduced-motion: reduce` rule was found.",
+    });
+  }
+  if (!hasReducedMotionRule && active) {
     // With an unread stylesheet in the page, absence of the rule is unproven. Say
     // that instead of asserting it: `check animation` reads the *behaviour* under
     // emulation and does not depend on CSS text, so a dogfood run got
@@ -264,8 +286,14 @@ export async function runMotionDetection(options: MotionDetectionOptions): Promi
           transitionProperty: style.transitionProperty,
           transitionDuration: style.transitionDuration,
           transitionDelay: style.transitionDelay,
+          ...(/gradient\(/.test(style.backgroundImage) ? { gradientBackground: true } : {}),
+          ...(style.animationTimeline && !/^(auto|none)$/.test(style.animationTimeline.trim())
+            ? { animationTimeline: style.animationTimeline }
+            : {}),
         };
-        const hasAnimation = sample.animationName.trim() !== "none" && maxTimeInPage(sample.animationDuration) > 0;
+        const hasAnimation =
+          sample.animationName.trim() !== "none" &&
+          (maxTimeInPage(sample.animationDuration) > 0 || sample.animationTimeline !== undefined);
         const hasTransition =
           sample.transitionProperty.trim() !== "none" && maxTimeInPage(sample.transitionDuration) > 0;
         if (hasAnimation || hasTransition) samples.push(sample);
@@ -321,7 +349,11 @@ export function formatMotionDetectionReport(report: MotionDetectionReport, rules
     lines.push("Motion samples:");
     for (const sample of report.samples.slice(0, 20)) {
       lines.push(
-        `  - ${sample.selector}: animation=${sample.animationName} ${sample.animationDuration} ${sample.animationPlayState}; transition=${sample.transitionProperty} ${sample.transitionDuration}`,
+        `  - ${sample.selector}: animation=${sample.animationName} ${sample.animationDuration} ${sample.animationPlayState}${sample.animationTimeline ? ` on ${sample.animationTimeline}` : ""}; transition=${sample.transitionProperty} ${sample.transitionDuration}` +
+          (sample.gradientBackground &&
+          sample.transitionProperty.split(",").some((p) => /^(background|background-image)$/.test(p.trim()))
+            ? " (over a gradient, which does not interpolate: it steps — check animation's discrete-transition)"
+            : ""),
       );
     }
   }
