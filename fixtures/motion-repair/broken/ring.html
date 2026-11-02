@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Storage</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #f8fafc; color: #0f172a; display: grid; place-items: center; min-height: 100vh; }
+  .usage { display: flex; align-items: center; gap: 28px; padding: 32px 40px; border-radius: 16px; background: #fff; box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08); }
+  .ring { --p: 0%; position: relative; width: 140px; height: 140px; border-radius: 50%; background: conic-gradient(#2563eb var(--p), #e2e8f0 0); transition: --p 1000ms ease-out; }
+  .ring::after { content: ""; position: absolute; inset: 16px; border-radius: 50%; background: #fff; }
+  .ring.filled { --p: 72%; }
+  .ring span { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; font-size: 26px; font-weight: 700; }
+  .usage h1 { margin: 0 0 4px; font-size: 20px; }
+  .usage p { margin: 0; color: #475569; }
+</style></head>
+<body>
+  <section class="usage">
+    <div class="ring" role="img" aria-label="72% of storage used"><span>72%</span></div>
+    <div>
+      <h1>Storage</h1>
+      <p>72 GB of 100 GB used</p>
+    </div>
+  </section>
+  <script>
+    setTimeout(() => document.querySelector(".ring").classList.add("filled"), 200);
+  </script>
+</body></html>

@@ -61,6 +61,8 @@ export interface MotionDom {
   notRendered?: boolean;
   /** Every colour it paints (background stops, text, border), RGBA in order. */
   paint?: number[];
+  /** Its gradients' stop positions and angles, on paint's 0-255 scale (100% or a turn is 255). */
+  stops?: number[];
   /** Its transition on background runs over a gradient (which steps: gradients do not interpolate). */
   discreteBg?: boolean;
   /** It takes a click at its centre as the page is. */

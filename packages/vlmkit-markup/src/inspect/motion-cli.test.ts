@@ -431,6 +431,21 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
     assert.doesNotMatch(fixed.out, /turn-off-centre/);
   });
 
+  // Round 13, before any agent ran: both reference pages failed on these.
+  it(
+    "lets the load entrance end before a --hover, and fits a gradient's moving stop",
+    { timeout: 180_000 },
+    async () => {
+      const lift = await run("reference/rise.html", ["--selector", "#p2", "--hover", "#p2"]);
+      assert.equal(lift.code, 0, lift.out);
+      assert.match(lift.out, /runs 150ms: travels 4px upwards .*follows ease-out/, lift.out);
+      const ring = await run("reference/ring.html", ["--selector", ".ring"]);
+      assert.equal(ring.code, 0, ring.out);
+      assert.match(ring.out, /follows ease-out in its gradient/, ring.out);
+      assert.doesNotMatch(ring.out, /target-static/);
+    },
+  );
+
   it("samples the hold between two segments", () => {
     const plan = motionPlan([
       { startMs: 300, durationMs: 360, iterations: 1 },

@@ -160,6 +160,11 @@ export interface MotionSample {
     dashNote?: string;
     /** Every colour it paints (RGBA in order): fitted as a channel when it changes. */
     paint?: number[];
+    /**
+     * Where its gradients' stops and angles lie, on paint's 0-255 scale (100% or a full turn is
+     * 255): a ring filling by its conic stop changes no colour (round 13).
+     */
+    stops?: number[];
     /** It takes a click at its centre: an invisible target that does sits over what is behind it. */
     catches?: boolean;
     /** An SVG element inside an <svg>: its transform-origin is measured from the viewBox by default. */
@@ -296,7 +301,7 @@ export interface MotionFinding {
 }
 
 /** What an easing was fitted to: the path, or with the element measured, its opacity or scale. */
-export type EasingChannel = "position" | "opacity" | "scale" | "turn" | "drawn" | "colour";
+export type EasingChannel = "position" | "opacity" | "scale" | "turn" | "drawn" | "colour" | "gradient";
 
 export type ChannelFit = EasingFit & { channel: EasingChannel };
 
@@ -663,27 +668,32 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         if (fit && Number.isFinite(fit.errors[fit.best]))
           fits.push({ ...fit, channel: key === "turnDeg" ? "turn" : key });
       }
-      // Its colours, as one channel: how far each frame has gone from the first towards the last.
-      const painted = sorted.filter(
-        (x) =>
-          x.dom?.paint &&
-          x.atMs >= seg.startMs &&
-          x.atMs <= seg.endMs &&
-          x.dom.paint.length === sorted.find((y) => y.dom?.paint)!.dom!.paint!.length,
-      );
-      if (painted.length >= 4) {
-        const p0 = painted[0]!.dom!.paint!;
-        const p1 = painted[painted.length - 1]!.dom!.paint!;
+      // Its colours, and its gradients' stops, each as one channel: how far each frame has gone
+      // from the first towards the last.
+      for (const [key, name] of [
+        ["paint", "colour"],
+        ["stops", "gradient"],
+      ] as const) {
+        const first = sorted.find((y) => y.dom?.[key]);
+        const painted = sorted.filter(
+          (x) =>
+            x.dom?.[key] &&
+            x.atMs >= seg.startMs &&
+            x.atMs <= seg.endMs &&
+            x.dom[key]!.length === first!.dom![key]!.length,
+        );
+        if (painted.length < 4) continue;
+        const p0 = painted[0]!.dom![key]!;
+        const p1 = painted[painted.length - 1]!.dom![key]!;
         const d = p1.map((v, i) => v - p0[i]!);
         const len = Math.hypot(...d);
-        if (Math.max(...d.map(Math.abs)) >= 8) {
-          const pts = painted.map((x) => ({
-            t: timeOf(x.atMs, seg),
-            s: x.dom!.paint!.reduce((acc, v, i) => acc + (v - p0[i]!) * d[i]!, 0) / len,
-          }));
-          const fit = fitEasingAffine(pts);
-          if (Number.isFinite(fit.errors[fit.best])) fits.push({ ...fit, channel: "colour" });
-        }
+        if (Math.max(...d.map(Math.abs)) < 8) continue;
+        const pts = painted.map((x) => ({
+          t: timeOf(x.atMs, seg),
+          s: x.dom![key]!.reduce((acc, v, i) => acc + (v - p0[i]!) * d[i]!, 0) / len,
+        }));
+        const fit = fitEasingAffine(pts);
+        if (Number.isFinite(fit.errors[fit.best])) fits.push({ ...fit, channel: name });
       }
     }
     easing = fits[0] ? { ...fits[0], channels: fits } : { skipped: skipped ?? "nothing about it changes" };
@@ -1069,7 +1079,9 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
           Math.abs((x.dom!.turnDeg ?? 0) - (sorted[0]!.dom!.turnDeg ?? 0)) > 2 ||
           Math.abs((x.dom!.drawn ?? 0) - (sorted[0]!.dom!.drawn ?? 0)) > 0.05 ||
           // A colour that fades in place: a hover gradient read "target-static" (round 11).
-          (x.dom!.paint ?? []).some((v, i) => Math.abs(v - (sorted[0]!.dom!.paint?.[i] ?? v)) >= 8),
+          (x.dom!.paint ?? []).some((v, i) => Math.abs(v - (sorted[0]!.dom!.paint?.[i] ?? v)) >= 8) ||
+          // A ring filling by its conic stop: no colour changes, the stop moves (round 13).
+          (x.dom!.stops ?? []).some((v, i) => Math.abs(v - (sorted[0]!.dom!.stops?.[i] ?? v)) >= 8),
       )
     )
   ) {

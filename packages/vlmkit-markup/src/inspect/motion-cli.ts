@@ -160,6 +160,30 @@ export async function measureTargets(
               .map(Number);
             paint.push(c[0] ?? 0, c[1] ?? 0, c[2] ?? 0, Math.round((c[3] ?? 1) * 255));
           }
+        // Where its gradients' stops and angles are, on the same 0-255 scale (100% or a turn is 255):
+        // a ring filled by a conic stop changes no colour, and read "travels 0px … target-static"
+        // on its repair (round 13).
+        const stops: number[] = [];
+        if (/gradient\(/.test(own.backgroundImage))
+          for (const m of own.backgroundImage
+            .replace(/rgba?\([^)]*\)/g, "")
+            .matchAll(/(-?\d*\.?\d+)(%|deg|turn|rad|grad|px)/g)) {
+            const v = Number(m[1]);
+            const unit = m[2]!;
+            stops.push(
+              unit === "%"
+                ? v * 2.55
+                : unit === "deg"
+                  ? (v * 255) / 360
+                  : unit === "turn"
+                    ? v * 255
+                    : unit === "rad"
+                      ? (v * 255) / (2 * Math.PI)
+                      : unit === "grad"
+                        ? (v * 255) / 400
+                        : v,
+            );
+          }
         // A transition on background over a gradient: a gradient does not interpolate, so it steps.
         const durations = own.transitionDuration.split(",").map((d) => parseFloat(d) || 0);
         const discreteBg =
@@ -398,6 +422,7 @@ export async function measureTargets(
           ...turn(el),
           ...(m33 < -0.01 && !backHidden ? { mirrored: true } : {}),
           ...(paint.length > 0 ? { paint } : {}),
+          ...(stops.length > 0 ? { stops } : {}),
           ...(discreteBg ? { discreteBg: true } : {}),
           ...(el instanceof SVGElement && !(el instanceof SVGSVGElement) ? { svg: true } : {}),
           catches,
@@ -1181,6 +1206,20 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
         }
         if (steps.length === 0)
           throw new MotionUsageError("--wait needs an action to follow (--click, --hover, --leave, --scroll)");
+        // What the page plays at load ends before the first pointer action, as a visitor's hover
+        // comes after the cards have risen in. Hovered at 0, a card still in its delay rose under
+        // the pointer and the lift read as a 12px jump on the broken page and its repair alike
+        // (round 13). A leading --wait says when instead; a scroll keeps a reveal begun at load.
+        if (clockNow === 0 && steps[0]!.act.kind !== "scroll") {
+          const ends = held
+            .filter((h) => h.iterations !== null)
+            .map((h) => h.startMs + h.durationMs * (h.iterations ?? 1))
+            .filter((e) => e <= 10_000);
+          if (ends.length > 0) {
+            clockNow = Math.max(...ends) + frameTimeMs(1);
+            await timeline.at(clockNow);
+          }
+        }
         for (const [k, { act, waitAfter }] of steps.entries()) {
           if (k === steps.length - 1) {
             beforeClick = o.selectors.length > 0 ? await measureTargets(page, o.selectors) : [];
@@ -1243,8 +1282,9 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
             const op = Math.abs(a.opacity - b.opacity);
             const pa = a.paint ?? [];
             const pb = b.paint ?? [];
-            const paintStep =
-              pa.length === pb.length && pa.length > 0 ? Math.max(...pa.map((v, k) => Math.abs(v - pb[k]!))) : 0;
+            const step = (x: number[], y: number[]) =>
+              x.length === y.length && x.length > 0 ? Math.max(...x.map((v, k) => Math.abs(v - y[k]!))) : 0;
+            const paintStep = Math.max(step(pa, pb), step(a.stops ?? [], b.stops ?? []));
             if (!(d >= 1 || op >= 0.05 || paintStep >= 8)) return [];
             causes.push(
               b.notRendered
@@ -2027,6 +2067,9 @@ async function scrollSweep(o: MotionCliOptions): Promise<number | null> {
           const pa = first.paint ?? [];
           const pb = last.paint ?? [];
           if (pa.length === pb.length && pa.some((v, k) => Math.abs(v - pb[k]!) >= 8)) changes.push("its colour");
+          const sa = first.stops ?? [];
+          const sb = last.stops ?? [];
+          if (sa.length === sb.length && sa.some((v, k) => Math.abs(v - sb[k]!) >= 8)) changes.push("its gradient");
         }
         lines.push(
           `  target "${sel}" follows the scroll (\`${d.name}\` on ${d.timeline}): progress ${[0, 0.25, 0.5, 0.75, 1].map((f) => `${fmt(pr(at(f === 0.25 ? 0.2 : f === 0.75 ? 0.8 : f)))} at ${Math.round((f === 0.25 ? 0.2 : f === 0.75 ? 0.8 : f) * 100)}%`).join(", ")}; back at 50% ${fmt(pr(rows[11]!))}, at 0% ${fmt(pr(rows[12]!))}${changes.length > 0 ? `; ${changes.join(", ")}` : ""}`,

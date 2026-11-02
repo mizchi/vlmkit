@@ -1,5 +1,5 @@
 // Hidden from the agents: judges a repaired page against its brief.
-// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet|slidein|progress|accordion|dialog|hover|reveal|flip|interrupt|reduced|push|seam|draw|gradient|quote|dismiss|reading|gear|label> <page.html>
+// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet|slidein|progress|accordion|dialog|hover|reveal|flip|interrupt|reduced|push|seam|draw|gradient|quote|dismiss|reading|gear|label|popin|rise|ring> <page.html>
 import { chromium } from "playwright";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
@@ -653,6 +653,129 @@ if (kind === "notify") {
   await page.evaluate(() => { for (const x of document.getAnimations()) x.finish(); });
   const after = await page.evaluate(() => { const a = document.querySelector(".add"); const r = a.getBoundingClientRect(); const cs = getComputedStyle(a); return { w: r.width, h: r.height, bg: cs.backgroundColor, text: a.textContent.trim(), clipped: a.scrollWidth > a.clientWidth + 1 }; });
   ok("after: 'Added ✓ — View cart', 260px wide, 44px high, green, nothing cut off", after.text === "Added ✓ — View cart" && Math.abs(after.w - 260) <= 1 && Math.abs(after.h - 44) <= 1 && after.bg === "rgb(21, 128, 61)" && !after.clipped, after);
+} else if (kind === "popin") {
+  // Pauses whatever runs on the panel at t and reads it. A transition, a @keyframes entrance or a Web
+  // Animation all pass: the brief is about what is seen.
+  const panelAt = (t) =>
+    page.evaluate((t) => {
+      const el = document.querySelector(".panel");
+      const anims = el.getAnimations();
+      const d = Math.max(0, ...anims.map((a) => a.effect.getComputedTiming().endTime));
+      for (const a of anims) { a.pause(); a.currentTime = t; }
+      const r = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      return { d, n: anims.length, op: Number(cs.opacity), display: cs.display, y: r.y, right: r.right, w: r.width };
+    }, t);
+  const finish = () => page.evaluate(() => document.querySelector(".panel").getAnimations().forEach((a) => a.finish()));
+  const closed = await panelAt(0);
+  ok("closed at load: the panel is not shown", closed.display === "none" || closed.op < 0.05, closed);
+  await page.click(".share-btn");
+  const o0 = await panelAt(0);
+  const o100 = await panelAt(100);
+  ok("opening: something animates it over about 200ms", o100.n > 0 && Math.abs(o100.d - 200) <= 20, o100);
+  ok("opening starts transparent and 8px higher", o0.op < 0.1 && o0.display !== "none", { o0 });
+  await finish();
+  const open = await panelAt(0);
+  ok("open: fully shown, 280px wide, right edge under the button's", open.op > 0.99 && Math.abs(open.w - 280) <= 1 && Math.abs(open.right - 1248) <= 2, open);
+  ok("opening at 100ms: past half faded in, past half the drop (ease-out)", o100.op > 0.5 && o100.op < 0.99 && open.y - o100.y > -4 && o100.y < open.y, { o100, open, o0 });
+  ok("opening drops 8px into place", Math.abs(open.y - o0.y - 8) <= 1, { o0, open });
+  await page.click(".share-btn");
+  const c100 = await panelAt(100);
+  ok("closing: it fades out over about 200ms", c100.n > 0 && Math.abs(c100.d - 200) <= 20 && c100.op > 0.01 && c100.op < 0.5 && c100.display !== "none", c100);
+  await finish();
+  const gone = await panelAt(0);
+  ok("closed again: gone", gone.display === "none" || (gone.op < 0.05 && !(await page.evaluate(() => document.elementFromPoint(1200, 140)?.closest(".panel")))), gone);
+} else if (kind === "rise") {
+  const ids = ["#p1", "#p2", "#p3"];
+  const entrance = await page.evaluate((ids) =>
+    ids.map((id) => {
+      const el = document.querySelector(id);
+      const a = el.getAnimations().find((x) => !x.transitionProperty);
+      if (!a) return null;
+      const t = a.effect.getComputedTiming();
+      return { delay: t.delay, d: t.duration };
+    }), ids);
+  ok("entrance: each card 400ms, 100ms after the one before", entrance.every((e, i) => e && Math.abs(e.d - 400) <= 1 && Math.abs(e.delay - i * 100) <= 1), entrance);
+  const mid = await page.evaluate(() => {
+    const el = document.querySelector("#p2");
+    const a = el.getAnimations().find((x) => !x.transitionProperty);
+    a.pause(); a.currentTime = 100 + 200;
+    const r = el.getBoundingClientRect();
+    const out = { op: Number(getComputedStyle(el).opacity), y: r.y };
+    a.play();
+    return out;
+  });
+  // Let the entrance end the way a visitor sees it, in real time.
+  await page.waitForTimeout(900);
+  const rest = await rect("#p2");
+  ok("mid-entrance: rising and fading in", mid.op > 0.3 && mid.op < 0.99 && mid.y > rest[1] + 0.5 && mid.y < rest[1] + 16, { mid, rest });
+  const box = rest;
+  await page.mouse.move(box[0] + box[2] / 2, box[1] + box[3] / 2);
+  const up = await page.evaluate(() => {
+    const el = document.querySelector("#p2");
+    const a = el.getAnimations().find((x) => x.transitionProperty === "transform" || x.transitionProperty === "translate");
+    if (!a) return null;
+    const d = a.effect.getComputedTiming().duration;
+    a.pause(); a.currentTime = 75;
+    const y = el.getBoundingClientRect().y;
+    a.play();
+    return { d, y };
+  });
+  ok("pointer over: a 150ms transition moves it", up && Math.abs(up.d - 150) <= 1, up);
+  ok("lifting at 75ms: more than half way up (ease-out)", up && (rest[1] - up.y) / 4 > 0.6 && rest[1] - up.y < 3.98, { rest, up });
+  await page.waitForTimeout(400);
+  ok("lifted 4px while over it", Math.abs((await rect("#p2"))[1] - (rest[1] - 4)) <= 0.5, await rect("#p2"));
+  const shadow = await page.evaluate(() => getComputedStyle(document.querySelector("#p2")).boxShadow);
+  ok("its shadow deepens", /14px 28px/.test(shadow), shadow);
+  await page.mouse.move(5, 5);
+  await page.waitForTimeout(400);
+  ok("back at rest after the pointer leaves", JSON.stringify(await rect("#p2")) === JSON.stringify(rest), { now: await rect("#p2"), rest });
+} else if (kind === "ring") {
+  // The arc's end read from the pixels: the blue share of 360 points just inside the ring's edge.
+  const share = () =>
+    page.evaluate(async () => {
+      const r = document.querySelector(".ring").getBoundingClientRect();
+      return { x: r.x, y: r.y, w: r.width, h: r.height };
+    });
+  const box = await share();
+  const arc = async () => {
+    const png = await page.screenshot({ clip: { x: box.x, y: box.y, width: box.w, height: box.h } });
+    return page.evaluate(async (b64) => {
+      const img = new Image();
+      img.src = "data:image/png;base64," + b64;
+      await img.decode();
+      const c = new OffscreenCanvas(img.width, img.height);
+      const g = c.getContext("2d");
+      g.drawImage(img, 0, 0);
+      const { data, width, height } = g.getImageData(0, 0, img.width, img.height);
+      let blue = 0;
+      for (let i = 0; i < 360; i++) {
+        const a = ((i + 0.5) / 360) * 2 * Math.PI;
+        const x = Math.round(width / 2 + Math.sin(a) * width * 0.44), y = Math.round(height / 2 - Math.cos(a) * height * 0.44);
+        const k = (y * width + x) * 4;
+        if (data[k + 2] > 200 && data[k] < 80) blue++;
+      }
+      return blue / 360;
+    }, png.toString("base64"));
+  };
+  const hold = (t) => page.evaluate((t) => { for (const a of document.getAnimations()) { a.pause(); a.currentTime = t; } return document.getAnimations().length; }, t);
+  ok("before it starts: empty", (await arc()) < 0.02, await arc());
+  await page.waitForTimeout(400);
+  const n = await hold(0);
+  ok("once it starts, something animates the ring", n > 0, n);
+  const durs = await page.evaluate(() => document.getAnimations().map((a) => a.effect.getComputedTiming().endTime));
+  ok("over about one second", durs.some((d) => Math.abs(d - 1000) <= 50), durs);
+  const s = [];
+  for (const t of [0, 100, 250, 500, 750, 999]) { await hold(t); s.push(Math.round((await arc()) * 1000) / 10); }
+  ok("it fills a little at a time (0 → 72%, never jumping more than 30 points between samples)", s.every((v, i) => i === 0 || (v >= s[i - 1] - 0.5 && v - s[i - 1] < 30)) && s[0] < 10, s);
+  ok("slowing at the end: past half its way at half its time", s[3] > 36 && s[3] < 71, s);
+  await page.evaluate(() => document.getAnimations().forEach((a) => a.finish()));
+  const end = await arc();
+  ok("filled: 72% blue", Math.abs(end - 0.72) <= 0.02, end);
+  const label = await page.evaluate(() => document.querySelector(".ring span").textContent.trim());
+  ok("the number says 72%", label === "72%", label);
+  const size = await rect(".ring");
+  ok("the ring is still 140px", size[2] === 140 && size[3] === 140, size);
 }
 await browser.close();
 const failed = checks.filter((c) => !c.pass);
