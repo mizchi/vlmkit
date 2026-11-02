@@ -3,6 +3,60 @@
 All notable changes to this project will be documented in this file.
 Dates are YYYY-MM-DD.
 
+## 0.24.0 — 2026-11-02
+
+Breaking:
+
+- `@mizchi/vlmkit-anim` and the explanation skills moved to mizchi/explainer, and the package is deprecated.
+  `@mizchi/vlmkit-animation-eval` stays here.
+- TypeSafe Jev is opt-in. `--jev` turns it on (`diff png --jev`, with `--kind` kept as an alias; `inspect motion --jev`).
+  Without it, nothing asks Jev.
+
+Added:
+
+- `check flash` judges WCAG 2.3.1 (Three Flashes) over the page's own time on a held clock. Motion is compensated,
+  and a page's video or animated images are reported as not measured.
+- `scan video` decodes recordings through the user's own ffmpeg (5.1+) into `vlmkit-frames/1`.
+  `check flash` also judges a video, GIF or APNG directly.
+- `vlmkit-frames/1` is one format for numbered captures:
+  - `check animation --at/--frames`;
+  - `check integrity --timeline-at/--frames`;
+  - `inspect interact` frames steps;
+  - `snapshot strip --manifest`.
+- `snapshot storyboard` finds a frame sequence's states, events and loops from the pixels. `--lossy` and `--noise`
+  compare lossy recordings through a noise band that knows the codec's GOPs, and `--floor` sets the floor.
+- `scan a11y --app` collects and judges a macOS window's Accessibility tree.
+- Jev commands:
+  - `diff png --jev` labels each region;
+  - `inspect locate` and interact `click` with `describe`;
+  - `inspect claims`.
+- `inspect motion` judges whether a CSS animation is visually broken, from frames on the held clock. With
+  `--selector` it needs no key. Twelve rounds of agent repair shaped it.
+  - It checks against expectations: `--expect-easing`, `-origin`, `-start`, `-stagger`, `-duration`, `-iterations`,
+    `-direction` (sides, and clockwise or counterclockwise), and `-still`.
+  - Actions run before sampling: `--click`, `--hover`, `--leave`, `--scroll`, `--wait`.
+  - Failures it names include:
+    - `target-hidden`, `snapped`, `replayed`, `pushed`, `interrupt-jump`, `loop-seam`;
+    - `stroke-incomplete`, `size-jump`, `invisible-blocker`, `turn-off-centre`;
+    - `scroll-static` and `scroll-mismatch` (a scroll-timeline target is judged by sweeping the scroll).
+- New `check animation` rules: `delayed-entrance`, `unknown-transition-property`, `reduced-motion-hides`,
+  `layout-animation`, `loop-seam`, `stroke-incomplete`, `discrete-transition`, `animation-replayed`,
+  `zero-duration-animation`. Scroll-driven animations are listed rather than seeked. 228 rules in all.
+- `check animation --frames-reduced-motion`. `check integrity --viewport WxH` checks one viewport.
+- An unknown gate option's warning names the nearest option.
+
+Changed:
+
+- Tests and library builds run on Vite+ (`vp test`, `vp pack`). TS/JS formatting is checked in CI.
+- Several fixes to the held clock:
+  - it counts frames instead of summing them;
+  - it lists animations still in their delay;
+  - the rest instant is bounded by the animations sampled.
+- `check theme` compares a component's pixels, not their averages. `check palette` names each colour by a hex the
+  image holds.
+- `check flash` says when it did not judge animations on a scroll timeline. The run ledger's creation is announced
+  outside a git repository too.
+
 ## 0.23.2 — 2026-10-02
 
 - Add `check animation --virtual-time`: the page clock (`requestAnimationFrame`, `performance.now`, `Date`,
