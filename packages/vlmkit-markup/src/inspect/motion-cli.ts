@@ -560,6 +560,7 @@ each forbidden statement is. vlmkit judges the motion from that:
   invisible-blocker at rest it is transparent and still takes clicks at its centre
   size-jump        its width or height steps in one frame while it eases (its text re-wrapping)
   turn-off-centre  it turns and its centre is carried round: another transform-origin (warn)
+  target-unchanged nothing about the target changes while another element animates: the trigger (warn)
   inert-offset     its animation moves top / left on a position: static box, where they do nothing (warn)
   channel-step     a colour, gradient or shadow changes all at once between two frames (fail in
                    one frame; warn when the frames are too far apart to tell)
@@ -628,6 +629,8 @@ an easing is checked on each channel that changes.
                           Nothing animating while a --selector target changes is \`snapped\`.
                           What plays at load ends before the first --click / --hover / --leave
                           (a leading --wait says when instead)
+  --every-action          With several actions, sample the motion each one starts (one run per
+                          action, in order) instead of the last one's only; --exits is the last's
   --wait <ms>             After an action: let only this long pass before the next one instead
                           of its whole motion — a change of mind mid-motion. "--click .menu-btn
                           --wait 100 --click .menu-btn" lands the second click 100ms into the
@@ -691,6 +694,8 @@ export interface MotionCliOptions {
   frames: string;
   threshold: number;
   json: boolean;
+  /** Sample the motion each action starts, one run per action, instead of the last one's only. */
+  everyAction?: boolean;
   /** Ask TypeSafe Jev. Without it every target is a --selector, measured from the page alone. */
   jev: boolean;
   /**
@@ -739,6 +744,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   let threshold = 0.5;
   let json = false;
   let exits = false;
+  let everyAction = false;
   const exitSelectors: string[] = [];
   const stillSelectors: string[] = [];
   let noForbid = false;
@@ -902,6 +908,9 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
       case "--exits":
         exits = true;
         break;
+      case "--every-action":
+        everyAction = true;
+        break;
       case "--jev":
         jev = true;
         break;
@@ -1037,6 +1046,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
     jev,
     actions,
     expectStill,
+    ...(everyAction ? { everyAction } : {}),
   };
 }
 
@@ -1226,6 +1236,8 @@ interface Captured {
   forever?: boolean;
   /** The last action cut into the motion before it: the targets as they were just before it. */
   interrupt?: { atMs: number; action: string; before: (MotionDom | null)[] };
+  /** Elements that animate and are not a target, nor around one (inside one counts). */
+  elsewhere?: string[];
   /** The --selector targets just before the last action, and that action. */
   beforeLast?: { action: string; targets: (MotionDom | null)[] };
   /** The page's scroll position across the frames shot, when it moved (a clamp at the page's end). */
@@ -1468,6 +1480,24 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
           timeline = await openHeldTimeline(page, url);
         }
       }
+      // What animates that is not a target, nor around one: a run on the "?" that opens
+      // a bubble measured the trigger and read "travels 0px, no fail" (round 14).
+      const elsewhere = await page
+        .evaluate((sels: string[]) => {
+          const targets = sels.flatMap((s) => [...document.querySelectorAll(s)]);
+          const name = (e: Element) =>
+            e.localName + (e.id ? `#${e.id}` : "") + [...e.classList].map((c) => `.${c}`).join("");
+          const out = new Set<string>();
+          for (const a of document.getAnimations()) {
+            const el = (a.effect as KeyframeEffect | null)?.target;
+            if (!(el instanceof Element)) continue;
+            // An ancestor carries the target with it; a descendant is what moved instead of it.
+            if (targets.some((t) => t === el || el.contains(t))) continue;
+            out.add(name(el));
+          }
+          return [...out].slice(0, 4);
+        }, o.selectors)
+        .catch(() => [] as string[]);
       const holds = await keyframeHolds(page).catch(() => []);
       // After actions, the motion the last one started; what ran before it is not this sampling's.
       const planned = o.actions.length > 0 ? held.slice(heldBefore) : held;
@@ -1809,6 +1839,7 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
         ...(forever ? { forever: true } : {}),
         ...(interrupt ? { interrupt } : {}),
         ...(lastBefore ? { beforeLast: lastBefore } : {}),
+        ...(elsewhere.length > 0 ? { elsewhere } : {}),
         ...(scrollYs.length > 1 && Math.max(...scrollYs) - Math.min(...scrollYs) >= 1
           ? { scrolled: { from: scrollYs[0]!, to: scrollYs[scrollYs.length - 1]! } }
           : {}),
@@ -1928,7 +1959,32 @@ export function formatMotionReport(
     if (!("best" in e)) return `no easing fit: ${e.skipped}`;
     if (broken) return "no easing named: the path has a jump, so no curve describes it";
     const channels = (e.channels ?? [e]) as Fit[];
-    return channels.map(oneFit).join("; ");
+    // Channels that follow one curve exactly are said once: "follows ease-out exactly …; follows
+    // ease-out in its opacity exactly …" read as the same claim twice (round 14).
+    const exact = (f: Fit) => !Number.isFinite(f.margin) || f.margin >= 1000;
+    const out: string[] = [];
+    const done = new Set<Fit>();
+    for (const c of channels) {
+      if (done.has(c)) continue;
+      const same = exact(c) ? channels.filter((d) => !done.has(d) && exact(d) && d.best === c.best) : [c];
+      if (same.length < 2 || (fadeOwner && same.some((d) => d.channel === "opacity"))) {
+        done.add(c);
+        out.push(oneFit(c));
+        continue;
+      }
+      for (const d of same) done.add(d);
+      const names = same.map((d) =>
+        !d.channel || d.channel === "position"
+          ? "its path"
+          : d.channel === "drawn"
+            ? "its drawn length"
+            : `its ${d.channel}`,
+      );
+      out.push(
+        `follows ${c.best} exactly in ${names.slice(0, -1).join(", ")} and ${names[names.length - 1]} (measured: no other curve comes close)`,
+      );
+    }
+    return out.join("; ");
   };
   // Where a scale grows from, and when the target's own animation begins: printed whether or
   // not they were expected, since round 3's wrong transform-origin and missing stagger each
@@ -2320,6 +2376,28 @@ export async function runMotionCli(argv: string[]): Promise<number> {
     );
     return 2;
   }
+  // Each action's motion, one run each: "--hover .help --leave" measured only the fade-out, and the
+  // fade-in took a second command (round 14). --exits is the last action's.
+  const acts = o.actions.flatMap((a, k) => (a.kind === "wait" ? [] : [k]));
+  if (o.everyAction && acts.length > 1) {
+    let worst = 0;
+    for (const [n, k] of acts.entries()) {
+      const step: MotionCliOptions = {
+        ...o,
+        actions: o.actions.slice(0, k + 1),
+        exits: n === acts.length - 1 ? o.exits : false,
+        frames: join(o.frames, `action-${n + 1}`),
+        everyAction: false,
+      };
+      console.log(`== ${n + 1}/${acts.length}: the motion ${describeAction(o.actions[k]!)} starts`);
+      worst = Math.max(worst, await runMotionOptions(step, argv));
+    }
+    return worst;
+  }
+  return runMotionOptions(o, argv);
+}
+
+async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<number> {
   // A target on a scroll timeline is judged against the scroll (round 12).
   if (
     !/(^|\/)frames\.json$/.test(o.source) &&
@@ -2369,6 +2447,15 @@ export async function runMotionCli(argv: string[]): Promise<number> {
     return 2;
   }
   const { checkMotionFrames } = await import("@mizchi/vlmkit-ai/motion-check.ts");
+  // The pointer leaving what showed a target: gone at rest is its end. A repaired help bubble failed
+  // absent-at-rest after --hover .help --leave until --exits was added (round 14).
+  const lastAct = o.actions.filter((a) => a.kind !== "wait").at(-1);
+  const leaveExits =
+    !o.exits &&
+    lastAct?.kind === "leave" &&
+    (captured.beforeLast?.targets ?? []).some(
+      (b) => b && !b.notRendered && b.opacity >= 0.5 && (b.visible ?? 0) >= 0.5,
+    );
   const r = await checkMotionFrames(captured.frames, {
     targets: o.targets,
     forbid: o.forbid,
@@ -2376,7 +2463,7 @@ export async function runMotionCli(argv: string[]): Promise<number> {
     endMs: captured.endMs,
     segments: captured.segments,
     threshold: o.threshold,
-    exits: o.exits,
+    exits: o.exits || leaveExits,
     ...(o.exitSelectors.length > 0 ? { exitsFor: o.selectors.map((sel) => o.exitSelectors.includes(sel)) } : {}),
     jev: o.jev,
     ...motionEasingOptions(o.expectEasing),
@@ -2411,6 +2498,20 @@ export async function runMotionCli(argv: string[]): Promise<number> {
           },
     );
   }
+  // Nothing about any target changed while something else on the page animated: the target is
+  // likely the trigger, not what moves.
+  if (
+    captured.elsewhere &&
+    o.selectors.length > 0 &&
+    r.targets.every((t) => !("best" in t.easing) && t.travelPx < 2 && t.findings.every((f) => f.severity !== "fail"))
+  )
+    for (const t of r.targets)
+      t.findings.push({
+        rule: "target-unchanged" as (typeof t.findings)[number]["rule"],
+        severity: "warn",
+        atMs: captured.startMs,
+        message: `nothing about it changes, while ${captured.elsewhere.join(", ")} ${captured.elsewhere.length === 1 ? "animates" : "animate"}: if that is what should move, give it as --selector (the element that moves, not the one that starts it)`,
+      });
   const jumps = [
     ...interruptJumps(captured, o.selectors),
     ...(captured.seams ?? []).map((s) => ({ ...s, rule: "loop-seam" })),
@@ -2438,6 +2539,12 @@ export async function runMotionCli(argv: string[]): Promise<number> {
   if (o.json) console.log(JSON.stringify(json, null, 2));
   else {
     const lines = formatMotionReport(o.source, captured, r, o.forbid).split("\n");
+    if (leaveExits)
+      lines.splice(
+        1,
+        0,
+        "  taken as leaving: it was shown before --leave, and the pointer leaving is what hides a hover-only element, so gone at rest is its end (as --exits); if it should stay after the pointer leaves, that is the defect",
+      );
     // Only the last action's motion is sampled: two --click on a panel measured its close, and
     // nothing said its open had not been (round 13).
     const acts = o.actions.filter((a) => a.kind !== "wait");
@@ -2450,7 +2557,7 @@ export async function runMotionCli(argv: string[]): Promise<number> {
           .map(describeAction)
           .join(
             ", ",
-          )} started ran${o.actions.some((a) => a.kind === "wait") ? " (as far as --wait let it)" : " to its end"} unsampled — run without the later actions to measure it`,
+          )} started ran${o.actions.some((a) => a.kind === "wait") ? " (as far as --wait let it)" : " to its end"} unsampled — --every-action measures each in turn`,
       );
     if (jumps.length > 0 || warnsAfter.length > 0) {
       // Into the report, above its tally, and counted in it: "no fail" printed above a FAIL line.

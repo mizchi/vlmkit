@@ -438,7 +438,11 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   fail, and `check animation`'s `inert-offset-animation` (suspect, 230 rules); `turn-off-centre` leaves
   out a centre the target's own translate explains; when no target is seen every `--expect-*` is not
   judged. The oracle replays an entrance before sampling: a `backwards` fill leaves a finished
-  animation off its element and out of `getAnimations()`.
+  animation off its element and out of `getAnimations()`. Its deferred items: a target shown before
+  `--leave` and gone at rest is taken as leaving; `--every-action` samples each action's motion in its
+  own run (`action-N/`, worst exit code); `diff html` drops a global shift that leaves no fewer pixels
+  differing; channels that follow one curve exactly are said once; `target-unchanged` (warn) when
+  every target is still and a non-ancestor animates.
 
 ## Generated figures (raster images)
 

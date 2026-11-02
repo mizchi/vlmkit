@@ -296,7 +296,9 @@ vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ea
   0fr → 1fr` runs in every engine). Motion a pointer or a scroll starts: `--hover <css>`,
   `--leave` and `--scroll <css>` are actions too, run in order, each one before the last let
   run to its end — "settles back when the pointer moves off" is `--hover .card --leave`
-  (`snapped` there names a transition declared only in the `:hover` rule), and "fades up as it
+  (`snapped` there names a transition declared only in the `:hover` rule; a target the pointer
+  leaving hides is taken as leaving, and `--every-action` measures the fade-in and the fade-out
+  in one command), and "fades up as it
   scrolls into view" is `--scroll .section`. `check animation` evaluates motion that runs from
   load only: it passes a page whose motion all waits for a click, a hover or a scroll. "Stays
   dead centre", "only its size and opacity change" is `--expect-still`; a target that sits off

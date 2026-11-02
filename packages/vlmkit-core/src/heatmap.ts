@@ -810,10 +810,17 @@ export async function generateDiffReport(
         globalShift,
         r.threshold,
       );
-      // Prefer per-band shifts when they reveal locally-varying offsets.
-      // Falls back to the global single-band region if no band locks on.
-      const bands = detectBandShifts(r.resizedBaseline, r.resizedCurrent);
-      shiftRegions = bands.length > 0 ? bands : [{ yStart: 0, yEnd: r.height, shift: globalShift }];
+      // A shift that leaves more pixels differing than none is no shift: an anti-aliasing change of
+      // 523px "explained" by +221px came to 26.3% (round 14's notice, raw 0.2%).
+      if (compensated >= r.diffPixels) {
+        globalShift = 0;
+        compensated = r.diffPixels;
+      } else {
+        // Prefer per-band shifts when they reveal locally-varying offsets.
+        // Falls back to the global single-band region if no band locks on.
+        const bands = detectBandShifts(r.resizedBaseline, r.resizedCurrent);
+        shiftRegions = bands.length > 0 ? bands : [{ yStart: 0, yEnd: r.height, shift: globalShift }];
+      }
     }
   }
 

@@ -95,7 +95,33 @@ agent animated `transform` instead of adding `position`. Four of the six agents 
 - **The skill.** The dynamic-markup skill now says that `--expect-direction` fails a path more than 10° off its
   axis, and a target that is expected to move and does not.
 
-## Deferred
+## Deferred, and fixed after the round (2026-11-02)
+
+Every item below is fixed.
+
+- **A hover-only element after `--leave`** is taken as leaving when it was shown just before the
+  `--leave`. The output says so: `taken as leaving: it was shown before --leave … gone at rest is its end
+  (as --exits); if it should stay after the pointer leaves, that is the defect`. The repaired bubble passes
+  `--hover .help --leave` with no `--exits`. The broken one still fails `hidden-at-once`.
+- **`--every-action`** runs once for each action, in order, and samples the motion that action starts: `==
+  1/2: the motion --hover .help starts` … `== 2/2: the motion --leave starts`. The exit code is the worst of
+  them. `--exits` applies to the last run, and each run writes its frames to `action-N/`. The
+  `sampled: …` note now names the flag.
+- **`diff html`'s shift label.** A global shift that leaves at least as many pixels differing as none is
+  now no shift. The notice's 547px of anti-aliasing reads `~ mobile 0.2% (547 px) [4 other]`, without
+  `[shift +221px → 26.3%]`. The shift is detected from the pixels (`detectGlobalShift`), not from the
+  computed styles. The label was a shift that made the diff worse.
+- **One curve, said once.** Channels that each follow the same curve exactly are named together:
+  `follows ease-out exactly in its path and its opacity (measured: …)`. A channel that fits less well, or
+  an opacity that is an ancestor's fade, keeps its own phrase.
+- **The trigger measured instead of what moves.** When nothing about any target changes and an element
+  that is not a target or its ancestor animates (one inside a target counts), each target gets `warn
+  target-unchanged: nothing about it changes, while span.bubble animates: if that is what should move,
+  give it as --selector`.
+- **The skill's `--version` line** reads `vlmkit/0.24.0 <platform>-<arch> node-v<version>: only the first
+  word is compared`, instead of one machine's line.
+
+## Deferred (as written after the round)
 
 - After `--hover .help --leave` without `--exits`, the repaired bubble fails `absent-at-rest`. The message
   points to `--exits`, but a hover-only element that leaves when the pointer does is the usual case.

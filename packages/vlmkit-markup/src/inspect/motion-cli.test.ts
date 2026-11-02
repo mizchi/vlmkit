@@ -547,6 +547,33 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
     );
   });
 
+  // Round 14's deferred items.
+  it(
+    "samples every action, takes a --leave as the exit, and names the element that moved instead",
+    { timeout: 400_000 },
+    async () => {
+      const both = await run("reference/hint.html", [
+        "--selector",
+        ".bubble",
+        "--hover",
+        ".help",
+        "--leave",
+        "--every-action",
+      ]);
+      assert.equal(both.code, 0, both.out);
+      assert.match(both.out, /== 1\/2: the motion --hover \.help starts[\s\S]*== 2\/2: the motion --leave starts/);
+      assert.match(both.out, /taken as leaving: it was shown before --leave/);
+      assert.doesNotMatch(both.out, /absent-at-rest/);
+      const trigger = await run("reference/hint.html", ["--selector", ".help", "--hover", ".help"]);
+      assert.match(
+        trigger.out,
+        /warn target-unchanged .*span\.bubble animates: if that is what should move, give it as --selector/,
+      );
+      const once = await run("reference/nudge.html", ["--selector", ".notice"]);
+      assert.match(once.out, /follows ease-out exactly in its path and its opacity/);
+    },
+  );
+
   it("takes --no-ledger, and prints a usage error without the whole help", async () => {
     assert.doesNotThrow(() => parseMotionArgs(["p.html", "--selector", ".t", "--no-ledger"]));
     const errors: string[] = [];

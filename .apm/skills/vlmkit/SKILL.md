@@ -47,7 +47,7 @@ place an agent has already read before it runs a gate.
 Read what is installed before the first gate of a task:
 
 ```sh
-npx vlmkit --version     # vlmkit/0.24.0 darwin-arm64 node-v24.14.1
+npx vlmkit --version     # vlmkit/0.24.0 <platform>-<arch> node-v<version>: only the first word is compared
 ```
 
 - **Older, or not installed** → install `@mizchi/vlmkit@0.24.0` and use that.

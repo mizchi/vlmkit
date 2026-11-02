@@ -303,7 +303,8 @@ export type MotionRule =
   | "turn-off-centre"
   | "channel-step"
   | "inert-offset"
-  | "hidden-at-once";
+  | "hidden-at-once"
+  | "target-unchanged";
 
 export interface MotionFinding {
   rule: MotionRule;
