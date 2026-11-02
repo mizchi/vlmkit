@@ -804,17 +804,29 @@ if (kind === "notify") {
   await finish();
   const gone = await bubbleAt(0);
   ok("then gone", !shown(gone), gone);
-} else if (kind === "ticket") {
+} else if (kind === "ticket" || kind === "nudge") {
+  // A finished entrance with a fill other than forwards is off its element (and out of
+  // getAnimations), so it is played again from its start and paused there before it is sampled.
+  await page.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    el.style.animation = "none";
+    void el.offsetWidth;
+    el.style.animation = "";
+    window.__oAnims = document.getAnimations();
+    for (const a of window.__oAnims) a.pause();
+  }, kind === "ticket" ? ".ticket" : ".notice");
+}
+if (kind === "ticket") {
   const poseAt = (t) =>
     page.evaluate((t) => {
       const el = document.querySelector(".ticket");
-      for (const a of document.getAnimations()) { a.pause(); a.currentTime = t; }
+      for (const a of window.__oAnims) { a.pause(); a.currentTime = t; }
       const r = el.getBoundingClientRect();
       const tf = getComputedStyle(el).transform;
       const m = new DOMMatrixReadOnly(tf === "none" ? undefined : tf);
       return { cx: r.x + r.width / 2, cy: r.y + r.height / 2, deg: (Math.atan2(m.b, m.a) * 180) / Math.PI, op: Number(getComputedStyle(el).opacity) };
     }, t);
-  const timing = await page.evaluate(() => { const a = document.querySelector(".ticket").getAnimations()[0]; const t = a?.effect.getComputedTiming(); return t ? { d: t.duration, delay: t.delay } : null; });
+  const timing = await page.evaluate(() => { const a = window.__oAnims[0]; const t = a?.effect.getComputedTiming(); return t ? { d: t.duration, delay: t.delay } : null; });
   ok("one 500ms entrance at load", timing && Math.abs(timing.d - 500) <= 1 && timing.delay === 0, timing);
   const rest = await poseAt(500);
   const p = [];
@@ -827,11 +839,11 @@ if (kind === "notify") {
   const at2 = (t) =>
     page.evaluate((t) => {
       const el = document.querySelector(".notice");
-      for (const a of document.getAnimations()) { a.pause(); a.currentTime = t; }
+      for (const a of window.__oAnims) { a.pause(); a.currentTime = t; }
       const r = el.getBoundingClientRect();
       return { x: r.x, y: r.y, w: r.width, op: Number(getComputedStyle(el).opacity) };
     }, t);
-  const timing = await page.evaluate(() => { const a = document.querySelector(".notice").getAnimations()[0]; const t = a?.effect.getComputedTiming(); return t ? { d: t.duration } : null; });
+  const timing = await page.evaluate(() => { const a = window.__oAnims[0]; const t = a?.effect.getComputedTiming(); return t ? { d: t.duration } : null; });
   ok("a 400ms entrance at load", timing && Math.abs(timing.d - 400) <= 1, timing);
   const rest = await at2(400);
   const s0 = await at2(0);
