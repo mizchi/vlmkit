@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Upload</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, ui-sans-serif, sans-serif; background: #f8fafc; color: #0f172a; }
+  main { max-width: 640px; margin: 64px auto; padding: 0 24px; }
+  .toast { position: fixed; right: 24px; bottom: 24px; width: 320px; padding: 16px 20px; border-radius: 12px; background: #0f172a; color: #f8fafc; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.25);
+    animation: rise 400ms ease-out both, pulse 1600ms ease-in-out 400ms infinite both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+  /* Attention pulse, from the shared motion kit. */
+  @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+</style></head>
+<body>
+  <main><h1>Upload</h1><p>Your files are being processed.</p></main>
+  <div class="toast" id="toast" role="status">3 files uploaded — 1 needs your review</div>
+</body></html>

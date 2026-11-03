@@ -1,5 +1,5 @@
 // Hidden from the agents: judges a repaired page against its brief.
-// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet|slidein|progress|accordion|dialog|hover|reveal|flip|interrupt|reduced|push|seam|draw|gradient|quote|dismiss|reading|gear|label|popin|rise|ring|hint|ticket|nudge|focus|fadeup|queue|lift|turn|boot|stepper|meter|guard> <page.html>
+// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet|slidein|progress|accordion|dialog|hover|reveal|flip|interrupt|reduced|push|seam|draw|gradient|quote|dismiss|reading|gear|label|popin|rise|ring|hint|ticket|nudge|focus|fadeup|queue|lift|turn|boot|stepper|meter|guard|combo|tokens|upright> <page.html>
 import { chromium } from "playwright";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
@@ -1062,6 +1062,74 @@ if (kind === "stepper" || kind === "meter" || kind === "guard") {
     });
     ok("reduced motion: no animation, in place and opaque", calm.n === 0 && calm.op > 0.99 && Math.abs(calm.y - rest.y) <= 1, { calm, rest });
   }
+}
+if (kind === "combo") {
+  await page.evaluate(() => {
+    const el = document.querySelector("#toast");
+    el.style.animation = "none";
+    void el.offsetWidth;
+    el.style.animation = "";
+    window.__oAnims = el.getAnimations();
+    for (const a of window.__oAnims) a.pause();
+  });
+  const pose = (t) =>
+    page.evaluate((t) => {
+      for (const a of window.__oAnims) { a.pause(); a.currentTime = t; }
+      const el = document.querySelector("#toast");
+      const r = el.getBoundingClientRect();
+      return { y: r.y, w: r.width, op: Number(getComputedStyle(el).opacity), n: window.__oAnims.length };
+    }, t);
+  const rest = await pose(400);
+  const s0 = await pose(0), s1 = await pose(120);
+  const pulseMid = await pose(400 + 800), pulseEnd = await pose(400 + 1600);
+  ok("two animations: the entrance and the pulse", s0.n === 2, s0);
+  ok("starts 24px below its place, transparent", Math.abs(s0.y - (rest.y + 24)) <= 1 && s0.op < 0.05, { s0, rest });
+  ok("rising and fading in at 120ms, slowing as it arrives", s1.y < rest.y + 24 * 0.62 && s1.y > rest.y + 0.3 && s1.op > 0.2 && s1.op < 0.99, { s1, rest });
+  ok("in place at the bottom-right corner, opaque", Math.abs(rest.y + 58 - 776) <= 30 && rest.op > 0.99, rest);
+  ok("pulses: 104% half way through a 1.6s pulse, 100% at its end", Math.abs(pulseMid.w / rest.w - 1.04) <= 0.006 && Math.abs(pulseEnd.w / rest.w - 1) <= 0.003, { pulseMid, pulseEnd, rest });
+  const inf = await page.evaluate(() => window.__oAnims.some((a) => a.effect.getComputedTiming().iterations === Infinity));
+  ok("the pulse repeats forever", inf, inf);
+} else if (kind === "tokens") {
+  const closed = await rect("#drawer");
+  ok("closed: the drawer is off the right edge", closed[0] >= 1279, closed);
+  await page.click("#open");
+  const slide = (t) =>
+    page.evaluate((t) => {
+      const el = document.querySelector("#drawer");
+      const a = el.getAnimations().find((x) => x.transitionProperty === "transform");
+      if (!a) return null;
+      a.pause();
+      a.currentTime = t;
+      return { d: a.effect.getComputedTiming().duration, x: el.getBoundingClientRect().x };
+    }, t);
+  const m = await slide(60);
+  ok("a click slides it in over about 180ms", m && Math.abs(m.d - 180) <= 5, m);
+  ok("slowing as it arrives: past 40% of its way at 60ms of 180", m && m.x < 1280 - 0.4 * 360 && m.x > 920 + 1, m);
+  await page.evaluate(() => document.getAnimations().forEach((a) => a.finish()));
+  const open = await rect("#drawer");
+  ok("open: flush with the right edge, 360px wide", open[0] === 920 && open[2] === 360, open);
+  await page.click("#open");
+  const back = await slide(60);
+  ok("another click slides it back out the same way", back && Math.abs(back.d - 180) <= 5 && back.x > 920 + 1 && back.x < 1279, back);
+} else if (kind === "upright") {
+  const at4 = (t) =>
+    page.evaluate((t) => {
+      for (const a of document.getAnimations()) { a.pause(); a.currentTime = t; }
+      const deg = (el) => {
+        let m = new DOMMatrix();
+        for (let n = el; n && n !== document.documentElement; n = n.parentElement) {
+          const tf = getComputedStyle(n).transform;
+          if (tf && tf !== "none") m = new DOMMatrix(tf).multiply(m);
+        }
+        return (Math.atan2(m.b, m.a) * 180) / Math.PI;
+      };
+      return { dial: deg(document.querySelector("#dial")), label: deg(document.querySelector("#label")) };
+    }, t);
+  const ts = [500, 1300, 2200, 3100, 3900, 5700, 8900];
+  const poses = [];
+  for (const t of ts) poses.push(await at4(t));
+  ok("the dial turns clockwise once every 4s", Math.abs((((poses[0].dial % 360) + 360) % 360) - 45) <= 1 && Math.abs((((poses[2].dial % 360) + 360) % 360) - 198) <= 1, poses.slice(0, 3));
+  ok("the word stays upright at every instant (within 0.5°)", poses.every((p) => Math.abs(p.label) <= 0.5 || Math.abs(Math.abs(p.label) - 360) <= 0.5), poses.map((p) => Math.round(p.label * 10) / 10));
 }
 await browser.close();
 const failed = checks.filter((c) => !c.pass);

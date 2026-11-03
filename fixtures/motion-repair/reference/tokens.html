@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Settings</title>
+<style>
+  /* Design tokens (generated from the token file). */
+  :root { --motion-fast: 180ms; --ease-out: cubic-bezier(0, 0, 0.2, 1); }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, ui-sans-serif, sans-serif; background: #fff; color: #111827; overflow: hidden; }
+  header { display: flex; gap: 16px; align-items: center; padding: 16px 24px; border-bottom: 1px solid #e5e7eb; }
+  button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid #d1d5db; background: #fff; cursor: pointer; }
+  .drawer { position: fixed; top: 0; right: 0; width: 360px; height: 100vh; background: #111827; color: #f9fafb; padding: 24px;
+    transform: translateX(100%); transition: transform var(--motion-fast) var(--ease-out); }
+  .drawer.open { transform: none; }
+</style></head>
+<body>
+  <header><button id="open">Filters</button><strong>Settings</strong></header>
+  <aside class="drawer" id="drawer"><h2>Filters</h2><p>Status, owner, date.</p></aside>
+  <script>document.getElementById("open").addEventListener("click", () => document.getElementById("drawer").classList.toggle("open"));</script>
+</body></html>
