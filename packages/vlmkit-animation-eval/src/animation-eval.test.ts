@@ -1347,3 +1347,20 @@ test(
       );
   },
 );
+
+test(
+  "runAnimationEval: a later animation overriding an entrance, and a duration token with no unit (round 18)",
+  { timeout: 240_000 },
+  async () => {
+    const dir = join(import.meta.dirname, "../../../fixtures/motion-repair");
+    const kinds = async (f: string) => (await runAnimationEval({ source: join(dir, f) })).issues.map((i) => i.kind);
+    assert.ok((await kinds("broken/combo.html")).includes("overridden-animation"));
+    assert.ok((await kinds("broken/tokens.html")).includes("unitless-duration-var"));
+    for (const f of ["reference/combo.html", "reference/tokens.html", "reference/upright.html"])
+      assert.deepEqual(
+        (await kinds(f)).filter((k) => ["overridden-animation", "unitless-duration-var"].includes(k)),
+        [],
+        f,
+      );
+  },
+);

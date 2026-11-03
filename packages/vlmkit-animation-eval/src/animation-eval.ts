@@ -276,6 +276,8 @@ export type AnimationEvalIssueKind =
   | "stepped-keyframe"
   | "inert-size-animation"
   | "unknown-media-feature"
+  | "overridden-animation"
+  | "unitless-duration-var"
   | "reduced-motion-hides"
   | "layout-animation"
   | "loop-seam"
@@ -545,6 +547,10 @@ export interface DeriveIssuesInput {
     restFilter?: string;
     /** The rule that holds it paused while it hides the element (animation-play-state: paused). */
     heldPaused?: string;
+    /** A later animation in animation-name on the same property, whose fill covers this one's run. */
+    overridden?: { by: string; props: string[]; delayMs: number; fill: string; coveredMs: number | null };
+    /** A transition / animation duration var() that resolves to a number with no unit. */
+    unitlessVar?: { prop: string; text: string; variable: string; value: string };
     /** A keyframe's steps() timing function that overrides the element's smooth one. */
     steppedKeyframe?: { at: string; easing: string; own: string };
     /** Size properties its keyframes animate on a non-replaced inline box, where they do nothing. */
@@ -687,6 +693,26 @@ export function deriveAnimationIssues(
         severity: "warn",
         selector: u.selector,
         message: `${u.selector} \`${u.name}\` has animation-delay ${u.negativeDelayMs}ms: it starts ${-u.negativeDelayMs}ms into its ${u.durationMs}ms run, so that much of its entrance is skipped and it is already part way in at load. A stagger is a positive delay per item (calc(var(--i) * 80ms)); a negative one only suits a loop meant to start mid-run.`,
+      });
+      continue;
+    }
+    if (u.overridden) {
+      const o = u.overridden;
+      issues.push({
+        kind: "overridden-animation",
+        severity: "suspect",
+        selector: u.selector,
+        message: `${u.selector} \`${u.name}\` and \`${o.by}\` both animate ${o.props.join(", ")}, and \`${o.by}\` comes later in animation-name, so its value wins${o.coveredMs === null ? " for the whole of" : ` for ${o.coveredMs}ms of`} \`${u.name}\`'s run${o.delayMs > 0 && (o.fill === "backwards" || o.fill === "both") ? ` (its ${o.fill} fill holds its first keyframe through its ${Math.round(o.delayMs)}ms delay)` : ""}: that part of \`${u.name}\` never shows. Animate one with an individual property (translate / scale / rotate compose with transform), or drop the backwards fill.`,
+      });
+      continue;
+    }
+    if (u.unitlessVar) {
+      const v = u.unitlessVar;
+      issues.push({
+        kind: "unitless-duration-var",
+        severity: "suspect",
+        selector: u.selector,
+        message: `${u.selector} { ${v.prop}: ${v.text} } reads ${v.variable}, which is ${v.value}: a number with no unit, so the declaration is invalid at computed-value time and ${v.prop.startsWith("animation") ? "the animation" : "the transition"} is dropped (the element snaps). Give the token a unit (${v.value}ms), or write calc(var(${v.variable}) * 1ms).`,
       });
       continue;
     }
@@ -1343,6 +1369,38 @@ ${ANIMATION_HELPERS_JS}
         }
       }
     }
+    // Two animations on one element on one property: the later in animation-name wins wherever its
+    // fill reaches. A toast's rise was replaced for its whole run by the pulse after it, whose both
+    // fill held scale(1) through its delay, and the rise read "visible" from its fade (round 18).
+    if (out.length < 8) {
+      const order = cs.animationName.split(/,\\s*/);
+      const css = el.getAnimations().filter((a) => typeof CSSAnimation !== "undefined" && a instanceof CSSAnimation)
+        .sort((a, b) => order.indexOf(a.animationName) - order.indexOf(b.animationName));
+      const propsOf = (a) => new Set(((a.effect && a.effect.getKeyframes) ? a.effect.getKeyframes() : []).flatMap((k) => Object.keys(k).filter((p) => !["offset", "computedOffset", "easing", "composite", "opacity"].includes(p))));
+      const span = (a, applying) => {
+        const t = a.effect.getComputedTiming();
+        const delay = Number(t.delay) || 0;
+        const end = Number(t.endTime);
+        const fill = t.fill;
+        const from = applying && (fill === "backwards" || fill === "both") ? 0 : delay;
+        const to = applying && (fill === "forwards" || fill === "both") ? Infinity : end;
+        return [from, to, delay, fill];
+      };
+      for (let i = 0; i < css.length; i++) {
+        for (let j = i + 1; j < css.length; j++) {
+          const shared = [...propsOf(css[j])].filter((p) => propsOf(css[i]).has(p));
+          if (shared.length === 0 || (css[j].effect.composite || "replace") !== "replace") continue;
+          const [ai, bi] = span(css[i], false);
+          const [aj, bj, dj, fj] = span(css[j], true);
+          const overlap = Math.min(bi, bj) - Math.max(ai, aj);
+          const selector = stableSelector(el);
+          if (overlap > 0 && !seen.has("ovr\u0000" + selector)) {
+            seen.add("ovr\u0000" + selector);
+            out.push({ selector, name: css[i].animationName, overridden: { by: css[j].animationName, props: shared, delayMs: dj, fill: fj, coveredMs: Number.isFinite(overlap) ? Math.round(overlap) : null } });
+          }
+        }
+      }
+    }
     // An offset animated on a static box does nothing: a notice meant to slide in animated
     // \`left\` and only faded, and \`check animation\` read it "visible" (round 14).
     if (cs.position === "static" && out.length < 8) {
@@ -1379,6 +1437,43 @@ ${ANIMATION_HELPERS_JS}
       seen.add(selector + "\\u0000" + name);
       out.push({ selector, name });
     });
+  }
+  // A duration token with no unit: transition: transform var(--motion-fast) with --motion-fast: 180
+  // is invalid at computed-value time, so the drawer had no transition and snapped (round 18).
+  {
+    const PROPS = ["transition", "transition-duration", "transition-delay", "animation", "animation-duration", "animation-delay"];
+    const walkVar = (rules) => {
+      for (const r of rules) {
+        if (out.length >= 8) return;
+        if (typeof CSSStyleRule !== "undefined" && r instanceof CSSStyleRule) {
+          for (const prop of PROPS) {
+            const text = r.style.getPropertyValue(prop);
+            if (!text || !text.includes("var(")) continue;
+            let el = null;
+            try { el = document.querySelector(r.selectorText); } catch {}
+            if (!el) continue;
+            const cs = getComputedStyle(el);
+            for (const m of text.matchAll(/var\\(\\s*(--[\\w-]+)/g)) {
+              // Inside calc() a unitless number is a multiplier (calc(var(--i) * 80ms)), not a duration.
+              const before = text.slice(0, m.index);
+              const at = before.lastIndexOf("calc(");
+              if (at >= 0) {
+                let depth = 0;
+                for (const ch of before.slice(at + 4)) depth += ch === "(" ? 1 : ch === ")" ? -1 : 0;
+                if (depth > 0) continue;
+              }
+              const v = cs.getPropertyValue(m[1]).trim();
+              const key = "var\u0000" + r.selectorText + "\u0000" + prop;
+              if (/^-?\\d*\\.?\\d+$/.test(v) && !seen.has(key)) {
+                seen.add(key);
+                out.push({ selector: r.selectorText, name: prop, unitlessVar: { prop, text, variable: m[1], value: v } });
+              }
+            }
+          }
+        } else if (r.cssRules) walkVar(r.cssRules);
+      }
+    };
+    for (const sheet of document.styleSheets) { try { walkVar(sheet.cssRules); } catch {} }
   }
   // An @media whose feature the browser does not know never matches (it reads as "not all"): an
   // entrance behind @media (prefers-reduce-motion: no-preference) never played for anyone, and

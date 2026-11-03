@@ -115,6 +115,18 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       docs: "A negative delay skips that much of the run, so an entrance from a hidden or offset first keyframe is already part way in at load; in a stagger the later items finish first. A stagger is a positive delay per item.",
     },
     {
+      id: "overridden-animation",
+      title: "A later animation on the same property overrides an earlier one",
+      severity: "suspect",
+      docs: "Of two animations on one element that animate one property, the later in animation-name wins wherever its fill reaches: a pulse with a both fill held scale(1) through its delay and replaced a toast's whole rise. Animate one with an individual property (translate / scale / rotate), or drop the backwards fill.",
+    },
+    {
+      id: "unitless-duration-var",
+      title: "A duration var() that resolves to a number with no unit",
+      severity: "suspect",
+      docs: "transition: transform var(--motion-fast) with --motion-fast: 180 is invalid at computed-value time, so the transition is dropped and the element snaps. Give the token a unit, or calc(var(--x) * 1ms).",
+    },
+    {
       id: "stepped-keyframe",
       title: "A keyframe's steps() overrides the element's smooth easing",
       severity: "warn",

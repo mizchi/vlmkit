@@ -5,6 +5,7 @@
   body { margin: 0; font: 16px/1.5 system-ui, ui-sans-serif, sans-serif; background: #0b1220; color: #e2e8f0; display: grid; place-items: center; min-height: 100vh; }
   .dial { position: relative; width: 280px; height: 280px; border-radius: 50%; border: 10px dashed #38bdf8; animation: turn 4s linear infinite; }
   .label { position: absolute; inset: 0; display: grid; place-items: center; font-size: 28px; font-weight: 700; color: #f8fafc; animation: turn-back 4s linear infinite; }
+  @media (max-width: 480px) { .dial { width: 200px; height: 200px; } }
   @keyframes turn { to { transform: rotate(360deg); } }
   @keyframes turn-back { to { transform: rotate(-360deg); } }
 </style></head>

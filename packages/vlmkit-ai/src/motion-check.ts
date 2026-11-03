@@ -77,6 +77,17 @@ export interface MotionDom {
   heldFilter?: string;
   /** Its animation's @keyframes name is defined more than once, and what each defines. */
   dupKeyframes?: string;
+  /** Its angle as drawn through every transform up the tree (2D only), and the ancestor that turns. */
+  screenDeg?: number;
+  turnedBy?: string;
+  /** One of its animations overridden on a property by a later one in animation-name. */
+  overriddenBy?: string;
+  /** Its own timing function when it is a curve with no name (cubic-bezier(…), linear(…)). */
+  ownEasing?: string;
+  /** A transition / animation duration var() that resolves to a unitless number. */
+  varDuration?: string;
+  /** Every run of its own animations (ms), when there is more than one. */
+  durations?: number[];
   /** A keyframe of its own animation sets a timing function that overrides the element's. */
   kfEasing?: string;
   /** Points along its edge another element paints over (the 5x5 grid never reaches an edge). */
@@ -138,6 +149,8 @@ export interface MotionCheckOptions {
   expectDirection?: readonly MotionDirection[];
   /** Every target's centre must not move: only its size and opacity change. */
   expectStill?: boolean;
+  /** Its angle on screen must not change (a label kept level inside a turning dial). */
+  expectUpright?: boolean;
   /** Per target in order: this one's centre must not move. */
   expectStillFor?: readonly boolean[];
   /** Animations that change layout on the page ("div.notice animates margin-top"). */
@@ -409,6 +422,7 @@ export async function checkMotionFrames(
           ? { expectIterations: perTarget(options.expectIterations, i)! }
           : {}),
         ...(options.expectStill || options.expectStillFor?.[i] ? { expectStill: true } : {}),
+        ...(options.expectUpright ? { expectUpright: true } : {}),
         ...(options.layoutMovers ? { layoutMovers: options.layoutMovers } : {}),
       }),
     };

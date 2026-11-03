@@ -3,7 +3,7 @@
  * what a person would notice at a glance, asked of a screenshot as typed yes/no questions.
  *
  * Each statement is one Jev `noul` (TypeSafe; TYPESAFEAI_API_KEY), all in one request on one
- * image: ~$0.0002 and ~0.2s for a handful. `--forbid` fails when the screenshot shows it, `--expect`
+ * image: ~$0.00013 and ~0.2s for a handful. `--forbid` fails when the screenshot shows it, `--expect`
  * when it does not. Exit 0 all pass, 1 any fails, 2 usage. Advisory: a model's reading of the
  * pixels, not a measurement — the deterministic gates (`check integrity`, …) are what to gate on.
  */
@@ -15,7 +15,7 @@ import type { Claim } from "@mizchi/vlmkit-ai/claims.ts";
 export const CLAIMS_USAGE = `Usage: vlmkit inspect claims <page.html|url|screenshot.png> [--forbid "<statement>"]... [--expect "<statement>"]... [options]
 
 Ask what a screenshot visibly shows, one yes/no question per statement, answered
-by TypeSafe Jev (TYPESAFEAI_API_KEY) in one request: ~$0.0002 and ~0.2s.
+by TypeSafe Jev (TYPESAFEAI_API_KEY) in one request: ~$0.00013 and ~0.2s.
 A page is screenshotted at the viewport first. Advisory: a model's reading of
 the pixels; gate on the deterministic checks.
 

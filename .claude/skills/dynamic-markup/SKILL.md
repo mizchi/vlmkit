@@ -249,7 +249,9 @@ vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ea
   plus points just inside its edges), which is what sees a clip or a cover — a hovered card
   that grows under its neighbour is `covered-edge`. A 3D turn with no `perspective` on the
   turning element's parent is `flat-3d` (drawn as a squash). Gate motion by preference either way:
-  take it away under `prefers-reduced-motion: reduce`, or give it only under `no-preference`. On `fixtures/motion-defects/` that caught 6 of the 7
+  take it away under `prefers-reduced-motion: reduce`, or give it only under `no-preference`.
+  "Stays upright / level while its parent turns" is `--expect-upright` (its angle on screen);
+  `--expect-still` is its centre only. On `fixtures/motion-defects/` that caught 6 of the 7
   broken pages by the expected rule, with all 7 intact pages passing. The one it cannot see is
   text left lying on other text (`overlap-rest`): that is `check integrity`'s `text-collision`,
   or `--jev`, whose default `--forbid` statement asks it.

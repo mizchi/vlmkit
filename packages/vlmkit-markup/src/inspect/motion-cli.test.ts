@@ -220,6 +220,23 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
       ["--selector", ".toast", "--exits", "--expect-easing", "ease-out,ease-in"],
       /FAIL snap-back .*in the hold after 660ms/,
     ],
+    // Round 18: a later animation's fill overriding an entrance, a unitless duration token, and a
+    // counter-rotation that does not cancel its parent's turn.
+    [
+      "combo.html",
+      ["--selector", "#toast", "--expect-direction", "up"],
+      /FAIL direction-mismatch .*`rise` and `pulse` both animate transform, and `pulse` comes later in animation-name, so its value wins: its both fill holds/,
+    ],
+    [
+      "tokens.html",
+      ["--selector", "#drawer", "--click", "#open"],
+      /FAIL snapped: .*reads --motion-fast, which is 180 — a number with no unit/,
+    ],
+    [
+      "upright.html",
+      ["--selector", "#label", "--expect-upright"],
+      /FAIL upright-mismatch .*div#dial turns it, and its own counter-rotation does not cancel that turn/,
+    ],
     // Round 17: steps() inside a keyframe, and width animated on an inline box.
     [
       "stepper.html",
@@ -730,6 +747,31 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
       assert.equal(dead.code, 2, dead.out);
       const bar = await run("reference/meter.html", ["--selector", "#fill"]);
       assert.match(bar.out, /\(its centre: its box grows \d+px from its left edge, which stays put\)/, bar.out);
+    },
+  );
+
+  it(
+    "holds --expect-duration by any of a target's runs, and checks one value per action under --every-action (round 18)",
+    { timeout: 240_000 },
+    async () => {
+      const toast = await run("reference/combo.html", ["--selector", "#toast", "--expect-duration", "400ms"]);
+      assert.doesNotMatch(toast.out, /duration-mismatch/, toast.out);
+      assert.match(toast.out, /\(its animations run 400ms, 1600ms\)/, toast.out);
+      const drawer = await run("reference/tokens.html", [
+        "--selector",
+        "#drawer",
+        "--click",
+        "#open",
+        "--click",
+        "#open",
+        "--every-action",
+        "--exits",
+        "--expect-direction",
+        "left,right",
+      ]);
+      assert.equal(drawer.code, 0, drawer.out);
+      assert.doesNotMatch(drawer.out, /ran to its end unsampled/, drawer.out);
+      assert.match(drawer.out, /its own timing function is cubic-bezier\(0, 0, 0\.2, 1\)/, drawer.out);
     },
   );
 

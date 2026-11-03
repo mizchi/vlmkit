@@ -376,7 +376,7 @@ The built-ins load through the same `createGateRegistry([...])` call. If the
 contract were not sufficient for them it would not be sufficient for anyone
 else, and making them its first consumer is the only way to keep that honest.
 
-## The 35 gates (237 tunable rules)
+## The 35 gates (239 tunable rules)
 
 | Gate | Rules | Plugin |
 |---|---|---|

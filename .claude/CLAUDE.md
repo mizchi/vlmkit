@@ -493,6 +493,17 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   `unknown-media-feature` (suspect), 237 rules, none firing on the repo's 69 other correct animated pages;
   its motion region includes the first keyframe. `check motion` and `stress media` take motion given only
   under `prefers-reduced-motion: no-preference` as honouring the preference.
+- **A fill that overrides an entrance, a token with no unit, a label that drifts** (round 18,
+  `docs/reports/2026-11-03-motion-repair-v18.md`). Two animations on one element on one property: the later in
+  `animation-name` wins wherever its fill reaches (a pulse's `both` fill held `scale(1)` through its delay and
+  replaced a rise) — the cause in `direction-mismatch` / `target-static`, else `overridden-animation` (warn);
+  `--expect-duration` holds by any of the target's runs, which the target line lists; a scale gives its range;
+  a transition / animation duration `var()` that resolves to a bare number is the named cause of `snapped`
+  (inside `calc()` it is a multiplier, not named); a curve with no name is said as the element's own timing
+  function; `--every-action` takes one `--expect-direction` / `-duration` / `-iterations` value per action;
+  a target that an ancestor turns says its angle on screen, and `--expect-upright` fails `upright-mismatch`
+  when that changes by over 1°. `check animation`: `overridden-animation` and `unitless-duration-var`
+  (suspect), 239 rules, none of the rounds 16-18 rules firing on the repo's 72 other correct animated pages.
 
 ## Generated figures (raster images)
 

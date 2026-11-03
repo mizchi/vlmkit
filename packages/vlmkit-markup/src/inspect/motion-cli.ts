@@ -245,6 +245,30 @@ export async function measureTargets(
           const deg = (Math.atan2(m.b, m.a) * 180) / Math.PI;
           return Math.abs(deg) > 0.01 ? { turnDeg: deg } : {};
         };
+        // Its angle as drawn, through every transform up the tree, and the nearest ancestor that turns:
+        // a label counter-rotating at 5s inside a dial turning at 4s read only its own turn, 72°/s,
+        // while on screen it drifted 18°/s (round 18).
+        let screenDeg: number | undefined;
+        let turnedBy: string | undefined;
+        {
+          let M = new DOMMatrix();
+          let flat = true;
+          for (let n: Element | null = el; n && n !== document.documentElement; n = n.parentElement) {
+            const tf = fullTransform(n);
+            if (!tf) continue;
+            if (!tf.is2D) flat = false;
+            M = new DOMMatrix(tf.toString()).multiply(M);
+            if (n !== el && !turnedBy && Math.abs(Math.atan2(tf.b, tf.a)) > 1e-4 && n.getAnimations().length > 0)
+              turnedBy =
+                n.tagName.toLowerCase() +
+                (n.id
+                  ? `#${n.id}`
+                  : typeof n.className === "string" && n.className.trim()
+                    ? `.${n.className.trim().split(/\s+/)[0]}`
+                    : "");
+          }
+          if (flat) screenDeg = (Math.atan2(M.b, M.a) * 180) / Math.PI;
+        }
         // A preserve-3d container draws its faces in 3D, each by its own facing: turned over, its back
         // is what a face that faces you (the answer) shows, not it mirrored. Only a face turned away
         // whose backface is visible is drawn backwards (round 16: a correct flip card read mirrored).
@@ -414,6 +438,114 @@ export async function measureTargets(
               kfEasing = `\`${name}\`'s ${at} keyframe sets animation-timing-function: ${odd.easing}, which overrides the element's own ${mine} from that keyframe to the next${stepped ? ": it moves in jumps, not a glide" : ""} — take the timing function out of the keyframe (a timing function inside @keyframes applies per keyframe and wins over the element's)`;
             }
           }
+        }
+        // One of its animations overridden by a later one on the same property: a toast's entrance
+        // rose by transform, and the pulse after it in animation-name held scale(1) through its delay
+        // with a both fill, so the toast only faded (round 18). The later one wins the property.
+        let overriddenBy: string | undefined;
+        {
+          const css = el
+            .getAnimations()
+            .filter((a) => typeof CSSAnimation !== "undefined" && a instanceof CSSAnimation) as CSSAnimation[];
+          const order = own.animationName.split(/,\s*/);
+          css.sort((a, b) => order.indexOf(a.animationName) - order.indexOf(b.animationName));
+          const propsOf = (a: Animation) =>
+            new Set(
+              (((a.effect as KeyframeEffect | null)?.getKeyframes?.() ?? []) as Record<string, unknown>[]).flatMap(
+                (k) => Object.keys(k).filter((p) => !["offset", "computedOffset", "easing", "composite"].includes(p)),
+              ),
+            );
+          for (let i = 0; i < css.length && !overriddenBy; i++) {
+            const ti = css[i]!.effect?.getComputedTiming();
+            if (!ti || ti.progress === null) continue;
+            const pi = propsOf(css[i]!);
+            for (let j = i + 1; j < css.length && !overriddenBy; j++) {
+              const tj = css[j]!.effect?.getComputedTiming();
+              if (!tj || tj.progress === null) continue;
+              const comp = (css[j]!.effect as KeyframeEffect | null)?.composite ?? "replace";
+              if (comp !== "replace") continue;
+              const shared = [...propsOf(css[j]!)].filter((p) => pi.has(p) && p !== "opacity");
+              if (shared.length === 0) continue;
+              const inDelay = Number(tj.localTime) < Number(tj.delay ?? 0);
+              overriddenBy = `\`${css[i]!.animationName}\` and \`${css[j]!.animationName}\` both animate ${shared.join(", ")}, and \`${css[j]!.animationName}\` comes later in animation-name, so its value wins${
+                inDelay
+                  ? `: its ${tj.fill} fill holds its first keyframe's ${shared[0]} through its ${Math.round(Number(tj.delay))}ms delay, which replaces \`${css[i]!.animationName}\`'s`
+                  : `, replacing \`${css[i]!.animationName}\`'s`
+              } — animate one with an individual property (translate / scale / rotate compose with transform)${inDelay ? ", or drop the backwards fill (animation-fill-mode: forwards or none)" : ""}`;
+            }
+          }
+        }
+        // Its own timing function when the CSS gives a curve no name: a drawer on the token
+        // cubic-bezier(0, 0, 0.2, 1) read "follows ease (1.3x better than ease-out)" (round 18).
+        let ownEasing: string | undefined;
+        for (const a of el.getAnimations()) {
+          const kf0 = ((a.effect as KeyframeEffect | null)?.getKeyframes?.() ?? [])[0] as
+            | { easing?: string }
+            | undefined;
+          const e =
+            typeof CSSAnimation !== "undefined" && a instanceof CSSAnimation
+              ? kf0?.easing
+              : a.effect?.getTiming().easing;
+          if (e && /cubic-bezier|linear\(/.test(e)) {
+            ownEasing = e;
+            break;
+          }
+        }
+        // Every run of its own, named: a toast with a 400ms entrance and a 1600ms pulse read only the
+        // pulse, and --expect-duration 400ms failed on it (round 18).
+        const runs = el
+          .getAnimations()
+          .map((a) => Number(a.effect?.getComputedTiming().duration))
+          .filter((d) => Number.isFinite(d) && d > 0);
+        // A duration token with no unit: `transition: transform var(--motion-fast)` with --motion-fast:
+        // 180 is invalid at computed-value time, so the transition is none and the drawer snapped
+        // (round 18, which read "height: auto … interpolate-size").
+        let varDuration: string | undefined;
+        if (!/[1-9]/.test(own.transitionDuration + own.animationDuration) || own.animationName === "none") {
+          const found: string[] = [];
+          const walkVar = (rules: CSSRuleList) => {
+            for (const r of [...rules]) {
+              if (found.length) return;
+              if (r instanceof CSSStyleRule) {
+                let hit = false;
+                try {
+                  hit = el.matches(r.selectorText);
+                } catch {}
+                if (!hit) continue;
+                for (const prop of [
+                  "transition",
+                  "transition-duration",
+                  "transition-delay",
+                  "animation",
+                  "animation-duration",
+                  "animation-delay",
+                ]) {
+                  const text = r.style.getPropertyValue(prop);
+                  for (const m of text.matchAll(/var\(\s*(--[\w-]+)/g)) {
+                    // Inside calc() a unitless number is a multiplier (calc(var(--i) * 80ms)).
+                    const before = text.slice(0, m.index);
+                    const at = before.lastIndexOf("calc(");
+                    if (at >= 0) {
+                      let depth = 0;
+                      for (const ch of before.slice(at + 4)) depth += ch === "(" ? 1 : ch === ")" ? -1 : 0;
+                      if (depth > 0) continue;
+                    }
+                    const v = own.getPropertyValue(m[1]!).trim();
+                    if (/^-?\d*\.?\d+$/.test(v))
+                      found.push(
+                        `${prop}: ${text} reads ${m[1]}, which is ${v} — a number with no unit, so the declaration is invalid at computed-value time and ${prop.startsWith("animation") ? "the animation" : "the transition"} is dropped: give the token a unit (${v}ms), or write calc(var(${m[1]}) * 1ms)`,
+                      );
+                  }
+                }
+              } else if ("cssRules" in r) walkVar((r as CSSGroupingRule).cssRules);
+            }
+          };
+          for (const sheet of [...document.styleSheets]) {
+            try {
+              walkVar(sheet.cssRules);
+            } catch {}
+          }
+          varDuration = found[0];
         }
         // Its shadow, as numbers (each shadow's RGBA, then its offsets, blur and spread in px): a
         // card whose shadow deepened on hover was confirmed only by eye (round 13).
@@ -825,6 +957,12 @@ export async function measureTargets(
           ...(m33 < -0.01 ? { facingAway: true } : {}),
           ...(drawn !== undefined ? { drawn, ...(dashNote ? { dashNote } : {}) } : {}),
           ...turn(el),
+          ...(screenDeg !== undefined ? { screenDeg } : {}),
+          ...(turnedBy ? { turnedBy } : {}),
+          ...(overriddenBy ? { overriddenBy } : {}),
+          ...(varDuration ? { varDuration } : {}),
+          ...(ownEasing ? { ownEasing } : {}),
+          ...(runs.length > 1 ? { durations: runs } : {}),
           ...(m33 < -0.01 && !backHidden ? { mirrored: true } : {}),
           ...(paint.length > 0 ? { paint } : {}),
           ...(stops.length > 0 ? { stops } : {}),
@@ -952,6 +1090,8 @@ an easing is checked on each channel that changes.
                           comma-separated per target. --selector
   --expect-still          Its centre must not move: only its size and opacity change (a dialog
                           that stays centred while it grows in). --selector
+  --expect-upright        Its angle on screen must not change, through every transform up the tree
+                          (a label kept level inside a turning dial). --selector
   --click <css>           Actions on the held page before any frame, in the order given: the
   --hover <css>           motion the LAST one starts is sampled, and each one before it first
   --leave                 runs to its end. --hover puts the pointer over an element, --leave
@@ -962,7 +1102,9 @@ an easing is checked on each channel that changes.
                           What plays at load ends before the first --click / --hover / --leave
                           (a leading --wait says when instead)
   --every-action          With several actions, sample the motion each one starts (one run per
-                          action, in order) instead of the last one's only; --exits is the last's
+                          action, in order) instead of the last one's only; --exits is the last's.
+                          --expect-direction / -duration / -iterations with one value per action
+                          check each step against its own (left,right for an open and a close)
   --wait <ms>             After an action: let only this long pass before the next one instead
                           of its whole motion — a change of mind mid-motion. "--click .menu-btn
                           --wait 100 --click .menu-btn" lands the second click 100ms into the
@@ -1034,6 +1176,8 @@ export interface MotionCliOptions {
   json: boolean;
   /** Sample the motion each action starts, one run per action, instead of the last one's only. */
   everyAction?: boolean;
+  /** One step of an --every-action run: the actions before it were sampled in their own steps. */
+  inEveryAction?: boolean;
   /** Ask TypeSafe Jev. Without it every target is a --selector, measured from the page alone. */
   jev: boolean;
   /**
@@ -1043,6 +1187,8 @@ export interface MotionCliOptions {
   actions: MotionAction[];
   /** Each target's centre must not move (only size and opacity change). */
   expectStill: boolean;
+  /** Its angle on screen must not change (`--expect-upright`). */
+  expectUpright: boolean;
 }
 
 /** One thing done on the held page: a click, the pointer over or off an element, a scroll. */
@@ -1090,6 +1236,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   let jev = false;
   const actions: MotionAction[] = [];
   let expectStill = false;
+  let expectUpright = false;
   const value = (flag: string, v: string | undefined) => {
     if (v === undefined || v.startsWith("--")) throw new MotionUsageError(`${flag} needs a value`);
     return v;
@@ -1118,7 +1265,11 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
         const bad = names.filter((e) => e !== "any" && !(EASING_NAMES as string[]).includes(e));
         if (bad.length > 0 || names.length === 0 || names.every((e) => e === "any")) {
           throw new MotionUsageError(
-            `--expect-easing takes ${EASING_NAMES.join(", ")} (comma-separated per segment); got ${bad.join(", ")}`,
+            `--expect-easing takes ${EASING_NAMES.join(", ")} (comma-separated per segment); got ${bad.join(", ")}${
+              bad.some((b) => /cubic-bezier|linear\(|steps\(/.test(b))
+                ? '. A custom curve is not fitted by name: the target\'s line says when the CSS gives it one ("its own timing function is cubic-bezier(…)"), and the nearest named curve is the one to expect (ease-out for cubic-bezier(0, 0, 0.2, 1))'
+                : ""
+            }`,
           );
         }
         (expectEasing ??= []).push(names.map((e) => (e === "any" ? undefined : e)) as EasingName[]);
@@ -1201,6 +1352,9 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
         actions.push(/^\d+(px)?$/.test(v) ? { kind: "scroll", y: parseInt(v, 10) } : { kind: "scroll", selector: v });
         break;
       }
+      case "--expect-upright":
+        expectUpright = true;
+        break;
       case "--expect-still":
         expectStill = true;
         break;
@@ -1340,9 +1494,12 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
     ["--expect-iterations", expectIterations],
     ["--expect-direction", expectDirection],
   ] as const) {
-    if (xs && xs.length > 1 && xs.length !== targets.length)
+    // With --every-action, one per action is per step: a drawer that opens leftwards and closes
+    // rightwards could not say so in one run (round 18).
+    const steps = actions.filter((a) => a.kind !== "wait").length;
+    if (xs && xs.length > 1 && xs.length !== targets.length && !(everyAction && xs.length === steps))
       throw new MotionUsageError(
-        `${xs.length} ${flag} values for ${targets.length} targets: one for all, or one per target`,
+        `${xs.length} ${flag} values for ${targets.length} targets: one for all, or one per target${steps > 1 ? `; with --every-action, one per action (${steps})` : ""}`,
       );
   }
   if (deviceScale !== 1 && jev)
@@ -1405,6 +1562,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
     jev,
     actions,
     expectStill,
+    expectUpright,
     ...(everyAction ? { everyAction } : {}),
   };
 }
@@ -1816,7 +1974,7 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
                     `it was not rendered (${a.hiddenBy?.replace(/^not rendered: /, "") ?? "display: none"}) before the action, and a transition from display: none has no style to start from, so it appears at its end state: give the shown state a @starting-style with the values it enters from (@starting-style { .open { opacity: 0; transform: … } }), or play its entrance as a @keyframes animation`
                   : paintStep >= 8 && d < 1 && op < 0.05 && (a.discreteBg || b.discreteBg)
                     ? `only its colour changed, and its transition on background runs between two gradients, which do not interpolate (a gradient is an image: it steps at once). Build the gradient from registered colour properties (@property --c { syntax: "<color>"; … }) and transition those, or cross-fade a second gradient layer's opacity`
-                    : undefined,
+                    : (b.varDuration ?? a.varDuration),
             );
             return [
               d >= 1 || op >= 0.05
@@ -2531,9 +2689,11 @@ export function formatMotionReport(
   // passed "follows ease-out exactly" with nothing on screen that said where or when.
   const grows = (g: { origin?: Parameters<typeof describeOrigin>[0] }) =>
     g.origin ? `; the scale grows from ${describeOrigin(g.origin)}` : "";
-  const begins = (t: { startsAtMs?: number; durationMs?: number; iterations?: number | null }) =>
+  const begins = (t: { startsAtMs?: number; durationMs?: number; iterations?: number | null; runs?: number[] }) =>
     (t.startsAtMs !== undefined ? `, begins at ${Math.round(t.startsAtMs)}ms` : "") +
     (t.durationMs !== undefined ? `, runs ${Math.round(t.durationMs)}ms` : "") +
+    // An entrance beside a loop: "runs 1600ms and repeats forever" said nothing of the 400ms rise.
+    (t.runs && t.runs.length > 1 ? ` (its animations run ${t.runs.map((d) => `${d}ms`).join(", ")})` : "") +
     (t.iterations === null
       ? " and repeats forever"
       : t.iterations !== undefined && t.iterations !== 1
@@ -2565,13 +2725,30 @@ export function formatMotionReport(
             ? t.turn.in3d
               ? // In 3D the turn is its face's angle, 0 facing you to 180 turned over: no way round.
                 `, turns over ${Math.round(Math.abs(t.turn.deg))}° in 3D`
-              : `, turns ${t.turn.deg > 0 ? "clockwise" : "counterclockwise"} ${Math.round(Math.abs(t.turn.deg))}° (${Math.round(Math.abs(t.turn.perSecond))}°/s${Math.abs(t.turn.perSecond) >= 1 ? `, a turn every ${Math.round(360000 / Math.abs(t.turn.perSecond))}ms` : ""})`
+              : `, turns ${t.turn.deg > 0 ? "clockwise" : "counterclockwise"} ${Math.round(Math.abs(t.turn.deg))}° (${Math.round(Math.abs(t.turn.perSecond))}°/s${Math.abs(t.turn.perSecond) >= 1 ? `, a turn every ${Math.round(360000 / Math.abs(t.turn.perSecond))}ms` : ""})${t.screenTurn ? ` on its own` : ""}`
+            : ""
+        }${
+          // What is seen: an ancestor turns it too, and its own turn is a counter-rotation.
+          t.screenTurn
+            ? t.screenTurn.deg <= 1
+              ? `; on screen, with ${t.screenTurn.by}'s turn, it stays upright (its angle changes by under 1°)`
+              : `; on screen, with ${t.screenTurn.by}'s turn, its angle changes by ${Math.round(t.screenTurn.deg)}° (--expect-upright fails that)`
             : ""
         }${
           t.sweepDeg !== undefined
             ? `, its conic arc sweeps ${t.sweepDeg > 0 ? "clockwise" : "counterclockwise"} ${Math.round(Math.abs(t.sweepDeg))}°`
             : ""
-        }, ${fitText(t.easing, broken)}${t.segments[0] ? grows(t.segments[0]) : ""}`,
+        }, ${fitText(t.easing, broken)}${(() => {
+          const e = doms.find((d) => d!.ownEasing)?.ownEasing;
+          return e ? ` (its own timing function is ${e}: the curve names here are the nearest built-in ones)` : "";
+        })()}${t.segments[0] ? grows(t.segments[0]) : ""}${(() => {
+          // How far it scales: a pulse to 104% was only in the JSON (round 18).
+          const ks = doms.map((d) => d!.scale).filter((k): k is number => typeof k === "number" && k > 0);
+          if (ks.length < 2) return "";
+          const lo = Math.min(...ks);
+          const hi = Math.max(...ks);
+          return hi - lo >= 0.01 ? ` (its scale goes from ${lo.toFixed(2)} to ${hi.toFixed(2)})` : "";
+        })()}`,
       );
     } else {
       lines.push(`  target ${JSON.stringify(t.target)}${begins(t)}: ${t.segments.length} segments`);
@@ -2895,6 +3072,7 @@ function* argvExpects(o: MotionCliOptions): Generator<string> {
   if (o.expectIterations) yield "iterations";
   if (o.expectDirection) yield "direction";
   if (o.expectStill) yield "still";
+  if (o.expectUpright) yield "upright";
 }
 
 export async function runMotionCli(argv: string[]): Promise<number> {
@@ -2932,6 +3110,17 @@ export async function runMotionCli(argv: string[]): Promise<number> {
         exits: n === acts.length - 1 ? o.exits : false,
         frames: join(o.frames, `action-${n + 1}`),
         everyAction: false,
+        inEveryAction: true,
+        // One value per action: this step's.
+        ...(o.expectDirection && o.expectDirection.length === acts.length && acts.length !== o.targets.length
+          ? { expectDirection: [o.expectDirection[n]!] }
+          : {}),
+        ...(o.expectDurationMs && o.expectDurationMs.length === acts.length && acts.length !== o.targets.length
+          ? { expectDurationMs: [o.expectDurationMs[n]!] }
+          : {}),
+        ...(o.expectIterations && o.expectIterations.length === acts.length && acts.length !== o.targets.length
+          ? { expectIterations: [o.expectIterations[n]!] }
+          : {}),
       };
       console.log(`== ${n + 1}/${acts.length}: the motion ${describeAction(o.actions[k]!)} starts`);
       worst = Math.max(worst, await runMotionOptions(step, argv));
@@ -3028,6 +3217,7 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
     ...(o.expectIterations ? { expectIterations: o.expectIterations } : {}),
     ...(o.expectDirection ? { expectDirection: o.expectDirection } : {}),
     ...(o.expectStill ? { expectStill: true } : {}),
+    ...(o.expectUpright ? { expectUpright: true } : {}),
     ...(o.stillSelectors.length > 0
       ? { expectStillFor: o.selectors.map((sel) => o.stillSelectors.includes(sel)) }
       : {}),
@@ -3116,7 +3306,8 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
     // Only the last action's motion is sampled: two --click on a panel measured its close, and
     // nothing said its open had not been (round 13).
     const acts = o.actions.filter((a) => a.kind !== "wait");
-    if (acts.length > 1)
+    // Inside an --every-action run the earlier actions had their own steps (round 18).
+    if (acts.length > 1 && !o.inEveryAction)
       lines.splice(
         1,
         0,
@@ -3166,7 +3357,9 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
                   ? "iterations-mismatch"
                   : /direction/.test(flag)
                     ? "direction-mismatch"
-                    : "still-mismatch";
+                    : /upright/.test(flag)
+                      ? "upright-mismatch"
+                      : "still-mismatch";
       // A path never fitted (never seen, or under 2px of travel) checked no easing, direction or
       // origin: "held: --expect-direction up" sat under "travels 0px" on a card that never moved
       // (round 13).
@@ -3206,7 +3399,15 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
         ...(held.length > 0 ? [`  held: ${held.join(", ")}`] : []),
         ...(skipped.length > 0
           ? [
-              `  not judged: ${skipped.join(", ")} — ${unseen ? "the target was not seen in any frame" : "no path was fitted (see the target's line)"}, so nothing checked ${skipped.length === 1 ? "it" : "them"}`,
+              `  not judged: ${skipped.join(", ")} — ${
+                unseen
+                  ? "the target was not seen in any frame"
+                  : !unfitted && easingOpen && skipped.every((f) => /easing/.test(f))
+                    ? // A curve was fitted, but the expected one fits about as well: "no path was fitted"
+                      // sat under a target line that named the fit (round 18).
+                      "the frames fit it about as well as the curve named on the target's line (easing-unchecked says by how much)"
+                    : "no path was fitted (see the target's line)"
+              }, so nothing checked ${skipped.length === 1 ? "it" : "them"}`,
             ]
           : []),
       ];

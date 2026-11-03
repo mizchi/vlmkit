@@ -179,6 +179,13 @@ export interface MotionSample {
     heldFilter?: string;
     /** Its animation's @keyframes name is defined more than once, and what each defines. */
     dupKeyframes?: string;
+    /** Its angle as drawn through every transform up the tree (2D only), and the ancestor that turns. */
+    screenDeg?: number;
+    turnedBy?: string;
+    /** One of its animations overridden on a property by a later one in animation-name. */
+    overriddenBy?: string;
+    /** Every run of its own animations (ms), when there is more than one. */
+    durations?: number[];
     /** A keyframe of its own animation sets a timing function that overrides the element's. */
     kfEasing?: string;
     /** Points along its edge another element paints over (the 5x5 grid never reaches an edge). */
@@ -289,6 +296,8 @@ export interface MotionPathOptions {
   expectIterations?: number | null;
   /** Its centre must not move: only its size, opacity or colour change (a dialog that stays centred). */
   expectStill?: boolean;
+  /** Its angle on screen must not change (a label kept level inside a turning dial). */
+  expectUpright?: boolean;
   /** Animations on the page that change layout, named ("div.notice animates margin-top"). */
   layoutMovers?: readonly string[];
 }
@@ -325,7 +334,9 @@ export type MotionRule =
   | "duplicate-keyframes"
   | "covered-edge"
   | "flat-3d"
-  | "keyframe-easing";
+  | "keyframe-easing"
+  | "overridden-animation"
+  | "upright-mismatch";
 
 export interface MotionFinding {
   rule: MotionRule;
@@ -421,6 +432,10 @@ export interface MotionPathReport {
   excursionPx?: number;
   /** How far it turns over the frames (degrees, clockwise positive) and how fast, when it turns. */
   turn?: { deg: number; perSecond: number; in3d?: boolean };
+  /** On screen, when an ancestor turns it too: how far its drawn angle changes over the frames. */
+  screenTurn?: { deg: number; by: string };
+  /** Every run of its own animations (ms), when there is more than one. */
+  runs?: number[];
   /** How far a conic gradient's first arc grows over the frames (degrees, clockwise positive). */
   sweepDeg?: number;
   easing: SegmentEasing;
@@ -497,6 +512,9 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
   const shown = (s: MotionSample) => (seen(s) ?? 0) >= thr && s.box !== null;
   // A keyframe's own timing function, overriding the element's: named as the cause of its steps.
   const kfCause = sorted.find((x) => x.dom?.kfEasing)?.dom?.kfEasing;
+  // One of its animations overridden on a property by a later one (named as the cause of a path
+  // that never happens, and said as a warn when no fail quotes it).
+  const overrideCause = sorted.find((x) => x.dom?.overriddenBy)?.dom?.overriddenBy;
   const findings: MotionFinding[] = [];
 
   // Which sides of the frame a box touches: the target is partly outside the viewport there.
@@ -827,7 +845,11 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
           severity: unsure ? "warn" : "fail",
           atMs: seg.startMs,
           message: unsure
-            ? `${what}${tag} fits ${fit.best} and ${expected} about as well (${expected} ${vsExpected.toFixed(1)}x the error of ${fit.best}): these frames cannot tell them apart — sample it closely (--at, frame by frame) to check ${expected}`
+            ? `${what}${tag} fits ${fit.best} and ${expected} about as well (${expected} ${vsExpected.toFixed(1)}x the error of ${fit.best}): these frames cannot tell them apart — ${
+                frames.length >= 2 && frames.every((f, k) => k === 0 || f.atMs - frames[k - 1]!.atMs <= 17.5)
+                  ? `they are already every 60fps frame of it, so no closer sampling will: its own timing function in the CSS decides`
+                  : `sample it closely (--at, frame by frame) to check ${expected}`
+              }`
             : `${what}${tag} follows ${fit.best} (it fits ${fit.margin.toFixed(1)}x better than the next-best curve), not ${expected}${hidden > 0 ? `; in ${hidden} frame(s) there it is not seen at all — if something covers it, fix that first and re-check` : ""}${kfCause ? `: ${kfCause}` : ""}`,
         });
       }
@@ -984,7 +1006,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         atMs: seg.startMs,
         message: endedBefore
           ? `its own animation began ${Math.round(d0!.elapsedMs! - firstAt)}ms before the page was shown and was ${Math.min(100, Math.round((d0!.elapsedMs! / d0!.durationMs!) * 100))}% through at the first frame (${ms(firstAt)}), so its motion is not seen and it does not go ${towards(options.expectDirection)} on screen — a negative animation-delay plays that part before the page is shown`
-          : `it does not move (travels ${Math.round(travelPx)}px), so it does not go ${towards(options.expectDirection)}${inert ? `: ${inert}` : ": whatever was meant to move it is not applying"}`,
+          : `it does not move (travels ${Math.round(travelPx)}px), so it does not go ${towards(options.expectDirection)}${inert ? `: ${inert}` : overrideCause ? `: ${overrideCause}` : ": whatever was meant to move it is not applying"}`,
       });
     }
     return { ...seg, travelPx, easing, ...(origin ? { origin } : {}), ...(direction ? { direction } : {}) };
@@ -1321,6 +1343,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       atMs: firstMotion.atMs,
       message: `fully shown from ${ms(firstMotion.atMs)} and moves under ${still}px in every frame: if it is meant to animate, ${
         sorted.find((x) => x.dom?.heldByFill)?.dom?.heldByFill ??
+        overrideCause ??
         sorted.find((x) => x.dom?.dupKeyframes)?.dom?.dupKeyframes ??
         sorted.find((x) => x.dom?.inertOffsets)?.dom?.inertOffsets ??
         "its animation is not applying (a dropped rule, a misspelt animation-name)"
@@ -1346,6 +1369,44 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
   // Said without an --expect-* too: the brief's "glides" has no flag (round 17).
   if (kfCause && !findings.some((f) => f.message.includes(kfCause)))
     findings.push({ rule: "keyframe-easing", severity: "warn", atMs: sorted[0]?.atMs ?? 0, message: kfCause });
+  if (overrideCause && !findings.some((f) => f.message.includes(overrideCause)))
+    findings.push({
+      rule: "overridden-animation",
+      severity: "warn",
+      atMs: sorted.find((x) => x.dom?.overriddenBy)!.atMs,
+      message: overrideCause,
+    });
+  // Its angle on screen: an ancestor's turn carries it, and its own counter-rotation is meant to
+  // cancel that. Measured over the frames, unwrapped.
+  const angles = sorted.filter((x) => typeof x.dom?.screenDeg === "number").map((x) => x.dom!.screenDeg!);
+  let screenTurn = 0;
+  if (angles.length >= 2) {
+    let acc = 0;
+    let lo = 0;
+    let hi = 0;
+    for (let k = 1; k < angles.length; k++) {
+      let d = angles[k]! - angles[k - 1]!;
+      if (d > 180) d -= 360;
+      if (d < -180) d += 360;
+      acc += d;
+      lo = Math.min(lo, acc);
+      hi = Math.max(hi, acc);
+    }
+    screenTurn = hi - lo;
+  }
+  if (options.expectUpright && angles.length >= 2 && screenTurn > 1) {
+    const by = sorted.find((x) => x.dom?.turnedBy)?.dom?.turnedBy;
+    findings.push({
+      rule: "upright-mismatch",
+      severity: "fail",
+      atMs: sorted[0]!.atMs,
+      message: `it does not stay upright: on screen its angle changes by ${Math.round(screenTurn)}° over the frames${
+        by
+          ? ` — ${by} turns it, and its own counter-rotation does not cancel that turn: give the counter-rotation the same duration, easing and delay as ${by}'s turn, the other way`
+          : ""
+      }`,
+    });
+  }
   // Turned in 3D and drawn flat: nothing gives the turn depth.
   const flatAt = sorted.find((x) => x.dom?.flat3d && !x.dom.edgeOn);
   if (flatAt) findings.push({ rule: "flat-3d", severity: "warn", atMs: flatAt.atMs, message: flatAt.dom!.flat3d! });
@@ -1369,14 +1430,18 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
   const timed = sorted.filter((x) => typeof x.dom?.durationMs === "number");
   const durationMs = timed.length > 0 ? median(timed.map((x) => x.dom!.durationMs!)) : undefined;
   const iterations = timed.find((x) => x.dom!.iterations !== undefined)?.dom!.iterations;
+  // Every run of its own: an entrance beside a loop (a 400ms rise and a 1600ms pulse) is held by
+  // the one that matches, not failed on the longest (round 18).
+  const allRuns = [...new Set(sorted.flatMap((x) => x.dom?.durations ?? []).map((d) => Math.round(d)))];
   if (options.expectDurationMs !== undefined && durationMs !== undefined) {
+    const tol = Math.max(START_TOLERANCE_MS, options.expectDurationMs * 0.05);
     const off = Math.abs(durationMs - options.expectDurationMs);
-    if (off > Math.max(START_TOLERANCE_MS, options.expectDurationMs * 0.05)) {
+    if (off > tol && !allRuns.some((d) => Math.abs(d - options.expectDurationMs!) <= tol)) {
       findings.push({
         rule: "duration-mismatch",
         severity: "fail",
         atMs: segments[0]!.startMs,
-        message: `one run takes ${ms(durationMs)}, not ${ms(options.expectDurationMs)} (${(durationMs / options.expectDurationMs).toFixed(1)}x): its animation-duration decides it`,
+        message: `one run takes ${ms(durationMs)}, not ${ms(options.expectDurationMs)} (${(durationMs / options.expectDurationMs).toFixed(1)}x)${allRuns.length > 1 ? ` (its runs: ${allRuns.map((d) => ms(d)).join(", ")})` : ""}: its animation-duration decides it`,
       });
     }
   }
@@ -1412,6 +1477,10 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     travelPx: first.travelPx,
     ...(geo.length >= 2 ? { excursionPx: Math.max(...geo.map((p) => dist(p, geo[0]!))) } : {}),
     ...(turnReport ? { turn: turnReport } : {}),
+    ...(sorted.some((x) => x.dom?.turnedBy) && angles.length >= 2
+      ? { screenTurn: { deg: screenTurn, by: sorted.find((x) => x.dom?.turnedBy)!.dom!.turnedBy! } }
+      : {}),
+    ...(allRuns.length > 1 ? { runs: allRuns } : {}),
     ...(Math.abs(sweep) >= 10 ? { sweepDeg: sweep } : {}),
     easing: first.easing,
     ...(startsAtMs !== undefined ? { startsAtMs } : {}),
