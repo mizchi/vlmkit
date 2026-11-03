@@ -98,11 +98,17 @@ brief forbade (`create_session`). It was denied, had no effect, and the agent sa
 `held-paused-animation` does not fire. Those pages are the reference pages, the intact motion-defects pages,
 the correct held-out pages and the example sites.
 
-## Deferred
+## Deferred, and fixed after the round
 
-- With the boot release delayed by 300ms (an agent's probe page), the sampling plan, made at load, put the rest
-  frame mid-animation, and a false `jump` named a transform cause.
-- `motion-report.json` gives a target's box per frame, but its path entries leave out the height. An agent
-  measured the turn's edge height from the PNGs.
-- After the repair, `check animation` exits 1 on boot by default (`reduced-motion-ignored`, for a brief with no
-  reduced-motion policy). This is kept as a suspect, as decided before.
+- **A rest frame planned before a late release.** The plan is made at load. When an agent's probe page released
+  the boot hold 300ms late, the rest frame fell mid-animation and a false `jump` named a transform cause. Now,
+  if a measured target's own animation is still in its active phase when the rest frame comes, frames are added
+  up to its real end, the rest frame moves past it, and the output says so: `sampled again: .result:nth-child(4)
+  began later than the page's animations were timed at load (… at 560ms: something held them and released them
+  later)`.
+- **`motion-report.json` path entries carry `width` and `height`**: the box as drawn, measured from the page
+  when it was. A 3D turn's foreshortening shows in the height. An agent had measured it from the PNGs.
+
+Not deferred, but decided: after the repair, `check animation` exits 1 on boot by default
+(`reduced-motion-ignored`, for a brief with no reduced-motion policy). This stays a suspect, as decided before,
+and its message says how to judge the rest without it.

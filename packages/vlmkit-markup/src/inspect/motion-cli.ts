@@ -1525,6 +1525,8 @@ interface Captured {
   startMs: number;
   endMs: number;
   segments: { startMs: number; endMs: number }[];
+  /** The rest frame was moved: an animation began later than planned at load. */
+  replanned?: string;
   manifest: string;
   /** Each frame's file, by its instant. */
   files?: Map<number, string>;
@@ -1882,10 +1884,10 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
       }
       const atOnly = o.endMs === undefined && !!o.at && plan.segments.length === 0 && !forever;
       const given = o.endMs !== undefined || atOnly;
-      const endMs = o.endMs ?? (atOnly ? Math.max(...o.at!) : (forever?.endMs ?? plan.endMs));
+      let endMs = o.endMs ?? (atOnly ? Math.max(...o.at!) : (forever?.endMs ?? plan.endMs));
       const startMs = o.startMs ?? (given ? 0 : (forever?.startMs ?? plan.startMs));
       // --at chooses the frames; the segments are still the page's own spans of motion.
-      const segments = given || forever ? [{ startMs, endMs }] : plan.segments;
+      const segments = given || forever ? [{ startMs, endMs }] : plan.segments.map((g) => ({ ...g }));
       const instants = (
         o.at
           ? [...new Set(o.at)].sort((a, b) => a - b)
@@ -1908,8 +1910,35 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
       const files = new Map<number, string>();
       const frames: Captured["frames"] = [];
       const scrollYs: number[] = [];
-      for (const atMs of instants) {
+      // The plan is made at load. An animation the page holds and releases later (a boot class lifted
+      // when the fonts are in, 300ms late) is still running at the planned rest frame, which then read
+      // a jump "11px off where it rests" (round 16): the rest frame waits for its real end.
+      let replanned: string | undefined;
+      for (let k = 0; k < instants.length; k++) {
+        const atMs = instants[k]!;
         await timeline.at(atMs);
+        if (atMs > endMs && !replanned && !o.at && !given && !forever && o.selectors.length > 0) {
+          const late = (await measureTargets(page, o.selectors)).flatMap((d, i) => {
+            if (!d || typeof d.durationMs !== "number" || typeof d.elapsedMs !== "number" || d.iterations === null)
+              return [];
+            const runs = d.durationMs * (d.iterations ?? 1);
+            if (!Number.isFinite(runs) || d.elapsedMs <= 0 || d.elapsedMs >= runs - 1) return [];
+            return [{ sel: o.selectors[i]!, end: atMs + (runs - d.elapsedMs), start: atMs - d.elapsedMs }];
+          });
+          if (late.length > 0) {
+            const lateEnd = Math.ceil(Math.max(...late.map((x) => x.end)));
+            const lateStart = Math.min(...late.map((x) => x.start));
+            replanned = `${late.map((x) => x.sel).join(", ")} began later than the page's animations were timed at load (${late.map((x) => `${x.sel} at ${Math.round(x.start)}ms`).join(", ")}: something held them and released them later), so frames were added up to ${lateEnd}ms and the rest frame moved past it; the frames before ${Math.round(atMs)}ms were planned without it`;
+            const last = segments[segments.length - 1];
+            if (last && lateStart <= last.endMs) last.endMs = Math.max(last.endMs, lateEnd);
+            else segments.push({ startMs: Math.round(lateStart), endMs: lateEnd });
+            endMs = lateEnd;
+            const more = motionInstants(atMs, lateEnd, 6);
+            instants.splice(k, instants.length - k, ...more.motion, more.rest);
+            k--;
+            continue;
+          }
+        }
         scrollYs.push(await page.evaluate(() => window.scrollY).catch(() => 0));
         const { png, stable } = await captureStable(page);
         files.set(atMs, await writer.add(png, { atMs, stable, ...(atMs > endMs ? { label: "rest" } : {}) }));
@@ -2181,6 +2210,7 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
         startMs,
         endMs,
         segments,
+        ...(replanned ? { replanned } : {}),
         manifest: written.manifest,
         files,
         viewport: o.viewport,
@@ -2927,6 +2957,7 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
         (!d || d.opacity < 0.05 || (d.visible ?? 1) < 0.5)
       );
     });
+    if (captured.replanned) lines.splice(1, 0, `  sampled again: ${captured.replanned}`);
     if (leaveExits && went)
       lines.splice(
         1,

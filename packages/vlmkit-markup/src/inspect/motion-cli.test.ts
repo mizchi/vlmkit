@@ -673,6 +673,42 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
     assert.doesNotMatch(settle.out, /covered-edge|taken as leaving/, settle.out);
   });
 
+  it(
+    "samples again past an entrance released after the plan was made, and writes each frame's drawn size (round 16 deferred)",
+    { timeout: 240_000 },
+    async () => {
+      const { readFile, writeFile } = await import("node:fs/promises");
+      const late = join(await mkdtemp(join(tmpdir(), "vlmkit-late-")), "late.html");
+      const src = await readFile(join(dir, "reference/boot.html"), "utf8");
+      await writeFile(
+        late,
+        src.replace(
+          'document.fonts.ready.then(() => document.body.classList.remove("is-booting"))',
+          'document.fonts.ready.then(() => new Promise((r) => setTimeout(r, 300))).then(() => document.body.classList.remove("is-booting"))',
+        ),
+      );
+      const lines: string[] = [];
+      const log = console.log;
+      console.log = (m: string) => lines.push(m);
+      let code: number;
+      const frames = await mkdtemp(join(tmpdir(), "vlmkit-late-frames-"));
+      try {
+        code = await runMotionCli([late, "--selector", ".result:nth-child(4)", "--frames", frames]);
+      } finally {
+        console.log = log;
+      }
+      const out = lines.join("\n");
+      assert.equal(code, 0, out);
+      assert.match(
+        out,
+        /sampled again: \.result:nth-child\(4\) began later than the page's animations were timed at load/,
+      );
+      assert.doesNotMatch(out, /FAIL jump/);
+      const report = JSON.parse(await readFile(join(frames, "motion-report.json"), "utf8"));
+      assert.ok(report.targets[0].path.every((p: { height?: number }) => typeof p.height === "number"));
+    },
+  );
+
   it("says an empty argument is not a page", () => {
     assert.throws(() => parseMotionArgs(["p.html", "--selector", ".t", "--expect-still", ""]), /empty argument/);
   });

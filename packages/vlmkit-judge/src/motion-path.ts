@@ -397,7 +397,8 @@ export function describeOrigin(o: Pick<ScaleOrigin, "fx" | "fy" | "name">): stri
 export interface MotionPathReport {
   findings: MotionFinding[];
   /** Positions of the frames the target is shown in, motion and rest; `edge` = put back from a clipped box. */
-  path: { atMs: number; x: number; y: number; rest: boolean; edge: boolean }[];
+  /** Each frame's centre, and its box's drawn size (a turn's foreshortening shows in the height). */
+  path: { atMs: number; x: number; y: number; width?: number; height?: number; rest: boolean; edge: boolean }[];
   /** Per segment: its span, how far the target travels in it, the fit or why there is none. */
   segments: (MotionSegment & {
     travelPx: number;
@@ -428,6 +429,12 @@ const median = (xs: number[]) => {
   const s = [...xs].sort((a, b) => a - b);
   return s.length === 0 ? NaN : s[s.length >> 1]!;
 };
+
+/** A sample's box as drawn (measured from the page when it was, else the model's box). */
+function drawnSize(s: MotionSample): { width?: number; height?: number } {
+  const b = s.dom?.box ?? s.box;
+  return b ? { width: Math.round(b.width * 100) / 100, height: Math.round(b.height * 100) / 100 } : {};
+}
 
 export function judgeMotionPath(samples: readonly MotionSample[], options: MotionPathOptions): MotionPathReport {
   const thr = options.presenceThreshold ?? 0.5;
@@ -518,7 +525,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
 
   const path = sorted
     .filter(shown)
-    .map((s) => ({ atMs: s.atMs, ...position(s), rest: isRest(s), edge: !s.dom && atEdge(s) }));
+    .map((s) => ({ atMs: s.atMs, ...position(s), ...drawnSize(s), rest: isRest(s), edge: !s.dom && atEdge(s) }));
   const motion = path.filter((p) => !p.rest);
 
   // Presence: absent between two frames that show it, or gone once it stops. A faint frame whose
@@ -599,7 +606,13 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       )
       .map((s) => s.atMs),
   );
-  const point = (s: MotionSample) => ({ atMs: s.atMs, ...position(s), rest: isRest(s), edge: !s.dom && atEdge(s) });
+  const point = (s: MotionSample) => ({
+    atMs: s.atMs,
+    ...position(s),
+    ...drawnSize(s),
+    rest: isRest(s),
+    edge: !s.dom && atEdge(s),
+  });
   const all = sorted.filter((s) => surely.has(s.atMs)).map(point);
   // Measured, every motion frame is geometry, rendered or not: a rise that starts at opacity 0 is
   // 24px from its first frame, not from the first frame it can be seen in (which read 17px).

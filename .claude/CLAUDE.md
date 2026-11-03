@@ -477,7 +477,10 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   `animation-play-state: paused` rule holding it, and `check animation`'s `held-paused-animation` (suspect, 234
   rules) does too, with reduced motion `not judged` beside it. Fixed before the agents ran: a `preserve-3d`
   container is mirrored only by a face turned away with its backface visible, and an animation the page paused
-  and its CSS released at clock 0 is held from where it was paused (it had run out on the real clock).
+  and its CSS released at clock 0 is held from where it was paused (it had run out on the real clock). Its deferred items: a measured target still in its own animation when the rest frame comes was released
+  late (a boot hold lifted 300ms after the fonts): frames are added to its end and the rest moves past it
+  (`sampled again:`), where the frame had read a false `jump`; `motion-report.json` path entries carry the drawn
+  `width` / `height`.
 
 ## Generated figures (raster images)
 
