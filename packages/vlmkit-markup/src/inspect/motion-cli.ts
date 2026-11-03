@@ -245,7 +245,21 @@ export async function measureTargets(
           const deg = (Math.atan2(m.b, m.a) * 180) / Math.PI;
           return Math.abs(deg) > 0.01 ? { turnDeg: deg } : {};
         };
-        const backHidden = getComputedStyle(el).backfaceVisibility === "hidden";
+        // A preserve-3d container draws its faces in 3D, each by its own facing: turned over, its back
+        // is what a face that faces you (the answer) shows, not it mirrored. Only a face turned away
+        // whose backface is visible is drawn backwards (round 16: a correct flip card read mirrored).
+        const backHidden =
+          getComputedStyle(el).backfaceVisibility === "hidden" ||
+          (getComputedStyle(el).transformStyle === "preserve-3d" &&
+            ![...el.querySelectorAll("*")].some((c) => {
+              if (facing(c) >= -0.01) return false;
+              const cs = getComputedStyle(c);
+              if (cs.backfaceVisibility === "hidden") return false;
+              // Hidden by an ancestor between it and the target.
+              for (let n = c.parentElement; n && n !== el; n = n.parentElement)
+                if (getComputedStyle(n).backfaceVisibility === "hidden" && facing(n) < -0.01) return false;
+              return true;
+            }));
         // Its paint, as numbers: every colour in its background (a gradient's stops), its text and
         // its border. A hover gradient that faded read "travels 0px … target-static", and one that
         // snapped read "no --selector target changed" (round 11).

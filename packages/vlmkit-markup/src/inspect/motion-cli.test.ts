@@ -620,6 +620,27 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
     },
   );
 
+  it(
+    "reads a correct preserve-3d flip card as turned, not mirrored, and times entrances a boot class released (round 16)",
+    { timeout: 240_000 },
+    async () => {
+      const card = await run("reference/turn.html", ["--selector", "#card", "--click", "#card"]);
+      assert.doesNotMatch(card.out, /mirrored/, card.out);
+      const flat = await run("reference/boot.html", [
+        "--selector",
+        ".result:nth-child(1)",
+        "--selector",
+        ".result:nth-child(4)",
+      ]);
+      assert.match(
+        flat.out,
+        /target "\.result:nth-child\(1\)", begins at 0ms, runs 400ms: travels 16px upwards/,
+        flat.out,
+      );
+      assert.doesNotMatch(flat.out, /target-static/, flat.out);
+    },
+  );
+
   it("takes --device-scale 1-4 and refuses it with --jev", () => {
     assert.equal(parseMotionArgs(["p.html", "--selector", ".t", "--device-scale", "2"]).deviceScale, 2);
     assert.equal(parseMotionArgs(["p.html", "--selector", ".t"]).deviceScale, 1);
