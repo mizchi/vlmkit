@@ -77,6 +77,10 @@ export interface MotionDom {
   heldFilter?: string;
   /** Its animation's @keyframes name is defined more than once, and what each defines. */
   dupKeyframes?: string;
+  /** Points along its edge another element paints over (the 5x5 grid never reaches an edge). */
+  edgeCover?: { share: number; message: string };
+  /** It turns in 3D with no perspective to give the turn depth, and what to set. */
+  flat3d?: string;
   /** Its own animation offsets a box that is position: static, where top / left do nothing. */
   inertOffsets?: string;
   /** A finished animation's forwards fill still holds what it animated, and why that matters. */

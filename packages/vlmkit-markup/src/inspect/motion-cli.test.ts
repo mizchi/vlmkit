@@ -220,6 +220,17 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
       ["--selector", ".toast", "--exits", "--expect-easing", "ease-out,ease-in"],
       /FAIL snap-back .*in the hold after 660ms/,
     ],
+    // Round 16: a lifted card under its neighbour, and entrances a boot class holds paused.
+    [
+      "lift.html",
+      ["--selector", "#p2", "--hover", "#p2"],
+      /FAIL covered-edge .*raised \(scale 1\.\d+\) and covered at its edge .*by section#p3: both are stacking contexts at z-index: auto/,
+    ],
+    [
+      "boot.html",
+      ["--selector", ".result:nth-child(1)"],
+      /FAIL target-hidden .*held paused at 0ms of its animation `result-in` by \.is-booting \* \{ animation-play-state: paused \}/,
+    ],
     // Round 15: a @keyframes name defined twice, and a stagger whose delays are negative.
     [
       "fadeup.html",
@@ -640,6 +651,31 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
       assert.doesNotMatch(flat.out, /target-static/, flat.out);
     },
   );
+
+  it("names a 3D turn drawn without perspective (round 16)", { timeout: 240_000 }, async () => {
+    const flat = await run("broken/turn.html", ["--selector", "#card", "--click", "#card"]);
+    assert.match(
+      flat.out,
+      /warn flat-3d .*perspective: 900px on div#card itself gives depth to its children, not to its own turn — move it to its parent \(div\.scene\)/,
+      flat.out,
+    );
+    const deep = await run("reference/turn.html", ["--selector", "#card", "--click", "#card"]);
+    assert.doesNotMatch(deep.out, /flat-3d/, deep.out);
+    const settle = await run("reference/lift.html", [
+      "--selector",
+      "#p2",
+      "--selector",
+      "#p3",
+      "--hover",
+      "#p2",
+      "--leave",
+    ]);
+    assert.doesNotMatch(settle.out, /covered-edge|taken as leaving/, settle.out);
+  });
+
+  it("says an empty argument is not a page", () => {
+    assert.throws(() => parseMotionArgs(["p.html", "--selector", ".t", "--expect-still", ""]), /empty argument/);
+  });
 
   it("takes --device-scale 1-4 and refuses it with --jev", () => {
     assert.equal(parseMotionArgs(["p.html", "--selector", ".t", "--device-scale", "2"]).deviceScale, 2);

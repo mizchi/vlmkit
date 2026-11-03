@@ -576,12 +576,39 @@ export async function measureTargets(
             if (s.visibility === "hidden" && a === el) hiddenBy = "transparent: it is visibility: hidden";
             else if (Number(s.opacity) < 0.05) {
               const running = a.getAnimations().filter((x) => x.effect?.getComputedTiming().progress !== null);
+              // Held paused by the page's CSS on a hiding keyframe: results held by a boot class a
+              // script never removed read only "renders at opacity 0.00" (round 16).
+              const held = a
+                .getAnimations()
+                .find((x) => x.playState === "paused" && /paused/.test(s.animationPlayState)) as
+                | CSSAnimation
+                | undefined;
+              let heldBy = "";
+              if (held) {
+                const findRule = (rules: CSSRuleList) => {
+                  for (const r of [...rules]) {
+                    if (heldBy) return;
+                    if (r instanceof CSSStyleRule && /paused/.test(r.style.animationPlayState)) {
+                      try {
+                        if (a.matches(r.selectorText)) heldBy = `${r.selectorText} { animation-play-state: paused }`;
+                      } catch {}
+                    } else if ("cssRules" in r) findRule((r as CSSGroupingRule).cssRules);
+                  }
+                };
+                for (const sheet of [...document.styleSheets]) {
+                  try {
+                    findRule(sheet.cssRules);
+                  } catch {}
+                }
+              }
               hiddenBy = `transparent: ${own} renders at opacity ${Number(s.opacity).toFixed(2)}${
-                a === el
-                  ? ""
-                  : running.length === 0
-                    ? `, and nothing animates it (if it is meant to fade in, its animation is not running: check animation names an animation-name with no @keyframes)`
-                    : ""
+                held
+                  ? `, held paused at ${Math.round(Number(held.currentTime) || 0)}ms of its animation${held.animationName ? ` \`${held.animationName}\`` : ""} by ${heldBy || "animation-play-state: paused"}, which still matches at rest: whatever should release it (a class a script removes, a state the page reaches) has not`
+                  : a === el
+                    ? ""
+                    : running.length === 0
+                      ? `, and nothing animates it (if it is meant to fade in, its animation is not running: check animation names an animation-name with no @keyframes)`
+                      : ""
               }`;
             }
           }
@@ -627,7 +654,104 @@ export async function measureTargets(
             }
           }
         }
+        // Its edges, which the 5x5 grid never reaches: a hovered card grown to 110% slid 9px under
+        // the next card and read "1.00 seen" in every frame (round 16). Points 2px inside each
+        // edge, between 10% and 90% of its length; an ancestor hit is its own shape's corner.
+        let edgeCover: { share: number; message: string } | undefined;
+        if (
+          !hiddenBy &&
+          opacity >= 0.05 &&
+          !geometry &&
+          shapes.length === 0 &&
+          Math.abs(m33) > 0.999 &&
+          r.width > 8 &&
+          r.height > 8
+        ) {
+          el.setAttribute("data-vlmkit-probe", "");
+          let n = 0;
+          let covered = 0;
+          let by: Element | null = null;
+          const pts: [number, number][] = [];
+          for (let k = 0; k < 12; k++) {
+            const f = 0.1 + (0.8 * k) / 11;
+            pts.push([r.x + 2, r.y + f * r.height], [r.right - 2, r.y + f * r.height]);
+            pts.push([r.x + f * r.width, r.y + 2], [r.x + f * r.width, r.bottom - 2]);
+          }
+          for (const [x, y] of pts) {
+            if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight || !inClips(x, y)) continue;
+            n++;
+            const top = document.elementFromPoint(x, y);
+            if (!top || el.contains(top) || top.contains(el)) continue;
+            covered++;
+            by ??= top;
+          }
+          el.removeAttribute("data-vlmkit-probe");
+          if (n > 0 && by && covered / n >= 0.08) {
+            // The cover's own box that paints over it: the sibling (or its ancestor) that is not
+            // also an ancestor of the target.
+            let cover: Element = by;
+            while (cover.parentElement && !cover.parentElement.contains(el)) cover = cover.parentElement;
+            // A neighbour raised over it on purpose (the hovered card next to this one) is the design.
+            const coverTf = fullTransform(cover);
+            const coverScale = coverTf ? Math.hypot(coverTf.a, coverTf.b) : 1;
+            if (coverScale > scale + 0.01) by = null;
+          }
+          if (n > 0 && by && covered / n >= 0.08) {
+            let cover: Element = by;
+            while (cover.parentElement && !cover.parentElement.contains(el)) cover = cover.parentElement;
+            const mine = stacking(el);
+            const theirs = stacking(cover);
+            const after = !!(el.compareDocumentPosition(cover) & Node.DOCUMENT_POSITION_FOLLOWING);
+            const zi = getComputedStyle(el).zIndex;
+            edgeCover = {
+              share: covered / n,
+              message: `${Math.round((covered / n) * 100)}% of the points along its edge are covered by ${name(cover)}${
+                mine && theirs && after && zi === "auto"
+                  ? `: both are stacking contexts at z-index: auto (it: ${mine}; ${name(cover)}: ${theirs}), so they paint in document order and ${name(cover)}, later, paints over it — give it a z-index (z-index: 1) while it is raised`
+                  : after && zi === "auto"
+                    ? `, which comes later in the document and paints over it — give it a z-index (with position: relative, or as a grid / flex item) while it is raised`
+                    : ""
+              }`,
+            };
+          }
+        }
+        // Turned in 3D with nothing to give it depth: perspective on the element itself applies to
+        // its children, not to its own turn, so a flip card read "turns over 176° in 3D" while it
+        // was drawn as a flat squash (round 16).
+        let flat3d: string | undefined;
+        if (Math.abs(m33) < 0.999) {
+          let turner: Element | null = null;
+          for (let n: Element | null = el; n && n !== document.documentElement && !turner; n = n.parentElement) {
+            const tf = fullTransform(n);
+            if (tf && !tf.is2D) turner = n;
+          }
+          if (turner) {
+            const tf = fullTransform(turner)!;
+            const parent = turner.parentElement;
+            const deep =
+              Math.abs(tf.m34) > 1e-9 ||
+              (parent && getComputedStyle(parent).perspective !== "none") ||
+              // An ancestor further up that keeps 3D through preserve-3d and has a perspective.
+              (() => {
+                for (let a = parent; a && a !== document.documentElement; a = a.parentElement) {
+                  if (getComputedStyle(a).transformStyle !== "preserve-3d") break;
+                  if (a.parentElement && getComputedStyle(a.parentElement).perspective !== "none") return true;
+                }
+                return false;
+              })();
+            if (!deep) {
+              const ownP = getComputedStyle(turner).perspective;
+              flat3d = `${turner === el ? "it" : name(turner)} turns in 3D, but nothing gives the turn depth, so it is drawn flat (a squash, both edges as tall as ever)${
+                ownP !== "none"
+                  ? `: perspective: ${ownP} on ${name(turner)} itself gives depth to its children, not to its own turn — move it to its parent (${parent ? name(parent) : "the parent"})`
+                  : `: give its parent (${parent ? name(parent) : "the parent"}) a perspective (perspective: 900px), or start its transform with perspective(900px)`
+              }`;
+            }
+          }
+        }
         return {
+          ...(edgeCover ? { edgeCover } : {}),
+          ...(flat3d ? { flat3d } : {}),
           box: { x: r.x, y: r.y, width: r.width, height: r.height },
           opacity,
           scale,
@@ -721,6 +845,8 @@ each forbidden statement is. vlmkit judges the motion from that:
                    plays its animation again (a re-render); the same element starting again is a warn
   stroke-incomplete a stroke drawing itself ends part drawn (a dash shorter than its line)
   mirrored         a face turned past edge-on is seen backwards (backface-visibility)
+  flat-3d          (warn) it turns in 3D with no perspective on its parent: drawn as a flat squash
+  covered-edge     its edge is painted over by another element (fail when it is raised: scaled up)
   forbid           a statement seen at rest fails; only mid-motion, warns (--jev)
 
 Frames: each span some finite animation runs in is a segment (an entrance, and
@@ -1100,9 +1226,17 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   if (positional.length !== 1) {
     // `--expect-still .gear` read ".gear" as a second page (round 12): it takes no value.
     const afterFlag = positional.find((p, k) => k > 0 && argv[argv.indexOf(p) - 1] === "--expect-still");
-    if (afterFlag)
+    if (afterFlag !== undefined)
       throw new MotionUsageError(
-        `--expect-still takes no value (it applies to every target): for one target, write --still ${afterFlag}`,
+        afterFlag === ""
+          ? "--expect-still takes no value (it applies to every target), and an empty argument ('') followed it: leave the '' out"
+          : `--expect-still takes no value (it applies to every target): for one target, write --still ${afterFlag}`,
+      );
+    // An empty argument ('') read as a second page (round 16).
+    const empty = argv.findIndex((x) => x === "");
+    if (empty >= 0)
+      throw new MotionUsageError(
+        `an empty argument ('')${empty > 0 ? ` after ${argv[empty - 1]}` : ""} was read as a page: leave it out${empty > 0 && argv[empty - 1]!.startsWith("--") ? `, or give ${argv[empty - 1]} its value` : ""}`,
       );
     throw new MotionUsageError(
       `expected one page, URL or frames.json, got ${positional.length}${positional.length > 1 ? ' (quote each description: --target "the blue square")' : ""}`,
@@ -2780,7 +2914,20 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
   if (o.json) console.log(JSON.stringify(json, null, 2));
   else {
     const lines = formatMotionReport(o.source, captured, r, o.forbid, o.deviceScale).split("\n");
-    if (leaveExits)
+    // Said only when one did go: lifted cards that settle back read "the pointer leaving is what
+    // hides a hover-only element" (round 16).
+    const restDom = captured.frames.at(-1)?.dom ?? [];
+    const went = (captured.beforeLast?.targets ?? []).some((b, i) => {
+      const d = restDom[i];
+      return (
+        b &&
+        !b.notRendered &&
+        b.opacity >= 0.5 &&
+        (b.visible ?? 0) >= 0.5 &&
+        (!d || d.opacity < 0.05 || (d.visible ?? 1) < 0.5)
+      );
+    });
+    if (leaveExits && went)
       lines.splice(
         1,
         0,

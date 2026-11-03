@@ -469,6 +469,15 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   `honored`; `inspect motion` warns `duplicate-keyframes` with no `--expect-*` when the rules of one name
   animate different properties; a start-mismatch names the flags its time comes from; `--device-scale <n>`
   (not with `--jev`) shoots at that scale.
+- **A lifted card under its neighbour, a flip without perspective, entrances a boot class holds** (round 16,
+  `docs/reports/2026-11-03-motion-repair-v16.md`). The 5x5 hit-test never reaches an edge, so 48 points 2px
+  inside it are probed too: `covered-edge` names the cover and the paint order (fail when the target is scaled
+  up, never for a neighbour raised over it on purpose); `flat-3d` (warn) names a 3D turn with no perspective
+  (`perspective` on the turning element gives depth to its children only); a transparent target names the
+  `animation-play-state: paused` rule holding it, and `check animation`'s `held-paused-animation` (suspect, 234
+  rules) does too, with reduced motion `not judged` beside it. Fixed before the agents ran: a `preserve-3d`
+  container is mirrored only by a face turned away with its backface visible, and an animation the page paused
+  and its CSS released at clock 0 is held from where it was paused (it had run out on the real clock).
 
 ## Generated figures (raster images)
 

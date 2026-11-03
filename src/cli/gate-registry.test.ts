@@ -276,7 +276,8 @@ describe("composed built-in registry", () => {
     // on a static box only faded (round 14).
     // 230 → 233: `check animation` / `duplicate-keyframes`, `negative-delay-entrance`, `held-filter`
     // (round 15: a @keyframes name defined twice, a stagger with negative delays, a blur held at rest).
-    assert.equal(total, 233);
+    // 233 → 234: `check animation` / `held-paused-animation` (motion-repair round 16).
+    assert.equal(total, 234);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {

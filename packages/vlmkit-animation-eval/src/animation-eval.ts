@@ -272,6 +272,7 @@ export type AnimationEvalIssueKind =
   | "duplicate-keyframes"
   | "negative-delay-entrance"
   | "held-filter"
+  | "held-paused-animation"
   | "reduced-motion-hides"
   | "layout-animation"
   | "loop-seam"
@@ -539,6 +540,8 @@ export interface DeriveIssuesInput {
     negativeDelayMs?: number;
     durationMs?: number;
     restFilter?: string;
+    /** The rule that holds it paused while it hides the element (animation-play-state: paused). */
+    heldPaused?: string;
   }[];
   /** CSS animations with no duration: they end as they begin. */
   zeroDuration?: { selector: string; name: string }[];
@@ -674,6 +677,15 @@ export function deriveAnimationIssues(
         severity: "warn",
         selector: u.selector,
         message: `${u.selector} \`${u.name}\` has animation-delay ${u.negativeDelayMs}ms: it starts ${-u.negativeDelayMs}ms into its ${u.durationMs}ms run, so that much of its entrance is skipped and it is already part way in at load. A stagger is a positive delay per item (calc(var(--i) * 80ms)); a negative one only suits a loop meant to start mid-run.`,
+      });
+      continue;
+    }
+    if (u.heldPaused !== undefined) {
+      issues.push({
+        kind: "held-paused-animation",
+        severity: "suspect",
+        selector: u.selector,
+        message: `${u.selector} \`${u.name}\` is held paused at rest by ${u.heldPaused}, and the element is invisible while it is (opacity 0): the animation never plays, so the element never appears. Whatever should release it has not: a class a script removes (check the name it removes matches), a state the page never reaches. The frames of this evaluation seek it, so they show it as if it ran.`,
       });
       continue;
     }
@@ -1235,6 +1247,24 @@ ${ANIMATION_HELPERS_JS}
         if (t && Number(t.delay) < 0 && Number.isFinite(Number(t.iterations)) && hiddenStart && !seen.has("neg\u0000" + selector)) {
           seen.add("neg\u0000" + selector);
           out.push({ selector, name: name || "an animation", negativeDelayMs: Number(t.delay), durationMs: Number(t.duration) });
+        }
+        // Held paused by the page's CSS (animation-play-state: paused) while it hides the element:
+        // results held by a boot class that a script never removed stayed at opacity 0 for good,
+        // and the evaluation, seeking every animation, read them "visible" (round 16).
+        if (a.playState === "paused" && /paused/.test(cs.animationPlayState) && Number(cs.opacity) < 0.05 && !seen.has("hold\u0000" + selector)) {
+          seen.add("hold\u0000" + selector);
+          let rule = "";
+          const findRule = (rules) => {
+            for (const r of rules) {
+              if (rule) return;
+              if (r.selectorText && r.style && /paused/.test(r.style.animationPlayState || "")) {
+                try { if (el.matches(r.selectorText)) rule = r.selectorText + " { animation-play-state: " + r.style.animationPlayState + (r.style.getPropertyPriority("animation-play-state") ? " !important" : "") + " }"; } catch {}
+              } else if (r.cssRules) findRule(r.cssRules);
+            }
+          };
+          for (const sheet of document.styleSheets) { try { findRule(sheet.cssRules); } catch {} }
+          if (!rule && /paused/.test(el.style.animationPlayState || "")) rule = "its style attribute";
+          out.push({ selector, name: name || "an animation", heldPaused: rule || "animation-play-state: paused" });
         }
         // A fill that holds a filter at rest: blur(0.6px) left a card soft for good, and even
         // blur(0) keeps a filter layer the card is rasterised through (round 15).
@@ -2375,11 +2405,13 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
   }
   if (report.reducedMotion) {
     lines.push(
-      report.reducedMotion.nothingToReduce
+      report.reducedMotion.nothingToReduce && !report.issues.some((i) => i.kind === "held-paused-animation")
         ? `reduced-motion: nothing to reduce — no animation here moves anything (only opacity, colour or visibility)${report.reducedMotion.fadesUnderReduce ? `, and the ${report.reducedMotion.fadesUnderReduce} that run still run under reduce, which the preference allows` : ""}; not a sign the page has a prefers-reduced-motion rule`
-        : report.reducedMotion.remainingCount === 0
-          ? `reduced-motion: honored${report.issues.some((i) => i.kind === "reduced-motion-hides") ? ` — but ${report.issues.filter((i) => i.kind === "reduced-motion-hides").length} element(s) rest hidden or out of place under it${ruleTag("reduced-motion-hides")}` : ""}`
-          : `reduced-motion: ${report.reducedMotion.remainingCount} animation(s) still running${ruleTag("reduced-motion-ignored")}`,
+        : report.reducedMotion.remainingCount === 0 && report.issues.some((i) => i.kind === "held-paused-animation")
+          ? `reduced-motion: not judged — ${report.issues.filter((i) => i.kind === "held-paused-animation").length} animation(s) are held paused by the page and never run, with or without the preference${ruleTag("held-paused-animation")}`
+          : report.reducedMotion.remainingCount === 0
+            ? `reduced-motion: honored${report.issues.some((i) => i.kind === "reduced-motion-hides") ? ` — but ${report.issues.filter((i) => i.kind === "reduced-motion-hides").length} element(s) rest hidden or out of place under it${ruleTag("reduced-motion-hides")}` : ""}`
+            : `reduced-motion: ${report.reducedMotion.remainingCount} animation(s) still running${ruleTag("reduced-motion-ignored")}`,
     );
   }
   if (report.uncontrolledMotion) {

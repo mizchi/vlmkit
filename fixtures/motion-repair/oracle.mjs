@@ -940,7 +940,17 @@ if (kind === "lift") {
     ok(`${id} lifted: 110% of its size`, Math.abs(c.w - r0[2] * 1.1) <= 2, { c: c.w, r0 });
     ok(`${id} lifted: no part of it is covered`, c.covered.length === 0, c.covered.slice(0, 6));
   }
+  // Settling back it is still raised: covered as it shrinks is the same defect (both round 16
+  // agents kept it on top until it had settled).
+  const r2 = await rect("#p2");
+  await page.mouse.move(r2[0] + r2[2] / 2, r2[1] + r2[3] / 2);
+  await finish();
   await page.mouse.move(5, 5);
+  await page.evaluate(() => {
+    for (const a of document.querySelector("#p2").getAnimations()) { a.pause(); a.currentTime = 40; }
+  });
+  const leaving = await covered("#p2");
+  ok("settling back (40ms after the pointer leaves): still not covered", leaving.covered.length === 0 && leaving.w > base[2] * 1.01, leaving.covered.slice(0, 4));
   await finish();
   const back = await rect("#p2");
   ok("pointer away: it settles back", JSON.stringify(back) === JSON.stringify(base), { back, base });

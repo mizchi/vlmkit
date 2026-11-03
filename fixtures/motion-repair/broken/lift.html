@@ -8,6 +8,7 @@
   .plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
   .plan { background: #fff; border: 1px solid #cfd5df; border-radius: 12px; padding: 24px; min-height: 280px; transform: translateY(0); transition: transform 200ms ease-out, box-shadow 200ms ease-out; }
   .plan:hover { transform: scale(1.1); box-shadow: 0 18px 44px rgba(15, 23, 42, 0.22); }
+  @media (max-width: 720px) { .plans { grid-template-columns: 1fr; gap: 12px; } }
   .plan h2 { margin: 0 0 4px; font-size: 18px; }
   .plan .price { font-size: 30px; font-weight: 700; margin: 12px 0; }
   .plan ul { margin: 0; padding-left: 18px; color: #4b5563; }

@@ -1286,3 +1286,19 @@ test(
     assert.match(formatAnimationEvalReport(slide), /reduced-motion: honored/);
   },
 );
+
+test(
+  "runAnimationEval: an entrance a boot class holds paused is held-paused-animation, and reduced motion is not judged (round 16)",
+  { timeout: 120_000 },
+  async () => {
+    const page = await animPage(
+      ".boot * { animation-play-state: paused !important; } @keyframes up { from { opacity: 0; } to { opacity: 1; } } #a { animation: up 400ms ease-out both; }",
+      '<div class="boot"><div id="a"></div></div>',
+    );
+    const report = await runAnimationEval({ source: page });
+    const held = report.issues.find((i) => i.kind === "held-paused-animation");
+    assert.ok(held, JSON.stringify(report.issues));
+    assert.match(held!.message, /held paused at rest by \.boot \* \{ animation-play-state: paused !important \}/);
+    assert.match(formatAnimationEvalReport(report), /reduced-motion: not judged — 1 animation\(s\) are held paused/);
+  },
+);

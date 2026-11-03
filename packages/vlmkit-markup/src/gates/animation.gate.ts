@@ -115,6 +115,12 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       docs: "A negative delay skips that much of the run, so an entrance from a hidden or offset first keyframe is already part way in at load; in a stagger the later items finish first. A stagger is a positive delay per item.",
     },
     {
+      id: "held-paused-animation",
+      title: "An animation the page holds paused while its element is invisible",
+      severity: "suspect",
+      docs: "animation-play-state: paused at rest on an element at opacity 0 means its entrance never plays: a boot class whose removal names the wrong class kept every result blank. The evaluation seeks every animation, so its frames show it as if it ran; this rule reads the page's own state.",
+    },
+    {
       id: "held-filter",
       title: "A filter is held at rest by an animation's fill",
       severity: "warn",

@@ -179,6 +179,10 @@ export interface MotionSample {
     heldFilter?: string;
     /** Its animation's @keyframes name is defined more than once, and what each defines. */
     dupKeyframes?: string;
+    /** Points along its edge another element paints over (the 5x5 grid never reaches an edge). */
+    edgeCover?: { share: number; message: string };
+    /** It turns in 3D with no perspective to give the turn depth, and what to set. */
+    flat3d?: string;
     /** Its own animation offsets a box that is position: static, where top / left do nothing. */
     inertOffsets?: string;
     /** A finished animation's forwards fill still holds what it animated, and why that matters. */
@@ -316,7 +320,9 @@ export type MotionRule =
   | "hidden-at-once"
   | "target-unchanged"
   | "held-filter"
-  | "duplicate-keyframes";
+  | "duplicate-keyframes"
+  | "covered-edge"
+  | "flat-3d";
 
 export interface MotionFinding {
   rule: MotionRule;
@@ -1303,6 +1309,25 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       }`,
     });
   }
+
+  // Its edge painted over by another element, at the frame where most of it is (round 16's lifted
+  // card, under the next card's 9px). A fail when it is raised (scaled up): raised is meant to be on
+  // top. Otherwise a warn: a card under a sticky header can be meant.
+  const coverAt = sorted
+    .filter((x) => x.dom?.edgeCover && shown(x))
+    .sort((a, b) => b.dom!.edgeCover!.share - a.dom!.edgeCover!.share)[0];
+  if (coverAt) {
+    const raised = coverAt.dom!.scale > 1.01;
+    findings.push({
+      rule: "covered-edge",
+      severity: raised ? "fail" : "warn",
+      atMs: coverAt.atMs,
+      message: `${raised ? `raised (scale ${coverAt.dom!.scale.toFixed(2)}) and ` : ""}covered at its edge at ${ms(coverAt.atMs)}: ${coverAt.dom!.edgeCover!.message}`,
+    });
+  }
+  // Turned in 3D and drawn flat: nothing gives the turn depth.
+  const flatAt = sorted.find((x) => x.dom?.flat3d && !x.dom.edgeOn);
+  if (flatAt) findings.push({ rule: "flat-3d", severity: "warn", atMs: flatAt.atMs, message: flatAt.dom!.flat3d! });
 
   // A @keyframes name more than one rule defines, whose rules animate different things: the later
   // one wins and the other's motion never runs. Said without an --expect-*: a rise that never happens
