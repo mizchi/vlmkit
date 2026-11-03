@@ -2371,7 +2371,20 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
     `${DIM}source: ${report.source} (${report.viewport.width}x${report.viewport.height})${report.virtualTime ? ", page clock held (--virtual-time)" : ""}${RESET}`,
   );
   lines.push("");
-  lines.push(`status: ${status}`);
+  // A repaired page whose brief sets no reduced-motion policy still exits 1 on this one suspect
+  // (kept a suspect by decision): say so on the status line, so the rest reads as passed without
+  // hunting the issue list (round 16's boot agents turned the rule off to find that out).
+  const onlyReduced =
+    status === "suspect" &&
+    shown.some((i) => i.row.kind === "reduced-motion-ignored") &&
+    shown.every((i) => i.row.kind === "reduced-motion-ignored" || i.tier !== "suspect");
+  lines.push(
+    `status: ${status}${
+      onlyReduced
+        ? ` — only reduced-motion-ignored (WCAG 2.3.3, AAA): no other rule fails. If the brief sets no reduced-motion policy, the motion passed; --rule reduced-motion-ignored=off exits 0`
+        : ""
+    }`,
+  );
   lines.push(
     `animations: ${report.animationCount} (evaluated ${report.evaluated.length}, infinite ${report.infinite.length})`,
     ...(report.scrollDriven

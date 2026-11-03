@@ -480,7 +480,8 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   and its CSS released at clock 0 is held from where it was paused (it had run out on the real clock). Its deferred items: a measured target still in its own animation when the rest frame comes was released
   late (a boot hold lifted 300ms after the fonts): frames are added to its end and the rest moves past it
   (`sampled again:`), where the frame had read a false `jump`; `motion-report.json` path entries carry the drawn
-  `width` / `height`.
+  `width` / `height`; `check animation` with `reduced-motion-ignored` as its only suspect says so on the
+  status line (still a suspect, still exit 1).
 
 ## Generated figures (raster images)
 

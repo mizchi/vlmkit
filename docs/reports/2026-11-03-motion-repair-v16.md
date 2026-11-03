@@ -109,6 +109,9 @@ the correct held-out pages and the example sites.
 - **`motion-report.json` path entries carry `width` and `height`**: the box as drawn, measured from the page
   when it was. A 3D turn's foreshortening shows in the height. An agent had measured it from the PNGs.
 
-Not deferred, but decided: after the repair, `check animation` exits 1 on boot by default
-(`reduced-motion-ignored`, for a brief with no reduced-motion policy). This stays a suspect, as decided before,
-and its message says how to judge the rest without it.
+- **A repaired page exits 1 on reduced motion alone.** After the repair, `check animation` exits 1 on boot by
+  default (`reduced-motion-ignored`, for a brief with no reduced-motion policy), and the agents turned the rule
+  off to find that nothing else failed. The rule stays a suspect and the exit code stays 1, as decided before.
+  When it is the only suspect, the status line now says so: `status: suspect — only reduced-motion-ignored
+  (WCAG 2.3.3, AAA): no other rule fails. If the brief sets no reduced-motion policy, the motion passed;
+  --rule reduced-motion-ignored=off exits 0`.

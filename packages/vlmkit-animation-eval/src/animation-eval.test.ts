@@ -1302,3 +1302,25 @@ test(
     assert.match(formatAnimationEvalReport(report), /reduced-motion: not judged — 1 animation\(s\) are held paused/);
   },
 );
+
+test("formatAnimationEvalReport: a lone reduced-motion-ignored is named on the status line (round 16)", () => {
+  const base = { evaluated: [evaluated()], settleMs: 400, infinite: [] };
+  const lone = deriveAnimationIssues({
+    ...base,
+    reducedMotion: { remainingCount: 1, remaining: [{ selector: "#a", name: "slide", durationMs: 400 }] },
+  });
+  const report: AnimationEvalReport = {
+    source: "fixture.html",
+    viewport: { width: 1280, height: 720 },
+    animationCount: 1,
+    ...base,
+    reducedMotion: { remainingCount: 1, remaining: [{ selector: "#a", name: "slide", durationMs: 400 }] },
+    issues: lone,
+  };
+  assert.match(
+    formatAnimationEvalReport(report),
+    /status: suspect — only reduced-motion-ignored \(WCAG 2\.3\.3, AAA\): no other rule fails/,
+  );
+  const clean: AnimationEvalReport = { ...report, reducedMotion: { remainingCount: 0, remaining: [] }, issues: [] };
+  assert.doesNotMatch(formatAnimationEvalReport(clean), /only reduced-motion-ignored/);
+});
