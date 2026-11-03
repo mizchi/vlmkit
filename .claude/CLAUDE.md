@@ -503,7 +503,8 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   function; `--every-action` takes one `--expect-direction` / `-duration` / `-iterations` value per action;
   a target that an ancestor turns says its angle on screen, and `--expect-upright` fails `upright-mismatch`
   when that changes by over 1°. `check animation`: `overridden-animation` and `unitless-duration-var`
-  (suspect), 239 rules, none of the rounds 16-18 rules firing on the repo's 72 other correct animated pages.
+  (suspect), `counter-rotation-drift` (warn), 240 rules, none of the rounds 16-18 rules firing on the repo's 72
+  other correct animated pages; a counter-rotation's own turn is not blamed on a wrong sign.
 
 ## Generated figures (raster images)
 

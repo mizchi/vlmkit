@@ -279,7 +279,8 @@ describe("composed built-in registry", () => {
     // 233 → 234: `check animation` / `held-paused-animation` (motion-repair round 16).
     // 234 → 237: `stepped-keyframe`, `inert-size-animation`, `unknown-media-feature` (round 17).
     // 237 → 239: `overridden-animation`, `unitless-duration-var` (round 18).
-    assert.equal(total, 239);
+    // 239 → 240: `counter-rotation-drift` (round 18).
+    assert.equal(total, 240);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {

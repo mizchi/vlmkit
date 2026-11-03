@@ -278,6 +278,7 @@ export type AnimationEvalIssueKind =
   | "unknown-media-feature"
   | "overridden-animation"
   | "unitless-duration-var"
+  | "counter-rotation-drift"
   | "reduced-motion-hides"
   | "layout-animation"
   | "loop-seam"
@@ -549,6 +550,14 @@ export interface DeriveIssuesInput {
     heldPaused?: string;
     /** A later animation in animation-name on the same property, whose fill covers this one's run. */
     overridden?: { by: string; props: string[]; delayMs: number; fill: string; coveredMs: number | null };
+    /** A counter-rotation against an ancestor's turn at a rate that does not cancel it. */
+    counterDrift?: {
+      ancestor: string;
+      theirs: string;
+      mine: { deg: number; ms: number };
+      other: { deg: number; ms: number };
+      net: number;
+    };
     /** A transition / animation duration var() that resolves to a number with no unit. */
     unitlessVar?: { prop: string; text: string; variable: string; value: string };
     /** A keyframe's steps() timing function that overrides the element's smooth one. */
@@ -703,6 +712,16 @@ export function deriveAnimationIssues(
         severity: "suspect",
         selector: u.selector,
         message: `${u.selector} \`${u.name}\` and \`${o.by}\` both animate ${o.props.join(", ")}, and \`${o.by}\` comes later in animation-name, so its value wins${o.coveredMs === null ? " for the whole of" : ` for ${o.coveredMs}ms of`} \`${u.name}\`'s run${o.delayMs > 0 && (o.fill === "backwards" || o.fill === "both") ? ` (its ${o.fill} fill holds its first keyframe through its ${Math.round(o.delayMs)}ms delay)` : ""}: that part of \`${u.name}\` never shows. Animate one with an individual property (translate / scale / rotate compose with transform), or drop the backwards fill.`,
+      });
+      continue;
+    }
+    if (u.counterDrift) {
+      const c = u.counterDrift;
+      issues.push({
+        kind: "counter-rotation-drift",
+        severity: "warn",
+        selector: u.selector,
+        message: `${u.selector} \`${u.name}\` turns ${Math.round(c.mine.deg)}° per ${Math.round(c.mine.ms)}ms against ${c.ancestor}'s \`${c.theirs}\` (${Math.round(c.other.deg)}° per ${Math.round(c.other.ms)}ms), so on screen it turns ${Math.abs(c.net).toFixed(1)}°/s ${c.net > 0 ? "clockwise" : "counterclockwise"}: a counter-rotation meant to keep it level needs the same duration, easing and delay as the turn it cancels. If the drift is meant, ignore this.`,
       });
       continue;
     }
@@ -1398,6 +1417,42 @@ ${ANIMATION_HELPERS_JS}
             seen.add("ovr\u0000" + selector);
             out.push({ selector, name: css[i].animationName, overridden: { by: css[j].animationName, props: shared, delayMs: dj, fill: fj, coveredMs: Number.isFinite(overlap) ? Math.round(overlap) : null } });
           }
+        }
+      }
+    }
+    // A counter-rotation that does not cancel its ancestor's turn: a label at -360deg per 5s inside
+    // a dial at 360deg per 4s drifted 18deg/s on screen (round 18).
+    if (out.length < 8) {
+      const turnRate = (node) => {
+        for (const a of node.getAnimations()) {
+          if (typeof CSSAnimation === "undefined" || !(a instanceof CSSAnimation)) continue;
+          const t = a.effect.getComputedTiming();
+          if (t.iterations !== Infinity || !(Number(t.duration) > 0)) continue;
+          const kf = a.effect.getKeyframes();
+          const angle = (k) => {
+            const m = /rotate(?:Z)?\\((-?[\\d.]+)(deg|turn|rad|grad)\\)/.exec(String((k && (k.transform || k.rotate)) || ""));
+            if (!m) return 0;
+            const v = Number(m[1]);
+            return m[2] === "turn" ? v * 360 : m[2] === "rad" ? (v * 180) / Math.PI : m[2] === "grad" ? v * 0.9 : v;
+          };
+          const d = angle(kf[kf.length - 1]) - angle(kf[0]);
+          if (Math.abs(d) < 1) continue;
+          return { rate: (d / Number(t.duration)) * 1000, name: a.animationName, ms: Number(t.duration), deg: d };
+        }
+        return null;
+      };
+      const mine = turnRate(el);
+      if (mine) {
+        for (let p = el.parentElement; p; p = p.parentElement) {
+          const theirs = turnRate(p);
+          if (!theirs) continue;
+          const net = mine.rate + theirs.rate;
+          const selector = stableSelector(el);
+          if (Math.sign(mine.rate) !== Math.sign(theirs.rate) && Math.abs(net) > 0.5 && !seen.has("ctr\u0000" + selector)) {
+            seen.add("ctr\u0000" + selector);
+            out.push({ selector, name: mine.name, counterDrift: { ancestor: stableSelector(p), theirs: theirs.name, mine: { deg: mine.deg, ms: mine.ms }, other: { deg: theirs.deg, ms: theirs.ms }, net } });
+          }
+          break;
         }
       }
     }

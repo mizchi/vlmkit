@@ -1208,7 +1208,13 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         severity: "fail",
         atMs: segments[0]!.startMs,
         message: way
-          ? `it turns ${way} (${Math.round(Math.abs(turnReport!.deg))}° over the frames), not ${options.expectDirection}: a rotate() with the wrong sign`
+          ? `it turns ${way} (${Math.round(Math.abs(turnReport!.deg))}° over the frames), not ${options.expectDirection}: ${
+              sorted.some((x) => x.dom?.turnedBy)
+                ? // A counter-rotation turns the other way by design (round 18's label): its own turn
+                  // is not what is seen, so name the ancestor and the flag that checks what is.
+                  `that is its own turn, against ${sorted.find((x) => x.dom?.turnedBy)!.dom!.turnedBy}'s, which also turns it — a counter-rotation turns the other way on purpose; if it should stay level, --expect-upright checks its angle on screen (and --expect-direction is per target: one value per --selector)`
+                : "a rotate() with the wrong sign"
+            }`
           : `it does not turn (under 10° over the frames), so it does not turn ${options.expectDirection}`,
       });
     }

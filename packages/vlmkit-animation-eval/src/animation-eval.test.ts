@@ -1356,9 +1356,12 @@ test(
     const kinds = async (f: string) => (await runAnimationEval({ source: join(dir, f) })).issues.map((i) => i.kind);
     assert.ok((await kinds("broken/combo.html")).includes("overridden-animation"));
     assert.ok((await kinds("broken/tokens.html")).includes("unitless-duration-var"));
+    assert.ok((await kinds("broken/upright.html")).includes("counter-rotation-drift"));
     for (const f of ["reference/combo.html", "reference/tokens.html", "reference/upright.html"])
       assert.deepEqual(
-        (await kinds(f)).filter((k) => ["overridden-animation", "unitless-duration-var"].includes(k)),
+        (await kinds(f)).filter((k) =>
+          ["overridden-animation", "unitless-duration-var", "counter-rotation-drift"].includes(k),
+        ),
         [],
         f,
       );

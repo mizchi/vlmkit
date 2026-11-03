@@ -101,9 +101,15 @@ the agent said so.
   `--expect-upright` fails `upright-mismatch` when the angle on screen changes by more than 1°, through every
   transform up the tree: `div#dial turns it, and its own counter-rotation does not cancel that turn: give the
   counter-rotation the same duration, easing and delay`. `--expect-still` stays the centre's.
+- **A counter-rotation was blamed on a sign.** With `--expect-direction clockwise` given for both targets, the
+  label failed with `a rotate() with the wrong sign` (upright, default). **Fixed:** when an ancestor turns the
+  target too, the message says its own turn is a counter-rotation against that ancestor's, and points to
+  `--expect-upright`. `check animation` gains `counter-rotation-drift` (warn), measured from both rates:
+  `` #label `turn-back` turns -360° per 5000ms against #dial's `turn` (360° per 4000ms), so on screen it turns
+  18.0°/s clockwise ``.
 - **Smaller ones:**
   - The upright dial overflowed at 375px (its turned box). Both pages now shrink it under 480px.
   - `inspect claims` gave Jev's price as ~$0.0002 a call. Measured, it is ~$0.00013.
 
-`check animation` now has 239 rules. On the 72 other correct animated pages of the repo, none of the five
+`check animation` now has 240 rules. On the 72 other correct animated pages of the repo, none of the six
 rules added in rounds 16-18 fires.

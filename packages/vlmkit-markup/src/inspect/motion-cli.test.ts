@@ -775,6 +775,20 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
     },
   );
 
+  it(
+    "names a counter-rotation, not a wrong sign, when an ancestor turns the target too (round 18)",
+    { timeout: 240_000 },
+    async () => {
+      const label = await run("reference/upright.html", ["--selector", "#label", "--expect-direction", "clockwise"]);
+      assert.match(
+        label.out,
+        /that is its own turn, against div#dial's, which also turns it — a counter-rotation turns the other way on purpose/,
+        label.out,
+      );
+      assert.doesNotMatch(label.out, /wrong sign/, label.out);
+    },
+  );
+
   it("says an empty argument is not a page", () => {
     assert.throws(() => parseMotionArgs(["p.html", "--selector", ".t", "--expect-still", ""]), /empty argument/);
   });

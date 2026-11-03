@@ -121,6 +121,12 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       docs: "Of two animations on one element that animate one property, the later in animation-name wins wherever its fill reaches: a pulse with a both fill held scale(1) through its delay and replaced a toast's whole rise. Animate one with an individual property (translate / scale / rotate), or drop the backwards fill.",
     },
     {
+      id: "counter-rotation-drift",
+      title: "A counter-rotation that does not cancel its ancestor's turn",
+      severity: "warn",
+      docs: "A child turning the other way inside a turning parent at a different rate drifts on screen: a label at -360deg per 5s inside a dial at 360deg per 4s turned 18deg/s. Give the counter-rotation the parent's duration, easing and delay.",
+    },
+    {
       id: "unitless-duration-var",
       title: "A duration var() that resolves to a number with no unit",
       severity: "suspect",
