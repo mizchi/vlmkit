@@ -114,4 +114,5 @@ the correct held-out pages and the example sites.
   off to find that nothing else failed. The rule stays a suspect and the exit code stays 1, as decided before.
   When it is the only suspect, the status line now says so: `status: suspect — only reduced-motion-ignored
   (WCAG 2.3.3, AAA): no other rule fails. If the brief sets no reduced-motion policy, the motion passed;
-  --rule reduced-motion-ignored=off exits 0`.
+  --rule reduced-motion-ignored=off exits 0`. Confirmed with the user on 2026-11-03: the suspect and its exit
+  code stay as they are, and the status line is the fix.

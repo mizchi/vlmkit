@@ -106,3 +106,6 @@ sites.
   announcement that says so. The router skill (`skills/vlmkit/SKILL.md`) now has a "Files it writes"
   section: the ledger, `--ledger` and `--no-ledger`, and where frames and reports go. It also gives the
   status line for a lone `reduced-motion-ignored`.
+
+Confirmed with the user on 2026-11-03: in both cases the behaviour was right and the missing explanation was
+the friction, so the new text settles them.
