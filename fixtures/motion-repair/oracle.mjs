@@ -1,5 +1,5 @@
 // Hidden from the agents: judges a repaired page against its brief.
-// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet|slidein|progress|accordion|dialog|hover|reveal|flip|interrupt|reduced|push|seam|draw|gradient|quote|dismiss|reading|gear|label|popin|rise|ring|hint|ticket|nudge|focus|fadeup|queue> <page.html>
+// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet|slidein|progress|accordion|dialog|hover|reveal|flip|interrupt|reduced|push|seam|draw|gradient|quote|dismiss|reading|gear|label|popin|rise|ring|hint|ticket|nudge|focus|fadeup|queue|lift|turn|boot> <page.html>
 import { chromium } from "playwright";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
@@ -903,6 +903,98 @@ if (kind === "ticket") {
       ok(`row ${k + 1}: rising and fading in at ${k * 80 + 100}ms`, mid.op > 0.2 && mid.op < 0.99 && mid.y > r.y + 0.5 && mid.y < r.y + 12, { mid, r });
       ok(`row ${k + 1}: settled at rest`, r.op > 0.99, r);
     }
+  }
+}
+if (kind === "lift") {
+  const base = await rect("#p2");
+  const finish = () => page.evaluate(() => document.getAnimations().forEach((a) => a.finish()));
+  const covered = (sel) =>
+    page.evaluate((sel) => {
+      const el = document.querySelector(sel);
+      const r = el.getBoundingClientRect();
+      const out = [];
+      for (let i = 0; i <= 10; i++)
+        for (const fx of [0.01, 0.5, 0.99]) {
+          const x = r.x + fx * r.width, y = r.y + 8 + (i / 10) * (r.height - 16);
+          const top = document.elementFromPoint(x, y);
+          if (!top || !el.contains(top)) out.push([Math.round(x), Math.round(y), top?.id || top?.tagName]);
+        }
+      return { w: r.width, h: r.height, covered: out };
+    }, sel);
+  for (const id of ["#p1", "#p2", "#p3"]) {
+    const r0 = await rect(id);
+    await page.mouse.move(r0[0] + r0[2] / 2, r0[1] + r0[3] / 2);
+    if (id === "#p2") {
+      const t = await page.evaluate(() => {
+        const a = document.querySelector("#p2").getAnimations().find((x) => x.transitionProperty === "transform");
+        if (!a) return null;
+        a.pause();
+        a.currentTime = 100;
+        const w = document.querySelector("#p2").getBoundingClientRect().width;
+        return { d: a.effect.getComputedTiming().duration, w };
+      });
+      ok("hover: the lift takes about 200ms and is past half way at 100ms", t && Math.abs(t.d - 200) <= 10 && t.w > base[2] * 1.055 && t.w < base[2] * 1.099, { t, base });
+    }
+    await finish();
+    const c = await covered(id);
+    ok(`${id} lifted: 110% of its size`, Math.abs(c.w - r0[2] * 1.1) <= 2, { c: c.w, r0 });
+    ok(`${id} lifted: no part of it is covered`, c.covered.length === 0, c.covered.slice(0, 6));
+  }
+  await page.mouse.move(5, 5);
+  await finish();
+  const back = await rect("#p2");
+  ok("pointer away: it settles back", JSON.stringify(back) === JSON.stringify(base), { back, base });
+} else if (kind === "turn") {
+  const r0 = await rect("#card");
+  ok("card 360x240 at rest, centred", r0[2] === 360 && r0[3] === 240 && Math.abs(r0[0] + 180 - 640) <= 1, r0);
+  const topIs = (cls) => page.evaluate((cls) => { const t = document.elementFromPoint(640, 400); return !!t?.closest(cls); }, cls);
+  ok("front face up at rest", await topIs(".front"), null);
+  await page.mouse.click(640, 400);
+  const pose = (t) =>
+    page.evaluate((t) => {
+      const el = document.querySelector("#card");
+      const a = el.getAnimations().find((x) => x.transitionProperty === "transform");
+      if (!a) return null;
+      a.pause();
+      a.currentTime = t;
+      const r = el.getBoundingClientRect();
+      return { d: a.effect.getComputedTiming().duration, x: r.x, w: r.width, h: r.height };
+    }, t);
+  const p = [];
+  for (const t of [200, 300, 400]) p.push(await pose(t));
+  ok("one 600ms turn", p[0] && Math.abs(p[0].d - 600) <= 10, p[0]);
+  ok("in depth: on the way the near edge is taller than the card (perspective about 900px)", p[0] && p[0].h > 252 && p[0].h < 300 && p[2].h > 252 && p[2].h < 300, p);
+  ok("edge on half way", p[1] && p[1].w < 40, p[1]);
+  await page.evaluate(() => document.getAnimations().forEach((a) => a.finish()));
+  const r1 = await rect("#card");
+  ok("turned over: flat and upright, the answer up", JSON.stringify(r1) === JSON.stringify(r0) && (await topIs(".back")), r1);
+  await page.mouse.click(640, 400);
+  await page.evaluate(() => document.getAnimations().forEach((a) => a.finish()));
+  ok("a second click turns it back", await topIs(".front"), null);
+} else if (kind === "boot") {
+  const { readFile } = await import("node:fs/promises");
+  const src = await readFile(file, "utf8");
+  ok("the boot utility stays: animations held while the fonts load, then released", /animation-play-state:\s*paused/.test(src) && /fonts\.ready/.test(src) && /is-booting/.test(src), null);
+  await page.waitForTimeout(1200);
+  const real = await page.evaluate(() =>
+    [...document.querySelectorAll(".result")].map((el) => ({ op: Number(getComputedStyle(el).opacity), paused: el.getAnimations().some((a) => a.playState === "paused") })),
+  );
+  ok("by real time 1.2s after load every result is fully shown, nothing held", real.length === 4 && real.every((r) => r.op > 0.99 && !r.paused), real);
+  await page.evaluate(() => {
+    for (const el of document.querySelectorAll(".result")) { el.style.animation = "none"; void el.offsetWidth; el.style.animation = ""; }
+    window.__oAnims = document.getAnimations();
+    for (const a of window.__oAnims) a.pause();
+  });
+  const at2 = (t) =>
+    page.evaluate((t) => {
+      for (const a of window.__oAnims) { a.pause(); a.currentTime = t; }
+      return [...document.querySelectorAll(".result")].map((el) => ({ y: el.getBoundingClientRect().y, op: Number(getComputedStyle(el).opacity) }));
+    }, t);
+  const rest = await at2(2000);
+  for (let k = 0; k < 4; k++) {
+    const s0 = (await at2(k * 80))[k], s1 = (await at2(k * 80 + 160))[k];
+    ok(`result ${k + 1}: starts 16px below and transparent at ${k * 80}ms`, Math.abs(s0.y - (rest[k].y + 16)) <= 1 && s0.op < 0.05, { s0, r: rest[k] });
+    ok(`result ${k + 1}: rising and fading in at ${k * 80 + 160}ms`, s1.op > 0.3 && s1.op < 0.99 && s1.y > rest[k].y + 0.3 && s1.y < rest[k].y + 12, { s1, r: rest[k] });
   }
 }
 await browser.close();

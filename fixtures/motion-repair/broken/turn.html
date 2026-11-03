@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Flashcards</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.5 system-ui, ui-sans-serif, sans-serif; background: #1e1b2e; color: #f5f3ff; }
+  main { display: grid; place-items: center; min-height: 100vh; }
+  .scene { width: 360px; height: 240px; }
+  .card { position: relative; width: 100%; height: 100%; cursor: pointer; perspective: 900px; transform-style: preserve-3d; transition: transform 600ms ease-in-out; }
+  .card.flipped { transform: rotateY(180deg); }
+  .face { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 16px; backface-visibility: hidden; font-size: 28px; font-weight: 600; }
+  .front { background: #6d28d9; }
+  .back { background: #f5f3ff; color: #1e1b2e; transform: rotateY(180deg); }
+  p { text-align: center; color: #c4b5fd; margin-top: 16px; }
+</style></head>
+<body>
+  <main>
+    <div>
+      <div class="scene"><div class="card" id="card"><div class="face front">der Apfel</div><div class="face back">the apple</div></div></div>
+      <p>Click the card to turn it over</p>
+    </div>
+  </main>
+  <script>document.getElementById("card").addEventListener("click", (e) => e.currentTarget.classList.toggle("flipped"));</script>
+</body></html>

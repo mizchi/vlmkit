@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Search results</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, ui-sans-serif, sans-serif; background: #fff; color: #111827; }
+  main { max-width: 720px; margin: 48px auto; padding: 0 24px; }
+  h1 { font-size: 20px; margin: 0 0 20px; }
+  /* Shared boot utility: hold every animation until the web fonts are in, so nothing animates in a fallback face. */
+  .is-booting * { animation-play-state: paused !important; }
+  .result { padding: 16px 0; border-bottom: 1px solid #e5e7eb; animation: result-in 400ms ease-out both; }
+  .result:nth-child(2) { animation-delay: 80ms; }
+  .result:nth-child(3) { animation-delay: 160ms; }
+  .result:nth-child(4) { animation-delay: 240ms; }
+  .result a { color: #1d4ed8; font-size: 17px; text-decoration: none; }
+  .result p { margin: 4px 0 0; color: #4b5563; }
+  @keyframes result-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+</style></head>
+<body class="is-booting">
+  <main>
+    <h1>Results for “tide tables”</h1>
+    <ol style="list-style: none; padding: 0; margin: 0;">
+      <li class="result"><a href="#">Tide tables for the north coast</a><p>Daily high and low water for 42 harbours.</p></li>
+      <li class="result"><a href="#">How tides are predicted</a><p>Harmonic constituents and what they mean.</p></li>
+      <li class="result"><a href="#">Spring and neap tides explained</a><p>Why the range changes over a month.</p></li>
+      <li class="result"><a href="#">Download tide data (CSV)</a><p>Ten years of hourly readings.</p></li>
+    </ol>
+  </main>
+  <script>
+    // Boot utility: release the held animations once the fonts are ready.
+    document.fonts.ready.then(() => document.body.classList.remove("booting"));
+  </script>
+</body></html>

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Plans</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, ui-sans-serif, sans-serif; background: #eef0f4; color: #1f2937; }
+  main { max-width: 960px; margin: 96px auto; padding: 0 24px; }
+  h1 { font-size: 22px; margin: 0 0 24px; }
+  .plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .plan { background: #fff; border: 1px solid #cfd5df; border-radius: 12px; padding: 24px; min-height: 280px; transform: translateY(0); transition: transform 200ms ease-out, box-shadow 200ms ease-out; }
+  .plan:hover { transform: scale(1.1); box-shadow: 0 18px 44px rgba(15, 23, 42, 0.22); }
+  .plan h2 { margin: 0 0 4px; font-size: 18px; }
+  .plan .price { font-size: 30px; font-weight: 700; margin: 12px 0; }
+  .plan ul { margin: 0; padding-left: 18px; color: #4b5563; }
+</style></head>
+<body>
+  <main>
+    <h1>Choose a plan</h1>
+    <div class="plans">
+      <section class="plan" id="p1"><h2>Starter</h2><div class="price">$0</div><ul><li>1 project</li><li>Community support</li></ul></section>
+      <section class="plan" id="p2"><h2>Team</h2><div class="price">$24</div><ul><li>10 projects</li><li>Shared workspaces</li><li>Email support</li></ul></section>
+      <section class="plan" id="p3"><h2>Business</h2><div class="price">$79</div><ul><li>Unlimited projects</li><li>SSO</li><li>Priority support</li></ul></section>
+    </div>
+  </main>
+</body></html>
