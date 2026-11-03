@@ -123,6 +123,8 @@ export interface MotionCheckOptions {
    * first target's (or its --expect-start) plus k times this.
    */
   expectStaggerMs?: number;
+  /** Device pixels per CSS px in the frames (a 2x capture): the frame's size in CSS px is its size over this. */
+  frameScale?: number;
   /** How long one run takes (ms) and how many runs (null: infinite): one for all, or per target. */
   expectDurationMs?: readonly number[];
   expectIterations?: readonly (number | null)[];
@@ -234,7 +236,8 @@ export async function checkMotionFrames(
     options.jev === false
       ? frames.map((frame): MotionFrameAnswer => {
           const img = decodeImage(Buffer.from(frame.png));
-          frameSize ??= { width: img.width, height: img.height };
+          const k = options.frameScale ?? 1;
+          frameSize ??= { width: Math.round(img.width / k), height: Math.round(img.height / k) };
           return {
             atMs: frame.atMs,
             rest: frame.atMs > options.endMs,
@@ -363,6 +366,11 @@ export async function checkMotionFrames(
     (options.expectStaggerMs !== undefined && i > 0 && staggerFrom !== undefined
       ? staggerFrom + i * options.expectStaggerMs
       : undefined);
+  // Where an expected start comes from, for the fail to say: "not 80ms" named no flag (round 15).
+  const startFrom = (i: number) =>
+    options.expectStartMs?.[i] !== undefined
+      ? `--expect-start ${Math.round(options.expectStartMs[i]!)}`
+      : `${options.expectStartMs?.[0] !== undefined ? `--expect-start ${Math.round(options.expectStartMs[0])}` : `the first target's measured start ${Math.round(staggerFrom!)}ms`} + ${i} × --expect-stagger ${Math.round(options.expectStaggerMs!)}`;
   const targets = options.targets.map((target, i) => {
     const measured = frames.every((f) => f.dom?.[i]);
     const samples: MotionSample[] = answers.map((f) => ({
@@ -384,7 +392,7 @@ export async function checkMotionFrames(
           ? { expectEasing: (options.targetEasing?.[i] ?? options.expectEasing)! }
           : {}),
         ...(originFor(i) ? { expectOrigin: originFor(i)! } : {}),
-        ...(startFor(i) !== undefined ? { expectStartMs: startFor(i)! } : {}),
+        ...(startFor(i) !== undefined ? { expectStartMs: startFor(i)!, expectStartFrom: startFrom(i) } : {}),
         ...(perTarget(options.expectDurationMs, i) !== undefined
           ? { expectDurationMs: perTarget(options.expectDurationMs, i)! }
           : {}),

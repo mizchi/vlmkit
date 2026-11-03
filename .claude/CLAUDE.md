@@ -463,7 +463,12 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   move"; `check animation`'s `duplicate-keyframes` (suspect), `negative-delay-entrance` and `held-filter`
   (warn), 233 rules, none firing on the repo's 72 other animated pages; an expectation checked on some
   targets is held and names the others; numbers in computed styles take exponents (`1.2e-05px` read as 5px);
-  `diff png` counts pixels that differ under the threshold (`below:`, `belowThreshold`).
+  `diff png` counts pixels that differ under the threshold (`below:`, `belowThreshold`). Its deferred items:
+  a region at most 8/255 off with no shift is a faint in-place `color-change` (a filter step read
+  `layout-shift`); a page whose animations move nothing reads `reduced-motion: nothing to reduce`, not
+  `honored`; `inspect motion` warns `duplicate-keyframes` with no `--expect-*` when the rules of one name
+  animate different properties; a start-mismatch names the flags its time comes from; `--device-scale <n>`
+  (not with `--jev`) shoots at that scale.
 
 ## Generated figures (raster images)
 

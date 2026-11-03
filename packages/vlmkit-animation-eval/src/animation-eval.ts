@@ -301,6 +301,13 @@ export interface AnimationEvalReport {
   reducedMotion?: {
     remainingCount: number;
     remaining: ReducedMotionRemaining[];
+    /**
+     * Nothing that moves runs without the preference either (only opacity, colour, visibility):
+     * there was no motion to reduce, so the pass is not "honored" by any choice of the page's.
+     */
+    nothingToReduce?: boolean;
+    /** With `nothingToReduce`: the fades / colour animations that still run under reduce, as allowed. */
+    fadesUnderReduce?: number;
   };
   /** `animation-name`s with no @keyframes: nothing ran under them (`reducedMotion`: only under reduce). */
   undefinedKeyframes?: { selector: string; name: string; reducedMotion: boolean }[];
@@ -517,7 +524,7 @@ export interface DeriveIssuesInput {
   evaluated: EvaluatedAnimation[];
   settleMs: number | null;
   infinite: { selector: string; name: string; indicator?: string }[];
-  reducedMotion?: { remainingCount: number; remaining: ReducedMotionRemaining[] };
+  reducedMotion?: AnimationEvalReport["reducedMotion"];
   uncontrolledMotion?: FrameDeltaStat;
   virtualTime?: boolean;
   clockMotion?: ClockMotion;
@@ -2262,7 +2269,19 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
           });
         }
       }
-      reducedMotion = { remainingCount: remaining.length, remaining };
+      // Nothing that moves ran without the preference either: "honored" claimed a choice the page
+      // never made (a fade-only card on a page with no prefers-reduced-motion rule, round 15).
+      const moves = (t: { properties?: string[] }) =>
+        !t.properties || t.properties.length === 0 || t.properties.some((p) => !NOT_MOTION.has(p));
+      const nothingToReduce = remaining.length === 0 && !timings.some(moves) && !clockMotion?.visible;
+      const fadesUnderReduce = rmTimings.filter(
+        (t) => t.playState !== "idle" && t.durationMs >= durationFloor && !moves(t),
+      ).length;
+      reducedMotion = {
+        remainingCount: remaining.length,
+        remaining,
+        ...(nothingToReduce ? { nothingToReduce: true, fadesUnderReduce } : {}),
+      };
     }
 
     const key = (u: { selector: string; name: string }) => `${u.selector}\u0000${u.name}`;
@@ -2356,9 +2375,11 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
   }
   if (report.reducedMotion) {
     lines.push(
-      report.reducedMotion.remainingCount === 0
-        ? `reduced-motion: honored${report.issues.some((i) => i.kind === "reduced-motion-hides") ? ` — but ${report.issues.filter((i) => i.kind === "reduced-motion-hides").length} element(s) rest hidden or out of place under it${ruleTag("reduced-motion-hides")}` : ""}`
-        : `reduced-motion: ${report.reducedMotion.remainingCount} animation(s) still running${ruleTag("reduced-motion-ignored")}`,
+      report.reducedMotion.nothingToReduce
+        ? `reduced-motion: nothing to reduce — no animation here moves anything (only opacity, colour or visibility)${report.reducedMotion.fadesUnderReduce ? `, and the ${report.reducedMotion.fadesUnderReduce} that run still run under reduce, which the preference allows` : ""}; not a sign the page has a prefers-reduced-motion rule`
+        : report.reducedMotion.remainingCount === 0
+          ? `reduced-motion: honored${report.issues.some((i) => i.kind === "reduced-motion-hides") ? ` — but ${report.issues.filter((i) => i.kind === "reduced-motion-hides").length} element(s) rest hidden or out of place under it${ruleTag("reduced-motion-hides")}` : ""}`
+          : `reduced-motion: ${report.reducedMotion.remainingCount} animation(s) still running${ruleTag("reduced-motion-ignored")}`,
     );
   }
   if (report.uncontrolledMotion) {

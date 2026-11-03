@@ -29,6 +29,20 @@ describe("classifyVisualDiff", () => {
     assert.match(result.summary, /1 render-noise/);
   });
 
+  it("calls a region a few levels off with no shift a faint in-place change, not an added element (round 15)", () => {
+    const diff = makeDiff([
+      { x: 288, y: 160, width: 704, height: 480, diffPixelCount: 32074, regionType: "content", maxChannelDelta: 1 },
+      { x: 0, y: 0, width: 1280, height: 200, diffPixelCount: 90000, regionType: "shift", maxChannelDelta: 3 },
+    ]);
+    const result = classifyVisualDiff(diff);
+    assert.deepEqual(
+      result.changes.map((c) => c.type),
+      ["color-change", "color-change"],
+    );
+    assert.match(result.changes[0].description, /Faint in-place change .* 1\/255 and nothing moved/);
+    assert.doesNotMatch(result.summary, /layout-shift|element-added/);
+  });
+
   it("should classify small square as icon-change", () => {
     const diff = makeDiff([{ x: 10, y: 10, width: 32, height: 32, diffPixelCount: 800 }]);
     const result = classifyVisualDiff(diff);

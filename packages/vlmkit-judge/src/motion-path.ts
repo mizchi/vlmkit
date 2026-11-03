@@ -274,6 +274,8 @@ export interface MotionPathOptions {
   expectOrigin?: OriginName;
   /** When its own animation must begin (page ms): measured from the element's animation time. */
   expectStartMs?: number;
+  /** Where `expectStartMs` comes from, named in a start-mismatch ("--expect-start 0 + 1 × --expect-stagger 80"). */
+  expectStartFrom?: string;
   /** Which way the first segment's motion must go. */
   expectDirection?: MotionDirection;
   /** How long one run must take (ms), and how many runs (null: infinite). */
@@ -313,7 +315,8 @@ export type MotionRule =
   | "inert-offset"
   | "hidden-at-once"
   | "target-unchanged"
-  | "held-filter";
+  | "held-filter"
+  | "duplicate-keyframes";
 
 export interface MotionFinding {
   rule: MotionRule;
@@ -992,7 +995,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         rule: "start-mismatch",
         severity: "fail",
         atMs: startsAtMs,
-        message: `its animation begins at ${ms(startsAtMs)}, not ${ms(options.expectStartMs)}: ${startsAtMs < options.expectStartMs ? "early" : "late"} by ${ms(Math.abs(startsAtMs - options.expectStartMs))} — its animation-delay (or when the animation is added) decides it`,
+        message: `its animation begins at ${ms(startsAtMs)}, not ${ms(options.expectStartMs)}${options.expectStartFrom ? ` (${options.expectStartFrom})` : ""}: ${startsAtMs < options.expectStartMs ? "early" : "late"} by ${ms(Math.abs(startsAtMs - options.expectStartMs))} — its animation-delay (or when the animation is added) decides it`,
       });
     }
   }
@@ -1298,6 +1301,20 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         sorted.find((x) => x.dom?.inertOffsets)?.dom?.inertOffsets ??
         "its animation is not applying (a dropped rule, a misspelt animation-name)"
       }`,
+    });
+  }
+
+  // A @keyframes name more than one rule defines, whose rules animate different things: the later
+  // one wins and the other's motion never runs. Said without an --expect-*: a rise that never happens
+  // read only "travels 0px" while its fade passed every rule (round 15).
+  const dupAt = sorted.find((x) => x.dom?.dupKeyframes);
+  if (dupAt && !findings.some((f) => f.message.includes(dupAt.dom!.dupKeyframes!))) {
+    const travelled = geo.length >= 2 ? Math.max(...geo.map((p) => dist(p, geo[0]!))) : undefined;
+    findings.push({
+      rule: "duplicate-keyframes",
+      severity: "warn",
+      atMs: dupAt.atMs,
+      message: `${dupAt.dom!.dupKeyframes!}${travelled !== undefined ? ` (here it travels ${Math.round(travelled)}px)` : ""}`,
     });
   }
 

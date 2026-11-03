@@ -34,6 +34,9 @@ export function classifyVisualDiff(diff: VrtDiff): VisualSemanticDiff {
   };
 }
 
+/** Max per-channel delta at or under which a region is a faint in-place change. */
+export const FAINT_CHANNEL_DELTA = 8;
+
 function classifyRegion(region: DiffRegion, diff: VrtDiff): VisualSemanticChange {
   // Edge rendering only (antialiasing, compositing) and nothing moved: not a change of
   // content. Two rest captures of one page read "4 element-added, 1 icon-change" (round 5).
@@ -60,6 +63,19 @@ function classifyRegion(region: DiffRegion, diff: VrtDiff): VisualSemanticChange
       region,
       confidence: s.confidence,
       description: describeShift(region, isReflow),
+    };
+  }
+
+  // A region whose pixels differ by a few levels at most, with no measured
+  // translation, is the same content drawn a little differently (a sub-pixel
+  // filter, an opacity a step off): nothing was added and nothing moved. A
+  // filter-only step read "1 layout-shift" / "1 element-added" (round 15).
+  if (!region.shift && region.maxChannelDelta !== undefined && region.maxChannelDelta <= FAINT_CHANNEL_DELTA) {
+    return {
+      type: "color-change",
+      region,
+      confidence: 0.6,
+      description: `Faint in-place change at (${region.x}, ${region.y}), ${region.width}x${region.height}: no pixel differs by more than ${region.maxChannelDelta}/255 and nothing moved — the same content drawn a little differently (a filter, opacity or compositing step), not an element added or moved`,
     };
   }
 

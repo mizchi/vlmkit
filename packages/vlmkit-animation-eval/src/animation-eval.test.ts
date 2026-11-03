@@ -1264,3 +1264,25 @@ test(
     assert.match(broken.issues[0]!.message, /`animation-timeline` has to come after the `animation` shorthand/);
   },
 );
+
+test(
+  "runAnimationEval: a fade-only page with no reduced-motion rule is 'nothing to reduce', not 'honored' (round 15)",
+  { timeout: 120_000 },
+  async () => {
+    const fade = await evaluate(
+      "@keyframes fade { from { opacity: 0; } to { opacity: 1; } } #a { animation: fade 400ms ease-out both; }",
+    );
+    assert.equal(fade.reducedMotion?.remainingCount, 0);
+    assert.equal(fade.reducedMotion?.nothingToReduce, true);
+    assert.equal(fade.reducedMotion?.fadesUnderReduce, 1);
+    const text = formatAnimationEvalReport(fade);
+    assert.match(text, /reduced-motion: nothing to reduce — no animation here moves anything/);
+    assert.doesNotMatch(text, /reduced-motion: honored/);
+    // A slide the page does take away under reduce is still honored.
+    const slide = await evaluate(
+      "#a { animation: slide 400ms ease-out both; } @media (prefers-reduced-motion: reduce) { #a { animation: none; } }",
+    );
+    assert.equal(slide.reducedMotion?.nothingToReduce, undefined);
+    assert.match(formatAnimationEvalReport(slide), /reduced-motion: honored/);
+  },
+);

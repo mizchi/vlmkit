@@ -351,7 +351,13 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
     `${report.animationCount} animation(s),` +
     ` settle ${report.settleMs === null ? "never" : `${Math.round(report.settleMs)}ms`},` +
     ` reduced-motion ${
-      report.reducedMotion ? (report.reducedMotion.remainingCount === 0 ? "honored" : "IGNORED") : "n/a"
+      report.reducedMotion
+        ? report.reducedMotion.nothingToReduce
+          ? "nothing to reduce"
+          : report.reducedMotion.remainingCount === 0
+            ? "honored"
+            : "IGNORED"
+        : "n/a"
     }`,
   ledger: (report, options) => ({
     tool: "check-animation",

@@ -265,6 +265,8 @@ vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ea
   as "the first fail's own frame" — a thinned strip can skip it; `easing-mismatch` = the timing function;
   `target-static` = nothing about it animates (a dropped rule, a misspelt name). The command
   prints the strip line to look at (cropped to where the targets move); open single frames for detail.
+  A sub-pixel effect (a 0.6px blur held at rest) can draw as nothing at 1x: `held-filter` names it
+  from the computed style, and `--device-scale 2` shoots the frames as a 2x screen shows them.
 - **Where and when are in the brief too: say them.** Every line names when the target's own
   animation begins and, for a scale, the point it grows from — but only an expectation fails on
   them. A popover that must grow out of its button: `--expect-origin bottom-left`

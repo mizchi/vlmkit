@@ -341,7 +341,13 @@ export async function measureTargets(
         for (const a of el.getAnimations()) {
           const name = (a as CSSAnimation).animationName;
           const defs = name ? kfDefs.get(name) : undefined;
-          if (defs && defs.length > 1 && !dupKeyframes)
+          if (
+            defs &&
+            defs.length > 1 &&
+            !dupKeyframes &&
+            // Rules that animate the same properties are a redefinition, not a lost motion.
+            new Set(defs.map((d) => [...d].sort().join(","))).size > 1
+          )
             dupKeyframes = `\`${name}\` is defined by ${defs.length} @keyframes rules (${defs.map((d, i) => `#${i + 1} animates ${d.join(", ") || "nothing"}`).join("; ")}): the last one in the cascade wins, so the others never run — give each its own name`;
           const fill = a.effect?.getComputedTiming().fill;
           const kf = (a.effect as KeyframeEffect | null)?.getKeyframes?.() ?? [];
@@ -777,6 +783,8 @@ an easing is checked on each channel that changes.
                           the page's own spans of motion
   --start <ms> --end <ms> The motion's span (needed for frames.json): one segment
   --viewport <WxH>        Default 1280x800
+  --device-scale <n>      Device pixels per CSS px, 1-4 (default 1): a 0.6px blur draws as no blur
+                          at 1x and may show at 2x. --selector targets only (not with --jev)
   --frames <dir>          (or --out) Where the frames go (default test-results/inspect-motion/<page name>, so
                           two pages, or check animation's frames, do not overwrite each other)
   --threshold <0-1>       A statement is true at or above this (default 0.5)
@@ -826,6 +834,8 @@ export interface MotionCliOptions {
   startMs?: number;
   endMs?: number;
   viewport: { width: number; height: number };
+  /** Device pixels per CSS px for every page and frame (`--device-scale`). */
+  deviceScale: number;
   frames: string;
   threshold: number;
   json: boolean;
@@ -875,6 +885,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   let startMs: number | undefined;
   let endMs: number | undefined;
   let viewport = { width: 1280, height: 800 };
+  let deviceScale = 1;
   let frames: string | undefined;
   let threshold = 0.5;
   let json = false;
@@ -1009,6 +1020,13 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
       case "--end":
         endMs = one(a, value(a, argv[++i]));
         break;
+      case "--device-scale": {
+        const v = Number(value(a, argv[++i]));
+        if (!(v >= 1 && v <= 4))
+          throw new MotionUsageError(`--device-scale takes a number from 1 to 4, got ${argv[i]}`);
+        deviceScale = v;
+        break;
+      }
       case "--viewport": {
         const m = /^(\d+)x(\d+)$/.exec(value(a, argv[++i]));
         if (!m) throw new MotionUsageError(`--viewport takes WxH, got ${argv[i]}`);
@@ -1126,6 +1144,10 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
         `${xs.length} ${flag} values for ${targets.length} targets: one for all, or one per target`,
       );
   }
+  if (deviceScale !== 1 && jev)
+    throw new MotionUsageError(
+      "--device-scale is for --selector targets: Jev's boxes are read in frame pixels, so leave out --jev",
+    );
   if (expectStaggerMs !== undefined && targets.length < 2)
     throw new MotionUsageError("--expect-stagger compares targets: give two or more, in the order they begin");
   const fromFrames = /(^|\/)frames\.json$/.test(positional[0]!);
@@ -1168,6 +1190,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
     ...(startMs !== undefined ? { startMs } : {}),
     ...(endMs !== undefined ? { endMs } : {}),
     viewport,
+    deviceScale,
     // Named by the page: a second page, or a frames.json read back, kept its own frames apart.
     frames:
       frames ??
@@ -1463,7 +1486,7 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
     await import("@mizchi/vlmkit-animation-eval/frames-capture.ts");
   const url = sourceToUrl(o.source);
   return withBrowser(async (browser) => {
-    let page = await browser.newPage({ viewport: o.viewport, deviceScaleFactor: 1 });
+    let page = await browser.newPage({ viewport: o.viewport, deviceScaleFactor: o.deviceScale });
     try {
       let timeline = await openHeldTimeline(page, url);
       let held = await timeline.animations();
@@ -1631,7 +1654,7 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
         // at 200ms read unchanged at every frame of --at 150..300/1f, round 13).
         if (held.length > 0 || ranTo !== null) {
           await page.close();
-          page = await browser.newPage({ viewport: o.viewport, deviceScaleFactor: 1 });
+          page = await browser.newPage({ viewport: o.viewport, deviceScaleFactor: o.deviceScale });
           timeline = await openHeldTimeline(page, url);
         }
       }
@@ -2109,6 +2132,7 @@ export function formatMotionReport(
   captured: Captured,
   r: MotionCheckReport,
   forbid: readonly string[] = [],
+  deviceScale = 1,
 ): string {
   const lines: string[] = [];
   const restCount = captured.frames.filter((f) => f.atMs > captured.endMs).length;
@@ -2334,7 +2358,11 @@ export function formatMotionReport(
     const h = cy1 - cy0;
     // Under three quarters of the frame: a panel sliding across the right half (556x800) got no
     // crop on the broken page and one on the fixed (round 7).
-    if (w > 0 && h > 0 && w * h < 0.75 * vw * vh) crop = ` --crop ${cx0},${cy0},${w},${h}`;
+    if (w > 0 && h > 0 && w * h < 0.75 * vw * vh) {
+      // The strip crops frame pixels: at --device-scale 2 a CSS box is twice the size.
+      const k = deviceScale;
+      crop = ` --crop ${cx0 * k},${cy0 * k},${w * k},${h * k}`;
+    }
   }
   lines.push(
     `  look at the frames: vlmkit snapshot strip --manifest ${captured.manifest} --max-frames 6 --columns 3${crop} --out ${join(dirname(captured.manifest), "strip.png")}`,
@@ -2377,7 +2405,7 @@ async function scrollSweep(o: MotionCliOptions): Promise<number | null> {
     await import("@mizchi/vlmkit-animation-eval/frames-capture.ts");
   const url = sourceToUrl(o.source);
   return withBrowser(async (browser) => {
-    const page = await browser.newPage({ viewport: o.viewport, deviceScaleFactor: 1 });
+    const page = await browser.newPage({ viewport: o.viewport, deviceScaleFactor: o.deviceScale });
     try {
       await page.goto(url, { waitUntil: "load" });
       const driven = await page.evaluate((sels) => {
@@ -2664,6 +2692,7 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
     exits: o.exits || leaveExits,
     ...(o.exitSelectors.length > 0 ? { exitsFor: o.selectors.map((sel) => o.exitSelectors.includes(sel)) } : {}),
     jev: o.jev,
+    ...(o.deviceScale !== 1 ? { frameScale: o.deviceScale } : {}),
     ...motionEasingOptions(o.expectEasing),
     ...(o.expectOrigin ? { expectOrigin: o.expectOrigin.length === 1 ? o.expectOrigin[0]! : o.expectOrigin } : {}),
     ...(o.expectStartMs ? { expectStartMs: o.expectStartMs } : {}),
@@ -2736,7 +2765,7 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
   await writeFile(saved, `${JSON.stringify(json, null, 2)}\n`);
   if (o.json) console.log(JSON.stringify(json, null, 2));
   else {
-    const lines = formatMotionReport(o.source, captured, r, o.forbid).split("\n");
+    const lines = formatMotionReport(o.source, captured, r, o.forbid, o.deviceScale).split("\n");
     if (leaveExits)
       lines.splice(
         1,

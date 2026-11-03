@@ -113,3 +113,27 @@ sites. The motion tests (182, the held-out 25 included) pass.
   which flag the 80ms comes from.
 - `inspect motion` has no device-scale option. A 0.6px blur that draws as nothing at 1x may show on a 2x
   screen.
+
+## Deferred, and fixed after the round
+
+- **A filter-only step is not a layout shift.** A region with no measured translation whose pixels differ by
+  at most `FAINT_CHANNEL_DELTA` (8/255) is `color-change`, described as a faint in-place change: `no pixel
+  differs by more than 1/255 and nothing moved`. The focus card's 599 → 600ms step read `1 layout-shift` /
+  `1 element-added` at a low threshold. At the default threshold no region is that faint, so nothing
+  else changes.
+- **"Nothing to reduce", not "honored".** When nothing that moves runs without the preference either
+  (only opacity, colour or visibility, and no script-driven motion), `check animation` says `reduced-motion:
+  nothing to reduce — no animation here moves anything …; not a sign the page has a prefers-reduced-motion
+  rule`. The report carries `nothingToReduce` and `fadesUnderReduce`, and the headline says `nothing to
+  reduce`. A page that takes a slide away under reduce still reads `honored`.
+- **A rise that never happens is said without an `--expect-*` flag.** `inspect motion` warns
+  `duplicate-keyframes` when the target's own animation is a name that rules animating different properties
+  define: `` `fade-up` is defined by 2 @keyframes rules (#1 animates opacity, transform; #2 animates opacity)
+  … (here it travels 0px) ``. Rules that animate the same properties are a redefinition and are not named.
+  The warning is dropped when a fail already quotes it.
+- **A start-mismatch names where its expected time comes from.** For example, `begins at 200ms, not 280ms
+  (the first target's measured start 200ms + 1 × --expect-stagger 80)`, or `not 0ms (--expect-start 0)`.
+- **`inspect motion --device-scale <n>`** (1-4) shoots every page and frame at that device scale.
+  `frames.json` records it, and the strip's `--crop` hint is in frame pixels. Positions stay in CSS px. Jev's
+  boxes are read in frame pixels, so the flag is refused with `--jev`. At 2x the focus card's held blur is
+  named the same way.

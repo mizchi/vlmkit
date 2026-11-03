@@ -368,12 +368,12 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
         "--expect-stagger",
         "60",
       ],
-      /FAIL start-mismatch .*begins at 420ms, not 240ms/,
+      /FAIL start-mismatch .*begins at 420ms, not 240ms \(--expect-start 240\)/,
     ],
     [
       "chips.html",
       ["--selector", ".chips", "--expect-start", "0"],
-      /FAIL start-mismatch .*begins at 1200ms, not 0ms: late by 1200ms/,
+      /FAIL start-mismatch .*begins at 1200ms, not 0ms \(--expect-start 0\): late by 1200ms/,
     ],
     // Round 3: an ancestor's opacity 0 named, a scale's fixed point, and a stagger that is not one.
     [
@@ -400,7 +400,7 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
         "--expect-stagger",
         "80",
       ],
-      /FAIL start-mismatch .*begins at 200ms, not 280ms.*; set by `li:nth-child\(2\) \{ animation-delay: 200ms \}`[\s\S]*begins: li\.a1 200ms, li\.a2 200ms, li\.a3 200ms, li\.a4 200ms — all within one frame/,
+      /FAIL start-mismatch .*begins at 200ms, not 280ms \(the first target's measured start 200ms \+ 1 × --expect-stagger 80\).*; set by `li:nth-child\(2\) \{ animation-delay: 200ms \}`[\s\S]*begins: li\.a1 200ms, li\.a2 200ms, li\.a3 200ms, li\.a4 200ms — all within one frame/,
     ],
     [
       "stagger.html",
@@ -599,6 +599,36 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
       assert.doesNotMatch(sharp.out, /held-filter|channel-step/, sharp.out);
     },
   );
+
+  it(
+    "warns on a @keyframes name defined twice with no --expect-*, and shoots at --device-scale 2 (round 15 deferred)",
+    { timeout: 240_000 },
+    async () => {
+      const rise = await run("broken/fadeup.html", ["--selector", "#n1"]);
+      assert.match(
+        rise.out,
+        /warn duplicate-keyframes .*`fade-up` is defined by 2 @keyframes rules .*\(here it travels 0px\)/,
+        rise.out,
+      );
+      const fixed = await run("reference/fadeup.html", ["--selector", "#n1"]);
+      assert.doesNotMatch(fixed.out, /duplicate-keyframes/, fixed.out);
+      const sharp = await run("broken/focus.html", ["--selector", ".hero", "--device-scale", "2"]);
+      assert.match(sharp.out, /warn held-filter/, sharp.out);
+      const manifest = /--manifest (\S+frames\.json)/.exec(sharp.out)![1]!;
+      const { readFile } = await import("node:fs/promises");
+      assert.equal(JSON.parse(await readFile(manifest, "utf8")).source.deviceScaleFactor, 2);
+    },
+  );
+
+  it("takes --device-scale 1-4 and refuses it with --jev", () => {
+    assert.equal(parseMotionArgs(["p.html", "--selector", ".t", "--device-scale", "2"]).deviceScale, 2);
+    assert.equal(parseMotionArgs(["p.html", "--selector", ".t"]).deviceScale, 1);
+    assert.throws(() => parseMotionArgs(["p.html", "--selector", ".t", "--device-scale", "9"]), /1 to 4/);
+    assert.throws(
+      () => parseMotionArgs(["p.html", "--jev", "--target", "the card", "--device-scale", "2"]),
+      /leave out --jev/,
+    );
+  });
 
   it("takes --no-ledger, and prints a usage error without the whole help", async () => {
     assert.doesNotThrow(() => parseMotionArgs(["p.html", "--selector", ".t", "--no-ledger"]));
