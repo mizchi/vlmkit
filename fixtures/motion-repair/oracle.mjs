@@ -1,5 +1,5 @@
 // Hidden from the agents: judges a repaired page against its brief.
-// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet|slidein|progress|accordion|dialog|hover|reveal|flip|interrupt|reduced|push|seam|draw|gradient|quote|dismiss|reading|gear|label|popin|rise|ring|hint|ticket|nudge|focus|fadeup|queue|lift|turn|boot> <page.html>
+// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet|slidein|progress|accordion|dialog|hover|reveal|flip|interrupt|reduced|push|seam|draw|gradient|quote|dismiss|reading|gear|label|popin|rise|ring|hint|ticket|nudge|focus|fadeup|queue|lift|turn|boot|stepper|meter|guard> <page.html>
 import { chromium } from "playwright";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
@@ -8,6 +8,7 @@ const [kind, file] = process.argv.slice(2);
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 if (kind === "reduced") await page.emulateMedia({ reducedMotion: "reduce" });
+else await page.emulateMedia({ reducedMotion: "no-preference" });
 await page.goto(pathToFileURL(resolve(file)).href);
 const at = (t) =>
   page.evaluate((t) => {
@@ -1005,6 +1006,61 @@ if (kind === "lift") {
     const s0 = (await at2(k * 80))[k], s1 = (await at2(k * 80 + 160))[k];
     ok(`result ${k + 1}: starts 16px below and transparent at ${k * 80}ms`, Math.abs(s0.y - (rest[k].y + 16)) <= 1 && s0.op < 0.05, { s0, r: rest[k] });
     ok(`result ${k + 1}: rising and fading in at ${k * 80 + 160}ms`, s1.op > 0.3 && s1.op < 0.99 && s1.y > rest[k].y + 0.3 && s1.y < rest[k].y + 12, { s1, r: rest[k] });
+  }
+}
+if (kind === "stepper" || kind === "meter" || kind === "guard") {
+  const sel = { stepper: "#panel", meter: "#fill", guard: "#hero" }[kind];
+  await page.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    el.style.animation = "none";
+    void el.offsetWidth;
+    el.style.animation = "";
+    window.__oAnims = el.getAnimations();
+    for (const a of window.__oAnims) a.pause();
+  }, sel);
+  const at3 = (t) =>
+    page.evaluate(
+      ({ t, sel }) => {
+        for (const a of window.__oAnims) { a.pause(); a.currentTime = t; }
+        const el = document.querySelector(sel);
+        const r = el.getBoundingClientRect();
+        return { x: r.x, y: r.y, w: r.width, h: r.height, op: Number(getComputedStyle(el).opacity), n: window.__oAnims.length };
+      },
+      { t, sel },
+    );
+  const d = await page.evaluate(() => Math.max(0, ...window.__oAnims.map((a) => a.effect.getComputedTiming().endTime)));
+  if (kind === "stepper") {
+    ok("one 600ms entrance", Math.abs(d - 600) <= 10, d);
+    const xs = [];
+    for (const t of [0, 40, 80, 120, 160, 200, 300, 599]) xs.push(await at3(t));
+    const rest = await at3(600);
+    ok("at rest: flush with the left edge, opaque, 320px wide", Math.abs(rest.x) <= 1 && rest.op > 0.99 && Math.abs(rest.w - 320) <= 1, rest);
+    ok("starts 320px beyond the left edge, transparent", Math.abs(xs[0].x + 320) <= 2 && xs[0].op < 0.05, xs[0]);
+    ok("glides: a different place at every 40ms of the first 200ms (no steps)", xs.slice(0, 6).every((p, i) => i === 0 || p.x > xs[i - 1].x + 0.5), xs.map((p) => Math.round(p.x)));
+    ok("slowing as it arrives: a third of the way at 160ms of 600 (ease-out, not linear)", xs[4].x > -320 + 0.33 * 320 && xs[4].x < -1, xs[4]);
+  } else if (kind === "meter") {
+    const track = await rect(".track");
+    ok("one 800ms fill", Math.abs(d - 800) <= 10, d);
+    const r0 = await at3(0), r1 = await at3(260), rest = await at3(800);
+    ok("at rest: the bar is 72% of the track and as tall as it", Math.abs(rest.w - 0.72 * track[2]) <= 2 && Math.abs(rest.h - track[3]) <= 1, { rest, track });
+    ok("starts empty", r0.w <= 1, r0);
+    ok("slowing as it arrives: past 40% of its fill at 260ms of 800 (ease-out, not linear)", r1.w > 0.4 * 0.72 * track[2] && r1.w < 0.72 * track[2] - 1, { r1, track });
+    const color = await page.evaluate(() => getComputedStyle(document.querySelector("#fill")).backgroundColor);
+    ok("still blue", color === "rgb(37, 99, 235)", color);
+  } else {
+    ok("one 500ms entrance for people without reduced motion", Math.abs(d - 500) <= 10, d);
+    const s0 = await at3(0), s1 = await at3(150), rest = await at3(500);
+    ok("starts 24px below its place, transparent", Math.abs(s0.y - (rest.y + 24)) <= 1 && s0.op < 0.05, { s0, rest });
+    ok("slowing as it arrives: past 38% of its rise at 150ms of 500 (ease-out, not linear)", s1.y < rest.y + 24 * 0.62 && s1.y > rest.y + 0.3, { s1, rest });
+    ok("at rest: in place, opaque", rest.op > 0.99, rest);
+    const rm = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    await rm.emulateMedia({ reducedMotion: "reduce" });
+    await rm.goto(pathToFileURL(resolve(file)).href);
+    const calm = await rm.evaluate(() => {
+      const el = document.querySelector("#hero");
+      return { n: el.getAnimations().length, op: Number(getComputedStyle(el).opacity), y: el.getBoundingClientRect().y };
+    });
+    ok("reduced motion: no animation, in place and opaque", calm.n === 0 && calm.op > 0.99 && Math.abs(calm.y - rest.y) <= 1, { calm, rest });
   }
 }
 await browser.close();
