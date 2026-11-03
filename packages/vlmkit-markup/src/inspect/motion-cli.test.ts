@@ -220,6 +220,17 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
       ["--selector", ".toast", "--exits", "--expect-easing", "ease-out,ease-in"],
       /FAIL snap-back .*in the hold after 660ms/,
     ],
+    // Round 17: steps() inside a keyframe, and width animated on an inline box.
+    [
+      "stepper.html",
+      ["--selector", "#panel"],
+      /FAIL jump .*`panel-in`'s from keyframe sets animation-timing-function: steps\(5\), which overrides the element's own ease-out/,
+    ],
+    [
+      "meter.html",
+      ["--selector", "#fill"],
+      /FAIL target-hidden .*it has no area \(0x0\): it is a <span> laid out inline \(display: inline\), where width and height do not apply, so animating width grows nothing/,
+    ],
     // Round 16: a lifted card under its neighbour, and entrances a boot class holds paused.
     [
       "lift.html",
@@ -706,6 +717,17 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
       assert.doesNotMatch(out, /FAIL jump/);
       const report = JSON.parse(await readFile(join(frames, "motion-report.json"), "utf8"));
       assert.ok(report.targets[0].path.every((p: { height?: number }) => typeof p.height === "number"));
+    },
+  );
+
+  it(
+    "names an @media that never matches as why nothing animates, and a bar growing from its edge (round 17)",
+    { timeout: 240_000 },
+    async () => {
+      const dead = await run("broken/guard.html", ["--selector", "#hero"]);
+      assert.equal(dead.code, 2, dead.out);
+      const bar = await run("reference/meter.html", ["--selector", "#fill"]);
+      assert.match(bar.out, /\(its centre: its box grows \d+px from its left edge, which stays put\)/, bar.out);
     },
   );
 

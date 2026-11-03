@@ -115,6 +115,24 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       docs: "A negative delay skips that much of the run, so an entrance from a hidden or offset first keyframe is already part way in at load; in a stagger the later items finish first. A stagger is a positive delay per item.",
     },
     {
+      id: "stepped-keyframe",
+      title: "A keyframe's steps() overrides the element's smooth easing",
+      severity: "warn",
+      docs: "animation-timing-function inside @keyframes applies per keyframe and wins over the element's: a shared entrance with from { animation-timing-function: steps(5, end) } made a panel hop in five. Only stepped overrides are named; per-keyframe curves are how a bounce is written.",
+    },
+    {
+      id: "inert-size-animation",
+      title: "width / height animated on an inline box",
+      severity: "suspect",
+      docs: "width and height do not apply to a non-replaced inline box: a usage bar written as an empty <span> animating width stayed 0x0. Give it display: block or inline-block.",
+    },
+    {
+      id: "unknown-media-feature",
+      title: "An @media around motion that names an unknown feature",
+      severity: "suspect",
+      docs: "A media feature (or value) the browser does not know makes the query false for everyone: @media (prefers-reduce-motion: no-preference) never matched, so its entrance never played. Names the nearest known feature.",
+    },
+    {
       id: "held-paused-animation",
       title: "An animation the page holds paused while its element is invisible",
       severity: "suspect",

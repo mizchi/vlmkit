@@ -273,6 +273,9 @@ export type AnimationEvalIssueKind =
   | "negative-delay-entrance"
   | "held-filter"
   | "held-paused-animation"
+  | "stepped-keyframe"
+  | "inert-size-animation"
+  | "unknown-media-feature"
   | "reduced-motion-hides"
   | "layout-animation"
   | "loop-seam"
@@ -542,6 +545,13 @@ export interface DeriveIssuesInput {
     restFilter?: string;
     /** The rule that holds it paused while it hides the element (animation-play-state: paused). */
     heldPaused?: string;
+    /** A keyframe's steps() timing function that overrides the element's smooth one. */
+    steppedKeyframe?: { at: string; easing: string; own: string };
+    /** Size properties its keyframes animate on a non-replaced inline box, where they do nothing. */
+    inertSize?: string[];
+    tag?: string;
+    /** An @media header the browser reads as "not all" (an unknown feature) around motion. */
+    unknownMedia?: { header: string; feature: string; suggest: string | null };
   }[];
   /** CSS animations with no duration: they end as they begin. */
   zeroDuration?: { selector: string; name: string }[];
@@ -677,6 +687,35 @@ export function deriveAnimationIssues(
         severity: "warn",
         selector: u.selector,
         message: `${u.selector} \`${u.name}\` has animation-delay ${u.negativeDelayMs}ms: it starts ${-u.negativeDelayMs}ms into its ${u.durationMs}ms run, so that much of its entrance is skipped and it is already part way in at load. A stagger is a positive delay per item (calc(var(--i) * 80ms)); a negative one only suits a loop meant to start mid-run.`,
+      });
+      continue;
+    }
+    if (u.steppedKeyframe) {
+      const k = u.steppedKeyframe;
+      issues.push({
+        kind: "stepped-keyframe",
+        severity: "warn",
+        selector: u.selector,
+        message: `${u.selector} \`${u.name}\`'s ${k.at} keyframe sets animation-timing-function: ${k.easing}, which overrides the element's own ${k.own} from that keyframe to the next: it moves in jumps, not a glide. A timing function inside @keyframes applies per keyframe and wins over the element's; take it out of the keyframe (or give that animation its own keyframes) unless the steps are meant.`,
+      });
+      continue;
+    }
+    if (u.inertSize) {
+      issues.push({
+        kind: "inert-size-animation",
+        severity: "suspect",
+        selector: u.selector,
+        message: `${u.selector} \`${u.name}\` animates ${u.inertSize.join(", ")}, but the element is a <${u.tag}> laid out inline (display: inline), where width and height do not apply: it has no box of its own to grow, so nothing is drawn. Give it display: block (or inline-block).`,
+      });
+      continue;
+    }
+    if (u.unknownMedia) {
+      const m = u.unknownMedia;
+      issues.push({
+        kind: "unknown-media-feature",
+        severity: "suspect",
+        selector: u.selector,
+        message: `@media ${m.header} never matches: the browser does not know the media feature${m.feature ? ` \`${m.feature}\`` : ""} (or its value), so the query is false for everyone and the animations and transitions inside it never apply for anyone${m.suggest && m.suggest !== m.feature ? ` — did you mean \`${m.suggest}\`?` : ""}`,
       });
       continue;
     }
@@ -1266,6 +1305,28 @@ ${ANIMATION_HELPERS_JS}
           if (!rule && /paused/.test(el.style.animationPlayState || "")) rule = "its style attribute";
           out.push({ selector, name: name || "an animation", heldPaused: rule || "animation-play-state: paused" });
         }
+        // steps() written inside a keyframe overrides the element's smooth easing: a shared
+        // entrance's from { animation-timing-function: steps(5, end) } made a panel hop (round 17).
+        {
+          const stepFn = (e) => /^steps\\(|^step-/.test(String(e || ""));
+          const names = cs.animationName.split(/,\\s*/);
+          const fns = cs.animationTimingFunction.split(/,\\s*(?![^()]*\\))/);
+          const mine = (fns[Math.max(0, names.indexOf(name)) % Math.max(1, fns.length)] || "ease").trim();
+          const odd = !stepFn(mine) ? kf.slice(0, -1).find((k) => stepFn(k.easing)) : undefined;
+          if (name && odd && !seen.has("stp\\u0000" + selector)) {
+            seen.add("stp\\u0000" + selector);
+            out.push({ selector, name, steppedKeyframe: { at: odd.offset === 0 ? "from" : odd.offset === 1 ? "to" : Math.round(Number(odd.computedOffset ?? odd.offset) * 100) + "%", easing: String(odd.easing), own: mine } });
+          }
+        }
+        // width / height animated on a non-replaced inline box do nothing: a usage bar written as
+        // an empty <span> stayed 0x0 for its whole fill (round 17).
+        if (cs.display === "inline" && !/^(img|video|canvas|svg|iframe|input|select|textarea|object|embed)$/i.test(el.tagName) && !seen.has("inl\\u0000" + selector)) {
+          const sizes = [...new Set(kf.flatMap((k) => Object.keys(k).filter((p) => /^(width|height|min-width|min-height|max-width|max-height|inline-size|block-size)$/.test(p))))];
+          if (sizes.length > 0) {
+            seen.add("inl\\u0000" + selector);
+            out.push({ selector, name: name || "an animation", inertSize: sizes, tag: el.tagName.toLowerCase() });
+          }
+        }
         // A fill that holds a filter at rest: blur(0.6px) left a card soft for good, and even
         // blur(0) keeps a filter layer the card is rasterised through (round 15).
         const last = kf[kf.length - 1] || {};
@@ -1318,6 +1379,44 @@ ${ANIMATION_HELPERS_JS}
       seen.add(selector + "\\u0000" + name);
       out.push({ selector, name });
     });
+  }
+  // An @media whose feature the browser does not know never matches (it reads as "not all"): an
+  // entrance behind @media (prefers-reduce-motion: no-preference) never played for anyone, and
+  // the page read "animations: 0 … No animation issues detected" (round 17).
+  {
+    const KNOWN = ["prefers-reduced-motion", "prefers-color-scheme", "prefers-contrast", "prefers-reduced-transparency", "forced-colors", "hover", "any-hover", "pointer", "any-pointer", "orientation", "min-width", "max-width", "width", "min-height", "max-height", "height", "aspect-ratio", "resolution", "min-resolution", "max-resolution", "color-gamut", "display-mode", "scripting", "inverted-colors"];
+    const near = (f) => {
+      let best = null, bd = Infinity;
+      for (const k of KNOWN) {
+        const d = (() => { const m = []; for (let i = 0; i <= f.length; i++) { m[i] = [i]; for (let j = 1; j <= k.length; j++) m[i][j] = i === 0 ? j : Math.min(m[i - 1][j] + 1, m[i][j - 1] + 1, m[i - 1][j - 1] + (f[i - 1] === k[j - 1] ? 0 : 1)); } return m[f.length][k.length]; })();
+        if (d < bd) { bd = d; best = k; }
+      }
+      return bd <= 3 ? best : null;
+    };
+    const moves = (rules) => [...rules].some((r) => (r.style && (/\\S/.test(r.style.animationName || "") && r.style.animationName !== "none" || /\\S/.test(r.style.transitionProperty || "") && (r.style.transitionDuration || "0s") !== "0s")) || (r.cssRules && moves(r.cssRules)));
+    // Chromium keeps an unknown feature's text and evaluates it as false; so does its negation. A
+    // known feature (and value) matches exactly one of (f) and not (f).
+    const unknownAtom = (cond) => {
+      for (const m of String(cond).matchAll(/\\(([^()]+)\\)/g)) {
+        const atom = "(" + m[1] + ")";
+        if (!window.matchMedia(atom).matches && !window.matchMedia("not " + atom).matches) return m[1].trim();
+      }
+      return null;
+    };
+    const walkMedia = (rules) => {
+      for (const r of rules) {
+        if (typeof CSSMediaRule !== "undefined" && r instanceof CSSMediaRule && moves(r.cssRules)) {
+          const header = r.conditionText || r.media.mediaText;
+          const atom = unknownAtom(header);
+          if (atom && !seen.has("med\\u0000" + header) && out.length < 8) {
+            seen.add("med\\u0000" + header);
+            const feature = (/^\\s*([a-z-]+)/i.exec(atom) || [])[1] || "";
+            out.push({ selector: "@media " + header, name: "@media", unknownMedia: { header, feature, suggest: feature ? near(feature) : null } });
+          }
+        } else if (r.cssRules) walkMedia(r.cssRules);
+      }
+    };
+    for (const sheet of document.styleSheets) { try { walkMedia(sheet.cssRules); } catch {} }
   }
   return out;
 })()`;
@@ -1853,6 +1952,15 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       let maxFrameRatio = 0;
       let readback: string | null = null;
       let firstSample: { timeMs: number; frame: RgbaFrame } | null = null;
+      // Its first keyframe as well, against rest: the samples start at 1/samples, and a bar filling
+      // from its left edge got a region that began at its 25% frame (round 17). Only the region.
+      {
+        await seek(timing.index, timing.delayMs);
+        for (const sib of siblings) await seek(sib.index, timing.delayMs);
+        const start = await shot(`anim-${timing.index}-0`);
+        const d0 = frameDelta(baseline, start, tolerance);
+        if (d0.changedPixels >= minChangedPixels) motionBbox = unionBbox(motionBbox, d0.bbox);
+      }
       for (let s = 1; s <= samples; s++) {
         const fraction = s / samples;
         // Stay 1ms inside the iteration end: seeking exactly to the end

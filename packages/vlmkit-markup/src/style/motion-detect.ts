@@ -119,7 +119,9 @@ function hasActiveTransition(sample: MotionComputedSample): boolean {
 }
 
 export function analyzeMotionSamples(input: MotionDetectionInput): MotionDetectionReport {
-  const hasReducedMotionRule = /@media[^{]*prefers-reduced-motion[^{]*reduce/i.test(input.cssText);
+  // Either form honours the preference: motion taken away under `reduce`, or motion given only
+  // under `no-preference` (a correct page read missing-reduced-motion for the second, round 17).
+  const hasReducedMotionRule = /@media[^{]*prefers-reduced-motion\s*:\s*(reduce|no-preference)/i.test(input.cssText);
   const activeAnimationSamples = input.samples.filter(hasActiveAnimation);
   const activeTransitionSamples = input.samples.filter(hasActiveTransition);
   // Only an animation that never ends is "non-settling": a finite entrance running at load
@@ -148,7 +150,7 @@ export function analyzeMotionSamples(input: MotionDetectionInput): MotionDetecti
       kind: "missing-reduced-motion",
       severity: "suspect",
       message:
-        "The stylesheet declares animations or transitions — none active at load (a class, :hover or a script applies them) — but no `prefers-reduced-motion: reduce` rule was found.",
+        "The stylesheet declares animations or transitions — none active at load (a class, :hover or a script applies them, or an @media that does not match — `check animation` names one that never can) — but no `prefers-reduced-motion` rule was found (`reduce` taking motion away, or `no-preference` giving it only to those who have not asked).",
     });
   }
   if (!hasReducedMotionRule && active) {
@@ -163,7 +165,7 @@ export function analyzeMotionSamples(input: MotionDetectionInput): MotionDetecti
             kind: "missing-reduced-motion",
             severity: "suspect",
             message:
-              "Active animation or transition declarations exist, but no `prefers-reduced-motion: reduce` rule was found.",
+              "Active animation or transition declarations exist, but no `prefers-reduced-motion` rule was found (`reduce` taking motion away, or `no-preference` giving it only to those who have not asked).",
           }
         : {
             kind: "unreadable-stylesheet",

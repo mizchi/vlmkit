@@ -336,6 +336,7 @@ export async function measureTargets(
         // that never ends at 0), and a @keyframes name more than one rule defines (round 15).
         let heldFilter: string | undefined;
         let dupKeyframes: string | undefined;
+        let kfEasing: string | undefined;
         const kfDefs = new Map<string, string[][]>();
         const walkKf = (rules: CSSRuleList) => {
           for (const r of [...rules]) {
@@ -386,6 +387,33 @@ export async function measureTargets(
             !heldFilter
           )
             heldFilter = `\`${name || "an animation"}\` ends on filter: ${String(last.filter)} and its fill holds it at rest: a blur left there softens it for good (at 1x a blur under 1px can draw as no blur, so the frames may not show it) — end without the filter, or fill it backwards`;
+          // A timing function written inside a keyframe overrides the element's own until the next
+          // keyframe: a shared entrance's \`from { animation-timing-function: steps(5, end) }\` made a
+          // panel hop in five, and read "jump … a gap between keyframes" (round 16-17).
+          if (name && !kfEasing) {
+            const names = own.animationName.split(/,\s*/);
+            const fns = own.animationTimingFunction.split(/,\s*(?![^()]*\))/);
+            const mine = fns[Math.max(0, names.indexOf(name)) % Math.max(1, fns.length)]?.trim() ?? "ease";
+            const norm = (e: string) =>
+              e.replace(/\s+/g, "").replace(/^cubic-bezier\(0\.42,0,0\.58,1\)$/, "ease-in-out");
+            // Stepped only: per-keyframe curves are how a bounce is written on purpose.
+            const stepFn = (e: string) => /^steps\(|^step-/.test(e);
+            const odd = stepFn(mine)
+              ? undefined
+              : kf
+                  .slice(0, -1)
+                  .find((k) => typeof k.easing === "string" && stepFn(k.easing) && norm(k.easing) !== norm(mine));
+            if (odd) {
+              const at =
+                odd.offset === 0
+                  ? "from"
+                  : odd.offset === 1
+                    ? "to"
+                    : `${Math.round(Number(odd.computedOffset ?? odd.offset) * 100)}%`;
+              const stepped = /^steps\(|^step-/.test(String(odd.easing));
+              kfEasing = `\`${name}\`'s ${at} keyframe sets animation-timing-function: ${odd.easing}, which overrides the element's own ${mine} from that keyframe to the next${stepped ? ": it moves in jumps, not a glide" : ""} — take the timing function out of the keyframe (a timing function inside @keyframes applies per keyframe and wins over the element's)`;
+            }
+          }
         }
         // Its shadow, as numbers (each shadow's RGBA, then its offsets, blur and spread in px): a
         // card whose shadow deepened on hover was confirmed only by eye (round 13).
@@ -539,7 +567,10 @@ export async function measureTargets(
           missed = null;
         }
         // Every point outside its shape: nothing was seen covering it.
-        const visible = opacity < 0.05 ? 0 : inView === 0 ? (outside > 0 ? 1 : 0) : hits / inView;
+        // No area: every grid point is the same point, an ancestor's, which read "outside its shape"
+        // and so "1.00 seen" for a usage bar that was a 0x0 inline <span> (round 17).
+        const noArea = !geometry && shapes.length === 0 && (r.width < 0.5 || r.height < 0.5);
+        const visible = opacity < 0.05 || noArea ? 0 : inView === 0 ? (outside > 0 ? 1 : 0) : hits / inView;
         // Why it is not seen, named for the repair: round 1 of motion-repair found the cause by
         // reading the CSS (an ancestor's overflow, a transform's stacking context) every time.
         const name = (e: Element) =>
@@ -563,7 +594,28 @@ export async function measureTargets(
           return null;
         };
         let hiddenBy: string | undefined;
-        if (m33 < -0.01 && backHidden && visible < 0.5) {
+        if (noArea && opacity >= 0.05) {
+          const cs0 = getComputedStyle(el);
+          const sizes = [
+            ...new Set(
+              el
+                .getAnimations()
+                .flatMap((a) =>
+                  ((a.effect as KeyframeEffect | null)?.getKeyframes?.() ?? []).flatMap((k) => Object.keys(k)),
+                )
+                .filter((p) =>
+                  /^(width|height|min-width|min-height|max-width|max-height|inlineSize|blockSize)$/.test(p),
+                ),
+            ),
+          ];
+          hiddenBy = `it has no area (${Math.round(r.width)}x${Math.round(r.height)})${
+            cs0.display === "inline" && !/^(img|video|canvas|svg|iframe|input)$/i.test(el.tagName)
+              ? `: it is a <${el.tagName.toLowerCase()}> laid out inline (display: inline), where width and height do not apply${sizes.length > 0 ? `, so animating ${sizes.join(", ")} grows nothing` : ""} — give it display: block (or inline-block)`
+              : sizes.length > 0
+                ? `, though its animation sets ${sizes.join(", ")}`
+                : ""
+          }`;
+        } else if (m33 < -0.01 && backHidden && visible < 0.5) {
           hiddenBy =
             "it faces away from you and its backface-visibility is hidden: turned over, as the far side of a flip card is";
         } else if (opacity < 0.05) {
@@ -783,6 +835,7 @@ export async function measureTargets(
           ...(filterVals.length > 0 ? { filter: filterVals } : {}),
           ...(heldFilter ? { heldFilter } : {}),
           ...(dupKeyframes ? { dupKeyframes } : {}),
+          ...(kfEasing ? { kfEasing } : {}),
           ...(inertOffsets ? { inertOffsets } : {}),
           ...(heldByFill ? { heldByFill } : {}),
           ...(discreteBg ? { discreteBg: true } : {}),
@@ -1875,8 +1928,76 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
                   ", ",
                 )}, a custom property no @property registers — an unregistered custom property has no type, so it does not interpolate and steps at once. Register it (@property ${unregistered[0]!.property} { syntax: "<percentage>"; inherits: false; initial-value: 0%; }, with the syntax of its values), and the transition runs. To shoot the page as it is, give --end <ms> or --at <instants>`,
             );
+          // An @media whose feature the browser does not know never matches: the entrance inside
+          // @media (prefers-reduce-motion: no-preference) never played for anyone (round 17).
+          const dead = await page
+            .evaluate(() => {
+              const out: string[] = [];
+              const moves = (rules: CSSRuleList): boolean =>
+                [...rules].some(
+                  (r) =>
+                    (r instanceof CSSStyleRule &&
+                      ((r.style.animationName && r.style.animationName !== "none") ||
+                        (r.style.transitionProperty &&
+                          r.style.transitionDuration &&
+                          r.style.transitionDuration !== "0s"))) ||
+                    ("cssRules" in r && moves((r as CSSGroupingRule).cssRules)),
+                );
+              // An unknown feature (or value) matches neither (f) nor not (f): Chromium keeps its text.
+              const unknown = (cond: string) =>
+                [...cond.matchAll(/\(([^()]+)\)/g)].some(
+                  (m) => !window.matchMedia(`(${m[1]})`).matches && !window.matchMedia(`not (${m[1]})`).matches,
+                );
+              const walk = (rules: CSSRuleList) => {
+                for (const r of [...rules]) {
+                  if (r instanceof CSSMediaRule && moves(r.cssRules) && unknown(r.conditionText || r.media.mediaText))
+                    out.push(r.conditionText || r.media.mediaText);
+                  else if ("cssRules" in r) walk((r as CSSGroupingRule).cssRules);
+                }
+              };
+              for (const sheet of [...document.styleSheets]) {
+                try {
+                  walk(sheet.cssRules);
+                } catch {}
+              }
+              return out;
+            })
+            .catch(() => [] as string[]);
+          if (dead.length > 0) {
+            const known = [
+              "prefers-reduced-motion",
+              "prefers-color-scheme",
+              "prefers-contrast",
+              "hover",
+              "pointer",
+              "orientation",
+              "min-width",
+              "max-width",
+            ];
+            const feature = /\(\s*([a-z-]+)\s*[:)]/i.exec(dead[0]!)?.[1] ?? "";
+            const lev = (a: string, b: string) => {
+              const m: number[][] = [];
+              for (let i = 0; i <= a.length; i++) {
+                m[i] = [i];
+                for (let j = 1; j <= b.length; j++)
+                  m[i]![j] =
+                    i === 0
+                      ? j
+                      : Math.min(
+                          m[i - 1]![j]! + 1,
+                          m[i]![j - 1]! + 1,
+                          m[i - 1]![j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1),
+                        );
+              }
+              return m[a.length]![b.length]!;
+            };
+            const near = known.map((k) => [k, lev(feature, k)] as const).sort((x, y) => x[1] - y[1])[0];
+            throw new MotionUsageError(
+              `no animation or transition on the page at load: the animation is declared inside @media ${dead[0]}, which never matches — the browser does not know the media feature${feature ? ` \`${feature}\`` : ""} (or its value), so the query is false for everyone${near && near[1] <= 3 && near[0] !== feature ? ` (did you mean \`${near[0]}\`?)` : ""}, so it applies for nobody`,
+            );
+          }
           throw new MotionUsageError(
-            `no animation or transition on the page${ranTo !== null ? `, at load or after its timers ran (to ${ranTo}ms)` : " at load"}: nothing to sample. If one should run, it never starts — check animation lists what does; a misspelt transition-property or animation-name, a transition to height: auto (which needs interpolate-size: allow-keywords), or a class added in the same frame as the style it transitions from, are the usual causes. If a click starts it, give --click <css>. To shoot the page anyway, give --end <ms> (with --start, or --at for the instants)`,
+            `no animation or transition on the page${ranTo !== null ? `, at load or after its timers ran (to ${ranTo}ms)` : " at load"}: nothing to sample. If one should run, it never starts — check animation lists what does; a misspelt transition-property or animation-name, a media query that never matches, a transition to height: auto (which needs interpolate-size: allow-keywords), or a class added in the same frame as the style it transitions from, are the usual causes. If a click starts it, give --click <css>. To shoot the page anyway, give --end <ms> (with --start, or --at for the instants)`,
           );
         }
         const s0 = Math.min(...infinite.map((a) => a.startMs));
@@ -2305,6 +2426,34 @@ function acrossText(d: { way: string; from: { x: number; y: number }; to: { x: n
   return ` (and ${Math.round(Math.abs(across))}px ${side})`;
 }
 
+/**
+ * A box that grows from one edge (a bar filling): its centre travels half its growth, and "travels
+ * 184px rightwards" read as a slide of a bar that grew 369px from its left edge (round 17).
+ */
+function growsFromEdge(t: {
+  path: { x: number; y: number; width?: number; height?: number; rest: boolean }[];
+}): string {
+  const p = t.path.filter((q) => q.width !== undefined && q.height !== undefined);
+  if (p.length < 2) return "";
+  const a = p[0]!;
+  const b = p[p.length - 1]!;
+  for (const [axis, size, lo, hi] of [
+    ["x", "width", "left", "right"],
+    ["y", "height", "top", "bottom"],
+  ] as const) {
+    const grew = b[size]! - a[size]!;
+    if (Math.abs(grew) < 4) continue;
+    const startA = a[axis] - a[size]! / 2;
+    const startB = b[axis] - b[size]! / 2;
+    const endA = a[axis] + a[size]! / 2;
+    const endB = b[axis] + b[size]! / 2;
+    const edge = Math.abs(startB - startA) <= 1 ? lo : Math.abs(endB - endA) <= 1 ? hi : null;
+    if (edge)
+      return ` (its centre: its box ${grew > 0 ? "grows" : "shrinks"} ${Math.round(Math.abs(grew))}px from its ${edge} edge, which stays put)`;
+  }
+  return "";
+}
+
 export function formatMotionReport(
   source: string,
   captured: Captured,
@@ -2411,7 +2560,7 @@ export function formatMotionReport(
           t.excursionPx !== undefined && t.excursionPx >= Math.max(4, t.travelPx * 2)
             ? ` (ending where it began; ${Math.round(t.excursionPx)}px away at most, between)`
             : ""
-        }${
+        }${growsFromEdge(t)}${
           t.turn
             ? t.turn.in3d
               ? // In 3D the turn is its face's angle, 0 facing you to 180 turned over: no way round.

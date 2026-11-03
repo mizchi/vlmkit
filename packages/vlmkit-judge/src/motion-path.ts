@@ -179,6 +179,8 @@ export interface MotionSample {
     heldFilter?: string;
     /** Its animation's @keyframes name is defined more than once, and what each defines. */
     dupKeyframes?: string;
+    /** A keyframe of its own animation sets a timing function that overrides the element's. */
+    kfEasing?: string;
     /** Points along its edge another element paints over (the 5x5 grid never reaches an edge). */
     edgeCover?: { share: number; message: string };
     /** It turns in 3D with no perspective to give the turn depth, and what to set. */
@@ -322,7 +324,8 @@ export type MotionRule =
   | "held-filter"
   | "duplicate-keyframes"
   | "covered-edge"
-  | "flat-3d";
+  | "flat-3d"
+  | "keyframe-easing";
 
 export interface MotionFinding {
   rule: MotionRule;
@@ -492,6 +495,8 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     return s.unsure ? null : s.present;
   };
   const shown = (s: MotionSample) => (seen(s) ?? 0) >= thr && s.box !== null;
+  // A keyframe's own timing function, overriding the element's: named as the cause of its steps.
+  const kfCause = sorted.find((x) => x.dom?.kfEasing)?.dom?.kfEasing;
   const findings: MotionFinding[] = [];
 
   // Which sides of the frame a box touches: the target is partly outside the viewport there.
@@ -823,7 +828,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
           atMs: seg.startMs,
           message: unsure
             ? `${what}${tag} fits ${fit.best} and ${expected} about as well (${expected} ${vsExpected.toFixed(1)}x the error of ${fit.best}): these frames cannot tell them apart — sample it closely (--at, frame by frame) to check ${expected}`
-            : `${what}${tag} follows ${fit.best} (it fits ${fit.margin.toFixed(1)}x better than the next-best curve), not ${expected}${hidden > 0 ? `; in ${hidden} frame(s) there it is not seen at all — if something covers it, fix that first and re-check` : ""}`,
+            : `${what}${tag} follows ${fit.best} (it fits ${fit.margin.toFixed(1)}x better than the next-best curve), not ${expected}${hidden > 0 ? `; in ${hidden} frame(s) there it is not seen at all — if something covers it, fix that first and re-check` : ""}${kfCause ? `: ${kfCause}` : ""}`,
         });
       }
     }
@@ -863,7 +868,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
             rule: "jump",
             severity: "fail",
             atMs: frames[i + 1]!.atMs,
-            message: `moves ${Math.round(st.px)}px between ${ms(frames[i]!.atMs)} and ${ms(frames[i + 1]!.atMs)}, ${times.toFixed(1)}x as fast as the steps around it: a discontinuity — a gap between keyframes, or a property changed with no transition or animation for it`,
+            message: `moves ${Math.round(st.px)}px between ${ms(frames[i]!.atMs)} and ${ms(frames[i + 1]!.atMs)}, ${times.toFixed(1)}x as fast as the steps around it: ${kfCause ?? "a discontinuity — a gap between keyframes, or a property changed with no transition or animation for it"}`,
           });
         }
       });
@@ -1077,7 +1082,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
                 rule: "jump",
                 severity: "fail",
                 atMs: r.atMs,
-                message: `jumps ${Math.round(off)}px when the motion ends (${ms(last.atMs)} → ${ms(r.atMs)}): the end state differs from the last keyframe`,
+                message: `jumps ${Math.round(off)}px when the motion ends (${ms(last.atMs)} → ${ms(r.atMs)}): ${kfCause ? `its last step lands as it ends — ${kfCause}` : "the end state differs from the last keyframe"}`,
               },
       );
     }
@@ -1338,6 +1343,9 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       message: `${raised ? `raised (scale ${coverAt.dom!.scale.toFixed(2)}) and ` : ""}covered at its edge at ${ms(coverAt.atMs)}: ${coverAt.dom!.edgeCover!.message}`,
     });
   }
+  // Said without an --expect-* too: the brief's "glides" has no flag (round 17).
+  if (kfCause && !findings.some((f) => f.message.includes(kfCause)))
+    findings.push({ rule: "keyframe-easing", severity: "warn", atMs: sorted[0]?.atMs ?? 0, message: kfCause });
   // Turned in 3D and drawn flat: nothing gives the turn depth.
   const flatAt = sorted.find((x) => x.dom?.flat3d && !x.dom.edgeOn);
   if (flatAt) findings.push({ rule: "flat-3d", severity: "warn", atMs: flatAt.atMs, message: flatAt.dom!.flat3d! });

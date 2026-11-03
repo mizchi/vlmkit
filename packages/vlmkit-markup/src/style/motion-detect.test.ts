@@ -9,6 +9,15 @@ describe("parseCssTimeList", () => {
 });
 
 describe("analyzeMotionSamples", () => {
+  it("takes motion given only under prefers-reduced-motion: no-preference as honouring it (round 17)", () => {
+    const css = "@media (prefers-reduced-motion: no-preference) { .hero { animation: rise 500ms ease-out both; } }";
+    const report = analyzeMotionSamples({ source: "inline", cssText: css, samples: [] });
+    assert.equal(
+      report.issues.some((i) => i.kind === "missing-reduced-motion"),
+      false,
+    );
+  });
+
   it("flags motion declarations without a reduced-motion rule", () => {
     const report = analyzeMotionSamples({
       source: "inline",

@@ -1324,3 +1324,26 @@ test("formatAnimationEvalReport: a lone reduced-motion-ignored is named on the s
   const clean: AnimationEvalReport = { ...report, reducedMotion: { remainingCount: 0, remaining: [] }, issues: [] };
   assert.doesNotMatch(formatAnimationEvalReport(clean), /only reduced-motion-ignored/);
 });
+
+test(
+  "runAnimationEval: steps() in a keyframe, width on an inline box, an @media that never matches (round 17)",
+  { timeout: 240_000 },
+  async () => {
+    const dir = join(import.meta.dirname, "../../../fixtures/motion-repair");
+    const kinds = async (f: string) => (await runAnimationEval({ source: join(dir, f) })).issues.map((i) => i.kind);
+    assert.ok((await kinds("broken/stepper.html")).includes("stepped-keyframe"));
+    assert.ok((await kinds("broken/meter.html")).includes("inert-size-animation"));
+    const guard = await runAnimationEval({ source: join(dir, "broken/guard.html") });
+    const media = guard.issues.find((i) => i.kind === "unknown-media-feature");
+    assert.ok(media, JSON.stringify(guard.issues));
+    assert.match(media!.message, /did you mean `prefers-reduced-motion`\?/);
+    for (const f of ["reference/stepper.html", "reference/meter.html", "reference/guard.html"])
+      assert.deepEqual(
+        (await kinds(f)).filter((k) =>
+          ["stepped-keyframe", "inert-size-animation", "unknown-media-feature"].includes(k),
+        ),
+        [],
+        f,
+      );
+  },
+);

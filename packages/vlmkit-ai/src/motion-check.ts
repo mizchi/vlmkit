@@ -77,6 +77,8 @@ export interface MotionDom {
   heldFilter?: string;
   /** Its animation's @keyframes name is defined more than once, and what each defines. */
   dupKeyframes?: string;
+  /** A keyframe of its own animation sets a timing function that overrides the element's. */
+  kfEasing?: string;
   /** Points along its edge another element paints over (the 5x5 grid never reaches an edge). */
   edgeCover?: { share: number; message: string };
   /** It turns in 3D with no perspective to give the turn depth, and what to set. */

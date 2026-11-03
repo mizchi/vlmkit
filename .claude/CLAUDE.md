@@ -482,6 +482,17 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   (`sampled again:`), where the frame had read a false `jump`; `motion-report.json` path entries carry the drawn
   `width` / `height`; `check animation` with `reduced-motion-ignored` as its only suspect says so on the
   status line (still a suspect, still exit 1).
+- **A keyframe that steps, a bar that is a span, a media query nobody matches** (round 17,
+  `docs/reports/2026-11-03-motion-repair-v17.md`). A `steps()` written inside a keyframe that overrides the
+  element's smooth easing is the named cause of `jump` / `easing-mismatch` (else `keyframe-easing` warn; only
+  stepped overrides, since per-keyframe curves are how a bounce is written); a box with no area is not seen,
+  and an inline box animating `width` / `height` is named; a box growing from one edge says its centre is half
+  the growth; an `@media` whose feature or value the browser does not know (Chromium keeps the text and
+  evaluates it false: a known one matches exactly one of `(f)` and `not (f)`) is the cause in `inspect
+  motion`'s "no animation" error. `check animation`: `stepped-keyframe` (warn), `inert-size-animation` and
+  `unknown-media-feature` (suspect), 237 rules, none firing on the repo's 69 other correct animated pages;
+  its motion region includes the first keyframe. `check motion` and `stress media` take motion given only
+  under `prefers-reduced-motion: no-preference` as honouring the preference.
 
 ## Generated figures (raster images)
 
