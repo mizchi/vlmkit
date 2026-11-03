@@ -95,10 +95,14 @@ All six repairs were right. Two of them differ from the reference:
 pages are the reference pages, the intact motion-defects pages, the correct held-out pages and the example
 sites.
 
-## Checked, not changed
+## Two remarks, answered in the output
 
-- **The `diff png` label.** With a `both` fill, the 500ms frame of guard differs from its rest frame by 290 edge
-  pixels, which `diff png` labels `render-noise` (one small agent called that misleading). The two frames are
-  the element on a compositor layer and off one. It is antialiasing, and that is what the label says.
-- **The run ledger.** `check animation` creating `.vlmkit/run-ledger.jsonl` is announced on first use. Two
-  agents mentioned it, and both quoted the announcement.
+- **The `diff png` label.** One small agent called the `render-noise` label misleading. With a `both` fill,
+  guard's 500ms frame differs from its rest frame by 290 edge pixels. The two frames are the element on a
+  compositor layer and off one, so the label was right, but it did not say why. The description now names
+  the case: `an element on its own compositor layer in one capture and not the other — a finished animation
+  whose fill holds a transform keeps its layer, and animation-fill-mode: backwards drops it at rest`.
+- **The run ledger.** Two agents noted that `.vlmkit/run-ledger.jsonl` appeared, and both quoted the
+  announcement that says so. The router skill (`skills/vlmkit/SKILL.md`) now has a "Files it writes"
+  section: the ledger, `--ledger` and `--no-ledger`, and where frames and reports go. It also gives the
+  status line for a lone `reduced-motion-ignored`.

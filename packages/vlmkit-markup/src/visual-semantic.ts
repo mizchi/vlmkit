@@ -45,7 +45,7 @@ function classifyRegion(region: DiffRegion, diff: VrtDiff): VisualSemanticChange
       type: "render-noise",
       region,
       confidence: 0.8,
-      description: `Edge rendering differs at (${region.x}, ${region.y}), ${region.width}x${region.height}: a 5x5 average removes most of it and it lightens as much as it darkens (antialiasing or layer compositing) — not a change of content`,
+      description: `Edge rendering differs at (${region.x}, ${region.y}), ${region.width}x${region.height}: a 5x5 average removes most of it and it lightens as much as it darkens (antialiasing, or an element on its own compositor layer in one capture and not the other — a finished animation whose fill holds a transform keeps its layer, and \`animation-fill-mode: backwards\` drops it at rest) — not a change of content`,
     };
   }
   // A measured translation beats the shape/color heuristics: a moved

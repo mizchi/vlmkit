@@ -293,6 +293,15 @@ Track 3: A11y Diff      — a11y tree diff → semantic change detection
 
 escalate returns exit 0 but emits warnings.
 
+`check animation` exits 1 when `reduced-motion-ignored` is its only suspect, and its status line says so. If
+the brief sets no reduced-motion policy, judge the rest with `--rule reduced-motion-ignored=off`.
+
+## Files it writes
+
+Every gate run appends one line to `.vlmkit/run-ledger.jsonl` in the working directory. The run that creates
+it says so; `--ledger <path>` moves it, and `--no-ledger` writes nothing. Frames and reports go where
+`--frames` / `--out` point (default `test-results/`).
+
 ## How to Write Commit Messages
 
 The verification pipeline infers change intent from the commit message.
