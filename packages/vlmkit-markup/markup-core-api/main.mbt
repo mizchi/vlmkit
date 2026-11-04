@@ -22,7 +22,7 @@ pub fn run_markup_core_json(command : String, payload : String) -> String raise 
 /// Commands the JSON boundary accepts, so a TypeScript test can assert its table
 /// matches this one rather than finding a typo at the first call.
 pub fn markup_core_json_commands() -> String {
-  @core.json_commands().to_json().stringify()
+  @json.ToJson::to_json(@core.json_commands()).stringify()
 }
 
 ///|

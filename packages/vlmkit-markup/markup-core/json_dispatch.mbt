@@ -109,139 +109,139 @@ pub fn run_json(command : String, payload : String) -> String raise {
   match command {
     "layout-policy-issue-ids" => {
       let input : LayoutPolicyInput = @json.from_json(json)
-      layout_policy_issue_ids(input).to_json().stringify()
+      @json.ToJson::to_json(layout_policy_issue_ids(input)).stringify()
     }
     "goal-status" => {
       let input : GoalStatusInput = @json.from_json(json)
-      goal_status(input).to_json().stringify()
+      @json.ToJson::to_json(goal_status(input)).stringify()
     }
     "interaction-issues" => {
       let input : InteractionIssuesInput = @json.from_json(json)
-      interaction_issues(input).to_json().stringify()
+      @json.ToJson::to_json(interaction_issues(input)).stringify()
     }
     "screen-issue-ids" => {
       let input : ScreenIssuesInput = @json.from_json(json)
-      screen_issue_ids(input).to_json().stringify()
+      @json.ToJson::to_json(screen_issue_ids(input)).stringify()
     }
     "viewport-issue-ids" => {
       let input : ViewportIssuesInput = @json.from_json(json)
-      viewport_issue_ids(input).to_json().stringify()
+      @json.ToJson::to_json(viewport_issue_ids(input)).stringify()
     }
     "landmark-issue-ids" => {
       let input : LandmarkIssuesInput = @json.from_json(json)
-      landmark_issue_ids(input).to_json().stringify()
+      @json.ToJson::to_json(landmark_issue_ids(input)).stringify()
     }
     "marker-issue-ids" => {
       let input : MarkerIssuesInput = @json.from_json(json)
-      marker_issue_ids(input).to_json().stringify()
+      @json.ToJson::to_json(marker_issue_ids(input)).stringify()
     }
     "state-issue-ids" => {
       let input : StateIssuesInput = @json.from_json(json)
-      state_issue_ids(input).to_json().stringify()
+      @json.ToJson::to_json(state_issue_ids(input)).stringify()
     }
     "required-state-issue-ids" => {
       let input : RequiredStateIssuesInput = @json.from_json(json)
-      required_state_issue_ids(input).to_json().stringify()
+      @json.ToJson::to_json(required_state_issue_ids(input)).stringify()
     }
     "expected-scrollport-issue-ids" => {
       let input : ExpectedScrollportIssuesInput = @json.from_json(json)
-      expected_scrollport_issue_ids(input).to_json().stringify()
+      @json.ToJson::to_json(expected_scrollport_issue_ids(input)).stringify()
     }
     "composition-layer-issue-ids" => {
       let input : CompositionLayerIssuesInput = @json.from_json(json)
-      composition_layer_issue_ids(input).to_json().stringify()
+      @json.ToJson::to_json(composition_layer_issue_ids(input)).stringify()
     }
     "composition-shape-issue-ids" => {
       let input : CompositionShapeIssuesInput = @json.from_json(json)
-      composition_shape_issue_ids(input).to_json().stringify()
+      @json.ToJson::to_json(composition_shape_issue_ids(input)).stringify()
     }
     "composition-motion-issue-ids" => {
       let input : CompositionMotionIssuesInput = @json.from_json(json)
-      composition_motion_issue_ids(input).to_json().stringify()
+      @json.ToJson::to_json(composition_motion_issue_ids(input)).stringify()
     }
     "decoration-palette-issue-ids" => {
       let input : DecorationPaletteIssuesInput = @json.from_json(json)
-      decoration_palette_issue_ids(input).to_json().stringify()
+      @json.ToJson::to_json(decoration_palette_issue_ids(input)).stringify()
     }
     "pattern-evidence-issue-ids" => {
       let input : PatternEvidenceIssuesInput = @json.from_json(json)
-      pattern_evidence_issue_ids(input).to_json().stringify()
+      @json.ToJson::to_json(pattern_evidence_issue_ids(input)).stringify()
     }
     "contrast-evaluate" => {
       let input : ContrastEvaluateInput = @json.from_json(json)
-      contrast_evaluate(input).to_json().stringify()
+      @json.ToJson::to_json(contrast_evaluate(input)).stringify()
     }
     "touch-in-cluster" => {
       let input : TouchClusterInput = @json.from_json(json)
-      touch_in_cluster(input).to_json().stringify()
+      @json.ToJson::to_json(touch_in_cluster(input)).stringify()
     }
     "touch-policy" => {
       let input : TouchPolicyInput = @json.from_json(json)
-      touch_policy(input).to_json().stringify()
+      @json.ToJson::to_json(touch_policy(input)).stringify()
     }
     "focus-order-classify" => {
       let input : FocusOrderInput = @json.from_json(json)
-      focus_order_classification(input).to_json().stringify()
+      @json.ToJson::to_json(focus_order_classification(input)).stringify()
     }
     "grid-arrays-close" => {
       let input : GridArraysCloseInput = @json.from_json(json)
-      grid_arrays_close_json(input).to_json().stringify()
+      @json.ToJson::to_json(grid_arrays_close_json(input)).stringify()
     }
     "grid-gcd" => {
       let input : GridGcdInput = @json.from_json(json)
-      grid_gcd_json(input).to_json().stringify()
+      @json.ToJson::to_json(grid_gcd_json(input)).stringify()
     }
     "shift-classify-suspect" => {
       let input : ShiftSuspectInput = @json.from_json(json)
-      shift_suspect(input).to_json().stringify()
+      @json.ToJson::to_json(shift_suspect(input)).stringify()
     }
     "quality-error-state-kind" => {
       let input : ErrorStateInput = @json.from_json(json)
-      error_state_kind(input).to_json().stringify()
+      @json.ToJson::to_json(error_state_kind(input)).stringify()
     }
     "quality-coverage-passed" => {
       let input : CoverageInput = @json.from_json(json)
-      coverage_passed(input).to_json().stringify()
+      @json.ToJson::to_json(coverage_passed(input)).stringify()
     }
     "landscape-cell-score" => {
       let input : LandscapeCellScoreInput = @json.from_json(json)
-      landscape_cell_score_json(input).to_json().stringify()
+      @json.ToJson::to_json(landscape_cell_score_json(input)).stringify()
     }
     "landscape-cell-hex" => {
       let input : LandscapeCellHexInput = @json.from_json(json)
-      landscape_cell_hex_json(input).to_json().stringify()
+      @json.ToJson::to_json(landscape_cell_hex_json(input)).stringify()
     }
     "landscape-default-grid" => {
       let input : LandscapeGridInput = @json.from_json(json)
-      landscape_default_grid_json(input).to_json().stringify()
+      @json.ToJson::to_json(landscape_default_grid_json(input)).stringify()
     }
     "landscape-diff-summary" => {
       let input : LandscapeDiffInput = @json.from_json(json)
-      landscape_diff(input).to_json().stringify()
+      @json.ToJson::to_json(landscape_diff(input)).stringify()
     }
     "visual-classify-region" => {
       let input : ClassifyRegionInput = @json.from_json(json)
-      classify_region(input).to_json().stringify()
+      @json.ToJson::to_json(classify_region(input)).stringify()
     }
     "visual-is-likely-page-surface" => {
       let input : Rgb = @json.from_json(json)
-      is_likely_page_surface(input).to_json().stringify()
+      @json.ToJson::to_json(is_likely_page_surface(input)).stringify()
     }
     "region-classify-kind" => {
       let input : RegionKindInput = @json.from_json(json)
-      region_kind(input).to_json().stringify()
+      @json.ToJson::to_json(region_kind(input)).stringify()
     }
     "semantic-drilldown-select-index" => {
       let input : DrilldownSelectInput = @json.from_json(json)
-      drilldown_select_index(input).to_json().stringify()
+      @json.ToJson::to_json(drilldown_select_index(input)).stringify()
     }
     "semantic-drilldown-policy" => {
       let input : DrilldownPolicyInput = @json.from_json(json)
-      drilldown_policy(input).to_json().stringify()
+      @json.ToJson::to_json(drilldown_policy(input)).stringify()
     }
     "merge-component-probe-states" => {
       let input : MergeProbeStatesInput = @json.from_json(json)
-      merge_probe_states(input).to_json().stringify()
+      @json.ToJson::to_json(merge_probe_states(input)).stringify()
     }
     _ => raise Failure("unknown markup-core JSON command: \{command}")
   }
