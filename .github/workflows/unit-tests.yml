@@ -46,9 +46,8 @@ on:
 
 jobs:
   test:
-    # Pinned: the video tests are measured on Ubuntu 24.04's ffmpeg 6.1. ubuntu-latest moved to an
-    # image whose apt ffmpeg is 7 or later, where `-reinit_filter` is input-only and the colour
-    # conversion differs (9 tests). Supporting ffmpeg 7+ is its own change; until then this stays.
+    # The whole suite on Ubuntu 24.04 (ffmpeg 6.1); `video-ffmpeg-latest` below runs the video
+    # tests again on ubuntu-latest's newer ffmpeg, so both stay supported.
     runs-on: ubuntu-24.04
     # The suite is ~6 minutes locally and ~8 in the `bench` job it came from;
     # 20 leaves room for a cold pnpm store without masking a hang.
@@ -95,3 +94,28 @@ jobs:
       # before; a latent type error in a test file shipped once for exactly
       # that reason.
       - run: pnpm typecheck
+
+  # The tests that decode with the user's own ffmpeg, on ubuntu-latest's apt ffmpeg (7 or later
+  # when written), beside the 6.1 of the job above: vlmkit says it works with 5.1 or later, and
+  # ffmpeg 7 changed option placement and how colour properties reach the encoder.
+  video-ffmpeg-latest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg && ffmpeg -hide_banner -version | head -1
+      - run: pnpm build:packages
+      - run: VLMKIT_VIDEO_TRACE=1 pnpm exec vp test run packages/vlmkit-core/src/video-decode.test.ts packages/vlmkit-markup/src/inspect/flash-video.test.ts
