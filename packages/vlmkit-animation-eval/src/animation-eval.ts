@@ -188,7 +188,9 @@ export interface ClockMotion {
     selector: string;
     name: string;
     kind: "transition" | "animation";
+    /** The sweep instant it was first seen at; `afterMs` is the instant before it, when it was not. */
     atMs: number;
+    afterMs?: number;
     durationMs?: number;
   }>;
   /**
@@ -214,13 +216,23 @@ export function clockUpdatesOnly(clock: Pick<ClockMotion, "runs" | "started" | "
   return r.timers > 0 && r.timers <= 5 * Math.max(1, clock.windowMs / 1000);
 }
 
+/**
+ * When a timer-started animation began, as far as the sweep's instants can say: "at 250ms" read
+ * as the start of a transition a timer began at 200ms (round 13), when 250 was only the first
+ * instant after it.
+ */
+const beganText = (s: { atMs: number; afterMs?: number }) =>
+  s.afterMs !== undefined && s.atMs - s.afterMs > 1000 / 60 + 1e-6
+    ? `between ${s.afterMs}ms and ${s.atMs}ms`
+    : `at ${s.atMs}ms`;
+
 /** Pure: what a clock sweep's motion is, named as far as the page let it be. */
 export function clockMotionSource(clock: Pick<ClockMotion, "started">): string {
   const started = clock.started ?? [];
   if (started.length === 0) return "requestAnimationFrame / timers";
   const named = started
     .slice(0, 3)
-    .map((s) => `${s.kind} \`${s.name}\` on ${s.selector} (begun at ${s.atMs}ms)`)
+    .map((s) => `${s.kind} \`${s.name}\` on ${s.selector} (begun ${beganText(s)})`)
     .join(", ");
   return `a timer started ${named}${started.length > 3 ? ` and ${started.length - 3} more` : ""}`;
 }
@@ -255,6 +267,18 @@ export type AnimationEvalIssueKind =
   | "motion-mostly-hidden"
   | "delayed-entrance"
   | "unknown-transition-property"
+  | "unregistered-property-transition"
+  | "inert-offset-animation"
+  | "duplicate-keyframes"
+  | "negative-delay-entrance"
+  | "held-filter"
+  | "held-paused-animation"
+  | "stepped-keyframe"
+  | "inert-size-animation"
+  | "unknown-media-feature"
+  | "overridden-animation"
+  | "unitless-duration-var"
+  | "counter-rotation-drift"
   | "reduced-motion-hides"
   | "layout-animation"
   | "loop-seam"
@@ -284,6 +308,13 @@ export interface AnimationEvalReport {
   reducedMotion?: {
     remainingCount: number;
     remaining: ReducedMotionRemaining[];
+    /**
+     * Nothing that moves runs without the preference either (only opacity, colour, visibility):
+     * there was no motion to reduce, so the pass is not "honored" by any choice of the page's.
+     */
+    nothingToReduce?: boolean;
+    /** With `nothingToReduce`: the fades / colour animations that still run under reduce, as allowed. */
+    fadesUnderReduce?: number;
   };
   /** `animation-name`s with no @keyframes: nothing ran under them (`reducedMotion`: only under reduce). */
   undefinedKeyframes?: { selector: string; name: string; reducedMotion: boolean }[];
@@ -500,13 +531,43 @@ export interface DeriveIssuesInput {
   evaluated: EvaluatedAnimation[];
   settleMs: number | null;
   infinite: { selector: string; name: string; indicator?: string }[];
-  reducedMotion?: { remainingCount: number; remaining: ReducedMotionRemaining[] };
+  reducedMotion?: AnimationEvalReport["reducedMotion"];
   uncontrolledMotion?: FrameDeltaStat;
   virtualTime?: boolean;
   clockMotion?: ClockMotion;
   undefinedKeyframes?: { selector: string; name: string; reducedMotion: boolean }[];
   /** transition-property names no CSS property, with a duration over 0. */
-  unknownTransitions?: { selector: string; name: string }[];
+  unknownTransitions?: {
+    selector: string;
+    name: string;
+    unregistered?: boolean;
+    inertOffsets?: string[];
+    duplicate?: string[];
+    negativeDelayMs?: number;
+    durationMs?: number;
+    restFilter?: string;
+    /** The rule that holds it paused while it hides the element (animation-play-state: paused). */
+    heldPaused?: string;
+    /** A later animation in animation-name on the same property, whose fill covers this one's run. */
+    overridden?: { by: string; props: string[]; delayMs: number; fill: string; coveredMs: number | null };
+    /** A counter-rotation against an ancestor's turn at a rate that does not cancel it. */
+    counterDrift?: {
+      ancestor: string;
+      theirs: string;
+      mine: { deg: number; ms: number };
+      other: { deg: number; ms: number };
+      net: number;
+    };
+    /** A transition / animation duration var() that resolves to a number with no unit. */
+    unitlessVar?: { prop: string; text: string; variable: string; value: string };
+    /** A keyframe's steps() timing function that overrides the element's smooth one. */
+    steppedKeyframe?: { at: string; easing: string; own: string };
+    /** Size properties its keyframes animate on a non-replaced inline box, where they do nothing. */
+    inertSize?: string[];
+    tag?: string;
+    /** An @media header the browser reads as "not all" (an unknown feature) around motion. */
+    unknownMedia?: { header: string; feature: string; suggest: string | null };
+  }[];
   /** CSS animations with no duration: they end as they begin. */
   zeroDuration?: { selector: string; name: string }[];
   /** A transition on background over a gradient, which does not interpolate. */
@@ -626,6 +687,119 @@ export function deriveAnimationIssues(
   }
 
   for (const u of input.unknownTransitions ?? []) {
+    if (u.duplicate) {
+      issues.push({
+        kind: "duplicate-keyframes",
+        severity: "suspect",
+        selector: u.selector,
+        message: `${u.selector} plays \`${u.name}\`, which ${u.duplicate.length} @keyframes rules define (${u.duplicate.map((d, i) => `#${i + 1}: ${d || "nothing"}`).join("; ")}): the last one in the cascade wins, so the others never run. Give each its own name.`,
+      });
+      continue;
+    }
+    if (u.negativeDelayMs !== undefined) {
+      issues.push({
+        kind: "negative-delay-entrance",
+        severity: "warn",
+        selector: u.selector,
+        message: `${u.selector} \`${u.name}\` has animation-delay ${u.negativeDelayMs}ms: it starts ${-u.negativeDelayMs}ms into its ${u.durationMs}ms run, so that much of its entrance is skipped and it is already part way in at load. A stagger is a positive delay per item (calc(var(--i) * 80ms)); a negative one only suits a loop meant to start mid-run.`,
+      });
+      continue;
+    }
+    if (u.overridden) {
+      const o = u.overridden;
+      issues.push({
+        kind: "overridden-animation",
+        severity: "suspect",
+        selector: u.selector,
+        message: `${u.selector} \`${u.name}\` and \`${o.by}\` both animate ${o.props.join(", ")}, and \`${o.by}\` comes later in animation-name, so its value wins${o.coveredMs === null ? " for the whole of" : ` for ${o.coveredMs}ms of`} \`${u.name}\`'s run${o.delayMs > 0 && (o.fill === "backwards" || o.fill === "both") ? ` (its ${o.fill} fill holds its first keyframe through its ${Math.round(o.delayMs)}ms delay)` : ""}: that part of \`${u.name}\` never shows. Animate one with an individual property (translate / scale / rotate compose with transform), or drop the backwards fill.`,
+      });
+      continue;
+    }
+    if (u.counterDrift) {
+      const c = u.counterDrift;
+      issues.push({
+        kind: "counter-rotation-drift",
+        severity: "warn",
+        selector: u.selector,
+        message: `${u.selector} \`${u.name}\` turns ${Math.round(c.mine.deg)}° per ${Math.round(c.mine.ms)}ms against ${c.ancestor}'s \`${c.theirs}\` (${Math.round(c.other.deg)}° per ${Math.round(c.other.ms)}ms), so on screen it turns ${Math.abs(c.net).toFixed(1)}°/s ${c.net > 0 ? "clockwise" : "counterclockwise"}: a counter-rotation meant to keep it level needs the same duration, easing and delay as the turn it cancels. If the drift is meant, ignore this.`,
+      });
+      continue;
+    }
+    if (u.unitlessVar) {
+      const v = u.unitlessVar;
+      issues.push({
+        kind: "unitless-duration-var",
+        severity: "suspect",
+        selector: u.selector,
+        message: `${u.selector} { ${v.prop}: ${v.text} } reads ${v.variable}, which is ${v.value}: a number with no unit, so the declaration is invalid at computed-value time and ${v.prop.startsWith("animation") ? "the animation" : "the transition"} is dropped (the element snaps). Give the token a unit (${v.value}ms), or write calc(var(${v.variable}) * 1ms).`,
+      });
+      continue;
+    }
+    if (u.steppedKeyframe) {
+      const k = u.steppedKeyframe;
+      issues.push({
+        kind: "stepped-keyframe",
+        severity: "warn",
+        selector: u.selector,
+        message: `${u.selector} \`${u.name}\`'s ${k.at} keyframe sets animation-timing-function: ${k.easing}, which overrides the element's own ${k.own} from that keyframe to the next: it moves in jumps, not a glide. A timing function inside @keyframes applies per keyframe and wins over the element's; take it out of the keyframe (or give that animation its own keyframes) unless the steps are meant.`,
+      });
+      continue;
+    }
+    if (u.inertSize) {
+      issues.push({
+        kind: "inert-size-animation",
+        severity: "suspect",
+        selector: u.selector,
+        message: `${u.selector} \`${u.name}\` animates ${u.inertSize.join(", ")}, but the element is a <${u.tag}> laid out inline (display: inline), where width and height do not apply: it has no box of its own to grow, so nothing is drawn. Give it display: block (or inline-block).`,
+      });
+      continue;
+    }
+    if (u.unknownMedia) {
+      const m = u.unknownMedia;
+      issues.push({
+        kind: "unknown-media-feature",
+        severity: "suspect",
+        selector: u.selector,
+        message: `@media ${m.header} never matches: the browser does not know the media feature${m.feature ? ` \`${m.feature}\`` : ""} (or its value), so the query is false for everyone and the animations and transitions inside it never apply for anyone${m.suggest && m.suggest !== m.feature ? ` — did you mean \`${m.suggest}\`?` : ""}`,
+      });
+      continue;
+    }
+    if (u.heldPaused !== undefined) {
+      issues.push({
+        kind: "held-paused-animation",
+        severity: "suspect",
+        selector: u.selector,
+        message: `${u.selector} \`${u.name}\` is held paused at rest by ${u.heldPaused}, and the element is invisible while it is (opacity 0): the animation never plays, so the element never appears. Whatever should release it has not: a class a script removes (check the name it removes matches), a state the page never reaches. The frames of this evaluation seek it, so they show it as if it ran.`,
+      });
+      continue;
+    }
+    if (u.restFilter !== undefined) {
+      issues.push({
+        kind: "held-filter",
+        severity: "warn",
+        selector: u.selector,
+        message: `${u.selector} \`${u.name}\` ends on filter: ${u.restFilter} and its fill holds it at rest: a blur left there softens the element for good (at 1x a blur under 1px can draw as no blur, so a screenshot may not show it), End the animation without the filter, or fill it backwards so the element's own style shows once it ends.`,
+      });
+      continue;
+    }
+    if (u.inertOffsets) {
+      issues.push({
+        kind: "inert-offset-animation",
+        severity: "suspect",
+        selector: u.selector,
+        message: `${u.selector} \`${u.name}\` animates ${u.inertOffsets.join(", ")}, but the element is position: static, where ${u.inertOffsets.length === 1 ? "that offset does" : "offsets do"} nothing: whatever else the animation does still shows, and the move it meant never happens. Give it position: relative, or animate transform: translate() (or translate) instead.`,
+      });
+      continue;
+    }
+    if (u.unregistered) {
+      issues.push({
+        kind: "unregistered-property-transition",
+        severity: "suspect",
+        selector: u.selector,
+        message: `${u.selector} transitions \`${u.name}\`, a custom property no @property registers: an unregistered custom property has no type, so it does not interpolate and whatever it drives (a gradient stop, a width through calc()) changes in one frame. Register it — @property ${u.name} { syntax: "<percentage>"; inherits: false; initial-value: 0%; }, with the syntax of its values — and the transition runs.`,
+      });
+      continue;
+    }
     issues.push({
       kind: "unknown-transition-property",
       severity: "suspect",
@@ -1098,19 +1272,301 @@ const UNKNOWN_TRANSITION_PROPERTY_SCRIPT = `(() => {
 ${ANIMATION_HELPERS_JS}
   const out = [];
   const seen = new Set();
+  // Custom properties an @property rule registers (in the sheets the page can read): only those
+  // have a type, and a transition on any other one steps at once (round 13's ring).
+  const registered = new Set();
+  const walk = (rules) => {
+    for (const r of rules) {
+      if (typeof CSSPropertyRule !== "undefined" && r instanceof CSSPropertyRule) registered.add(r.name);
+      else if (r.cssRules) walk(r.cssRules);
+    }
+  };
+  for (const sheet of document.styleSheets) {
+    try { walk(sheet.cssRules); } catch {}
+  }
+  // Registered with a type anywhere (CSS.registerProperty in a script, a sheet the page cannot
+  // read): such a property computes \`initial\` to its initial value, an unregistered one to
+  // nothing. A switch registered from JS read as unregistered (held-out set).
+  const typedProperty = (name) => {
+    const probe = document.createElement("div");
+    probe.style.setProperty(name, "initial");
+    document.documentElement.append(probe);
+    const v = getComputedStyle(probe).getPropertyValue(name).trim();
+    probe.remove();
+    return v !== "";
+  };
+  // Every @keyframes rule by name, in sheet order, with the properties it animates: the last one
+  // of a name wins, and a component's fade-up lost its rise to a utility's later fade-up (round 15).
+  const keyframes = new Map();
+  const walkKf = (rules) => {
+    for (const r of rules) {
+      if (typeof CSSKeyframesRule !== "undefined" && r instanceof CSSKeyframesRule) {
+        const props = new Set();
+        for (const k of r.cssRules) for (let i = 0; i < k.style.length; i++) props.add(k.style[i]);
+        if (!keyframes.has(r.name)) keyframes.set(r.name, []);
+        keyframes.get(r.name).push([...props]);
+      } else if (r.cssRules) walkKf(r.cssRules);
+    }
+  };
+  for (const sheet of document.styleSheets) {
+    try { walkKf(sheet.cssRules); } catch {}
+  }
   for (const el of document.querySelectorAll("*")) {
     const cs = getComputedStyle(el);
+    if (out.length < 8) {
+      for (const a of el.getAnimations()) {
+        const name = a.animationName;
+        const t = a.effect && a.effect.getComputedTiming ? a.effect.getComputedTiming() : null;
+        const kf = a.effect && a.effect.getKeyframes ? a.effect.getKeyframes() : [];
+        const selector = stableSelector(el);
+        const defs = name ? keyframes.get(name) : undefined;
+        if (defs && defs.length > 1 && !seen.has("dup\u0000" + name)) {
+          seen.add("dup\u0000" + name);
+          out.push({ selector, name, duplicate: defs.map((d) => d.join(", ")) });
+        }
+        // An entrance with a negative delay starts part way through: a row 240ms into its 300ms
+        // rise was there at load, and the stagger read as running backwards (round 15).
+        const first = kf[0] || {};
+        const hiddenStart = Number(first.opacity) < 0.05 || (first.transform && first.transform !== "none") || (first.translate && first.translate !== "none");
+        if (t && Number(t.delay) < 0 && Number.isFinite(Number(t.iterations)) && hiddenStart && !seen.has("neg\u0000" + selector)) {
+          seen.add("neg\u0000" + selector);
+          out.push({ selector, name: name || "an animation", negativeDelayMs: Number(t.delay), durationMs: Number(t.duration) });
+        }
+        // Held paused by the page's CSS (animation-play-state: paused) while it hides the element:
+        // results held by a boot class that a script never removed stayed at opacity 0 for good,
+        // and the evaluation, seeking every animation, read them "visible" (round 16).
+        if (a.playState === "paused" && /paused/.test(cs.animationPlayState) && Number(cs.opacity) < 0.05 && !seen.has("hold\u0000" + selector)) {
+          seen.add("hold\u0000" + selector);
+          let rule = "";
+          const findRule = (rules) => {
+            for (const r of rules) {
+              if (rule) return;
+              if (r.selectorText && r.style && /paused/.test(r.style.animationPlayState || "")) {
+                try { if (el.matches(r.selectorText)) rule = r.selectorText + " { animation-play-state: " + r.style.animationPlayState + (r.style.getPropertyPriority("animation-play-state") ? " !important" : "") + " }"; } catch {}
+              } else if (r.cssRules) findRule(r.cssRules);
+            }
+          };
+          for (const sheet of document.styleSheets) { try { findRule(sheet.cssRules); } catch {} }
+          if (!rule && /paused/.test(el.style.animationPlayState || "")) rule = "its style attribute";
+          out.push({ selector, name: name || "an animation", heldPaused: rule || "animation-play-state: paused" });
+        }
+        // steps() written inside a keyframe overrides the element's smooth easing: a shared
+        // entrance's from { animation-timing-function: steps(5, end) } made a panel hop (round 17).
+        {
+          const stepFn = (e) => /^steps\\(|^step-/.test(String(e || ""));
+          const names = cs.animationName.split(/,\\s*/);
+          const fns = cs.animationTimingFunction.split(/,\\s*(?![^()]*\\))/);
+          const mine = (fns[Math.max(0, names.indexOf(name)) % Math.max(1, fns.length)] || "ease").trim();
+          const odd = !stepFn(mine) ? kf.slice(0, -1).find((k) => stepFn(k.easing)) : undefined;
+          if (name && odd && !seen.has("stp\\u0000" + selector)) {
+            seen.add("stp\\u0000" + selector);
+            out.push({ selector, name, steppedKeyframe: { at: odd.offset === 0 ? "from" : odd.offset === 1 ? "to" : Math.round(Number(odd.computedOffset ?? odd.offset) * 100) + "%", easing: String(odd.easing), own: mine } });
+          }
+        }
+        // width / height animated on a non-replaced inline box do nothing: a usage bar written as
+        // an empty <span> stayed 0x0 for its whole fill (round 17).
+        if (cs.display === "inline" && !/^(img|video|canvas|svg|iframe|input|select|textarea|object|embed)$/i.test(el.tagName) && !seen.has("inl\\u0000" + selector)) {
+          const sizes = [...new Set(kf.flatMap((k) => Object.keys(k).filter((p) => /^(width|height|min-width|min-height|max-width|max-height|inline-size|block-size)$/.test(p))))];
+          if (sizes.length > 0) {
+            seen.add("inl\\u0000" + selector);
+            out.push({ selector, name: name || "an animation", inertSize: sizes, tag: el.tagName.toLowerCase() });
+          }
+        }
+        // A fill that holds a filter at rest: blur(0.6px) left a card soft for good, and even
+        // blur(0) keeps a filter layer the card is rasterised through (round 15).
+        const last = kf[kf.length - 1] || {};
+        const changes = (f) => [...f.matchAll(/([a-z-]+)\\(([^)]*)\\)/g)].some(([, fn, arg]) => {
+          const v = parseFloat(arg);
+          if (!Number.isFinite(v)) return true;
+          if (/^(blur|grayscale|sepia|invert|hue-rotate)$/.test(fn)) return Math.abs(v) > 1e-3;
+          if (/^(brightness|contrast|saturate|opacity)$/.test(fn)) return Math.abs((arg.includes("%") ? v / 100 : v) - 1) > 1e-3;
+          return true;
+        });
+        if (t && (t.fill === "forwards" || t.fill === "both") && last.filter && last.filter !== "none" && changes(String(last.filter)) && !seen.has("flt\u0000" + selector)) {
+          seen.add("flt\u0000" + selector);
+          out.push({ selector, name: name || "an animation", restFilter: String(last.filter) });
+        }
+      }
+    }
+    // Two animations on one element on one property: the later in animation-name wins wherever its
+    // fill reaches. A toast's rise was replaced for its whole run by the pulse after it, whose both
+    // fill held scale(1) through its delay, and the rise read "visible" from its fade (round 18).
+    if (out.length < 8) {
+      const order = cs.animationName.split(/,\\s*/);
+      const css = el.getAnimations().filter((a) => typeof CSSAnimation !== "undefined" && a instanceof CSSAnimation)
+        .sort((a, b) => order.indexOf(a.animationName) - order.indexOf(b.animationName));
+      const propsOf = (a) => new Set(((a.effect && a.effect.getKeyframes) ? a.effect.getKeyframes() : []).flatMap((k) => Object.keys(k).filter((p) => !["offset", "computedOffset", "easing", "composite", "opacity"].includes(p))));
+      const span = (a, applying) => {
+        const t = a.effect.getComputedTiming();
+        const delay = Number(t.delay) || 0;
+        const end = Number(t.endTime);
+        const fill = t.fill;
+        const from = applying && (fill === "backwards" || fill === "both") ? 0 : delay;
+        const to = applying && (fill === "forwards" || fill === "both") ? Infinity : end;
+        return [from, to, delay, fill];
+      };
+      for (let i = 0; i < css.length; i++) {
+        for (let j = i + 1; j < css.length; j++) {
+          const shared = [...propsOf(css[j])].filter((p) => propsOf(css[i]).has(p));
+          if (shared.length === 0 || (css[j].effect.composite || "replace") !== "replace") continue;
+          const [ai, bi] = span(css[i], false);
+          const [aj, bj, dj, fj] = span(css[j], true);
+          const overlap = Math.min(bi, bj) - Math.max(ai, aj);
+          const selector = stableSelector(el);
+          if (overlap > 0 && !seen.has("ovr\u0000" + selector)) {
+            seen.add("ovr\u0000" + selector);
+            out.push({ selector, name: css[i].animationName, overridden: { by: css[j].animationName, props: shared, delayMs: dj, fill: fj, coveredMs: Number.isFinite(overlap) ? Math.round(overlap) : null } });
+          }
+        }
+      }
+    }
+    // A counter-rotation that does not cancel its ancestor's turn: a label at -360deg per 5s inside
+    // a dial at 360deg per 4s drifted 18deg/s on screen (round 18).
+    if (out.length < 8) {
+      const turnRate = (node) => {
+        for (const a of node.getAnimations()) {
+          if (typeof CSSAnimation === "undefined" || !(a instanceof CSSAnimation)) continue;
+          const t = a.effect.getComputedTiming();
+          if (t.iterations !== Infinity || !(Number(t.duration) > 0)) continue;
+          const kf = a.effect.getKeyframes();
+          const angle = (k) => {
+            const m = /rotate(?:Z)?\\((-?[\\d.]+)(deg|turn|rad|grad)\\)/.exec(String((k && (k.transform || k.rotate)) || ""));
+            if (!m) return 0;
+            const v = Number(m[1]);
+            return m[2] === "turn" ? v * 360 : m[2] === "rad" ? (v * 180) / Math.PI : m[2] === "grad" ? v * 0.9 : v;
+          };
+          const d = angle(kf[kf.length - 1]) - angle(kf[0]);
+          if (Math.abs(d) < 1) continue;
+          return { rate: (d / Number(t.duration)) * 1000, name: a.animationName, ms: Number(t.duration), deg: d };
+        }
+        return null;
+      };
+      const mine = turnRate(el);
+      if (mine) {
+        for (let p = el.parentElement; p; p = p.parentElement) {
+          const theirs = turnRate(p);
+          if (!theirs) continue;
+          const net = mine.rate + theirs.rate;
+          const selector = stableSelector(el);
+          if (Math.sign(mine.rate) !== Math.sign(theirs.rate) && Math.abs(net) > 0.5 && !seen.has("ctr\u0000" + selector)) {
+            seen.add("ctr\u0000" + selector);
+            out.push({ selector, name: mine.name, counterDrift: { ancestor: stableSelector(p), theirs: theirs.name, mine: { deg: mine.deg, ms: mine.ms }, other: { deg: theirs.deg, ms: theirs.ms }, net } });
+          }
+          break;
+        }
+      }
+    }
+    // An offset animated on a static box does nothing: a notice meant to slide in animated
+    // \`left\` and only faded, and \`check animation\` read it "visible" (round 14).
+    if (cs.position === "static" && out.length < 8) {
+      for (const a of el.getAnimations()) {
+        const kf = (a.effect && a.effect.getKeyframes) ? a.effect.getKeyframes() : [];
+        const offs = [...new Set(kf.flatMap((k) => Object.keys(k).filter((p) => /^(top|left|right|bottom|inset)/.test(p))))];
+        if (offs.length === 0) continue;
+        // It moves by a transform as well: the slide happens, the offset is only dead weight (a
+        // held-out box animating left and translateX together slid 200px and read "never moves").
+        if (kf.some((k) => ["transform", "translate"].some((p) => k[p] !== undefined && k[p] !== "none"))) continue;
+        const selector = stableSelector(el);
+        const key = selector + "\u0000" + (a.animationName || "");
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ selector, name: a.animationName || "an animation", inertOffsets: offs });
+      }
+    }
     const props = cs.transitionProperty.split(",").map((p) => p.trim());
     const durations = cs.transitionDuration.split(",").map((d) => parseFloat(d) || 0);
     props.forEach((name, i) => {
-      if (!name || name === "all" || name === "none" || name.startsWith("--")) return;
+      if (!name || name === "all" || name === "none") return;
       if (!(durations[i % durations.length] > 0)) return;
+      if (name.startsWith("--")) {
+        if (registered.has(name) || typedProperty(name)) return;
+        const selector = stableSelector(el);
+        if (seen.has(selector + "\u0000" + name) || out.length >= 8) return;
+        seen.add(selector + "\u0000" + name);
+        out.push({ selector, name, unregistered: true });
+        return;
+      }
       if (CSS.supports(name, "initial")) return;
       const selector = stableSelector(el);
       if (seen.has(selector + "\\u0000" + name) || out.length >= 8) return;
       seen.add(selector + "\\u0000" + name);
       out.push({ selector, name });
     });
+  }
+  // A duration token with no unit: transition: transform var(--motion-fast) with --motion-fast: 180
+  // is invalid at computed-value time, so the drawer had no transition and snapped (round 18).
+  {
+    const PROPS = ["transition", "transition-duration", "transition-delay", "animation", "animation-duration", "animation-delay"];
+    const walkVar = (rules) => {
+      for (const r of rules) {
+        if (out.length >= 8) return;
+        if (typeof CSSStyleRule !== "undefined" && r instanceof CSSStyleRule) {
+          for (const prop of PROPS) {
+            const text = r.style.getPropertyValue(prop);
+            if (!text || !text.includes("var(")) continue;
+            let el = null;
+            try { el = document.querySelector(r.selectorText); } catch {}
+            if (!el) continue;
+            const cs = getComputedStyle(el);
+            for (const m of text.matchAll(/var\\(\\s*(--[\\w-]+)/g)) {
+              // Inside calc() a unitless number is a multiplier (calc(var(--i) * 80ms)), not a duration.
+              const before = text.slice(0, m.index);
+              const at = before.lastIndexOf("calc(");
+              if (at >= 0) {
+                let depth = 0;
+                for (const ch of before.slice(at + 4)) depth += ch === "(" ? 1 : ch === ")" ? -1 : 0;
+                if (depth > 0) continue;
+              }
+              const v = cs.getPropertyValue(m[1]).trim();
+              const key = "var\u0000" + r.selectorText + "\u0000" + prop;
+              if (/^-?\\d*\\.?\\d+$/.test(v) && !seen.has(key)) {
+                seen.add(key);
+                out.push({ selector: r.selectorText, name: prop, unitlessVar: { prop, text, variable: m[1], value: v } });
+              }
+            }
+          }
+        } else if (r.cssRules) walkVar(r.cssRules);
+      }
+    };
+    for (const sheet of document.styleSheets) { try { walkVar(sheet.cssRules); } catch {} }
+  }
+  // An @media whose feature the browser does not know never matches (it reads as "not all"): an
+  // entrance behind @media (prefers-reduce-motion: no-preference) never played for anyone, and
+  // the page read "animations: 0 … No animation issues detected" (round 17).
+  {
+    const KNOWN = ["prefers-reduced-motion", "prefers-color-scheme", "prefers-contrast", "prefers-reduced-transparency", "forced-colors", "hover", "any-hover", "pointer", "any-pointer", "orientation", "min-width", "max-width", "width", "min-height", "max-height", "height", "aspect-ratio", "resolution", "min-resolution", "max-resolution", "color-gamut", "display-mode", "scripting", "inverted-colors"];
+    const near = (f) => {
+      let best = null, bd = Infinity;
+      for (const k of KNOWN) {
+        const d = (() => { const m = []; for (let i = 0; i <= f.length; i++) { m[i] = [i]; for (let j = 1; j <= k.length; j++) m[i][j] = i === 0 ? j : Math.min(m[i - 1][j] + 1, m[i][j - 1] + 1, m[i - 1][j - 1] + (f[i - 1] === k[j - 1] ? 0 : 1)); } return m[f.length][k.length]; })();
+        if (d < bd) { bd = d; best = k; }
+      }
+      return bd <= 3 ? best : null;
+    };
+    const moves = (rules) => [...rules].some((r) => (r.style && (/\\S/.test(r.style.animationName || "") && r.style.animationName !== "none" || /\\S/.test(r.style.transitionProperty || "") && (r.style.transitionDuration || "0s") !== "0s")) || (r.cssRules && moves(r.cssRules)));
+    // Chromium keeps an unknown feature's text and evaluates it as false; so does its negation. A
+    // known feature (and value) matches exactly one of (f) and not (f).
+    const unknownAtom = (cond) => {
+      for (const m of String(cond).matchAll(/\\(([^()]+)\\)/g)) {
+        const atom = "(" + m[1] + ")";
+        if (!window.matchMedia(atom).matches && !window.matchMedia("not " + atom).matches) return m[1].trim();
+      }
+      return null;
+    };
+    const walkMedia = (rules) => {
+      for (const r of rules) {
+        if (typeof CSSMediaRule !== "undefined" && r instanceof CSSMediaRule && moves(r.cssRules)) {
+          const header = r.conditionText || r.media.mediaText;
+          const atom = unknownAtom(header);
+          if (atom && !seen.has("med\\u0000" + header) && out.length < 8) {
+            seen.add("med\\u0000" + header);
+            const feature = (/^\\s*([a-z-]+)/i.exec(atom) || [])[1] || "";
+            out.push({ selector: "@media " + header, name: "@media", unknownMedia: { header, feature, suggest: feature ? near(feature) : null } });
+          }
+        } else if (r.cssRules) walkMedia(r.cssRules);
+      }
+    };
+    for (const sheet of document.styleSheets) { try { walkMedia(sheet.cssRules); } catch {} }
   }
   return out;
 })()`;
@@ -1423,6 +1879,7 @@ async function sampleClock(
   const known = new Set((await listStarted().catch(() => [])).map((a) => a.key));
   const started: NonNullable<ClockMotion["started"]> = [];
   const replays = new Map<string, { selector: string; name: string; atMs: number[]; newElement: boolean }>();
+  let prevT = 0;
   for (const t of times) {
     await advanceClock(page, t);
     for (const a of await listStarted().catch(() => [])) {
@@ -1440,9 +1897,11 @@ async function sampleClock(
         name: a.name,
         kind: a.kind,
         atMs: t,
+        afterMs: prevT,
         ...(a.durationMs !== null ? { durationMs: a.durationMs } : {}),
       });
     }
+    prevT = t;
     const frame = await shot(`${label}-${t}ms`);
     const delta = frameDelta(previous, frame, tolerance);
     frames.push(delta);
@@ -1643,6 +2102,15 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       let maxFrameRatio = 0;
       let readback: string | null = null;
       let firstSample: { timeMs: number; frame: RgbaFrame } | null = null;
+      // Its first keyframe as well, against rest: the samples start at 1/samples, and a bar filling
+      // from its left edge got a region that began at its 25% frame (round 17). Only the region.
+      {
+        await seek(timing.index, timing.delayMs);
+        for (const sib of siblings) await seek(sib.index, timing.delayMs);
+        const start = await shot(`anim-${timing.index}-0`);
+        const d0 = frameDelta(baseline, start, tolerance);
+        if (d0.changedPixels >= minChangedPixels) motionBbox = unionBbox(motionBbox, d0.bbox);
+      }
       for (let s = 1; s <= samples; s++) {
         const fraction = s / samples;
         // Stay 1ms inside the iteration end: seeking exactly to the end
@@ -2074,7 +2542,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
           // it "requestAnimationFrame / timers" sent round 7's agents looking for a loop.
           for (const st of rmClock.started!)
             remaining.push({
-              selector: `${st.selector} (a ${st.kind} a timer started at ${st.atMs}ms)`,
+              selector: `${st.selector} (a ${st.kind} a timer started ${beganText(st)})`,
               name: st.name,
               // Its own duration: "shrink 500ms" was the clock window for a 300ms animation (round 9).
               durationMs: st.durationMs ?? lasted,
@@ -2089,7 +2557,19 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
           });
         }
       }
-      reducedMotion = { remainingCount: remaining.length, remaining };
+      // Nothing that moves ran without the preference either: "honored" claimed a choice the page
+      // never made (a fade-only card on a page with no prefers-reduced-motion rule, round 15).
+      const moves = (t: { properties?: string[] }) =>
+        !t.properties || t.properties.length === 0 || t.properties.some((p) => !NOT_MOTION.has(p));
+      const nothingToReduce = remaining.length === 0 && !timings.some(moves) && !clockMotion?.visible;
+      const fadesUnderReduce = rmTimings.filter(
+        (t) => t.playState !== "idle" && t.durationMs >= durationFloor && !moves(t),
+      ).length;
+      reducedMotion = {
+        remainingCount: remaining.length,
+        remaining,
+        ...(nothingToReduce ? { nothingToReduce: true, fadesUnderReduce } : {}),
+      };
     }
 
     const key = (u: { selector: string; name: string }) => `${u.selector}\u0000${u.name}`;
@@ -2149,7 +2629,20 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
     `${DIM}source: ${report.source} (${report.viewport.width}x${report.viewport.height})${report.virtualTime ? ", page clock held (--virtual-time)" : ""}${RESET}`,
   );
   lines.push("");
-  lines.push(`status: ${status}`);
+  // A repaired page whose brief sets no reduced-motion policy still exits 1 on this one suspect
+  // (kept a suspect by decision): say so on the status line, so the rest reads as passed without
+  // hunting the issue list (round 16's boot agents turned the rule off to find that out).
+  const onlyReduced =
+    status === "suspect" &&
+    shown.some((i) => i.row.kind === "reduced-motion-ignored") &&
+    shown.every((i) => i.row.kind === "reduced-motion-ignored" || i.tier !== "suspect");
+  lines.push(
+    `status: ${status}${
+      onlyReduced
+        ? ` — only reduced-motion-ignored (WCAG 2.3.3, AAA): no other rule fails. If the brief sets no reduced-motion policy, the motion passed; --rule reduced-motion-ignored=off exits 0`
+        : ""
+    }`,
+  );
   lines.push(
     `animations: ${report.animationCount} (evaluated ${report.evaluated.length}, infinite ${report.infinite.length})`,
     ...(report.scrollDriven
@@ -2183,9 +2676,13 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
   }
   if (report.reducedMotion) {
     lines.push(
-      report.reducedMotion.remainingCount === 0
-        ? `reduced-motion: honored${report.issues.some((i) => i.kind === "reduced-motion-hides") ? ` — but ${report.issues.filter((i) => i.kind === "reduced-motion-hides").length} element(s) rest hidden or out of place under it${ruleTag("reduced-motion-hides")}` : ""}`
-        : `reduced-motion: ${report.reducedMotion.remainingCount} animation(s) still running${ruleTag("reduced-motion-ignored")}`,
+      report.reducedMotion.nothingToReduce && !report.issues.some((i) => i.kind === "held-paused-animation")
+        ? `reduced-motion: nothing to reduce — no animation here moves anything (only opacity, colour or visibility)${report.reducedMotion.fadesUnderReduce ? `, and the ${report.reducedMotion.fadesUnderReduce} that run still run under reduce, which the preference allows` : ""}; not a sign the page has a prefers-reduced-motion rule`
+        : report.reducedMotion.remainingCount === 0 && report.issues.some((i) => i.kind === "held-paused-animation")
+          ? `reduced-motion: not judged — ${report.issues.filter((i) => i.kind === "held-paused-animation").length} animation(s) are held paused by the page and never run, with or without the preference${ruleTag("held-paused-animation")}`
+          : report.reducedMotion.remainingCount === 0
+            ? `reduced-motion: honored${report.issues.some((i) => i.kind === "reduced-motion-hides") ? ` — but ${report.issues.filter((i) => i.kind === "reduced-motion-hides").length} element(s) rest hidden or out of place under it${ruleTag("reduced-motion-hides")}` : ""}`
+            : `reduced-motion: ${report.reducedMotion.remainingCount} animation(s) still running${ruleTag("reduced-motion-ignored")}`,
     );
   }
   if (report.uncontrolledMotion) {
@@ -2207,7 +2704,11 @@ export function formatAnimationEvalReport(report: AnimationEvalReport, rules?: R
           ? `script-driven change${where}: a timer updates it in place (${c.runs!.timers} run(s), no animation frame) — not motion${ruleTag("clock-motion-unsettled")}`
           : c.settledAtMs === null
             ? `script-driven motion${where}: still moving at ${c.windowMs}ms of virtual time${ruleTag("clock-motion-unsettled")}`
-            : `script-driven motion${where}: settles by ${c.settledAtMs}ms of virtual time${ruleTag("long-settle")}`,
+            : `script-driven motion${where}: settles by ${c.settledAtMs}ms of virtual time${ruleTag("long-settle")}${
+                (c.started ?? []).some((st) => (st.durationMs ?? 0) > 0)
+                  ? ` — the sweep's own frames only: what the timer started runs ${Math.max(...c.started!.map((st) => st.durationMs ?? 0))}ms on its own clock, so measure it with \`vlmkit inspect motion <page> --selector <el>\``
+                  : ""
+              }`,
     );
     if (c.visible && (c.started ?? []).length > 0)
       lines.push(`${DIM}  not a requestAnimationFrame loop: ${clockMotionSource(c)}${RESET}`);

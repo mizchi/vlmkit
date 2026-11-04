@@ -37,7 +37,7 @@ running a loop to detect and repair regressions.
 
 ## Automatic tool bootstrap
 
-### The version these workflows are written against: 0.24.0
+### The version these workflows are written against: 0.25.0
 
 Recorded here, once. The workflows do not repeat it, and
 `tests/skill-package.test.mjs` pins this line to the package's own version so the
@@ -47,10 +47,10 @@ place an agent has already read before it runs a gate.
 Read what is installed before the first gate of a task:
 
 ```sh
-npx vlmkit --version     # vlmkit/0.24.0 darwin-arm64 node-v24.14.1
+npx vlmkit --version     # vlmkit/0.25.0 <platform>-<arch> node-v<version>: only the first word is compared
 ```
 
-- **Older, or not installed** → install `@mizchi/vlmkit@0.24.0` and use that.
+- **Older, or not installed** → install `@mizchi/vlmkit@0.25.0` and use that.
   A workflow that names a verb or a flag the installed CLI does not have fails
   with "unknown option", which reads as the user's mistake rather than as a
   version skew. Recent releases add gates and probe families that older CLIs
@@ -292,6 +292,15 @@ Track 3: A11y Diff      — a11y tree diff → semantic change detection
 | 1    | FAIL — rejected changes, or quality error |
 
 escalate returns exit 0 but emits warnings.
+
+`check animation` exits 1 when `reduced-motion-ignored` is its only suspect, and its status line says so. If
+the brief sets no reduced-motion policy, judge the rest with `--rule reduced-motion-ignored=off`.
+
+## Files it writes
+
+Every gate run appends one line to `.vlmkit/run-ledger.jsonl` in the working directory. The run that creates
+it says so; `--ledger <path>` moves it, and `--no-ledger` writes nothing. Frames and reports go where
+`--frames` / `--out` point (default `test-results/`).
 
 ## How to Write Commit Messages
 

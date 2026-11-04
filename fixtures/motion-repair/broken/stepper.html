@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Inbox</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, ui-sans-serif, sans-serif; background: #f3f4f6; color: #111827; }
+  .layout { display: flex; min-height: 100vh; }
+  .panel { width: 320px; background: #111827; color: #f9fafb; padding: 24px; animation: panel-in 600ms ease-out both; }
+  .panel h2 { margin: 0 0 16px; font-size: 18px; }
+  .panel a { display: block; color: #d1d5db; text-decoration: none; padding: 8px 0; }
+  main { flex: 1; padding: 32px; }
+  @media (max-width: 720px) { .layout { display: block; } .panel { width: auto; } }
+  /* Shared keyframes (motion.css): the entrance every side panel uses. */
+  @keyframes panel-in {
+    from { transform: translateX(-320px); opacity: 0; animation-timing-function: steps(5, end); }
+    to { transform: none; opacity: 1; }
+  }
+</style></head>
+<body>
+  <div class="layout">
+    <nav class="panel" id="panel"><h2>Mail</h2><a href="#">Inbox</a><a href="#">Starred</a><a href="#">Sent</a><a href="#">Archive</a></nav>
+    <main><h1>Inbox</h1><p>No new messages.</p></main>
+  </div>
+</body></html>

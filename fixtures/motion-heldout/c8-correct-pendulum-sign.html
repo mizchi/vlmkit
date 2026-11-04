@@ -1,0 +1,10 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Open sign</title><style>body{margin:0;font:15px/1.4 system-ui,sans-serif;background:#f4f5f7;color:#1d2330}
+.door{margin:60px auto;width:300px;height:420px;background:#7a4b2a;border-radius:8px;position:relative}
+.hook{position:absolute;left:50%;top:40px;width:8px;height:8px;margin-left:-4px;border-radius:50%;background:#ccc}
+.sign{position:absolute;left:50%;top:44px;width:160px;margin-left:-80px;padding-top:40px;transform-origin:50% 0;animation:swing 1.2s ease-in-out 300ms 2}
+.sign::before{content:"";position:absolute;left:50%;top:0;width:60px;height:40px;margin-left:-30px;border:2px solid #ddd;border-bottom:0;transform:none;clip-path:polygon(50% 0,100% 100%,0 100%);background:transparent}
+.sign span{display:block;background:#fff7e0;border:3px solid #d33;border-radius:6px;text-align:center;font:800 26px system-ui;color:#d33;padding:10px 0}
+@keyframes swing{0%{rotate:0deg}25%{rotate:10deg}75%{rotate:-10deg}100%{rotate:0deg}}
+</style></head><body>
+<div class="door"><span class="hook"></span><div class="sign"><span>OPEN</span></div></div>
+</body></html>

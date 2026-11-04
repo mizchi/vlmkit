@@ -1,0 +1,569 @@
+[
+ {
+  "id": "c1-broken-trapped-badge",
+  "file": "c1-broken-trapped-badge.html",
+  "class": 1,
+  "intent": "broken",
+  "brief": "When the page loads, a red count bubble pops in just under the cart icon in the top bar.",
+  "args": [
+   "--selector",
+   ".badge"
+  ],
+  "defect": "The toolbar has transform: translateZ(0), which makes it a stacking context at z-index 0, so the badge's z-index:100 is trapped inside it and the following .promo strip (position:relative; z-index:1; margin-top:-18px) paints over the whole badge.",
+  "expect": {
+   "motion": {
+    "exit": 1,
+    "rule": "target-hidden"
+   },
+   "animation": [
+    "no-visible-effect"
+   ]
+  }
+ },
+ {
+  "id": "c1-correct-clip-reveal",
+  "file": "c1-correct-clip-reveal.html",
+  "class": 1,
+  "intent": "correct",
+  "brief": "The hero banner wipes in from left to right over 700ms as the page loads, ending fully shown.",
+  "args": [
+   "--selector",
+   ".reveal",
+   "--expect-duration",
+   "700ms"
+  ],
+  "expect": {
+   "motion": {
+    "exit": 0
+   },
+   "animation": []
+  }
+ },
+ {
+  "id": "c2-broken-waapi-exit-hidden",
+  "file": "c2-broken-waapi-exit-hidden.html",
+  "class": 2,
+  "intent": "broken",
+  "brief": "Clicking the x on the toast fades it out over 300ms while it sinks slightly, and then it is gone.",
+  "args": [
+   "--click",
+   ".toast-close",
+   "--selector",
+   ".toast",
+   "--exits",
+   "--expect-duration",
+   "300ms",
+   "--expect-direction",
+   "down"
+  ],
+  "defect": "The click handler starts element.animate() for the fade and then sets style.display='none' in the same task, so the toast is removed from rendering at once and the exit animation never shows.",
+  "expect": {
+   "motion": {
+    "exit": 1,
+    "rule": "hidden-at-once"
+   },
+   "animation": []
+  }
+ },
+ {
+  "id": "c2-correct-allow-discrete",
+  "file": "c2-correct-allow-discrete.html",
+  "class": 2,
+  "intent": "correct",
+  "brief": "Clicking Dismiss fades the announcement panel out over 250ms, after which it is gone.",
+  "args": [
+   "--click",
+   ".dismiss",
+   "--selector",
+   ".panel",
+   "--exits",
+   "--expect-duration",
+   "250ms"
+  ],
+  "expect": {
+   "motion": {
+    "exit": 0
+   },
+   "animation": []
+  }
+ },
+ {
+  "id": "c3-broken-waapi-stray-y",
+  "file": "c3-broken-waapi-stray-y.html",
+  "class": 3,
+  "intent": "broken",
+  "brief": "On load the offer card slides in horizontally from the left and fades in, staying on one line.",
+  "args": [
+   "--selector",
+   ".offer",
+   "--expect-direction",
+   "right"
+  ],
+  "defect": "The element.animate() keyframes start at translate: '-360px 48px' — a stray 48px Y offset — so the card rises diagonally instead of sliding horizontally.",
+  "expect": {
+   "motion": {
+    "exit": 1,
+    "rule": "direction-mismatch"
+   },
+   "animation": []
+  }
+ },
+ {
+  "id": "c3-correct-offset-arc",
+  "file": "c3-correct-offset-arc.html",
+  "class": 3,
+  "intent": "correct",
+  "brief": "Clicking Add to cart sends an orange dot arcing up and over to the cart on the right, where it stays.",
+  "args": [
+   "--click",
+   ".add",
+   "--selector",
+   ".dot",
+   "--expect-direction",
+   "right"
+  ],
+  "expect": {
+   "motion": {
+    "exit": 0
+   },
+   "animation": []
+  }
+ },
+ {
+  "id": "c4-broken-inset-inline-static",
+  "file": "c4-broken-inset-inline-static.html",
+  "class": 4,
+  "intent": "broken",
+  "brief": "Hovering a settings row nudges its chevron 6px to the right.",
+  "args": [
+   "--hover",
+   ".row:nth-child(2)",
+   "--selector",
+   ".row:nth-child(2) .chev",
+   "--expect-direction",
+   "right"
+  ],
+  "defect": "The chevron transitions inset-inline-start but is position: static, where inset properties have no effect, so nothing moves.",
+  "expect": {
+   "motion": {
+    "exit": 1,
+    "rule": "direction-mismatch"
+   },
+   "animation": []
+  }
+ },
+ {
+  "id": "c4-correct-fixed-bottom",
+  "file": "c4-correct-fixed-bottom.html",
+  "class": 4,
+  "intent": "correct",
+  "brief": "Shortly after load the snackbar rises up from below the bottom edge of the screen into place.",
+  "args": [
+   "--selector",
+   ".snack",
+   "--expect-direction",
+   "up"
+  ],
+  "expect": {
+   "motion": {
+    "exit": 0
+   },
+   "animation": []
+  }
+ },
+ {
+  "id": "c4-correct-static-left-plus-transform",
+  "file": "c4-correct-static-left-plus-transform.html",
+  "class": 4,
+  "intent": "correct",
+  "brief": "On load the welcome card slides in from the left and fades in.",
+  "args": [
+   "--selector",
+   ".welcome",
+   "--expect-direction",
+   "right"
+  ],
+  "expect": {
+   "motion": {
+    "exit": 0
+   },
+   "animation": []
+  }
+ },
+ {
+  "id": "c5-broken-waapi-fill-blocks-hover",
+  "file": "c5-broken-waapi-fill-blocks-hover.html",
+  "class": 5,
+  "intent": "broken",
+  "brief": "The pricing card pops in on load, and grows slightly when you hover it.",
+  "args": [
+   "--hover",
+   ".plan",
+   "--selector",
+   ".plan"
+  ],
+  "defect": "The entrance element.animate() on scale uses fill: 'forwards', so after it finishes the animation keeps holding scale: 1 and overrides the :hover rule's scale: 1.06.",
+  "expect": {
+   "motion": {
+    "exit": 1,
+    "rule": "held-by-fill"
+   },
+   "animation": []
+  }
+ },
+ {
+  "id": "c5-correct-both-fill-different-property",
+  "file": "c5-correct-both-fill-different-property.html",
+  "class": 5,
+  "intent": "correct",
+  "brief": "The card rises into place on load; hovering it then grows it slightly in place.",
+  "args": [
+   "--hover",
+   ".card",
+   "--selector",
+   ".card",
+   "--expect-still"
+  ],
+  "expect": {
+   "motion": {
+    "exit": 0
+   },
+   "animation": []
+  }
+ },
+ {
+  "id": "c6-broken-unregistered-var",
+  "file": "c6-broken-unregistered-var.html",
+  "class": 6,
+  "intent": "broken",
+  "brief": "Clicking the switch slides its knob smoothly to the right over 250ms.",
+  "args": [
+   "--click",
+   ".switch",
+   "--selector",
+   ".knob",
+   "--expect-direction",
+   "right",
+   "--expect-duration",
+   "250ms"
+  ],
+  "defect": "The knob's translate reads var(--pos) and the rule transitions --pos, but --pos is not registered, so it interpolates discretely and the knob jumps.",
+  "expect": {
+   "motion": {
+    "exit": 1,
+    "rule": "direction-mismatch"
+   },
+   "animation": [
+    "unregistered-property-transition"
+   ]
+  }
+ },
+ {
+  "id": "c6-correct-registerproperty-js",
+  "file": "c6-correct-registerproperty-js.html",
+  "class": 6,
+  "intent": "correct",
+  "brief": "Clicking the switch slides its knob smoothly to the right over 250ms.",
+  "args": [
+   "--click",
+   ".switch",
+   "--selector",
+   ".knob",
+   "--expect-direction",
+   "right",
+   "--expect-duration",
+   "250ms"
+  ],
+  "expect": {
+   "motion": {
+    "exit": 0
+   },
+   "animation": []
+  }
+ },
+ {
+  "id": "c7-broken-hidden-attr-no-starting-style",
+  "file": "c7-broken-hidden-attr-no-starting-style.html",
+  "class": 7,
+  "intent": "broken",
+  "brief": "Clicking the account button opens its menu, which fades in and slides down a few pixels over 200ms.",
+  "args": [
+   "--click",
+   ".menu-btn",
+   "--selector",
+   ".menu",
+   "--expect-direction",
+   "down",
+   "--expect-duration",
+   "200ms"
+  ],
+  "defect": "The menu goes from display:none ([hidden]) to display:block with only opacity/translate transitions and no @starting-style, so there is no before-style to transition from and it pops in.",
+  "expect": {
+   "motion": {
+    "exit": 1,
+    "rule": "snapped"
+   },
+   "animation": []
+  }
+ },
+ {
+  "id": "c7-correct-nested-starting-style",
+  "file": "c7-correct-nested-starting-style.html",
+  "class": 7,
+  "intent": "correct",
+  "brief": "Clicking Share brings up a bottom sheet that rises up into place and fades in over 300ms.",
+  "args": [
+   "--click",
+   ".share",
+   "--selector",
+   ".sheet",
+   "--expect-direction",
+   "up",
+   "--expect-duration",
+   "300ms"
+  ],
+  "expect": {
+   "motion": {
+    "exit": 0
+   },
+   "animation": []
+  }
+ },
+ {
+  "id": "c8-broken-wide-wrapper-origin",
+  "file": "c8-broken-wide-wrapper-origin.html",
+  "class": 8,
+  "intent": "broken",
+  "brief": "Clicking Sync now spins the sync icon once, clockwise, in place.",
+  "args": [
+   "--click",
+   ".sync-btn",
+   "--selector",
+   ".sync svg",
+   "--expect-still",
+   "--expect-direction",
+   "clockwise",
+   "--expect-iterations",
+   "1"
+  ],
+  "defect": "The rotation is applied to .icon-wrap, a display:block span as wide as the card (552px), so its default centre origin is ~276px right of the icon and the icon swings around a large circle.",
+  "expect": {
+   "motion": {
+    "exit": 1,
+    "rule": "direction-mismatch"
+   },
+   "animation": []
+  }
+ },
+ {
+  "id": "c8-correct-pendulum-sign",
+  "file": "c8-correct-pendulum-sign.html",
+  "class": 8,
+  "intent": "correct",
+  "brief": "The hanging OPEN sign swings back and forth from its hook at the top, twice, then hangs still.",
+  "args": [
+   "--selector",
+   ".sign",
+   "--expect-iterations",
+   "2"
+  ],
+  "expect": {
+   "motion": {
+    "exit": 0
+   },
+   "animation": []
+  }
+ },
+ {
+  "id": "c9-broken-invalid-shorthand",
+  "file": "c9-broken-invalid-shorthand.html",
+  "class": 9,
+  "intent": "broken",
+  "brief": "When the page loads the cookie banner slides down from above the top edge into place.",
+  "args": [
+   "--selector",
+   ".banner",
+   "--expect-direction",
+   "down"
+  ],
+  "defect": "In 'animation: banner-drop 400 ease-out both' the unitless 400 is read as animation-iteration-count, not a duration, so the duration stays 0s and the both-filled animation sits at its end state from the first frame: nothing ever slides.",
+  "expect": {
+   "motion": {
+    "exit": 2
+   },
+   "animation": [
+    "zero-duration-animation"
+   ]
+  }
+ },
+ {
+  "id": "c9-correct-colour-only",
+  "file": "c9-correct-colour-only.html",
+  "class": 9,
+  "intent": "correct",
+  "brief": "The status pill changes from grey to green over one second and stays exactly where it is.",
+  "args": [
+   "--selector",
+   ".pill",
+   "--expect-still",
+   "--expect-duration",
+   "1s"
+  ],
+  "expect": {
+   "motion": {
+    "exit": 0
+   },
+   "animation": []
+  }
+ },
+ {
+  "id": "c10-broken-waapi-330",
+  "file": "c10-broken-waapi-330.html",
+  "class": 10,
+  "intent": "broken",
+  "brief": "The loading ring spins clockwise in place, smoothly and forever.",
+  "args": [
+   "--selector",
+   ".spinner",
+   "--expect-iterations",
+   "infinite",
+   "--expect-direction",
+   "clockwise",
+   "--expect-still"
+  ],
+  "defect": "The element.animate() keyframes go from rotate 0deg to 330deg with iterations: Infinity, so every loop snaps 30deg back to the start — a visible seam.",
+  "expect": {
+   "motion": {
+    "exit": 1,
+    "rule": "loop-seam"
+   },
+   "animation": [
+    "loop-seam"
+   ]
+  }
+ },
+ {
+  "id": "c10-correct-steps-dots",
+  "file": "c10-correct-steps-dots.html",
+  "class": 10,
+  "intent": "correct",
+  "brief": "The eight-dot loader ticks round clockwise in eight jumps per turn, forever, in place.",
+  "args": [
+   "--selector",
+   ".loader",
+   "--expect-easing",
+   "steps",
+   "--expect-iterations",
+   "infinite",
+   "--expect-direction",
+   "clockwise",
+   "--expect-still"
+  ],
+  "expect": {
+   "motion": {
+    "exit": 0
+   },
+   "animation": []
+  }
+ },
+ {
+  "id": "plain-list-stagger",
+  "file": "plain-list-stagger.html",
+  "class": "plain",
+  "intent": "correct",
+  "brief": "The four activity rows fade up into place one after another, 80ms apart, each taking 400ms.",
+  "args": [
+   "--selector",
+   ".feed li:nth-child(1)",
+   "--selector",
+   ".feed li:nth-child(2)",
+   "--selector",
+   ".feed li:nth-child(3)",
+   "--selector",
+   ".feed li:nth-child(4)",
+   "--expect-direction",
+   "up",
+   "--expect-duration",
+   "400ms",
+   "--expect-stagger",
+   "80"
+  ],
+  "expect": {
+   "motion": {
+    "exit": 0
+   },
+   "animation": []
+  }
+ },
+ {
+  "id": "plain-drawer",
+  "file": "plain-drawer.html",
+  "class": "plain",
+  "intent": "correct",
+  "brief": "Clicking Menu slides the navigation drawer in from the left edge, easing out over 300ms.",
+  "args": [
+   "--click",
+   ".menu-btn",
+   "--selector",
+   ".drawer",
+   "--expect-direction",
+   "right",
+   "--expect-duration",
+   "300ms",
+   "--expect-easing",
+   "ease-out"
+  ],
+  "expect": {
+   "motion": {
+    "exit": 0
+   },
+   "animation": []
+  }
+ },
+ {
+  "id": "plain-hover-lift",
+  "file": "plain-hover-lift.html",
+  "class": "plain",
+  "intent": "correct",
+  "brief": "Hovering the article card lifts it 4px over 150ms, with a softer, larger shadow.",
+  "args": [
+   "--hover",
+   ".card",
+   "--selector",
+   ".card",
+   "--expect-direction",
+   "up",
+   "--expect-duration",
+   "150ms"
+  ],
+  "expect": {
+   "motion": {
+    "exit": 0
+   },
+   "animation": []
+  }
+ },
+ {
+  "id": "plain-progress-width",
+  "file": "plain-progress-width.html",
+  "class": "plain",
+  "intent": "correct",
+  "brief": "Clicking Upload fills the progress bar from the left to 70% over 600ms, easing in and out.",
+  "args": [
+   "--click",
+   ".start",
+   "--selector",
+   ".fill",
+   "--expect-duration",
+   "600ms",
+   "--expect-easing",
+   "ease-in-out"
+  ],
+  "expect": {
+   "motion": {
+    "exit": 0
+   },
+   "animation": []
+  }
+ }
+]

@@ -1,0 +1,17 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sync status</title><style>body{margin:0;font:15px/1.4 system-ui,sans-serif;background:#f4f5f7;color:#1d2330}
+.card{margin:60px auto;width:600px;background:#fff;border-radius:12px;border:1px solid #dde1e8;padding:20px 24px;box-sizing:border-box}
+.icon-wrap{display:block;height:24px}
+.icon-wrap.spinning{animation:spin 700ms linear 1}
+@keyframes spin{to{rotate:360deg}}
+.sync svg{display:block}
+.sync-btn{margin-top:12px;padding:6px 14px;border-radius:6px;border:1px solid #b9c0cc;background:#f7f8fa;cursor:pointer}
+</style></head><body>
+<section class="card sync">
+<span class="icon-wrap"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.4" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg></span>
+<p>Last synced 2 minutes ago</p>
+<button class="sync-btn">Sync now</button>
+</section>
+<script>
+const w=document.querySelector('.icon-wrap');
+document.querySelector('.sync-btn').addEventListener('click',()=>{w.classList.remove('spinning');void w.offsetWidth;w.classList.add('spinning')});
+</script></body></html>

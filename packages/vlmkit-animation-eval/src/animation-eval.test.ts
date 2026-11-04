@@ -4,6 +4,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  clockMotionSource,
   computeOscillation,
   computeSettleMs,
   deriveAnimationIssues,
@@ -1047,6 +1048,68 @@ test("a transition-property that is no CSS property raises unknown-transition-pr
   assert.match(issues[0]!.message, /div\.bar transitions `widht`, which is no CSS property/);
 });
 
+test("a transition on an unregistered custom property raises unregistered-property-transition (round 13)", () => {
+  const issues = deriveAnimationIssues({
+    evaluated: [],
+    settleMs: 0,
+    infinite: [],
+    unknownTransitions: [{ selector: "div.ring", name: "--p", unregistered: true }],
+  });
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0]!.kind, "unregistered-property-transition");
+  assert.equal(issues[0]!.severity, "suspect");
+  assert.match(issues[0]!.message, /div\.ring transitions `--p`, a custom property no @property registers/);
+});
+
+test("an animation moving left on a static box raises inert-offset-animation (round 14)", () => {
+  const issues = deriveAnimationIssues({
+    evaluated: [],
+    settleMs: 0,
+    infinite: [],
+    unknownTransitions: [{ selector: "div.notice", name: "nudge-in", inertOffsets: ["left"] }],
+  });
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0]!.kind, "inert-offset-animation");
+  assert.match(issues[0]!.message, /div\.notice `nudge-in` animates left, but the element is position: static/);
+});
+
+test("round 15: duplicate @keyframes, a negative-delay entrance and a filter held at rest", () => {
+  const issues = deriveAnimationIssues({
+    evaluated: [],
+    settleMs: 0,
+    infinite: [],
+    unknownTransitions: [
+      { selector: "div.note", name: "fade-up", duplicate: ["opacity, transform", "opacity"] },
+      { selector: "li.row", name: "row-in", negativeDelayMs: -240, durationMs: 300 },
+      { selector: "article.hero", name: "focus-in", restFilter: "blur(0.6px)" },
+    ],
+  });
+  assert.deepEqual(
+    issues.map((i) => [i.kind, i.severity]),
+    [
+      ["duplicate-keyframes", "suspect"],
+      ["negative-delay-entrance", "warn"],
+      ["held-filter", "warn"],
+    ],
+  );
+  assert.match(issues[0]!.message, /which 2 @keyframes rules define \(#1: opacity, transform; #2: opacity\)/);
+  assert.match(issues[1]!.message, /starts 240ms into its 300ms run/);
+  assert.match(issues[2]!.message, /ends on filter: blur\(0\.6px\) and its fill holds it at rest/);
+});
+
+test("a timer-started animation's start is the window between two sweep instants (round 13)", () => {
+  assert.match(
+    clockMotionSource({
+      started: [{ selector: "div.ring", name: "--p", kind: "transition", atMs: 250, afterMs: 125 }],
+    }),
+    /\(begun between 125ms and 250ms\)/,
+  );
+  assert.match(
+    clockMotionSource({ started: [{ selector: "div.ring", name: "--p", kind: "transition", atMs: 250 }] }),
+    /\(begun at 250ms\)/,
+  );
+});
+
 test(
   "runAnimationEval: an element reduced motion leaves at opacity 0 raises reduced-motion-hides (suspect)",
   { timeout: 180_000 },
@@ -1199,5 +1262,108 @@ test(
       [["zero-duration-animation", "suspect"]],
     );
     assert.match(broken.issues[0]!.message, /`animation-timeline` has to come after the `animation` shorthand/);
+  },
+);
+
+test(
+  "runAnimationEval: a fade-only page with no reduced-motion rule is 'nothing to reduce', not 'honored' (round 15)",
+  { timeout: 120_000 },
+  async () => {
+    const fade = await evaluate(
+      "@keyframes fade { from { opacity: 0; } to { opacity: 1; } } #a { animation: fade 400ms ease-out both; }",
+    );
+    assert.equal(fade.reducedMotion?.remainingCount, 0);
+    assert.equal(fade.reducedMotion?.nothingToReduce, true);
+    assert.equal(fade.reducedMotion?.fadesUnderReduce, 1);
+    const text = formatAnimationEvalReport(fade);
+    assert.match(text, /reduced-motion: nothing to reduce — no animation here moves anything/);
+    assert.doesNotMatch(text, /reduced-motion: honored/);
+    // A slide the page does take away under reduce is still honored.
+    const slide = await evaluate(
+      "#a { animation: slide 400ms ease-out both; } @media (prefers-reduced-motion: reduce) { #a { animation: none; } }",
+    );
+    assert.equal(slide.reducedMotion?.nothingToReduce, undefined);
+    assert.match(formatAnimationEvalReport(slide), /reduced-motion: honored/);
+  },
+);
+
+test(
+  "runAnimationEval: an entrance a boot class holds paused is held-paused-animation, and reduced motion is not judged (round 16)",
+  { timeout: 120_000 },
+  async () => {
+    const page = await animPage(
+      ".boot * { animation-play-state: paused !important; } @keyframes up { from { opacity: 0; } to { opacity: 1; } } #a { animation: up 400ms ease-out both; }",
+      '<div class="boot"><div id="a"></div></div>',
+    );
+    const report = await runAnimationEval({ source: page });
+    const held = report.issues.find((i) => i.kind === "held-paused-animation");
+    assert.ok(held, JSON.stringify(report.issues));
+    assert.match(held!.message, /held paused at rest by \.boot \* \{ animation-play-state: paused !important \}/);
+    assert.match(formatAnimationEvalReport(report), /reduced-motion: not judged — 1 animation\(s\) are held paused/);
+  },
+);
+
+test("formatAnimationEvalReport: a lone reduced-motion-ignored is named on the status line (round 16)", () => {
+  const base = { evaluated: [evaluated()], settleMs: 400, infinite: [] };
+  const lone = deriveAnimationIssues({
+    ...base,
+    reducedMotion: { remainingCount: 1, remaining: [{ selector: "#a", name: "slide", durationMs: 400 }] },
+  });
+  const report: AnimationEvalReport = {
+    source: "fixture.html",
+    viewport: { width: 1280, height: 720 },
+    animationCount: 1,
+    ...base,
+    reducedMotion: { remainingCount: 1, remaining: [{ selector: "#a", name: "slide", durationMs: 400 }] },
+    issues: lone,
+  };
+  assert.match(
+    formatAnimationEvalReport(report),
+    /status: suspect — only reduced-motion-ignored \(WCAG 2\.3\.3, AAA\): no other rule fails/,
+  );
+  const clean: AnimationEvalReport = { ...report, reducedMotion: { remainingCount: 0, remaining: [] }, issues: [] };
+  assert.doesNotMatch(formatAnimationEvalReport(clean), /only reduced-motion-ignored/);
+});
+
+test(
+  "runAnimationEval: steps() in a keyframe, width on an inline box, an @media that never matches (round 17)",
+  { timeout: 240_000 },
+  async () => {
+    const dir = join(import.meta.dirname, "../../../fixtures/motion-repair");
+    const kinds = async (f: string) => (await runAnimationEval({ source: join(dir, f) })).issues.map((i) => i.kind);
+    assert.ok((await kinds("broken/stepper.html")).includes("stepped-keyframe"));
+    assert.ok((await kinds("broken/meter.html")).includes("inert-size-animation"));
+    const guard = await runAnimationEval({ source: join(dir, "broken/guard.html") });
+    const media = guard.issues.find((i) => i.kind === "unknown-media-feature");
+    assert.ok(media, JSON.stringify(guard.issues));
+    assert.match(media!.message, /did you mean `prefers-reduced-motion`\?/);
+    for (const f of ["reference/stepper.html", "reference/meter.html", "reference/guard.html"])
+      assert.deepEqual(
+        (await kinds(f)).filter((k) =>
+          ["stepped-keyframe", "inert-size-animation", "unknown-media-feature"].includes(k),
+        ),
+        [],
+        f,
+      );
+  },
+);
+
+test(
+  "runAnimationEval: a later animation overriding an entrance, and a duration token with no unit (round 18)",
+  { timeout: 240_000 },
+  async () => {
+    const dir = join(import.meta.dirname, "../../../fixtures/motion-repair");
+    const kinds = async (f: string) => (await runAnimationEval({ source: join(dir, f) })).issues.map((i) => i.kind);
+    assert.ok((await kinds("broken/combo.html")).includes("overridden-animation"));
+    assert.ok((await kinds("broken/tokens.html")).includes("unitless-duration-var"));
+    assert.ok((await kinds("broken/upright.html")).includes("counter-rotation-drift"));
+    for (const f of ["reference/combo.html", "reference/tokens.html", "reference/upright.html"])
+      assert.deepEqual(
+        (await kinds(f)).filter((k) =>
+          ["overridden-animation", "unitless-duration-var", "counter-rotation-drift"].includes(k),
+        ),
+        [],
+        f,
+      );
   },
 );

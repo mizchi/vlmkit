@@ -408,6 +408,103 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   gate option's warning names the nearest one, the ledger's creation is announced outside a git
   repository too, and with `--jev` a frame the page shows fully but the model calls not shown is
   unknown (`locate-unsure`), not `target-hidden`.
+- **A panel opened from display: none, a fill holding transform over :hover, an unregistered
+  custom property** (round 13, `docs/reports/2026-11-02-motion-repair-v13.md`). What plays at load
+  ends before the first `--click` / `--hover` / `--leave` (a card hovered in its entrance delay read
+  as a 12px jump on the broken page and its repair alike); a leading `--wait` or a first `--scroll`
+  keeps the old timing. A gradient's stop positions and angles are the `gradient` channel (a conic
+  ring filling read `target-static`). `snapped` from not rendered names `@starting-style`; a target
+  leaving by a `display` transition is seen where it is on screen (Chromium leaves it out of
+  hit-testing, and a correct close read "never seen"); `target-static` names a finished animation
+  whose forwards fill still holds what `:hover` sets; a target's timing is from an animation still
+  running (a finished, filled entrance gave a hover 400ms); `--expect-*` that no fitted path checked
+  are `not judged`, not `held`; "no animation" names a transition on a custom property no
+  `@property` registers. dynamic-markup fills entrances `backwards`, not `both`. Its deferred
+  items: with more than one action the output says only the last one's motion was sampled;
+  `channel-step` (fail in one frame, warn across a wider gap) replaces a curve fitted to a colour,
+  gradient or shadow that changes all at once; a conic gradient's first arc is measured, so
+  `--expect-direction clockwise` checks a ring that sweeps; `box-shadow` is a channel (`target-static`
+  ignores it); a frame past a target's own end, where a non-forwards fill took the animation off,
+  is at its own time 1, not the segment's clock; `--at` alone shoots a still page;
+  `check animation`'s `unregistered-property-transition` (suspect, 229 rules) and a timer-started
+  animation's start as a window between sweep instants.
+- **A fade-out hidden by visibility, a rotate before its translate, an offset on a static box**
+  (round 14, `docs/reports/2026-11-02-motion-repair-v14.md`). The targets are measured before the last
+  action, and one shown then and hidden from the next frame is `hidden-at-once` (naming `visibility`
+  left out of the transition), not "never seen"; `--expect-direction` fails a path more than 10° off
+  its axis (naming the transform order when it turns too) and a target that does not move; the target
+  line gives the path's part across its way (`rightwards (and 68px upwards)`); an own animation moving
+  `left` / `top` on a `position: static` box is `inert-offset` (warn) and the cause in a direction
+  fail, and `check animation`'s `inert-offset-animation` (suspect, 230 rules); `turn-off-centre` leaves
+  out a centre the target's own translate explains; when no target is seen every `--expect-*` is not
+  judged. The oracle replays an entrance before sampling: a `backwards` fill leaves a finished
+  animation off its element and out of `getAnimations()`. Its deferred items: a target shown before
+  `--leave` and gone at rest is taken as leaving; `--every-action` samples each action's motion in its
+  own run (`action-N/`, worst exit code); `diff html` drops a global shift that leaves no fewer pixels
+  differing; channels that follow one curve exactly are said once; `target-unchanged` (warn) when
+  every target is still and a non-ancestor animates.
+- **Held out, and what it found** (`fixtures/motion-heldout/`, `docs/reports/2026-11-02-motion-heldout-v1.md`):
+  25 pages by an agent that never saw the code — the ten defect classes in other forms (WAAPI, the
+  individual `translate`/`rotate`/`scale` properties, `offset-path`, `CSS.registerProperty`) and a
+  correct page built to look like each. The first run caught 7 of 10 broken pages, failed 2 correct
+  ones and `check animation` flagged 2 more. Not to re-learn: only `transform` was measured (now the
+  individual properties are composed first); a threshold from one round's example (10° off the axis,
+  now 5° and 8px); a seam on `steps()`; a mismatch claimed between curves within 1.5x
+  (`easing-unchecked` warn); a jump needs 3x the segment's median speed too; a fill is named only for a
+  property the element also transitions (`held-by-fill` when an action changes nothing); `clip` is a
+  channel; registration is probed by computing `initial`. `motion-heldout.test.ts` holds all 25. The
+  set is tuned against now: the next such check needs new pages.
+- **A blur held at rest, a @keyframes name defined twice, a stagger with negative delays** (round 15,
+  `docs/reports/2026-11-02-motion-repair-v15.md`). At 1x Chromium draws a blur under 1px as no blur, so the
+  broken card's rest frame was byte-identical to its repair: only the computed style shows it. `filter` is a
+  channel; a finished animation whose fill holds a filter that changes the picture is `held-filter` (warn, an
+  identity filter is not); `duplicate-keyframes` names what each rule of one name animates (also the cause in
+  a direction fail); a target begun before 0ms and half through at the first frame is said so, not "does not
+  move"; `check animation`'s `duplicate-keyframes` (suspect), `negative-delay-entrance` and `held-filter`
+  (warn), 233 rules, none firing on the repo's 72 other animated pages; an expectation checked on some
+  targets is held and names the others; numbers in computed styles take exponents (`1.2e-05px` read as 5px);
+  `diff png` counts pixels that differ under the threshold (`below:`, `belowThreshold`). Its deferred items:
+  a region at most 8/255 off with no shift is a faint in-place `color-change` (a filter step read
+  `layout-shift`); a page whose animations move nothing reads `reduced-motion: nothing to reduce`, not
+  `honored`; `inspect motion` warns `duplicate-keyframes` with no `--expect-*` when the rules of one name
+  animate different properties; a start-mismatch names the flags its time comes from; `--device-scale <n>`
+  (not with `--jev`) shoots at that scale.
+- **A lifted card under its neighbour, a flip without perspective, entrances a boot class holds** (round 16,
+  `docs/reports/2026-11-03-motion-repair-v16.md`). The 5x5 hit-test never reaches an edge, so 48 points 2px
+  inside it are probed too: `covered-edge` names the cover and the paint order (fail when the target is scaled
+  up, never for a neighbour raised over it on purpose); `flat-3d` (warn) names a 3D turn with no perspective
+  (`perspective` on the turning element gives depth to its children only); a transparent target names the
+  `animation-play-state: paused` rule holding it, and `check animation`'s `held-paused-animation` (suspect, 234
+  rules) does too, with reduced motion `not judged` beside it. Fixed before the agents ran: a `preserve-3d`
+  container is mirrored only by a face turned away with its backface visible, and an animation the page paused
+  and its CSS released at clock 0 is held from where it was paused (it had run out on the real clock). Its deferred items: a measured target still in its own animation when the rest frame comes was released
+  late (a boot hold lifted 300ms after the fonts): frames are added to its end and the rest moves past it
+  (`sampled again:`), where the frame had read a false `jump`; `motion-report.json` path entries carry the drawn
+  `width` / `height`; `check animation` with `reduced-motion-ignored` as its only suspect says so on the
+  status line (still a suspect, still exit 1).
+- **A keyframe that steps, a bar that is a span, a media query nobody matches** (round 17,
+  `docs/reports/2026-11-03-motion-repair-v17.md`). A `steps()` written inside a keyframe that overrides the
+  element's smooth easing is the named cause of `jump` / `easing-mismatch` (else `keyframe-easing` warn; only
+  stepped overrides, since per-keyframe curves are how a bounce is written); a box with no area is not seen,
+  and an inline box animating `width` / `height` is named; a box growing from one edge says its centre is half
+  the growth; an `@media` whose feature or value the browser does not know (Chromium keeps the text and
+  evaluates it false: a known one matches exactly one of `(f)` and `not (f)`) is the cause in `inspect
+  motion`'s "no animation" error. `check animation`: `stepped-keyframe` (warn), `inert-size-animation` and
+  `unknown-media-feature` (suspect), 237 rules, none firing on the repo's 69 other correct animated pages;
+  its motion region includes the first keyframe. `check motion` and `stress media` take motion given only
+  under `prefers-reduced-motion: no-preference` as honouring the preference.
+- **A fill that overrides an entrance, a token with no unit, a label that drifts** (round 18,
+  `docs/reports/2026-11-03-motion-repair-v18.md`). Two animations on one element on one property: the later in
+  `animation-name` wins wherever its fill reaches (a pulse's `both` fill held `scale(1)` through its delay and
+  replaced a rise) — the cause in `direction-mismatch` / `target-static`, else `overridden-animation` (warn);
+  `--expect-duration` holds by any of the target's runs, which the target line lists; a scale gives its range;
+  a transition / animation duration `var()` that resolves to a bare number is the named cause of `snapped`
+  (inside `calc()` it is a multiplier, not named); a curve with no name is said as the element's own timing
+  function; `--every-action` takes one `--expect-direction` / `-duration` / `-iterations` value per action;
+  a target that an ancestor turns says its angle on screen, and `--expect-upright` fails `upright-mismatch`
+  when that changes by over 1°. `check animation`: `overridden-animation` and `unitless-duration-var`
+  (suspect), `counter-rotation-drift` (warn), 240 rules, none of the rounds 16-18 rules firing on the repo's 72
+  other correct animated pages; a counter-rotation's own turn is not blamed on a wrong sign.
 
 ## Generated figures (raster images)
 
@@ -1774,7 +1871,7 @@ case at 0.23.0.
 | `docs/reports/2026-08-06-gate-rule-cost-bench.md` | Measured gate/rule execution cost: where a ruleset's time goes, why per-rule cost is attributed rather than isolated, why suppression saves nothing |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
 | `docs/design/package-decomposition.md` | **Splitting vlmkit by layer** (collector / pure judge / driver / loop / diagrams): what was measured, phase 1 (`vlmkit-judge`) and the proposed phases 2-5 |
-| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 35 gates + 228 rules, behavior changes, what is deliberately not a gate |
+| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 35 gates + 233 rules, behavior changes, what is deliberately not a gate |
 | `docs/design/moonbit-boundary.md` | **TS ↔ MoonBit boundary**: what the positional FFI costs (61 commands, 233 args, 2 duplicated dispatch tables), the JSON boundary that replaces it for new logic, how to add a command, and which pure logic belongs in MoonBit versus which deliberately does not |
 | `docs/crater-css-status.md` | Crater CSS rendering verification status |
 | `docs/reset-css-comparison.md` | Reset CSS domain knowledge |

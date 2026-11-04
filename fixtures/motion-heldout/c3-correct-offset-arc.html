@@ -1,0 +1,12 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Add to cart</title><style>body{margin:0;font:15px/1.4 system-ui,sans-serif;background:#f4f5f7;color:#1d2330}
+.shop{position:relative;margin:240px auto 0;width:760px;height:120px}
+.add{position:absolute;left:0;top:40px;padding:10px 16px;border-radius:8px;border:0;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}
+.cart{position:absolute;right:0;top:30px;width:60px;height:60px;border-radius:12px;background:#e6e9ef;display:grid;place-items:center;font-size:12px}
+.dot{position:absolute;z-index:2;left:150px;top:52px;width:16px;height:16px;border-radius:50%;background:#f97316;opacity:0;offset-path:path("M 0 0 Q 260 -220 560 0");offset-rotate:0deg;offset-distance:0%}
+.dot.fly{opacity:1;animation:fly 800ms ease-in-out both}
+@keyframes fly{from{offset-distance:0%}to{offset-distance:100%}}
+</style></head><body>
+<div class="shop"><button class="add">Add to cart</button><span class="dot"></span><div class="cart">Cart</div></div>
+<script>
+document.querySelector('.add').addEventListener('click',()=>document.querySelector('.dot').classList.add('fly'));
+</script></body></html>

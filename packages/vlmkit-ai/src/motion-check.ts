@@ -61,6 +61,43 @@ export interface MotionDom {
   notRendered?: boolean;
   /** Every colour it paints (background stops, text, border), RGBA in order. */
   paint?: number[];
+  /** Its gradients' stop positions and angles, on paint's 0-255 scale (100% or a turn is 255). */
+  stops?: number[];
+  /** Its box shadows: RGBA of each, then offsets, blur and spread (px). */
+  shadow?: number[];
+  /** A conic gradient's first arc, in degrees from its start (it grows as a ring fills clockwise). */
+  sweepDeg?: number;
+  /** Its own transform's translation (px): what carries its centre when it slides. */
+  shift?: number[];
+  /** Its clip-path's numbers (inset edges, radii), on paint's scale (100% is 255). */
+  clip?: number[];
+  /** Its filter's numbers (a blur's radius x 8, fractions x 255). */
+  filter?: number[];
+  /** A filter its finished animation's fill holds at rest, and why that matters. */
+  heldFilter?: string;
+  /** Its animation's @keyframes name is defined more than once, and what each defines. */
+  dupKeyframes?: string;
+  /** Its angle as drawn through every transform up the tree (2D only), and the ancestor that turns. */
+  screenDeg?: number;
+  turnedBy?: string;
+  /** One of its animations overridden on a property by a later one in animation-name. */
+  overriddenBy?: string;
+  /** Its own timing function when it is a curve with no name (cubic-bezier(…), linear(…)). */
+  ownEasing?: string;
+  /** A transition / animation duration var() that resolves to a unitless number. */
+  varDuration?: string;
+  /** Every run of its own animations (ms), when there is more than one. */
+  durations?: number[];
+  /** A keyframe of its own animation sets a timing function that overrides the element's. */
+  kfEasing?: string;
+  /** Points along its edge another element paints over (the 5x5 grid never reaches an edge). */
+  edgeCover?: { share: number; message: string };
+  /** It turns in 3D with no perspective to give the turn depth, and what to set. */
+  flat3d?: string;
+  /** Its own animation offsets a box that is position: static, where top / left do nothing. */
+  inertOffsets?: string;
+  /** A finished animation's forwards fill still holds what it animated, and why that matters. */
+  heldByFill?: string;
   /** Its transition on background runs over a gradient (which steps: gradients do not interpolate). */
   discreteBg?: boolean;
   /** It takes a click at its centre as the page is. */
@@ -103,6 +140,8 @@ export interface MotionCheckOptions {
    * first target's (or its --expect-start) plus k times this.
    */
   expectStaggerMs?: number;
+  /** Device pixels per CSS px in the frames (a 2x capture): the frame's size in CSS px is its size over this. */
+  frameScale?: number;
   /** How long one run takes (ms) and how many runs (null: infinite): one for all, or per target. */
   expectDurationMs?: readonly number[];
   expectIterations?: readonly (number | null)[];
@@ -110,6 +149,8 @@ export interface MotionCheckOptions {
   expectDirection?: readonly MotionDirection[];
   /** Every target's centre must not move: only its size and opacity change. */
   expectStill?: boolean;
+  /** Its angle on screen must not change (a label kept level inside a turning dial). */
+  expectUpright?: boolean;
   /** Per target in order: this one's centre must not move. */
   expectStillFor?: readonly boolean[];
   /** Animations that change layout on the page ("div.notice animates margin-top"). */
@@ -214,7 +255,8 @@ export async function checkMotionFrames(
     options.jev === false
       ? frames.map((frame): MotionFrameAnswer => {
           const img = decodeImage(Buffer.from(frame.png));
-          frameSize ??= { width: img.width, height: img.height };
+          const k = options.frameScale ?? 1;
+          frameSize ??= { width: Math.round(img.width / k), height: Math.round(img.height / k) };
           return {
             atMs: frame.atMs,
             rest: frame.atMs > options.endMs,
@@ -343,6 +385,11 @@ export async function checkMotionFrames(
     (options.expectStaggerMs !== undefined && i > 0 && staggerFrom !== undefined
       ? staggerFrom + i * options.expectStaggerMs
       : undefined);
+  // Where an expected start comes from, for the fail to say: "not 80ms" named no flag (round 15).
+  const startFrom = (i: number) =>
+    options.expectStartMs?.[i] !== undefined
+      ? `--expect-start ${Math.round(options.expectStartMs[i]!)}`
+      : `${options.expectStartMs?.[0] !== undefined ? `--expect-start ${Math.round(options.expectStartMs[0])}` : `the first target's measured start ${Math.round(staggerFrom!)}ms`} + ${i} × --expect-stagger ${Math.round(options.expectStaggerMs!)}`;
   const targets = options.targets.map((target, i) => {
     const measured = frames.every((f) => f.dom?.[i]);
     const samples: MotionSample[] = answers.map((f) => ({
@@ -364,7 +411,7 @@ export async function checkMotionFrames(
           ? { expectEasing: (options.targetEasing?.[i] ?? options.expectEasing)! }
           : {}),
         ...(originFor(i) ? { expectOrigin: originFor(i)! } : {}),
-        ...(startFor(i) !== undefined ? { expectStartMs: startFor(i)! } : {}),
+        ...(startFor(i) !== undefined ? { expectStartMs: startFor(i)!, expectStartFrom: startFrom(i) } : {}),
         ...(perTarget(options.expectDurationMs, i) !== undefined
           ? { expectDurationMs: perTarget(options.expectDurationMs, i)! }
           : {}),
@@ -375,6 +422,7 @@ export async function checkMotionFrames(
           ? { expectIterations: perTarget(options.expectIterations, i)! }
           : {}),
         ...(options.expectStill || options.expectStillFor?.[i] ? { expectStill: true } : {}),
+        ...(options.expectUpright ? { expectUpright: true } : {}),
         ...(options.layoutMovers ? { layoutMovers: options.layoutMovers } : {}),
       }),
     };

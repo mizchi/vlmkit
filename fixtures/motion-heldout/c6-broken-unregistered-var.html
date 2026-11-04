@@ -1,0 +1,13 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toggle</title><style>body{margin:0;font:15px/1.4 system-ui,sans-serif;background:#f4f5f7;color:#1d2330}
+.knob{--pos:0px}
+.switch{margin:80px auto;display:block;width:52px;height:28px;border-radius:14px;border:0;background:#c6ccd6;padding:0;position:relative;cursor:pointer;transition:background-color 250ms}
+.switch.on{background:#22c55e}
+.knob{position:absolute;left:2px;top:2px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0004;translate:var(--pos) 0;transition:--pos 250ms ease-in-out}
+.switch.on .knob{--pos:24px}
+label{display:block;text-align:center;margin-top:-64px}
+</style></head><body>
+<button class="switch" role="switch" aria-checked="false" aria-label="Email alerts"><span class="knob"></span></button>
+<label>Email alerts</label>
+<script>
+const s=document.querySelector('.switch');s.addEventListener('click',()=>{s.classList.toggle('on');s.setAttribute('aria-checked',s.classList.contains('on'))});
+</script></body></html>

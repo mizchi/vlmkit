@@ -1,0 +1,13 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Share sheet</title><style>body{margin:0;font:15px/1.4 system-ui,sans-serif;background:#f4f5f7;color:#1d2330}
+.share{margin:40px;padding:10px 18px;border-radius:8px;border:0;background:#2563eb;color:#fff;font-weight:600;cursor:pointer}
+.sheet{position:fixed;left:50%;margin-left:-240px;bottom:0;width:480px;box-sizing:border-box;padding:20px 24px 28px;background:#fff;border-radius:16px 16px 0 0;box-shadow:0 -8px 30px #0003;
+  display:none;opacity:0;translate:0 40px;transition:opacity 300ms ease-out,translate 300ms ease-out,display 300ms allow-discrete}
+.sheet.open{display:block;opacity:1;translate:0 0;
+  @starting-style{opacity:0;translate:0 40px}}
+.sheet ul{display:flex;gap:24px;list-style:none;padding:0;margin:12px 0 0}
+</style></head><body>
+<button class="share">Share</button>
+<div class="sheet" role="dialog" aria-label="Share"><strong>Share this article</strong><ul><li>Copy link</li><li>Email</li><li>Messages</li></ul></div>
+<script>
+document.querySelector('.share').addEventListener('click',()=>document.querySelector('.sheet').classList.add('open'));
+</script></body></html>

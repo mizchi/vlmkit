@@ -103,6 +103,78 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
       docs: "A misspelt property (`widht`) computes as itself and its transition never runs: the property it meant changes in one frame, and with no animation on the page nothing else reports it.",
     },
     {
+      id: "duplicate-keyframes",
+      title: "An animation's name is defined by more than one @keyframes rule",
+      severity: "suspect",
+      docs: "The last @keyframes of a name in the cascade wins, so the earlier ones never run: a component's fade-up that rises lost its rise to a utility's fade-only fade-up. Give each its own name.",
+    },
+    {
+      id: "negative-delay-entrance",
+      title: "An entrance starts part way through (a negative animation-delay)",
+      severity: "warn",
+      docs: "A negative delay skips that much of the run, so an entrance from a hidden or offset first keyframe is already part way in at load; in a stagger the later items finish first. A stagger is a positive delay per item.",
+    },
+    {
+      id: "overridden-animation",
+      title: "A later animation on the same property overrides an earlier one",
+      severity: "suspect",
+      docs: "Of two animations on one element that animate one property, the later in animation-name wins wherever its fill reaches: a pulse with a both fill held scale(1) through its delay and replaced a toast's whole rise. Animate one with an individual property (translate / scale / rotate), or drop the backwards fill.",
+    },
+    {
+      id: "counter-rotation-drift",
+      title: "A counter-rotation that does not cancel its ancestor's turn",
+      severity: "warn",
+      docs: "A child turning the other way inside a turning parent at a different rate drifts on screen: a label at -360deg per 5s inside a dial at 360deg per 4s turned 18deg/s. Give the counter-rotation the parent's duration, easing and delay.",
+    },
+    {
+      id: "unitless-duration-var",
+      title: "A duration var() that resolves to a number with no unit",
+      severity: "suspect",
+      docs: "transition: transform var(--motion-fast) with --motion-fast: 180 is invalid at computed-value time, so the transition is dropped and the element snaps. Give the token a unit, or calc(var(--x) * 1ms).",
+    },
+    {
+      id: "stepped-keyframe",
+      title: "A keyframe's steps() overrides the element's smooth easing",
+      severity: "warn",
+      docs: "animation-timing-function inside @keyframes applies per keyframe and wins over the element's: a shared entrance with from { animation-timing-function: steps(5, end) } made a panel hop in five. Only stepped overrides are named; per-keyframe curves are how a bounce is written.",
+    },
+    {
+      id: "inert-size-animation",
+      title: "width / height animated on an inline box",
+      severity: "suspect",
+      docs: "width and height do not apply to a non-replaced inline box: a usage bar written as an empty <span> animating width stayed 0x0. Give it display: block or inline-block.",
+    },
+    {
+      id: "unknown-media-feature",
+      title: "An @media around motion that names an unknown feature",
+      severity: "suspect",
+      docs: "A media feature (or value) the browser does not know makes the query false for everyone: @media (prefers-reduce-motion: no-preference) never matched, so its entrance never played. Names the nearest known feature.",
+    },
+    {
+      id: "held-paused-animation",
+      title: "An animation the page holds paused while its element is invisible",
+      severity: "suspect",
+      docs: "animation-play-state: paused at rest on an element at opacity 0 means its entrance never plays: a boot class whose removal names the wrong class kept every result blank. The evaluation seeks every animation, so its frames show it as if it ran; this rule reads the page's own state.",
+    },
+    {
+      id: "held-filter",
+      title: "A filter is held at rest by an animation's fill",
+      severity: "warn",
+      docs: "A forwards or both fill keeps the last keyframe's filter for good: a blur(0.6px) left a card soft (at 1x it can draw as no blur, so screenshots miss it), and even blur(0) keeps a filter layer. End without the filter, or fill backwards.",
+    },
+    {
+      id: "inert-offset-animation",
+      title: "An animation moves top / left on a position: static box",
+      severity: "suspect",
+      docs: "Offsets do nothing on a static box, so a keyframe `left: -360px` never moves it: the rest of the animation (a fade) still shows and reads as visible. Give it position: relative, or animate transform: translate().",
+    },
+    {
+      id: "unregistered-property-transition",
+      title: "A transition on a custom property no @property registers",
+      severity: "suspect",
+      docs: "An unregistered custom property has no type, so `transition: --p 1s` never interpolates: whatever reads it (a conic-gradient stop, a width through calc()) changes in one frame, and with no animation on the page nothing else reports it. Register it with @property and the syntax of its values.",
+    },
+    {
       id: "reduced-motion-hides",
       title: "Under reduced motion an element rests hidden or out of place",
       severity: "suspect",
@@ -321,7 +393,13 @@ video, an animated image or a worker. A page can also draw on demand: it gets a
     `${report.animationCount} animation(s),` +
     ` settle ${report.settleMs === null ? "never" : `${Math.round(report.settleMs)}ms`},` +
     ` reduced-motion ${
-      report.reducedMotion ? (report.reducedMotion.remainingCount === 0 ? "honored" : "IGNORED") : "n/a"
+      report.reducedMotion
+        ? report.reducedMotion.nothingToReduce
+          ? "nothing to reduce"
+          : report.reducedMotion.remainingCount === 0
+            ? "honored"
+            : "IGNORED"
+        : "n/a"
     }`,
   ledger: (report, options) => ({
     tool: "check-animation",

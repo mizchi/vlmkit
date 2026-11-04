@@ -270,7 +270,17 @@ describe("composed built-in registry", () => {
     // deferred items).
     // 227 → 228: `check animation` / `zero-duration-animation` (suspect) — a reading bar's
     // shorthand reset its animation-timeline, and it sat full from load (round 12).
-    assert.equal(total, 228);
+    // 228 → 229: `check animation` / `unregistered-property-transition` (suspect) — a usage ring's
+    // `transition: --p` on a custom property nothing registers stepped at once (round 13).
+    // 229 → 230: `check animation` / `inert-offset-animation` (suspect) — a notice animating `left`
+    // on a static box only faded (round 14).
+    // 230 → 233: `check animation` / `duplicate-keyframes`, `negative-delay-entrance`, `held-filter`
+    // (round 15: a @keyframes name defined twice, a stagger with negative delays, a blur held at rest).
+    // 233 → 234: `check animation` / `held-paused-animation` (motion-repair round 16).
+    // 234 → 237: `stepped-keyframe`, `inert-size-animation`, `unknown-media-feature` (round 17).
+    // 237 → 239: `overridden-animation`, `unitless-duration-var` (round 18).
+    // 239 → 240: `counter-rotation-drift` (round 18).
+    assert.equal(total, 240);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {

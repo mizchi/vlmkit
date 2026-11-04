@@ -220,6 +220,73 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
       ["--selector", ".toast", "--exits", "--expect-easing", "ease-out,ease-in"],
       /FAIL snap-back .*in the hold after 660ms/,
     ],
+    // Round 18: a later animation's fill overriding an entrance, a unitless duration token, and a
+    // counter-rotation that does not cancel its parent's turn.
+    [
+      "combo.html",
+      ["--selector", "#toast", "--expect-direction", "up"],
+      /FAIL direction-mismatch .*`rise` and `pulse` both animate transform, and `pulse` comes later in animation-name, so its value wins: its both fill holds/,
+    ],
+    [
+      "tokens.html",
+      ["--selector", "#drawer", "--click", "#open"],
+      /FAIL snapped: .*reads --motion-fast, which is 180 — a number with no unit/,
+    ],
+    [
+      "upright.html",
+      ["--selector", "#label", "--expect-upright"],
+      /FAIL upright-mismatch .*div#dial turns it, and its own counter-rotation does not cancel that turn/,
+    ],
+    // Round 17: steps() inside a keyframe, and width animated on an inline box.
+    [
+      "stepper.html",
+      ["--selector", "#panel"],
+      /FAIL jump .*`panel-in`'s from keyframe sets animation-timing-function: steps\(5\), which overrides the element's own ease-out/,
+    ],
+    [
+      "meter.html",
+      ["--selector", "#fill"],
+      /FAIL target-hidden .*it has no area \(0x0\): it is a <span> laid out inline \(display: inline\), where width and height do not apply, so animating width grows nothing/,
+    ],
+    // Round 16: a lifted card under its neighbour, and entrances a boot class holds paused.
+    [
+      "lift.html",
+      ["--selector", "#p2", "--hover", "#p2"],
+      /FAIL covered-edge .*raised \(scale 1\.\d+\) and covered at its edge .*by section#p3: both are stacking contexts at z-index: auto/,
+    ],
+    [
+      "boot.html",
+      ["--selector", ".result:nth-child(1)"],
+      /FAIL target-hidden .*held paused at 0ms of its animation `result-in` by \.is-booting \* \{ animation-play-state: paused \}/,
+    ],
+    // Round 15: a @keyframes name defined twice, and a stagger whose delays are negative.
+    [
+      "fadeup.html",
+      ["--selector", "#n1", "--expect-direction", "up"],
+      /FAIL direction-mismatch .*`fade-up` is defined by 2 @keyframes rules \(#1 animates opacity, transform; #2 animates opacity\)/,
+    ],
+    [
+      "queue.html",
+      ["--selector", "#r4", "--expect-direction", "up"],
+      /FAIL direction-mismatch .*its own animation began 240ms before the page was shown and was \d+% through at the first frame/,
+    ],
+    // Round 14: a bubble whose visibility flips before its fade-out, a card whose rotate comes
+    // before its translate, and a notice animating left on a static box.
+    [
+      "hint.html",
+      ["--selector", ".bubble", "--hover", ".help", "--leave", "--exits"],
+      /FAIL hidden-at-once .*shown before --leave .*visibility changes at once/,
+    ],
+    [
+      "ticket.html",
+      ["--selector", ".ticket", "--expect-direction", "right"],
+      /travels 200px rightwards \(and 68px upwards\)[\s\S]*FAIL direction-mismatch .*68px upwards on the way .*put the translate first/,
+    ],
+    [
+      "nudge.html",
+      ["--selector", ".notice", "--expect-direction", "right"],
+      /FAIL direction-mismatch .*it does not move .*`nudge-in` animates left, but the element is position: static/,
+    ],
     // Round 12: an SVG gear turning about its viewBox's centre, and a button whose label wraps
     // while its width eases.
     [
@@ -340,12 +407,12 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
         "--expect-stagger",
         "60",
       ],
-      /FAIL start-mismatch .*begins at 420ms, not 240ms/,
+      /FAIL start-mismatch .*begins at 420ms, not 240ms \(--expect-start 240\)/,
     ],
     [
       "chips.html",
       ["--selector", ".chips", "--expect-start", "0"],
-      /FAIL start-mismatch .*begins at 1200ms, not 0ms: late by 1200ms/,
+      /FAIL start-mismatch .*begins at 1200ms, not 0ms \(--expect-start 0\): late by 1200ms/,
     ],
     // Round 3: an ancestor's opacity 0 named, a scale's fixed point, and a stagger that is not one.
     [
@@ -372,7 +439,7 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
         "--expect-stagger",
         "80",
       ],
-      /FAIL start-mismatch .*begins at 200ms, not 280ms.*; set by `li:nth-child\(2\) \{ animation-delay: 200ms \}`[\s\S]*begins: li\.a1 200ms, li\.a2 200ms, li\.a3 200ms, li\.a4 200ms — all within one frame/,
+      /FAIL start-mismatch .*begins at 200ms, not 280ms \(the first target's measured start 200ms \+ 1 × --expect-stagger 80\).*; set by `li:nth-child\(2\) \{ animation-delay: 200ms \}`[\s\S]*begins: li\.a1 200ms, li\.a2 200ms, li\.a3 200ms, li\.a4 200ms — all within one frame/,
     ],
     [
       "stagger.html",
@@ -429,6 +496,326 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
     assert.match(broken.out, /warn turn-off-centre .*carried up to \d+px .*transform-box: fill-box/);
     const fixed = await run("reference/gear.html", ["--selector", ".gear"]);
     assert.doesNotMatch(fixed.out, /turn-off-centre/);
+    // Round 14: a card that slides while it straightens is carried by its translate.
+    const slide = await run("reference/ticket.html", ["--selector", ".ticket"]);
+    assert.doesNotMatch(slide.out, /turn-off-centre/);
+  });
+
+  // Round 13, before any agent ran: both reference pages failed on these.
+  it(
+    "lets the load entrance end before a --hover, and fits a gradient's moving stop",
+    { timeout: 180_000 },
+    async () => {
+      const lift = await run("reference/rise.html", ["--selector", "#p2", "--hover", "#p2"]);
+      assert.equal(lift.code, 0, lift.out);
+      // 4px; 3px under a full suite's load, where a hover transition (a real pointer event) is
+      // caught a frame late and the path starts one frame in. The curve and timing hold either way.
+      assert.match(lift.out, /runs 150ms: travels [34]px upwards .*follows ease-out/, lift.out);
+      const ring = await run("reference/ring.html", ["--selector", ".ring"]);
+      assert.equal(ring.code, 0, ring.out);
+      assert.match(ring.out, /follows ease-out in its gradient/, ring.out);
+      assert.doesNotMatch(ring.out, /target-static/);
+    },
+  );
+
+  // Round 13's agents: each broken page names its cause, and a correct close is seen.
+  it(
+    "names @starting-style, a forwards fill under :hover and an unregistered custom property",
+    { timeout: 300_000 },
+    async () => {
+      const open = await run("broken/popin.html", ["--selector", ".panel", "--click", ".share-btn"]);
+      assert.equal(open.code, 1, open.out);
+      assert.match(
+        open.out,
+        /FAIL snapped: .*it was not rendered \(it is display: none\) before the action.*@starting-style/,
+      );
+      const close = await run("reference/popin.html", [
+        "--selector",
+        ".panel",
+        "--click",
+        ".share-btn",
+        "--click",
+        ".share-btn",
+        "--exits",
+      ]);
+      assert.equal(close.code, 0, close.out);
+      assert.match(close.out, /travels 8px upwards/);
+      const lift = await run("broken/rise.html", ["--selector", "#p2", "--hover", "#p2", "--expect-direction", "up"]);
+      assert.match(
+        lift.out,
+        /warn target-static .*`rise` ended with animation-fill-mode: both and still holds transform:/,
+      );
+      // Expected to go up and it does not move: a fail since round 14, naming the fill.
+      assert.match(
+        lift.out,
+        /FAIL direction-mismatch .*it does not move .*`rise` ended with animation-fill-mode: both/,
+      );
+      assert.doesNotMatch(lift.out, /held: --expect-direction/);
+      const errors: string[] = [];
+      const error = console.error;
+      console.error = (m: string) => errors.push(m);
+      try {
+        assert.equal((await run("broken/ring.html", ["--selector", ".ring"])).code, 2);
+      } finally {
+        console.error = error;
+      }
+      assert.match(errors.join("\n"), /div\.ring(\.filled)? transitions --p, a custom property no @property registers/);
+    },
+  );
+
+  // Round 13's deferred items.
+  it("steps, sweeps, shadows, the action sampled and own time past the end", { timeout: 400_000 }, async () => {
+    const step = await run("broken/ring.html", ["--selector", ".ring", "--at", "150..300/1f"]);
+    assert.equal(step.code, 1, step.out);
+    assert.match(step.out, /FAIL channel-step at 200ms: its gradient steps between 183ms and 200ms, in one frame/);
+    const coarse = await run("broken/ring.html", ["--selector", ".ring", "--end", "1500"]);
+    assert.match(coarse.out, /warn channel-step .*two frames 150ms apart/);
+    assert.doesNotMatch(coarse.out, /follows overshoot/);
+    const sweep = await run("reference/ring.html", ["--selector", ".ring", "--expect-direction", "clockwise"]);
+    assert.equal(sweep.code, 0, sweep.out);
+    assert.match(sweep.out, /its conic arc sweeps clockwise \d+°[\s\S]*held: --expect-direction clockwise/);
+    const back = await run("reference/ring.html", ["--selector", ".ring", "--expect-direction", "counterclockwise"]);
+    assert.match(back.out, /FAIL direction-mismatch .*its conic arc sweeps clockwise/);
+    const shadow = await run("broken/rise.html", ["--selector", "#p2", "--hover", "#p2"]);
+    assert.match(shadow.out, /follows ease-out in its shadow/);
+    const cards = await run("reference/rise.html", ["--selector", "#p1", "--selector", "#p2", "--selector", "#p3"]);
+    assert.equal(
+      (cards.out.match(/travels 16px upwards over the frames measured, follows ease-out exactly/g) ?? []).length,
+      3,
+      cards.out,
+    );
+    const twice = await run("reference/popin.html", [
+      "--selector",
+      ".panel",
+      "--click",
+      ".share-btn",
+      "--click",
+      ".share-btn",
+      "--exits",
+    ]);
+    assert.match(
+      twice.out,
+      /sampled: the motion --click \.share-btn \(the last action\) starts; what --click \.share-btn started ran to its end unsampled/,
+    );
+  });
+
+  // Round 14's deferred items.
+  it(
+    "samples every action, takes a --leave as the exit, and names the element that moved instead",
+    { timeout: 400_000 },
+    async () => {
+      const both = await run("reference/hint.html", [
+        "--selector",
+        ".bubble",
+        "--hover",
+        ".help",
+        "--leave",
+        "--every-action",
+      ]);
+      assert.equal(both.code, 0, both.out);
+      assert.match(both.out, /== 1\/2: the motion --hover \.help starts[\s\S]*== 2\/2: the motion --leave starts/);
+      assert.match(both.out, /taken as leaving: it was shown before --leave/);
+      assert.doesNotMatch(both.out, /absent-at-rest/);
+      const trigger = await run("reference/hint.html", ["--selector", ".help", "--hover", ".help"]);
+      assert.match(
+        trigger.out,
+        /warn target-unchanged .*span\.bubble animates: if that is what should move, give it as --selector/,
+      );
+      const once = await run("reference/nudge.html", ["--selector", ".notice"]);
+      assert.match(once.out, /follows ease-out exactly in its path and its opacity/);
+    },
+  );
+
+  it(
+    "names a filter its fill holds at rest, and fits the filter as a channel (round 15)",
+    { timeout: 240_000 },
+    async () => {
+      const soft = await run("broken/focus.html", ["--selector", ".hero"]);
+      assert.match(soft.out, /follows ease-out exactly in its opacity and its filter/);
+      assert.match(
+        soft.out,
+        /warn held-filter .*`focus-in` ends on filter: blur\(0\.6px\) and its fill holds it at rest/,
+      );
+      const sharp = await run("reference/focus.html", ["--selector", ".hero"]);
+      assert.doesNotMatch(sharp.out, /held-filter|channel-step/, sharp.out);
+    },
+  );
+
+  it(
+    "warns on a @keyframes name defined twice with no --expect-*, and shoots at --device-scale 2 (round 15 deferred)",
+    { timeout: 240_000 },
+    async () => {
+      const rise = await run("broken/fadeup.html", ["--selector", "#n1"]);
+      assert.match(
+        rise.out,
+        /warn duplicate-keyframes .*`fade-up` is defined by 2 @keyframes rules .*\(here it travels 0px\)/,
+        rise.out,
+      );
+      const fixed = await run("reference/fadeup.html", ["--selector", "#n1"]);
+      assert.doesNotMatch(fixed.out, /duplicate-keyframes/, fixed.out);
+      const sharp = await run("broken/focus.html", ["--selector", ".hero", "--device-scale", "2"]);
+      assert.match(sharp.out, /warn held-filter/, sharp.out);
+      const manifest = /--manifest (\S+frames\.json)/.exec(sharp.out)![1]!;
+      const { readFile } = await import("node:fs/promises");
+      assert.equal(JSON.parse(await readFile(manifest, "utf8")).source.deviceScaleFactor, 2);
+    },
+  );
+
+  it(
+    "reads a correct preserve-3d flip card as turned, not mirrored, and times entrances a boot class released (round 16)",
+    { timeout: 240_000 },
+    async () => {
+      const card = await run("reference/turn.html", ["--selector", "#card", "--click", "#card"]);
+      assert.doesNotMatch(card.out, /mirrored/, card.out);
+      const flat = await run("reference/boot.html", [
+        "--selector",
+        ".result:nth-child(1)",
+        "--selector",
+        ".result:nth-child(4)",
+      ]);
+      assert.match(
+        flat.out,
+        /target "\.result:nth-child\(1\)", begins at 0ms, runs 400ms: travels 16px upwards/,
+        flat.out,
+      );
+      assert.doesNotMatch(flat.out, /target-static/, flat.out);
+    },
+  );
+
+  it("names a 3D turn drawn without perspective (round 16)", { timeout: 240_000 }, async () => {
+    const flat = await run("broken/turn.html", ["--selector", "#card", "--click", "#card"]);
+    assert.match(
+      flat.out,
+      /warn flat-3d .*perspective: 900px on div#card itself gives depth to its children, not to its own turn — move it to its parent \(div\.scene\)/,
+      flat.out,
+    );
+    const deep = await run("reference/turn.html", ["--selector", "#card", "--click", "#card"]);
+    assert.doesNotMatch(deep.out, /flat-3d/, deep.out);
+    const settle = await run("reference/lift.html", [
+      "--selector",
+      "#p2",
+      "--selector",
+      "#p3",
+      "--hover",
+      "#p2",
+      "--leave",
+    ]);
+    assert.doesNotMatch(settle.out, /covered-edge|taken as leaving/, settle.out);
+  });
+
+  it(
+    "samples again past an entrance released after the plan was made, and writes each frame's drawn size (round 16 deferred)",
+    { timeout: 240_000 },
+    async () => {
+      const { readFile, writeFile } = await import("node:fs/promises");
+      const late = join(await mkdtemp(join(tmpdir(), "vlmkit-late-")), "late.html");
+      const src = await readFile(join(dir, "reference/boot.html"), "utf8");
+      await writeFile(
+        late,
+        src.replace(
+          'document.fonts.ready.then(() => document.body.classList.remove("is-booting"))',
+          'document.fonts.ready.then(() => new Promise((r) => setTimeout(r, 300))).then(() => document.body.classList.remove("is-booting"))',
+        ),
+      );
+      const lines: string[] = [];
+      const log = console.log;
+      console.log = (m: string) => lines.push(m);
+      let code: number;
+      const frames = await mkdtemp(join(tmpdir(), "vlmkit-late-frames-"));
+      try {
+        code = await runMotionCli([late, "--selector", ".result:nth-child(4)", "--frames", frames]);
+      } finally {
+        console.log = log;
+      }
+      const out = lines.join("\n");
+      assert.equal(code, 0, out);
+      assert.match(
+        out,
+        /sampled again: \.result:nth-child\(4\) began later than the page's animations were timed at load/,
+      );
+      assert.doesNotMatch(out, /FAIL jump/);
+      const report = JSON.parse(await readFile(join(frames, "motion-report.json"), "utf8"));
+      assert.ok(report.targets[0].path.every((p: { height?: number }) => typeof p.height === "number"));
+    },
+  );
+
+  it(
+    "names an @media that never matches as why nothing animates, and a bar growing from its edge (round 17)",
+    { timeout: 240_000 },
+    async () => {
+      const dead = await run("broken/guard.html", ["--selector", "#hero"]);
+      assert.equal(dead.code, 2, dead.out);
+      const bar = await run("reference/meter.html", ["--selector", "#fill"]);
+      assert.match(bar.out, /\(its centre: its box grows \d+px from its left edge, which stays put\)/, bar.out);
+    },
+  );
+
+  it(
+    "holds --expect-duration by any of a target's runs, and checks one value per action under --every-action (round 18)",
+    { timeout: 240_000 },
+    async () => {
+      const toast = await run("reference/combo.html", ["--selector", "#toast", "--expect-duration", "400ms"]);
+      assert.doesNotMatch(toast.out, /duration-mismatch/, toast.out);
+      assert.match(toast.out, /\(its animations run 400ms, 1600ms\)/, toast.out);
+      const drawer = await run("reference/tokens.html", [
+        "--selector",
+        "#drawer",
+        "--click",
+        "#open",
+        "--click",
+        "#open",
+        "--every-action",
+        "--exits",
+        "--expect-direction",
+        "left,right",
+      ]);
+      assert.equal(drawer.code, 0, drawer.out);
+      assert.doesNotMatch(drawer.out, /ran to its end unsampled/, drawer.out);
+      assert.match(drawer.out, /its own timing function is cubic-bezier\(0, 0, 0\.2, 1\)/, drawer.out);
+    },
+  );
+
+  it(
+    "names a counter-rotation, not a wrong sign, when an ancestor turns the target too (round 18)",
+    { timeout: 240_000 },
+    async () => {
+      const label = await run("reference/upright.html", ["--selector", "#label", "--expect-direction", "clockwise"]);
+      assert.match(
+        label.out,
+        /that is its own turn, against div#dial's, which also turns it — a counter-rotation turns the other way on purpose/,
+        label.out,
+      );
+      assert.doesNotMatch(label.out, /wrong sign/, label.out);
+    },
+  );
+
+  it("says an empty argument is not a page", () => {
+    assert.throws(() => parseMotionArgs(["p.html", "--selector", ".t", "--expect-still", ""]), /empty argument/);
+  });
+
+  it("takes --device-scale 1-4 and refuses it with --jev", () => {
+    assert.equal(parseMotionArgs(["p.html", "--selector", ".t", "--device-scale", "2"]).deviceScale, 2);
+    assert.equal(parseMotionArgs(["p.html", "--selector", ".t"]).deviceScale, 1);
+    assert.throws(() => parseMotionArgs(["p.html", "--selector", ".t", "--device-scale", "9"]), /1 to 4/);
+    assert.throws(
+      () => parseMotionArgs(["p.html", "--jev", "--target", "the card", "--device-scale", "2"]),
+      /leave out --jev/,
+    );
+  });
+
+  it("takes --no-ledger, and prints a usage error without the whole help", async () => {
+    assert.doesNotThrow(() => parseMotionArgs(["p.html", "--selector", ".t", "--no-ledger"]));
+    const errors: string[] = [];
+    const error = console.error;
+    console.error = (m: string) => errors.push(m);
+    try {
+      assert.equal(await runMotionCli(["p.html", "--selector", ".t", "--bogus"]), 2);
+    } finally {
+      console.error = error;
+    }
+    const out = errors.join("\n");
+    assert.match(out, /error: unknown option --bogus\n\(vlmkit inspect motion --help lists every option\)/);
+    assert.ok(out.split("\n").length < 10, out);
   });
 
   it("samples the hold between two segments", () => {

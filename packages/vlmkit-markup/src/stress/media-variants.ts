@@ -278,7 +278,8 @@ export async function runMediaVariants(options: MediaVariantsOptions): Promise<M
           // analysis is more reliable:
           //   1. has `@media (prefers-reduced-motion: reduce)` rule?
           //   2. does the page declare any animations at all?
-          const hasReduceRule = /@media[^{]*prefers-reduced-motion[^{]*reduce/i.test(allCss);
+          // Either form honours it: motion removed under `reduce`, or given only under `no-preference`.
+          const hasReduceRule = /@media[^{]*prefers-reduced-motion\s*:\s*(reduce|no-preference)/i.test(allCss);
           const hasAnimation = /\banimation\s*:|@keyframes\b|\btransition\s*:/i.test(allCss);
           // Declared is not enough: what is seen at rest without the preference must be seen with it.
           const reducedOp = new Map(restReduced.map((r) => [r.selector, r.opacity]));

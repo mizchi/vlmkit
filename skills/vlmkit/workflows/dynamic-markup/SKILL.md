@@ -53,8 +53,13 @@ authoring motion — animations move pixels and make composition reports
 harder to read.
 
 One addition when animations are specified: author the entrance
-animation with `both`/`forwards` fill ending exactly at the static
-layout you converged, so the rest pose equals the screenshots.
+animation so it ends exactly at the static layout you converged, so the
+rest pose equals the screenshots. Fill it `backwards` (it holds its
+`from` pose through its delay), not `both`/`forwards`: a forwards fill
+keeps the last keyframe's value applied for good, and an animated value
+outranks every rule — a card's `:hover` lift and its transition on
+`transform` then never apply. The rest pose comes from the element's own
+style once the animation ends.
 
 ## Phase B — dynamic gates
 
@@ -240,8 +245,13 @@ vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ea
 ```
 
 - **Without `--jev` the page measures everything**: position, opacity, scale, the element's own
-  animation time, and how much of it is the topmost thing painted (a 5x5 hit-test of its box),
-  which is what sees a clip or a cover. On `fixtures/motion-defects/` that caught 6 of the 7
+  animation time, and how much of it is the topmost thing painted (a 5x5 hit-test of its box,
+  plus points just inside its edges), which is what sees a clip or a cover — a hovered card
+  that grows under its neighbour is `covered-edge`. A 3D turn with no `perspective` on the
+  turning element's parent is `flat-3d` (drawn as a squash). Gate motion by preference either way:
+  take it away under `prefers-reduced-motion: reduce`, or give it only under `no-preference`.
+  "Stays upright / level while its parent turns" is `--expect-upright` (its angle on screen);
+  `--expect-still` is its centre only. On `fixtures/motion-defects/` that caught 6 of the 7
   broken pages by the expected rule, with all 7 intact pages passing. The one it cannot see is
   text left lying on other text (`overlap-rest`): that is `check integrity`'s `text-collision`,
   or `--jev`, whose default `--forbid` statement asks it.
@@ -260,6 +270,8 @@ vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ea
   as "the first fail's own frame" — a thinned strip can skip it; `easing-mismatch` = the timing function;
   `target-static` = nothing about it animates (a dropped rule, a misspelt name). The command
   prints the strip line to look at (cropped to where the targets move); open single frames for detail.
+  A sub-pixel effect (a 0.6px blur held at rest) can draw as nothing at 1x: `held-filter` names it
+  from the computed style, and `--device-scale 2` shoots the frames as a 2x screen shows them.
 - **Where and when are in the brief too: say them.** Every line names when the target's own
   animation begins and, for a scale, the point it grows from — but only an expectation fails on
   them. A popover that must grow out of its button: `--expect-origin bottom-left`
@@ -281,7 +293,9 @@ vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ea
   and a snap-back after it is the fail. Without the flag, each target's
   line still says `begins at …, runs …ms x3` / `and repeats forever`. Which way: "glides in
   from beyond the right edge" moves left — `--expect-direction left`
-  (every line says `travels 360px leftwards`). Motion a click starts:
+  (every line says `travels 360px leftwards`); it also fails a path more
+  than 5° (and 8px) off that axis ("slides straight across" that swoops up), and a
+  target expected to move that does not move at all. Motion a click starts:
   `--click <css>` (repeat for several) clicks on the held page first;
   if nothing animates and a `--selector` target changes anyway, that
   is `snapped` — the usual cause is a transition to `height: auto`,
@@ -289,7 +303,9 @@ vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ea
   0fr → 1fr` runs in every engine). Motion a pointer or a scroll starts: `--hover <css>`,
   `--leave` and `--scroll <css>` are actions too, run in order, each one before the last let
   run to its end — "settles back when the pointer moves off" is `--hover .card --leave`
-  (`snapped` there names a transition declared only in the `:hover` rule), and "fades up as it
+  (`snapped` there names a transition declared only in the `:hover` rule; a target the pointer
+  leaving hides is taken as leaving, and `--every-action` measures the fade-in and the fade-out
+  in one command), and "fades up as it
   scrolls into view" is `--scroll .section`. `check animation` evaluates motion that runs from
   load only: it passes a page whose motion all waits for a click, a hover or a scroll. "Stays
   dead centre", "only its size and opacity change" is `--expect-still`; a target that sits off

@@ -3,6 +3,53 @@
 All notable changes to this project will be documented in this file.
 Dates are YYYY-MM-DD.
 
+## 0.25.0 — 2026-11-04
+
+Changed:
+
+- `check animation` has 240 rules, up from 228, and the new suspects can turn a passing page into exit 1:
+  - suspects: `unregistered-property-transition`, `inert-offset-animation`, `duplicate-keyframes`,
+    `held-paused-animation`, `inert-size-animation`, `unknown-media-feature`, `overridden-animation`,
+    `unitless-duration-var`;
+  - warns: `negative-delay-entrance`, `held-filter`, `stepped-keyframe`, `counter-rotation-drift`.
+- `check motion` and `stress media` accept motion given only under `prefers-reduced-motion: no-preference`.
+- `reduced-motion-ignored` is still a suspect. When it is the only one, the status line says so.
+
+Added:
+
+- `inspect motion`, shaped by motion-repair rounds 13-18 and a held-out set of 25 pages built by an agent that
+  never saw the code:
+  - Expectations: `--expect-upright` (its angle on screen through every transform up the tree).
+    `--every-action` samples each action's motion in its own run, and takes one `--expect-direction` /
+    `-duration` / `-iterations` value per action.
+  - Options: `--device-scale <n>`.
+  - Channels measured: filter, box-shadow, clip-path, gradient stops, colour, and the individual
+    `translate` / `rotate` / `scale` properties.
+  - Failures it names include:
+    - `covered-edge`, `flat-3d`, `hidden-at-once`, `inert-offset`, `held-filter`;
+    - `duplicate-keyframes`, `keyframe-easing`, `overridden-animation`, `upright-mismatch`;
+    - `channel-step`, `target-unchanged`, `held-by-fill`, `easing-unchecked`.
+  - Causes it names on screen, so an agent need not find them in the CSS:
+    - `animation-play-state: paused` held by a rule;
+    - a box with no area, and an inline box animating `width`;
+    - an `@media` with an unknown feature;
+    - a unitless duration token;
+    - a later animation's fill override;
+    - a negative delay.
+  - An animation released late, after the plan was made at load, is sampled again to its end. Path entries in
+    `motion-report.json` carry the drawn width and height.
+- `diff png` counts the pixels that differ under the threshold (`belowThreshold`). A faint region with no
+  shift reads as a faint in-place `color-change`.
+- The router skill has a "Files it writes" section (the run ledger, `--ledger`, `--no-ledger`).
+
+Fixed:
+
+- A correct `preserve-3d` flip card no longer reads `mirrored`.
+- An animation that a page paused and whose CSS released it at load is held on the page clock.
+- `reduced-motion: honored` is no longer printed when nothing moves (`nothing to reduce`), or when animations
+  are held paused (`not judged`).
+- Numbers in computed styles take exponents (`1.2e-05px` had read as 5px).
+
 ## 0.24.0 — 2026-11-02
 
 Breaking:

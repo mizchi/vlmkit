@@ -1,0 +1,11 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Offer card</title><style>body{margin:0;font:15px/1.4 system-ui,sans-serif;background:#f4f5f7;color:#1d2330}
+.row{padding:60px 0 0 420px}
+.offer{width:320px;background:#fff;border-radius:14px;padding:20px;box-shadow:0 6px 20px #0002;box-sizing:border-box}
+.offer h2{margin:0 0 6px;font-size:20px}
+</style></head><body>
+<div class="row"><article class="offer"><h2>20% off annual plans</h2><p>Upgrade before Friday to keep the discount.</p></article></div>
+<script>
+document.querySelector('.offer').animate(
+  [{translate:'-360px 48px',opacity:0},{translate:'0 0',opacity:1}],
+  {duration:500,delay:100,easing:'ease-out',fill:'backwards'});
+</script></body></html>

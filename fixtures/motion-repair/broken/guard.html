@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Welcome</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.5 system-ui, ui-sans-serif, sans-serif; background: #fdf8f3; color: #1c1917; }
+  .hero { max-width: 720px; margin: 120px auto; padding: 0 24px; }
+  .hero h1 { font-size: 40px; margin: 0 0 12px; }
+  .hero p { font-size: 18px; color: #57534e; margin: 0; }
+  @keyframes rise { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+  /* Only for people who have not asked their system for reduced motion. */
+  @media (prefers-reduce-motion: no-preference) {
+    .hero { animation: rise 500ms ease-out both; }
+  }
+</style></head>
+<body>
+  <section class="hero" id="hero"><h1>Plan your week in five minutes</h1><p>One list, every calendar, no setup.</p></section>
+</body></html>

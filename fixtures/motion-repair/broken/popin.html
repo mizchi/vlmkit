@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Report</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #f8fafc; color: #0f172a; }
+  header { display: flex; align-items: center; justify-content: space-between; height: 64px; padding: 0 32px; background: #fff; border-bottom: 1px solid #e2e8f0; }
+  header h1 { font-size: 18px; margin: 0; }
+  .share { position: relative; }
+  .share button { padding: 8px 16px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; font: inherit; cursor: pointer; }
+  .panel { position: absolute; right: 0; top: calc(100% + 8px); width: 280px; padding: 16px; border-radius: 12px; background: #fff; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16); display: none; opacity: 0; transform: translateY(-8px); transition: opacity 200ms ease-out, transform 200ms ease-out, display 200ms allow-discrete; }
+  .panel.open { display: block; opacity: 1; transform: none; }
+  .panel p { margin: 0 0 8px; font-weight: 600; }
+  .panel input { width: 100%; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font: 13px ui-monospace, monospace; }
+  main { max-width: 760px; margin: 40px auto; padding: 0 24px; }
+</style></head>
+<body>
+  <header>
+    <h1>Q3 revenue report</h1>
+    <div class="share">
+      <button type="button" class="share-btn" aria-expanded="false">Share</button>
+      <div class="panel" role="dialog" aria-label="Share">
+        <p>Anyone with the link can view</p>
+        <input readonly value="https://example.com/r/q3-2026">
+      </div>
+    </div>
+  </header>
+  <main>
+    <h2>Summary</h2>
+    <p>Revenue grew 12% quarter on quarter, led by the self-serve plan. Churn held at 2.1%.</p>
+  </main>
+  <script>
+    const btn = document.querySelector(".share-btn");
+    const panel = document.querySelector(".panel");
+    btn.addEventListener("click", () => {
+      const open = panel.classList.toggle("open");
+      btn.setAttribute("aria-expanded", String(open));
+    });
+  </script>
+</body></html>

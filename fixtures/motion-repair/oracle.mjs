@@ -1,5 +1,5 @@
 // Hidden from the agents: judges a repaired page against its brief.
-// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet|slidein|progress|accordion|dialog|hover|reveal|flip|interrupt|reduced|push|seam|draw|gradient|quote|dismiss|reading|gear|label> <page.html>
+// node fixtures/motion-repair/oracle.mjs <notify|menu|toast|drawer|popover|stagger|tooltip|tiles|chips|banner|badge|sheet|slidein|progress|accordion|dialog|hover|reveal|flip|interrupt|reduced|push|seam|draw|gradient|quote|dismiss|reading|gear|label|popin|rise|ring|hint|ticket|nudge|focus|fadeup|queue|lift|turn|boot|stepper|meter|guard|combo|tokens|upright> <page.html>
 import { chromium } from "playwright";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
@@ -8,6 +8,7 @@ const [kind, file] = process.argv.slice(2);
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 if (kind === "reduced") await page.emulateMedia({ reducedMotion: "reduce" });
+else await page.emulateMedia({ reducedMotion: "no-preference" });
 await page.goto(pathToFileURL(resolve(file)).href);
 const at = (t) =>
   page.evaluate((t) => {
@@ -653,6 +654,482 @@ if (kind === "notify") {
   await page.evaluate(() => { for (const x of document.getAnimations()) x.finish(); });
   const after = await page.evaluate(() => { const a = document.querySelector(".add"); const r = a.getBoundingClientRect(); const cs = getComputedStyle(a); return { w: r.width, h: r.height, bg: cs.backgroundColor, text: a.textContent.trim(), clipped: a.scrollWidth > a.clientWidth + 1 }; });
   ok("after: 'Added ✓ — View cart', 260px wide, 44px high, green, nothing cut off", after.text === "Added ✓ — View cart" && Math.abs(after.w - 260) <= 1 && Math.abs(after.h - 44) <= 1 && after.bg === "rgb(21, 128, 61)" && !after.clipped, after);
+} else if (kind === "popin") {
+  // Pauses whatever runs on the panel at t and reads it. A transition, a @keyframes entrance or a Web
+  // Animation all pass: the brief is about what is seen.
+  const panelAt = (t) =>
+    page.evaluate((t) => {
+      const el = document.querySelector(".panel");
+      const anims = el.getAnimations();
+      const d = Math.max(0, ...anims.map((a) => a.effect.getComputedTiming().endTime));
+      for (const a of anims) { a.pause(); a.currentTime = t; }
+      const r = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      return { d, n: anims.length, op: Number(cs.opacity), display: cs.display, y: r.y, right: r.right, w: r.width };
+    }, t);
+  const finish = () => page.evaluate(() => document.querySelector(".panel").getAnimations().forEach((a) => a.finish()));
+  const closed = await panelAt(0);
+  ok("closed at load: the panel is not shown", closed.display === "none" || closed.op < 0.05, closed);
+  await page.click(".share-btn");
+  const o0 = await panelAt(0);
+  const o100 = await panelAt(100);
+  ok("opening: something animates it over about 200ms", o100.n > 0 && Math.abs(o100.d - 200) <= 20, o100);
+  ok("opening starts transparent and 8px higher", o0.op < 0.1 && o0.display !== "none", { o0 });
+  await finish();
+  const open = await panelAt(0);
+  ok("open: fully shown, 280px wide, right edge under the button's", open.op > 0.99 && Math.abs(open.w - 280) <= 1 && Math.abs(open.right - 1248) <= 2, open);
+  ok("opening at 100ms: past half faded in, past half the drop (ease-out)", o100.op > 0.5 && o100.op < 0.99 && open.y - o100.y > -4 && o100.y < open.y, { o100, open, o0 });
+  ok("opening drops 8px into place", Math.abs(open.y - o0.y - 8) <= 1, { o0, open });
+  await page.click(".share-btn");
+  const c100 = await panelAt(100);
+  ok("closing: it fades out over about 200ms", c100.n > 0 && Math.abs(c100.d - 200) <= 20 && c100.op > 0.01 && c100.op < 0.5 && c100.display !== "none", c100);
+  await finish();
+  const gone = await panelAt(0);
+  ok("closed again: gone", gone.display === "none" || (gone.op < 0.05 && !(await page.evaluate(() => document.elementFromPoint(1200, 140)?.closest(".panel")))), gone);
+} else if (kind === "rise") {
+  const ids = ["#p1", "#p2", "#p3"];
+  const entrance = await page.evaluate((ids) =>
+    ids.map((id) => {
+      const el = document.querySelector(id);
+      const a = el.getAnimations().find((x) => !x.transitionProperty);
+      if (!a) return null;
+      const t = a.effect.getComputedTiming();
+      return { delay: t.delay, d: t.duration };
+    }), ids);
+  ok("entrance: each card 400ms, 100ms after the one before", entrance.every((e, i) => e && Math.abs(e.d - 400) <= 1 && Math.abs(e.delay - i * 100) <= 1), entrance);
+  const mid = await page.evaluate(() => {
+    const el = document.querySelector("#p2");
+    const a = el.getAnimations().find((x) => !x.transitionProperty);
+    a.pause(); a.currentTime = 100 + 200;
+    const r = el.getBoundingClientRect();
+    const out = { op: Number(getComputedStyle(el).opacity), y: r.y };
+    a.play();
+    return out;
+  });
+  // Let the entrance end the way a visitor sees it, in real time.
+  await page.waitForTimeout(900);
+  const rest = await rect("#p2");
+  ok("mid-entrance: rising and fading in", mid.op > 0.3 && mid.op < 0.99 && mid.y > rest[1] + 0.5 && mid.y < rest[1] + 16, { mid, rest });
+  const box = rest;
+  await page.mouse.move(box[0] + box[2] / 2, box[1] + box[3] / 2);
+  const up = await page.evaluate(() => {
+    const el = document.querySelector("#p2");
+    const a = el.getAnimations().find((x) => x.transitionProperty === "transform" || x.transitionProperty === "translate");
+    if (!a) return null;
+    const d = a.effect.getComputedTiming().duration;
+    a.pause(); a.currentTime = 75;
+    const y = el.getBoundingClientRect().y;
+    a.play();
+    return { d, y };
+  });
+  ok("pointer over: a 150ms transition moves it", up && Math.abs(up.d - 150) <= 1, up);
+  ok("lifting at 75ms: more than half way up (ease-out)", up && (rest[1] - up.y) / 4 > 0.6 && rest[1] - up.y < 3.98, { rest, up });
+  await page.waitForTimeout(400);
+  ok("lifted 4px while over it", Math.abs((await rect("#p2"))[1] - (rest[1] - 4)) <= 0.5, await rect("#p2"));
+  const shadow = await page.evaluate(() => getComputedStyle(document.querySelector("#p2")).boxShadow);
+  ok("its shadow deepens", /14px 28px/.test(shadow), shadow);
+  await page.mouse.move(5, 5);
+  await page.waitForTimeout(400);
+  ok("back at rest after the pointer leaves", JSON.stringify(await rect("#p2")) === JSON.stringify(rest), { now: await rect("#p2"), rest });
+} else if (kind === "ring") {
+  // The arc's end read from the pixels: the blue share of 360 points just inside the ring's edge.
+  const share = () =>
+    page.evaluate(async () => {
+      const r = document.querySelector(".ring").getBoundingClientRect();
+      return { x: r.x, y: r.y, w: r.width, h: r.height };
+    });
+  const box = await share();
+  const arc = async () => {
+    const png = await page.screenshot({ clip: { x: box.x, y: box.y, width: box.w, height: box.h } });
+    return page.evaluate(async (b64) => {
+      const img = new Image();
+      img.src = "data:image/png;base64," + b64;
+      await img.decode();
+      const c = new OffscreenCanvas(img.width, img.height);
+      const g = c.getContext("2d");
+      g.drawImage(img, 0, 0);
+      const { data, width, height } = g.getImageData(0, 0, img.width, img.height);
+      let blue = 0;
+      for (let i = 0; i < 360; i++) {
+        const a = ((i + 0.5) / 360) * 2 * Math.PI;
+        const x = Math.round(width / 2 + Math.sin(a) * width * 0.44), y = Math.round(height / 2 - Math.cos(a) * height * 0.44);
+        const k = (y * width + x) * 4;
+        if (data[k + 2] > 200 && data[k] < 80) blue++;
+      }
+      return blue / 360;
+    }, png.toString("base64"));
+  };
+  const hold = (t) => page.evaluate((t) => { for (const a of document.getAnimations()) { a.pause(); a.currentTime = t; } return document.getAnimations().length; }, t);
+  ok("before it starts: empty", (await arc()) < 0.02, await arc());
+  await page.waitForTimeout(400);
+  const n = await hold(0);
+  ok("once it starts, something animates the ring", n > 0, n);
+  const durs = await page.evaluate(() => document.getAnimations().map((a) => a.effect.getComputedTiming().endTime));
+  ok("over about one second", durs.some((d) => Math.abs(d - 1000) <= 50), durs);
+  const s = [];
+  for (const t of [0, 100, 250, 500, 750, 999]) { await hold(t); s.push(Math.round((await arc()) * 1000) / 10); }
+  ok("it fills a little at a time (0 → 72%, never jumping more than 30 points between samples)", s.every((v, i) => i === 0 || (v >= s[i - 1] - 0.5 && v - s[i - 1] < 30)) && s[0] < 10, s);
+  ok("slowing at the end: past half its way at half its time", s[3] > 36 && s[3] < 71, s);
+  await page.evaluate(() => document.getAnimations().forEach((a) => a.finish()));
+  const end = await arc();
+  ok("filled: 72% blue", Math.abs(end - 0.72) <= 0.02, end);
+  const label = await page.evaluate(() => document.querySelector(".ring span").textContent.trim());
+  ok("the number says 72%", label === "72%", label);
+  const size = await rect(".ring");
+  ok("the ring is still 140px", size[2] === 140 && size[3] === 140, size);
+} else if (kind === "hint") {
+  const help = await rect(".help");
+  const bubbleAt = (t) =>
+    page.evaluate((t) => {
+      const el = document.querySelector(".bubble");
+      const anims = el.getAnimations();
+      const d = Math.max(0, ...anims.map((a) => a.effect.getComputedTiming().endTime));
+      for (const a of anims) { a.pause(); a.currentTime = t; }
+      const cs = getComputedStyle(el);
+      const r = el.getBoundingClientRect();
+      return { d, n: anims.length, op: Number(cs.opacity), vis: cs.visibility, display: cs.display, x: r.x, y: r.y, w: r.width, bottom: r.bottom };
+    }, t);
+  const finish = () => page.evaluate(() => document.querySelector(".bubble").getAnimations().forEach((a) => a.finish()));
+  const shown = (b) => b.display !== "none" && b.vis === "visible" && b.op > 0.02;
+  const before = await bubbleAt(0);
+  ok("before the pointer: the bubble is not shown", !shown(before), before);
+  await page.mouse.move(help[0] + help[2] / 2, help[1] + help[3] / 2);
+  const in100 = await bubbleAt(100);
+  ok("pointer over: it fades in over about 200ms", in100.n > 0 && Math.abs(in100.d - 200) <= 20 && shown(in100) && in100.op > 0.3 && in100.op < 0.98, in100);
+  await finish();
+  const open = await bubbleAt(0);
+  ok("shown above the icon, 240px wide, fully opaque", shown(open) && open.op > 0.99 && Math.abs(open.w - 240) <= 1 && open.bottom <= help[1] - 8 && open.bottom >= help[1] - 12, { open, help });
+  await page.mouse.move(5, 5);
+  const out100 = await bubbleAt(100);
+  ok("pointer off: it fades out over about 200ms, still shown at 100ms", out100.n > 0 && Math.abs(out100.d - 200) <= 20 && shown(out100) && out100.op > 0.2 && out100.op < 0.8, out100);
+  await finish();
+  const gone = await bubbleAt(0);
+  ok("then gone", !shown(gone), gone);
+} else if (kind === "ticket" || kind === "nudge") {
+  // A finished entrance with a fill other than forwards is off its element (and out of
+  // getAnimations), so it is played again from its start and paused there before it is sampled.
+  await page.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    el.style.animation = "none";
+    void el.offsetWidth;
+    el.style.animation = "";
+    window.__oAnims = document.getAnimations();
+    for (const a of window.__oAnims) a.pause();
+  }, kind === "ticket" ? ".ticket" : ".notice");
+}
+if (kind === "ticket") {
+  const poseAt = (t) =>
+    page.evaluate((t) => {
+      const el = document.querySelector(".ticket");
+      for (const a of window.__oAnims) { a.pause(); a.currentTime = t; }
+      const r = el.getBoundingClientRect();
+      const tf = getComputedStyle(el).transform;
+      const m = new DOMMatrixReadOnly(tf === "none" ? undefined : tf);
+      return { cx: r.x + r.width / 2, cy: r.y + r.height / 2, deg: (Math.atan2(m.b, m.a) * 180) / Math.PI, op: Number(getComputedStyle(el).opacity) };
+    }, t);
+  const timing = await page.evaluate(() => { const a = window.__oAnims[0]; const t = a?.effect.getComputedTiming(); return t ? { d: t.duration, delay: t.delay } : null; });
+  ok("one 500ms entrance at load", timing && Math.abs(timing.d - 500) <= 1 && timing.delay === 0, timing);
+  const rest = await poseAt(500);
+  const p = [];
+  for (const t of [0, 100, 200, 300, 400, 499]) p.push(await poseAt(t));
+  ok("at rest: in place, upright, opaque", Math.abs(rest.deg) < 0.5 && rest.op > 0.99 && Math.abs(rest.cx - 640) <= 2 && Math.abs(rest.cy - 400) <= 2, rest);
+  ok("starts 200px to the left, tilted 20° anticlockwise, transparent", Math.abs(p[0].cx - (rest.cx - 200)) <= 3 && Math.abs(p[0].deg + 20) <= 1 && p[0].op < 0.05, p[0]);
+  ok("travels horizontally the whole way: its centre stays within 2px of its resting height", p.every((x) => Math.abs(x.cy - rest.cy) <= 2), p.map((x) => [Math.round(x.cx), Math.round(x.cy)]));
+  ok("slowing at the end: past half its way at 200ms of 500", (p[2].cx - p[0].cx) / 200 > 0.55 && p[2].cx < rest.cx, p.map((x) => Math.round(x.cx)));
+} else if (kind === "nudge") {
+  const at2 = (t) =>
+    page.evaluate((t) => {
+      const el = document.querySelector(".notice");
+      for (const a of window.__oAnims) { a.pause(); a.currentTime = t; }
+      const r = el.getBoundingClientRect();
+      return { x: r.x, y: r.y, w: r.width, op: Number(getComputedStyle(el).opacity) };
+    }, t);
+  const timing = await page.evaluate(() => { const a = window.__oAnims[0]; const t = a?.effect.getComputedTiming(); return t ? { d: t.duration } : null; });
+  ok("a 400ms entrance at load", timing && Math.abs(timing.d - 400) <= 1, timing);
+  const rest = await at2(400);
+  const s0 = await at2(0);
+  const s1 = await at2(160);
+  ok("at rest: in its place in the column, opaque", rest.op > 0.99 && Math.abs(rest.x - 304) <= 2, rest);
+  ok("starts 360px to the left of its place, transparent", Math.abs(s0.x - (rest.x - 360)) <= 3 && s0.op < 0.05 && Math.abs(s0.y - rest.y) <= 1, { s0, rest });
+  ok("slowing at the end: past half its way at 160ms of 400", (s1.x - s0.x) / 360 > 0.55 && s1.x < rest.x - 1, { s0, s1, rest });
+  const list = await rect("ul");
+  ok("the list below stays where it is", Math.abs(list[1] - (rest.y + 56 + 24)) <= 30, { list, rest });
+} else if (kind === "focus" || kind === "fadeup" || kind === "queue") {
+  // Each entrance played again from its start and its handles kept: a finished animation with a
+  // fill other than forwards is off its element.
+  const sel = { focus: ".hero", fadeup: ".note", queue: ".row" }[kind];
+  await page.evaluate((sel) => {
+    for (const el of document.querySelectorAll(sel)) {
+      el.style.animation = "none";
+      void el.offsetWidth;
+      el.style.animation = "";
+    }
+    window.__oAnims = document.getAnimations();
+    for (const a of window.__oAnims) a.pause();
+  }, sel);
+  const at = (t) =>
+    page.evaluate(
+      ({ t, sel }) => {
+        for (const a of window.__oAnims) { a.pause(); a.currentTime = t; }
+        return [...document.querySelectorAll(sel)].map((el) => {
+          const cs = getComputedStyle(el);
+          const r = el.getBoundingClientRect();
+          const blur = /blur\(([\d.]+)px\)/.exec(cs.filter);
+          return { y: r.y, op: Number(cs.opacity), blur: blur ? Number(blur[1]) : 0, filter: cs.filter };
+        });
+      },
+      { t, sel },
+    );
+  const rest = await at(2000);
+  if (kind === "focus") {
+    const [s0] = await at(0), [s1] = await at(300), [r] = rest;
+    ok("at rest: fully opaque and perfectly sharp (no blur left)", r.op > 0.99 && r.blur === 0, r);
+    ok("starts blurred (6px or more) and transparent", s0.blur >= 6 && s0.op < 0.05, s0);
+    ok("half way: still a little blurred and fading in", s1.blur > 0.3 && s1.op > 0.3 && s1.op < 0.99, s1);
+    const d = await page.evaluate(() => Math.max(...window.__oAnims.map((a) => a.effect.getComputedTiming().endTime)));
+    ok("over about 600ms", Math.abs(d - 600) <= 20, d);
+  } else if (kind === "fadeup") {
+    for (const [i, delay] of [0, 60, 120].entries()) {
+      const s0 = (await at(delay))[i], s1 = (await at(delay + 120))[i], r = rest[i];
+      ok(`note ${i + 1}: starts 12px below its place, transparent, at ${delay}ms`, Math.abs(s0.y - (r.y + 12)) <= 1 && s0.op < 0.05, { s0, r });
+      ok(`note ${i + 1}: rising and fading in at ${delay + 120}ms`, s1.y < r.y + 11 && s1.y > r.y + 0.5 && s1.op > 0.2 && s1.op < 0.99, { s1, r });
+      ok(`note ${i + 1}: in place at rest`, r.op > 0.99, r);
+    }
+  } else {
+    for (let k = 0; k < 4; k++) {
+      const before = k > 0 ? (await at(k * 80 - 10))[k] : null;
+      const mid = (await at(k * 80 + 100))[k];
+      const r = rest[k];
+      if (before) ok(`row ${k + 1}: not visible before its turn (${k * 80 - 10}ms)`, before.op < 0.05, before);
+      ok(`row ${k + 1}: rising and fading in at ${k * 80 + 100}ms`, mid.op > 0.2 && mid.op < 0.99 && mid.y > r.y + 0.5 && mid.y < r.y + 12, { mid, r });
+      ok(`row ${k + 1}: settled at rest`, r.op > 0.99, r);
+    }
+  }
+}
+if (kind === "lift") {
+  const base = await rect("#p2");
+  const finish = () => page.evaluate(() => document.getAnimations().forEach((a) => a.finish()));
+  const covered = (sel) =>
+    page.evaluate((sel) => {
+      const el = document.querySelector(sel);
+      const r = el.getBoundingClientRect();
+      const out = [];
+      for (let i = 0; i <= 10; i++)
+        for (const fx of [0.01, 0.5, 0.99]) {
+          const x = r.x + fx * r.width, y = r.y + 8 + (i / 10) * (r.height - 16);
+          const top = document.elementFromPoint(x, y);
+          if (!top || !el.contains(top)) out.push([Math.round(x), Math.round(y), top?.id || top?.tagName]);
+        }
+      return { w: r.width, h: r.height, covered: out };
+    }, sel);
+  for (const id of ["#p1", "#p2", "#p3"]) {
+    const r0 = await rect(id);
+    await page.mouse.move(r0[0] + r0[2] / 2, r0[1] + r0[3] / 2);
+    if (id === "#p2") {
+      const t = await page.evaluate(() => {
+        const a = document.querySelector("#p2").getAnimations().find((x) => x.transitionProperty === "transform");
+        if (!a) return null;
+        a.pause();
+        a.currentTime = 100;
+        const w = document.querySelector("#p2").getBoundingClientRect().width;
+        return { d: a.effect.getComputedTiming().duration, w };
+      });
+      ok("hover: the lift takes about 200ms and is past half way at 100ms", t && Math.abs(t.d - 200) <= 10 && t.w > base[2] * 1.055 && t.w < base[2] * 1.099, { t, base });
+    }
+    await finish();
+    const c = await covered(id);
+    ok(`${id} lifted: 110% of its size`, Math.abs(c.w - r0[2] * 1.1) <= 2, { c: c.w, r0 });
+    ok(`${id} lifted: no part of it is covered`, c.covered.length === 0, c.covered.slice(0, 6));
+  }
+  // Settling back it is still raised: covered as it shrinks is the same defect (both round 16
+  // agents kept it on top until it had settled).
+  const r2 = await rect("#p2");
+  await page.mouse.move(r2[0] + r2[2] / 2, r2[1] + r2[3] / 2);
+  await finish();
+  await page.mouse.move(5, 5);
+  await page.evaluate(() => {
+    for (const a of document.querySelector("#p2").getAnimations()) { a.pause(); a.currentTime = 40; }
+  });
+  const leaving = await covered("#p2");
+  ok("settling back (40ms after the pointer leaves): still not covered", leaving.covered.length === 0 && leaving.w > base[2] * 1.01, leaving.covered.slice(0, 4));
+  await finish();
+  const back = await rect("#p2");
+  ok("pointer away: it settles back", JSON.stringify(back) === JSON.stringify(base), { back, base });
+} else if (kind === "turn") {
+  const r0 = await rect("#card");
+  ok("card 360x240 at rest, centred", r0[2] === 360 && r0[3] === 240 && Math.abs(r0[0] + 180 - 640) <= 1, r0);
+  const topIs = (cls) => page.evaluate((cls) => { const t = document.elementFromPoint(640, 400); return !!t?.closest(cls); }, cls);
+  ok("front face up at rest", await topIs(".front"), null);
+  await page.mouse.click(640, 400);
+  const pose = (t) =>
+    page.evaluate((t) => {
+      const el = document.querySelector("#card");
+      const a = el.getAnimations().find((x) => x.transitionProperty === "transform");
+      if (!a) return null;
+      a.pause();
+      a.currentTime = t;
+      const r = el.getBoundingClientRect();
+      return { d: a.effect.getComputedTiming().duration, x: r.x, w: r.width, h: r.height };
+    }, t);
+  const p = [];
+  for (const t of [200, 300, 400]) p.push(await pose(t));
+  ok("one 600ms turn", p[0] && Math.abs(p[0].d - 600) <= 10, p[0]);
+  ok("in depth: on the way the near edge is taller than the card (perspective about 900px)", p[0] && p[0].h > 252 && p[0].h < 300 && p[2].h > 252 && p[2].h < 300, p);
+  ok("edge on half way", p[1] && p[1].w < 40, p[1]);
+  await page.evaluate(() => document.getAnimations().forEach((a) => a.finish()));
+  const r1 = await rect("#card");
+  ok("turned over: flat and upright, the answer up", JSON.stringify(r1) === JSON.stringify(r0) && (await topIs(".back")), r1);
+  await page.mouse.click(640, 400);
+  await page.evaluate(() => document.getAnimations().forEach((a) => a.finish()));
+  ok("a second click turns it back", await topIs(".front"), null);
+} else if (kind === "boot") {
+  const { readFile } = await import("node:fs/promises");
+  const src = await readFile(file, "utf8");
+  ok("the boot utility stays: animations held while the fonts load, then released", /animation-play-state:\s*paused/.test(src) && /fonts\.ready/.test(src) && /is-booting/.test(src), null);
+  await page.waitForTimeout(1200);
+  const real = await page.evaluate(() =>
+    [...document.querySelectorAll(".result")].map((el) => ({ op: Number(getComputedStyle(el).opacity), paused: el.getAnimations().some((a) => a.playState === "paused") })),
+  );
+  ok("by real time 1.2s after load every result is fully shown, nothing held", real.length === 4 && real.every((r) => r.op > 0.99 && !r.paused), real);
+  await page.evaluate(() => {
+    for (const el of document.querySelectorAll(".result")) { el.style.animation = "none"; void el.offsetWidth; el.style.animation = ""; }
+    window.__oAnims = document.getAnimations();
+    for (const a of window.__oAnims) a.pause();
+  });
+  const at2 = (t) =>
+    page.evaluate((t) => {
+      for (const a of window.__oAnims) { a.pause(); a.currentTime = t; }
+      return [...document.querySelectorAll(".result")].map((el) => ({ y: el.getBoundingClientRect().y, op: Number(getComputedStyle(el).opacity) }));
+    }, t);
+  const rest = await at2(2000);
+  for (let k = 0; k < 4; k++) {
+    const s0 = (await at2(k * 80))[k], s1 = (await at2(k * 80 + 160))[k];
+    ok(`result ${k + 1}: starts 16px below and transparent at ${k * 80}ms`, Math.abs(s0.y - (rest[k].y + 16)) <= 1 && s0.op < 0.05, { s0, r: rest[k] });
+    ok(`result ${k + 1}: rising and fading in at ${k * 80 + 160}ms`, s1.op > 0.3 && s1.op < 0.99 && s1.y > rest[k].y + 0.3 && s1.y < rest[k].y + 12, { s1, r: rest[k] });
+  }
+}
+if (kind === "stepper" || kind === "meter" || kind === "guard") {
+  const sel = { stepper: "#panel", meter: "#fill", guard: "#hero" }[kind];
+  await page.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    el.style.animation = "none";
+    void el.offsetWidth;
+    el.style.animation = "";
+    window.__oAnims = el.getAnimations();
+    for (const a of window.__oAnims) a.pause();
+  }, sel);
+  const at3 = (t) =>
+    page.evaluate(
+      ({ t, sel }) => {
+        for (const a of window.__oAnims) { a.pause(); a.currentTime = t; }
+        const el = document.querySelector(sel);
+        const r = el.getBoundingClientRect();
+        return { x: r.x, y: r.y, w: r.width, h: r.height, op: Number(getComputedStyle(el).opacity), n: window.__oAnims.length };
+      },
+      { t, sel },
+    );
+  const d = await page.evaluate(() => Math.max(0, ...window.__oAnims.map((a) => a.effect.getComputedTiming().endTime)));
+  if (kind === "stepper") {
+    ok("one 600ms entrance", Math.abs(d - 600) <= 10, d);
+    const xs = [];
+    for (const t of [0, 40, 80, 120, 160, 200, 300, 599]) xs.push(await at3(t));
+    const rest = await at3(600);
+    ok("at rest: flush with the left edge, opaque, 320px wide", Math.abs(rest.x) <= 1 && rest.op > 0.99 && Math.abs(rest.w - 320) <= 1, rest);
+    ok("starts 320px beyond the left edge, transparent", Math.abs(xs[0].x + 320) <= 2 && xs[0].op < 0.05, xs[0]);
+    ok("glides: a different place at every 40ms of the first 200ms (no steps)", xs.slice(0, 6).every((p, i) => i === 0 || p.x > xs[i - 1].x + 0.5), xs.map((p) => Math.round(p.x)));
+    ok("slowing as it arrives: a third of the way at 160ms of 600 (ease-out, not linear)", xs[4].x > -320 + 0.33 * 320 && xs[4].x < -1, xs[4]);
+  } else if (kind === "meter") {
+    const track = await rect(".track");
+    ok("one 800ms fill", Math.abs(d - 800) <= 10, d);
+    const r0 = await at3(0), r1 = await at3(260), rest = await at3(800);
+    ok("at rest: the bar is 72% of the track and as tall as it", Math.abs(rest.w - 0.72 * track[2]) <= 2 && Math.abs(rest.h - track[3]) <= 1, { rest, track });
+    ok("starts empty", r0.w <= 1, r0);
+    ok("slowing as it arrives: past 40% of its fill at 260ms of 800 (ease-out, not linear)", r1.w > 0.4 * 0.72 * track[2] && r1.w < 0.72 * track[2] - 1, { r1, track });
+    const color = await page.evaluate(() => getComputedStyle(document.querySelector("#fill")).backgroundColor);
+    ok("still blue", color === "rgb(37, 99, 235)", color);
+  } else {
+    ok("one 500ms entrance for people without reduced motion", Math.abs(d - 500) <= 10, d);
+    const s0 = await at3(0), s1 = await at3(150), rest = await at3(500);
+    ok("starts 24px below its place, transparent", Math.abs(s0.y - (rest.y + 24)) <= 1 && s0.op < 0.05, { s0, rest });
+    ok("slowing as it arrives: past 38% of its rise at 150ms of 500 (ease-out, not linear)", s1.y < rest.y + 24 * 0.62 && s1.y > rest.y + 0.3, { s1, rest });
+    ok("at rest: in place, opaque", rest.op > 0.99, rest);
+    const rm = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    await rm.emulateMedia({ reducedMotion: "reduce" });
+    await rm.goto(pathToFileURL(resolve(file)).href);
+    const calm = await rm.evaluate(() => {
+      const el = document.querySelector("#hero");
+      return { n: el.getAnimations().length, op: Number(getComputedStyle(el).opacity), y: el.getBoundingClientRect().y };
+    });
+    ok("reduced motion: no animation, in place and opaque", calm.n === 0 && calm.op > 0.99 && Math.abs(calm.y - rest.y) <= 1, { calm, rest });
+  }
+}
+if (kind === "combo") {
+  await page.evaluate(() => {
+    const el = document.querySelector("#toast");
+    el.style.animation = "none";
+    void el.offsetWidth;
+    el.style.animation = "";
+    window.__oAnims = el.getAnimations();
+    for (const a of window.__oAnims) a.pause();
+  });
+  const pose = (t) =>
+    page.evaluate((t) => {
+      for (const a of window.__oAnims) { a.pause(); a.currentTime = t; }
+      const el = document.querySelector("#toast");
+      const r = el.getBoundingClientRect();
+      return { y: r.y, w: r.width, op: Number(getComputedStyle(el).opacity), n: window.__oAnims.length };
+    }, t);
+  const rest = await pose(400);
+  const s0 = await pose(0), s1 = await pose(120);
+  const pulseMid = await pose(400 + 800), pulseEnd = await pose(400 + 1600);
+  ok("two animations: the entrance and the pulse", s0.n === 2, s0);
+  ok("starts 24px below its place, transparent", Math.abs(s0.y - (rest.y + 24)) <= 1 && s0.op < 0.05, { s0, rest });
+  ok("rising and fading in at 120ms, slowing as it arrives", s1.y < rest.y + 24 * 0.62 && s1.y > rest.y + 0.3 && s1.op > 0.2 && s1.op < 0.99, { s1, rest });
+  ok("in place at the bottom-right corner, opaque", Math.abs(rest.y + 58 - 776) <= 30 && rest.op > 0.99, rest);
+  ok("pulses: 104% half way through a 1.6s pulse, 100% at its end", Math.abs(pulseMid.w / rest.w - 1.04) <= 0.006 && Math.abs(pulseEnd.w / rest.w - 1) <= 0.003, { pulseMid, pulseEnd, rest });
+  const inf = await page.evaluate(() => window.__oAnims.some((a) => a.effect.getComputedTiming().iterations === Infinity));
+  ok("the pulse repeats forever", inf, inf);
+} else if (kind === "tokens") {
+  const closed = await rect("#drawer");
+  ok("closed: the drawer is off the right edge", closed[0] >= 1279, closed);
+  await page.click("#open");
+  const slide = (t) =>
+    page.evaluate((t) => {
+      const el = document.querySelector("#drawer");
+      const a = el.getAnimations().find((x) => x.transitionProperty === "transform");
+      if (!a) return null;
+      a.pause();
+      a.currentTime = t;
+      return { d: a.effect.getComputedTiming().duration, x: el.getBoundingClientRect().x };
+    }, t);
+  const m = await slide(60);
+  ok("a click slides it in over about 180ms", m && Math.abs(m.d - 180) <= 5, m);
+  ok("slowing as it arrives: past 40% of its way at 60ms of 180", m && m.x < 1280 - 0.4 * 360 && m.x > 920 + 1, m);
+  await page.evaluate(() => document.getAnimations().forEach((a) => a.finish()));
+  const open = await rect("#drawer");
+  ok("open: flush with the right edge, 360px wide", open[0] === 920 && open[2] === 360, open);
+  await page.click("#open");
+  const back = await slide(60);
+  ok("another click slides it back out the same way", back && Math.abs(back.d - 180) <= 5 && back.x > 920 + 1 && back.x < 1279, back);
+} else if (kind === "upright") {
+  const at4 = (t) =>
+    page.evaluate((t) => {
+      for (const a of document.getAnimations()) { a.pause(); a.currentTime = t; }
+      const deg = (el) => {
+        let m = new DOMMatrix();
+        for (let n = el; n && n !== document.documentElement; n = n.parentElement) {
+          const tf = getComputedStyle(n).transform;
+          if (tf && tf !== "none") m = new DOMMatrix(tf).multiply(m);
+        }
+        return (Math.atan2(m.b, m.a) * 180) / Math.PI;
+      };
+      return { dial: deg(document.querySelector("#dial")), label: deg(document.querySelector("#label")) };
+    }, t);
+  const ts = [500, 1300, 2200, 3100, 3900, 5700, 8900];
+  const poses = [];
+  for (const t of ts) poses.push(await at4(t));
+  ok("the dial turns clockwise once every 4s", Math.abs((((poses[0].dial % 360) + 360) % 360) - 45) <= 1 && Math.abs((((poses[2].dial % 360) + 360) % 360) - 198) <= 1, poses.slice(0, 3));
+  ok("the word stays upright at every instant (within 0.5°)", poses.every((p) => Math.abs(p.label) <= 0.5 || Math.abs(Math.abs(p.label) - 360) <= 0.5), poses.map((p) => Math.round(p.label * 10) / 10));
 }
 await browser.close();
 const failed = checks.filter((c) => !c.pass);

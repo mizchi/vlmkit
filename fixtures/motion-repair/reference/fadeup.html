@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Notifications</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #f8fafc; color: #0f172a; }
+  main { max-width: 560px; margin: 56px auto; padding: 0 24px; }
+  h1 { font-size: 22px; margin: 0 0 16px; }
+  .note { padding: 14px 16px; margin-bottom: 10px; border-radius: 10px; background: #fff; box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08); animation: fade-up 400ms ease-out backwards; }
+  .note:nth-child(2) { animation-delay: 60ms; }
+  .note:nth-child(3) { animation-delay: 120ms; }
+  /* Components */
+  @keyframes fade-up { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  /* Utilities (shared with the marketing site) */
+  .fade-up { animation: fade-in 200ms linear; }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+</style></head>
+<body>
+  <main>
+    <h1>Notifications</h1>
+    <section>
+      <div class="note" id="n1">Your export of “Q3 report” is ready.</div>
+      <div class="note" id="n2">Mika commented on “Launch checklist”.</div>
+      <div class="note" id="n3">Two-factor sign-in was turned on.</div>
+    </section>
+  </main>
+</body></html>

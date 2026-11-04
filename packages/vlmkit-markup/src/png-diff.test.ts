@@ -564,3 +564,45 @@ describe("png-diff --kind", () => {
     assert.deepEqual([capped.labelled, capped.uncertain, capped.skipped], [1, 1, 1]);
   });
 });
+
+describe("png-diff below the threshold", () => {
+  it("counts pixels that differ too faintly to be a change, and says nothing for identical ones", async () => {
+    const dir = join(TMP, "below");
+    await rm(dir, { recursive: true, force: true });
+    await mkdir(dir, { recursive: true });
+    const flat = (level: number) => {
+      const data = new Uint8Array(40 * 40 * 4);
+      for (let i = 0; i < data.length; i += 4) {
+        data[i] = level;
+        data[i + 1] = level;
+        data[i + 2] = level;
+        data[i + 3] = 255;
+      }
+      return { width: 40, height: 40, data };
+    };
+    // Round 15: a held blur(0.6px) against a sharp card read "no changes" at the default threshold.
+    const a = join(dir, "a.png");
+    const b = join(dir, "b.png");
+    await encodePng(a, flat(120));
+    await encodePng(b, flat(121));
+    const faint = await runPngDiff({
+      baselinePath: a,
+      currentPath: b,
+      outputDir: dir,
+      threshold: 0.1,
+      skipHeatmap: true,
+      json: false,
+    });
+    assert.equal(faint.diff.diffPixels, 0);
+    assert.equal(faint.belowThreshold, 1600);
+    const same = await runPngDiff({
+      baselinePath: a,
+      currentPath: a,
+      outputDir: dir,
+      threshold: 0.1,
+      skipHeatmap: true,
+      json: false,
+    });
+    assert.equal(same.belowThreshold, 0);
+  });
+});

@@ -387,6 +387,9 @@ export const HOLD_TIMELINE_SCRIPT = `(() => {
       },
       // One the page has already paused (a scrubber, animation-play-state: paused) is the page's.
       pagePaused: state === "paused",
+      // Where the page held it: released by a route no wrapper sees (animation-play-state) it runs
+      // on from here, and one that ran out on the real clock before the first seek began here.
+      pausedAt: state === "paused" && typeof anim.currentTime === "number" ? anim.currentTime : 0,
       cancelled: false,
       endedByHold: false,
       endedAt: null,
@@ -602,9 +605,23 @@ export const HOLD_TIMELINE_SCRIPT = `(() => {
           return;
         }
         // Ended by the page (finish()), or found finished after the clock moved: the page's.
-        // Finished while the clock is still at 0, it ran out during load: held from 0.
-        if (h.pagePaused || !zero || pageFinished.has(h.anim)) return;
-        h.anchor = h.anim.playbackRate < 0 && Number.isFinite(end) ? end : 0;
+        // Finished while the clock is still at 0, it ran out during load: held from 0. One the page
+        // had paused and released by its CSS (a boot class lifted when the fonts are in) ran out on
+        // the real clock too, from where it was held: results whose entrance was held until
+        // document.fonts.ready read "travels 0px … target-static" (round 16).
+        if (!zero || pageFinished.has(h.anim)) return;
+        if (h.pagePaused && !h.cssReleased) {
+          let released = false;
+          try {
+            const el = h.anim.effect && h.anim.effect.target;
+            released = !!el && typeof CSSAnimation !== "undefined" && h.anim instanceof CSSAnimation &&
+              !/paused/.test(getComputedStyle(el).animationPlayState);
+          } catch {}
+          if (!released) return;
+          h.cssReleased = true;
+        }
+        h.pagePaused = false;
+        h.anchor = h.anim.playbackRate < 0 && Number.isFinite(end) ? end : h.pausedAt || 0;
         h.anchorAt = 0;
         try { nativePause.call(h.anim); } catch {}
         watch(h);

@@ -1,6 +1,7 @@
 import {
   "mizchi/vlmkit-markup/markup-core" @core,
   "moonbitlang/core/string" @string,
+  "moonbitlang/core/json" @json,
 }
 
 options(

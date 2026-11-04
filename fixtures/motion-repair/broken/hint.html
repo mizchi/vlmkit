@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Billing</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #f8fafc; color: #0f172a; }
+  main { max-width: 640px; margin: 80px auto; padding: 0 24px; }
+  label { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .help { position: relative; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #e2e8f0; color: #334155; font-size: 13px; cursor: help; }
+  .bubble { position: absolute; left: 50%; bottom: calc(100% + 10px); width: 240px; margin-left: -120px; padding: 10px 12px; border-radius: 8px; background: #0f172a; color: #fff; font-weight: 400; font-size: 13px; line-height: 1.4; opacity: 0; visibility: hidden; transition: opacity 200ms ease-out; }
+  .help:hover .bubble { opacity: 1; visibility: visible; }
+  input { display: block; width: 100%; margin-top: 8px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font: inherit; }
+</style></head>
+<body>
+  <main>
+    <h1>Billing</h1>
+    <label>VAT number <span class="help" tabindex="0">?<span class="bubble" role="tooltip">Only needed for EU businesses. We show it on every invoice.</span></span></label>
+    <input value="DE123456789">
+  </main>
+</body></html>
