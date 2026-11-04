@@ -231,7 +231,10 @@ function run(bin: string, args: readonly string[], onLine?: (line: string) => vo
         const so = Buffer.concat(out).toString("utf8");
         appendFileSync(
           process.env.VLMKIT_VIDEO_TRACE,
-          `[trace] ${bin} ${args.join(" ")}\n[trace] code=${code}\n[trace] stdout=${so.slice(0, 2500)}\n[trace] stderr=${tail.filter((l) => !/showinfo/.test(l)).slice(-12).join("\n")}\n`,
+          `[trace] ${bin} ${args.join(" ")}\n[trace] code=${code}\n[trace] stdout=${so.slice(0, 2500)}\n[trace] stderr=${tail
+            .filter((l) => !/showinfo/.test(l))
+            .slice(-12)
+            .join("\n")}\n`,
         );
       }
       resolvePromise({ code, stdout: Buffer.concat(out).toString("utf8"), stderr: tail });
@@ -869,7 +872,9 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
         // restarted at 0 and picked other frames (measured).
         "-reinit_filter",
         "0",
-        ...(rotate.length > 0 ? ["-autorotate", "0"] : []),
+        // `-noautorotate`, not `-autorotate 0`: ffmpeg 8 reads autorotate as a flag that takes no
+        // value, so the 0 was an output file and the decode was refused (measured on 8.0.1).
+        ...(rotate.length > 0 ? ["-noautorotate"] : []),
         ...demuxer,
         "-i",
         asInput(file),

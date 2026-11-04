@@ -257,19 +257,13 @@ describe("scanVideo with the user's ffmpeg", () => {
       "-i",
       "color=c=red:s=1280x720:d=0.2:r=10",
       "-vf",
-      "scale=out_color_matrix=bt709:out_range=tv,format=yuv420p",
+      // The tags as frame properties: ffmpeg 8's encoder takes them from the frames, and
+      // `-color_trc` / `-color_primaries` on the output alone no longer reach the stream.
+      "scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,setparams=colorspace=bt709:range=tv:color_primaries=bt709:color_trc=bt709",
       "-c:v",
       "libx264",
       "-crf",
       "10",
-      "-colorspace",
-      "bt709",
-      "-color_range",
-      "tv",
-      "-color_primaries",
-      "bt709",
-      "-color_trc",
-      "bt709",
       file,
     );
     const r = await scanVideo({ file, out: join(dir, "red709") });
@@ -314,15 +308,9 @@ describe("scanVideo with the user's ffmpeg", () => {
       "-f",
       "lavfi",
       "-i",
-      "color=c=gray:s=64x48:d=0.1",
+      "color=c=gray:s=64x48:d=0.1,setparams=color_trc=smpte2084:color_primaries=bt2020:colorspace=bt2020nc",
       "-c:v",
       "libx264",
-      "-color_trc",
-      "smpte2084",
-      "-color_primaries",
-      "bt2020",
-      "-colorspace",
-      "bt2020nc",
       hdr,
     );
     await refuses(scanVideo({ file: hdr, out: join(dir, "x3") }), /HDR \(transfer smpte2084\)/);
@@ -790,7 +778,23 @@ describe("scanVideo: what review found, held", () => {
     parts.push(gif.subarray(at));
     const file = join(dir, "nogce.gif");
     writeFileSync(file, Buffer.concat(parts));
-    await assert.rejects(scanVideo({ file, out: join(dir, "nogce") }), /decoded 1 of the 2 images a browser shows/);
+    // ffmpeg before 8 merges the second image into the first: refused. ffmpeg 8 decodes both, and
+    // then they must be the two images a browser shows (the same pixels as with the extensions,
+    // whose packed byte is 0: no disposal, no transparency).
+    const scanned = await scanVideo({ file, out: join(dir, "nogce") }).catch((e: unknown) => e);
+    if (scanned instanceof Error) {
+      assert.match(scanned.message, /decoded 1 of the 2 images a browser shows/);
+      return;
+    }
+    const withGce = join(dir, "gce.gif");
+    writeFileSync(withGce, gif);
+    const reference = await scanVideo({ file: withGce, out: join(dir, "gce") });
+    const levels = (out: string, frames: { file: string }[]) =>
+      frames.slice(0, 2).map((f) => Array.from(decodePngPixels(readFileSync(join(out, f.file))).data));
+    assert.deepEqual(
+      levels(join(dir, "nogce"), scanned.manifest.frames),
+      levels(join(dir, "gce"), reference.manifest.frames),
+    );
   });
 
   test("ffmpeg told to colour its log, or a recording whose metadata reads like showinfo, decodes the same", async () => {
@@ -1217,6 +1221,7 @@ describe("scanVideo: what the second review found, held", () => {
     assert.deepEqual(levels, [0, 255, 0, 255, 0, 255, 0, 255, 0, 255], "the strobe is at field rate");
     // A field-order tag over frames coded progressive: 1px stripes stay still, not a field-rate strobe.
     const stripes = join(dir, "r2-stripes-tagged.mkv");
+    const plain = join(dir, "r2-stripes.mkv");
     ffmpeg(
       "-f",
       "lavfi",
@@ -1228,10 +1233,11 @@ describe("scanVideo: what the second review found, held", () => {
       "0",
       "-pix_fmt",
       "yuv444p",
-      "-field_order",
-      "tt",
-      stripes,
+      plain,
     );
+    // Tagged on a stream copy: ffmpeg 8's encoder takes the field order from the (progressive)
+    // frames over `-field_order`, and only a remux still writes the tag alone.
+    ffmpeg("-i", plain, "-c", "copy", "-field_order", "tt", stripes);
     const tagged = await scanVideo({ file: stripes, out: join(dir, "r2-stripes.frames") });
     assert.equal(tagged.manifest.source.video!.fields, undefined);
     assert.equal(tagged.manifest.frames.length, 10);
@@ -1276,15 +1282,14 @@ describe("scanVideo: what the second review found, held", () => {
       "-f",
       "lavfi",
       "-i",
-      "color=c=black:s=16x16:r=10:d=0.2,format=gray,geq=lum='if(mod(N\\,2)\\,235\\,16)'",
+      // The range as a frame property: ffmpeg 8's encoder takes it from the frames over `-color_range`.
+      "color=c=black:s=16x16:r=10:d=0.2,format=gray,geq=lum='if(mod(N\\,2)\\,235\\,16)',setparams=range=tv",
       "-c:v",
       "libx265",
       "-pix_fmt",
       "gray",
       "-x265-params",
       "lossless=1:log-level=error",
-      "-color_range",
-      "tv",
       mono,
     );
     const out = join(dir, "r2-mono.frames");
@@ -1378,15 +1383,13 @@ describe("scanVideo: what the third look found, held", () => {
         "-f",
         "lavfi",
         "-i",
-        "color=c=black:s=16x16:r=10:d=0.2,format=gray,geq=lum='if(mod(N\\,2)\\,172\\,150)'",
+        `color=c=black:s=16x16:r=10:d=0.2,format=gray,geq=lum='if(mod(N\\,2)\\,172\\,150)',setparams=range=${range}`,
         "-c:v",
         "libx265",
         "-pix_fmt",
         "gray",
         "-x265-params",
         "lossless=1:log-level=error",
-        "-color_range",
-        range,
         f,
       );
       return f;

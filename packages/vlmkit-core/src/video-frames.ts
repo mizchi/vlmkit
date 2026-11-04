@@ -776,7 +776,7 @@ export interface FilterPlan {
   fieldOrder?: "tff" | "bff";
   /** Each frame is one field (HEVC field pictures): line-double it to the picture's height, never split it. */
   lineDouble?: boolean;
-  /** Turn the frames (after the field split), for a decode that runs with `-autorotate 0`. */
+  /** Turn the frames (after the field split), for a decode that runs with `-noautorotate`. */
   rotate?: readonly string[];
   /** The showinfo instance's name, so two graphs in one run are told apart. */
   name?: string;

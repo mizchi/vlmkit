@@ -130,7 +130,8 @@ describe("check flash on a recording", () => {
 
   test("an untagged stream is read as BT.601 unless told otherwise: the matrix decides a green strobe", async () => {
     // #00ff00 / #00d700 at 5 Hz, encoded as BT.709 with no tags (measured: read as BT.601 the green
-    // clips and ΔL falls from 0.229 to 0.019, so the same file passes).
+    // clips and ΔL falls from 0.229 to 0.019, so the same file passes). ffmpeg 8's scale tags the
+    // frames with the matrix it wrote, so the tag is taken off again before the encoder.
     const file = join(dir, "green709.webm");
     execFileSync("ffmpeg", [
       "-hide_banner",
@@ -146,7 +147,7 @@ describe("check flash on a recording", () => {
       "-i",
       "color=c=0x00ff00:s=160x160:r=10:d=2",
       "-filter_complex",
-      "[0][1]blend=all_expr='if(lt(mod(N\\,2)\\,1)\\,B\\,A)',scale=out_color_matrix=bt709:out_range=tv,format=yuv420p",
+      "[0][1]blend=all_expr='if(lt(mod(N\\,2)\\,1)\\,B\\,A)',scale=out_color_matrix=bt709:out_range=tv,format=yuv420p,setparams=colorspace=unknown",
       "-c:v",
       "libvpx-vp9",
       "-lossless",
