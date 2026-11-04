@@ -113,3 +113,6 @@ the agent said so.
 
 `check animation` now has 240 rules. On the 72 other correct animated pages of the repo, none of the six
 rules added in rounds 16-18 fires.
+
+Confirmed with the user on 2026-11-04: round 18 is settled. Every point the agents raised was fixed in code,
+with a test that reproduces it, and the full suite passes on the final commit (4698 tests).
