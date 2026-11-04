@@ -781,7 +781,7 @@ describe("scanVideo: what review found, held", () => {
     // ffmpeg before 8 merges the second image into the first: refused. ffmpeg 8 decodes both, and
     // then they must be the two images a browser shows (the same pixels as with the extensions,
     // whose packed byte is 0: no disposal, no transparency).
-    const scanned = await scanVideo({ file, out: join(dir, "nogce") }).catch((e: unknown) => e);
+    const scanned = await scanVideo({ file, out: join(dir, "nogce") }).catch((e: unknown) => e as Error);
     if (scanned instanceof Error) {
       assert.match(scanned.message, /decoded 1 of the 2 images a browser shows/);
       return;

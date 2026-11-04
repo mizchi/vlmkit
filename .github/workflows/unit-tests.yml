@@ -117,6 +117,5 @@ jobs:
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
       - name: Install ffmpeg
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg && ffmpeg -hide_banner -version | head -1
-      - run: bash scripts/tmp-ffmpeg-probe.sh
       - run: pnpm build:packages
       - run: pnpm exec vp test run packages/vlmkit-core/src/video-decode.test.ts packages/vlmkit-markup/src/inspect/flash-video.test.ts

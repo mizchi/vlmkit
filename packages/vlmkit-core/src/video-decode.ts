@@ -32,7 +32,6 @@ import {
 } from "node:fs";
 import { hostname } from "node:os";
 import { copyFile, mkdir, mkdtemp, readdir, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
-import { appendFileSync } from "node:fs"; // TEMP-TRACE
 import { basename, dirname, extname, isAbsolute, join, posix, resolve, win32 } from "node:path";
 import { pathToFileURL } from "node:url";
 import { UsageError } from "@mizchi/vlmkit-judge/errors.ts";
@@ -226,17 +225,6 @@ function run(bin: string, args: readonly string[], onLine?: (line: string) => vo
     child.on("close", (code) => {
       untrack(child);
       if (partial) line(partial);
-      // TEMP-TRACE (ffmpeg 8 investigation; removed before merge)
-      if (process.env.VLMKIT_VIDEO_TRACE) {
-        const so = Buffer.concat(out).toString("utf8");
-        appendFileSync(
-          process.env.VLMKIT_VIDEO_TRACE,
-          `[trace] ${bin} ${args.join(" ")}\n[trace] code=${code}\n[trace] stdout=${so.slice(0, 2500)}\n[trace] stderr=${tail
-            .filter((l) => !/showinfo/.test(l))
-            .slice(-12)
-            .join("\n")}\n`,
-        );
-      }
       resolvePromise({ code, stdout: Buffer.concat(out).toString("utf8"), stderr: tail });
     });
   });
@@ -813,10 +801,15 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
   const t1 = performance.now();
   try {
     work = await mkdtemp(join(outDir, ".scan-video-"));
-    const outputs: string[] = [];
+    // One ffmpeg per graph. Since ffmpeg 7 each filter graph runs on its own thread, and showinfo
+    // writes a frame's line in several log calls, so two graphs in one decode interleaved their
+    // lines: a frame or a graph's time base went missing (measured on 8.0.1, run to run).
+    const outputs: string[][] = [];
     for (const g of graphs) {
       await mkdir(join(work, g.name));
-      outputs.push(
+      const output: string[] = [];
+      outputs.push(output);
+      output.push(
         "-map",
         `0:${stream.index}`,
         "-an",
@@ -853,50 +846,52 @@ export async function scanVideo(options: ScanVideoOptions): Promise<ScanVideoRes
     const written = new Map<string, ShowinfoFrame[]>(graphs.map((g) => [g.name, []]));
     const showTimeBase = new Map<string, { num: number; den: number }>();
     const stderrAll: string[] = [];
-    const decoded = await run(
-      decoder.ffmpeg,
-      [
-        "-hide_banner",
-        "-nostdin",
-        "-nostats",
-        // Each line carries its level, so the decoder's errors are told from its metadata.
-        "-loglevel",
-        "level+info",
-        // For every scaler ffmpeg inserts itself (an RGB source's conversion), the same rounding.
-        "-sws_flags",
-        "accurate_rnd+full_chroma_int",
-        "-copyts",
-        // libvpx decodes a WebM's alpha; ffmpeg's own VP8/VP9 decoders drop it.
-        ...(stream.alpha === "libvpx" || stream.alpha === "libvpx-vp9" ? ["-c:v", stream.alpha] : []),
-        // One filter graph for the whole stream: rebuilt on a size or format change, `select`'s n
-        // restarted at 0 and picked other frames (measured).
-        "-reinit_filter",
-        "0",
-        // `-noautorotate`, not `-autorotate 0`: ffmpeg 8 reads autorotate as a flag that takes no
-        // value, so the 0 was an output file and the decode was refused (measured on 8.0.1).
-        ...(rotate.length > 0 ? ["-noautorotate"] : []),
-        ...demuxer,
-        "-i",
-        asInput(file),
-        ...outputs,
-      ],
-      (line) => {
-        stderrAll.push(line);
-        const parsed = parseShowinfoLine(line);
-        if (!parsed) return;
-        const name = ("timeBase" in parsed ? parsed.instance : parsed.frame.instance) ?? graphs[0]!.name;
-        if ("timeBase" in parsed) {
-          if (!showTimeBase.has(name)) showTimeBase.set(name, parsed.timeBase);
-        } else written.get(name)?.push(parsed.frame);
-      },
-    ).catch((e) => spawnFailure(e, decoder.ffmpeg, "ffmpeg"));
-    if (decoded.code !== 0) {
-      const why = reason(decoded.stderr);
-      throw new UsageError(
-        /Unknown decoder|Decoder .* not found/i.test(why) && stream.alpha?.startsWith("libvpx")
-          ? `${shown}: its alpha decodes only with libvpx, which this ffmpeg lacks (${why}); use an ffmpeg built with libvpx`
-          : `${decoder.ffmpeg} cannot decode ${shown} (${stream.codec}): ${why}`,
-      );
+    for (const [gi, g] of graphs.entries()) {
+      const decoded = await run(
+        decoder.ffmpeg,
+        [
+          "-hide_banner",
+          "-nostdin",
+          "-nostats",
+          // Each line carries its level, so the decoder's errors are told from its metadata.
+          "-loglevel",
+          "level+info",
+          // For every scaler ffmpeg inserts itself (an RGB source's conversion), the same rounding.
+          "-sws_flags",
+          "accurate_rnd+full_chroma_int",
+          "-copyts",
+          // libvpx decodes a WebM's alpha; ffmpeg's own VP8/VP9 decoders drop it.
+          ...(stream.alpha === "libvpx" || stream.alpha === "libvpx-vp9" ? ["-c:v", stream.alpha] : []),
+          // One filter graph for the whole stream: rebuilt on a size or format change, `select`'s n
+          // restarted at 0 and picked other frames (measured).
+          "-reinit_filter",
+          "0",
+          // `-noautorotate`, not `-autorotate 0`: ffmpeg 8 reads autorotate as a flag that takes no
+          // value, so the 0 was an output file and the decode was refused (measured on 8.0.1).
+          ...(rotate.length > 0 ? ["-noautorotate"] : []),
+          ...demuxer,
+          "-i",
+          asInput(file),
+          ...outputs[gi]!,
+        ],
+        (line) => {
+          stderrAll.push(line);
+          const parsed = parseShowinfoLine(line);
+          if (!parsed) return;
+          const name = ("timeBase" in parsed ? parsed.instance : parsed.frame.instance) ?? g.name;
+          if ("timeBase" in parsed) {
+            if (!showTimeBase.has(name)) showTimeBase.set(name, parsed.timeBase);
+          } else written.get(name)?.push(parsed.frame);
+        },
+      ).catch((e) => spawnFailure(e, decoder.ffmpeg, "ffmpeg"));
+      if (decoded.code !== 0) {
+        const why = reason(decoded.stderr);
+        throw new UsageError(
+          /Unknown decoder|Decoder .* not found/i.test(why) && stream.alpha?.startsWith("libvpx")
+            ? `${shown}: its alpha decodes only with libvpx, which this ffmpeg lacks (${why}); use an ffmpeg built with libvpx`
+            : `${decoder.ffmpeg} cannot decode ${shown} (${stream.codec}): ${why}`,
+        );
+      }
     }
     for (const g of graphs) {
       checkWritten(
