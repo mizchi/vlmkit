@@ -247,8 +247,10 @@ test("filterChain: the measured order of every step", () => {
     "setsar=r=sar/2",
     "scale=in_color_matrix",
     "format=rgba",
+    "split",
+    "alphaextract",
     "negate",
-    "premultiply",
+    "blend=all_mode=multiply",
     "negate",
     "format=rgb24",
     "iw*sar",
@@ -265,7 +267,7 @@ test("filterChain: the measured order of every step", () => {
   }
   assert.ok(
     filterChain({ select: null, fields: false, color, alpha: { background: "black" }, sampleAspect: false }).includes(
-      "format=rgba,premultiply=inplace=1,format=rgb24",
+      "[vlmkit_c]format=gbrp[vlmkit_n];[vlmkit_n][vlmkit_a]blend=all_mode=multiply,format=rgb24",
     ),
   );
   // A turn the chain does itself comes after the field split; a named graph names its showinfo.
@@ -285,15 +287,22 @@ test("filterChain: the measured order of every step", () => {
 test("colorPlan: a YUV codec's grey frames are luma, limited unless tagged; a grey PNG is its own levels", () => {
   const gray = { index: 0, codec: "av1", pixelFormat: "gray", width: 8, height: 8, timeBase: { num: 1, den: 1000 } };
   const luma = colorPlan(gray, "a.webm");
-  // The range is kept across the step to YUV (left to itself the scaler reads grey as full).
-  assert.equal(luma.before, "scale=in_range=tv:out_range=tv,format=yuv444p");
-  assert.match(luma.scale, /in_range=tv/);
+  // Limited grey is expanded by a lut (ffmpeg 8's scaler leaves it as it is), then carried as full
+  // range across the step to YUV (left to itself the scaler reads grey as full).
+  assert.equal(
+    luma.before,
+    "lut=c0='clip(round((val-16)*255/219)\\,0\\,255)',scale=in_range=pc:out_range=pc,format=yuv444p",
+  );
+  assert.match(luma.scale, /in_range=pc/);
+  assert.equal(luma.color.range, "tv");
   assert.deepEqual(luma.color.assumed, ["range"]);
-  assert.match(colorPlan({ ...gray, colorRange: "pc" }, "a.webm").scale, /in_range=pc/);
-  assert.match(colorPlan(gray, "a.webm", { range: "pc" }).scale, /in_range=pc/);
+  // Full-range grey is carried as it is, tagged or told.
+  assert.doesNotMatch(colorPlan({ ...gray, colorRange: "pc" }, "a.webm").before!, /lut=/);
+  assert.doesNotMatch(colorPlan(gray, "a.webm", { range: "pc" }).before!, /lut=/);
+  assert.match(colorPlan({ ...gray, colorRange: "pc" }, "a.webm", { range: "tv" }).before!, /^lut=/);
   assert.equal(
     colorPlan({ ...gray, pixelFormat: "gray10le" }, "a.webm").before,
-    "scale=in_range=tv:out_range=tv,format=yuv444p16le",
+    "lut=c0='clip(round((val-64)*1023/876)\\,0\\,1023)',scale=in_range=pc:out_range=pc,format=yuv444p16le",
   );
   const png = colorPlan({ ...gray, codec: "png" }, "a.png");
   assert.equal(png.scale, "");
@@ -303,7 +312,8 @@ test("colorPlan: a YUV codec's grey frames are luma, limited unless tagged; a gr
   assert.equal(colorPlan({ ...gray, codec: "ffv1" }, "a.mkv", { range: "tv" }).color.matrix, "gray");
   assert.equal(colorPlan({ ...gray, codec: "ffv1" }, "a.mkv").color.matrix, "rgb");
   const chain = filterChain({ select: null, fields: false, color: luma, sampleAspect: false });
-  assert.ok(chain.startsWith("scale=in_range=tv:out_range=tv,format=yuv444p,scale=in_color_matrix=bt601:in_range=tv"));
+  assert.ok(chain.startsWith("lut=c0="));
+  assert.ok(chain.includes("scale=in_range=pc:out_range=pc,format=yuv444p,scale=in_color_matrix=bt601:in_range=pc"));
 });
 
 test("colorPlan: a matrix tagged but not convertible is refused, not called untagged", () => {

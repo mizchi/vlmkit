@@ -720,10 +720,16 @@ export function colorPlan(
       assumedRange.push("range");
     }
     return {
-      // The range kept across the step to YUV: left to itself, the scaler ffmpeg inserts for
-      // `format` reads grey as full and writes YUV as limited (a pc stream came out 150/172 → 145/164).
-      before: `scale=in_range=${range}:out_range=${range},${/^gray$/.test(stream.pixelFormat) ? "format=yuv444p" : "format=yuv444p16le"}`,
-      scale: `in_color_matrix=bt601:in_range=${range}:flags=accurate_rnd+full_chroma_int`,
+      // Limited grey is expanded by its own arithmetic, then carried as full range: ffmpeg 8's
+      // scaler leaves grey 16/235 as 16/235 whatever `in_range` says (measured on 8.0.1), while 6.1
+      // expanded it; the lut gives 6.1's levels on both. The range is kept across the step to YUV:
+      // left to itself, the scaler ffmpeg inserts for `format` reads grey as full and writes YUV as
+      // limited (a pc stream came out 150/172 → 145/164).
+      before: [
+        ...(range === "tv" ? [grayExpansion(stream.pixelFormat)] : []),
+        `scale=in_range=pc:out_range=pc,${/^gray$/.test(stream.pixelFormat) ? "format=yuv444p" : "format=yuv444p16le"}`,
+      ].join(","),
+      scale: `in_color_matrix=bt601:in_range=pc:flags=accurate_rnd+full_chroma_int`,
       color: { matrix: "gray", range, ...extra, assumed: assumedRange },
       notes,
     };
@@ -776,7 +782,7 @@ export interface FilterPlan {
   fieldOrder?: "tff" | "bff";
   /** Each frame is one field (HEVC field pictures): line-double it to the picture's height, never split it. */
   lineDouble?: boolean;
-  /** Turn the frames (after the field split), for a decode that runs with `-autorotate 0`. */
+  /** Turn the frames (after the field split), for a decode that runs with `-noautorotate`. */
   rotate?: readonly string[];
   /** The showinfo instance's name, so two graphs in one run are told apart. */
   name?: string;
@@ -788,22 +794,45 @@ export interface FilterPlan {
 }
 
 /**
+ * Limited-range grey expanded to full by arithmetic: (v - 16·2^s) · (2^d - 1) / (219·2^s), rounded
+ * and clipped, for d bits (s = d - 8). On 8 bits 16 → 0, 235 → 255 and 150 → 156, the levels
+ * ffmpeg 6.1's scaler gave.
+ */
+export function grayExpansion(pixelFormat: string): string {
+  const depth = Number(/^gray(\d+)/.exec(pixelFormat)?.[1] ?? 8);
+  const shift = depth - 8;
+  const lo = 16 << shift;
+  const span = 219 << shift;
+  const max = 2 ** depth - 1;
+  return `lut=c0='clip(round((val-${lo})*${max}/${span})\\,0\\,${max})'`;
+}
+
+/**
  * The filter chain. Measured, each step's place: `select` first (it counts decoded frames);
  * fields split before the colour conversion, and the line-doubling's doubled sample aspect undone
  * (`scale` keeps the display aspect, so an 8:9 field came out 16:9 and the frame twice as wide);
- * then the turn, if the chain does it; alpha composited after the conversion, by premultiplying (over
- * black) or by premultiplying the negative and negating back (over white), so every frame keeps its
- * timestamp — an `overlay` on a colour source would take that source's constant rate; the SAR
+ * then the turn, if the chain does it; alpha composited after the conversion, by multiplying the
+ * colour by its own alpha plane (over black) or the negative and negating back (over white), so every
+ * frame keeps its timestamp — an `overlay` on a colour source would take that source's constant rate; the SAR
  * resample after RGB, nearest, since bicubic in YUV blended a red/blue edge into (197,0,52); the
  * colour tags and an ICC profile stripped only after `format=rgb24` (before it, the matrix falls
  * back to BT.601); and showinfo without its checksums, which doubled the cost of a 1080p decode.
  */
 export function filterChain(plan: FilterPlan): string {
   const rgb = plan.alpha ? "format=rgba" : "format=rgb24";
+  // Colour times alpha by `blend`'s multiply (A·B/255), on the colour and on its alpha plane split
+  // from one frame: ffmpeg 8's `premultiply` rounds 255·255 down, so opaque black over white came
+  // out 1 (measured on 8.0.1); the multiply keeps opaque pixels exact on 6.1 and 8 alike. Over
+  // white the negative is multiplied and negated back. Both halves are the same frames, so every
+  // frame keeps its timestamp.
   const composite = plan.alpha
-    ? plan.alpha.background === "black"
-      ? ["premultiply=inplace=1", "format=rgb24"]
-      : ["negate", "premultiply=inplace=1", "negate", "format=rgb24"]
+    ? [
+        "split[vlmkit_c][vlmkit_m];[vlmkit_m]alphaextract,format=gbrp[vlmkit_a];" +
+          `[vlmkit_c]format=gbrp${plan.alpha.background === "black" ? "" : ",negate"}[vlmkit_n];` +
+          "[vlmkit_n][vlmkit_a]blend=all_mode=multiply",
+        ...(plan.alpha.background === "black" ? [] : ["negate"]),
+        "format=rgb24",
+      ]
     : [];
   return [
     plan.select,
