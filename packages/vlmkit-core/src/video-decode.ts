@@ -32,6 +32,7 @@ import {
 } from "node:fs";
 import { hostname } from "node:os";
 import { copyFile, mkdir, mkdtemp, readdir, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
+import { appendFileSync } from "node:fs"; // TEMP-TRACE
 import { basename, dirname, extname, isAbsolute, join, posix, resolve, win32 } from "node:path";
 import { pathToFileURL } from "node:url";
 import { UsageError } from "@mizchi/vlmkit-judge/errors.ts";
@@ -225,14 +226,12 @@ function run(bin: string, args: readonly string[], onLine?: (line: string) => vo
     child.on("close", (code) => {
       untrack(child);
       if (partial) line(partial);
-      // TEMP-TRACE (ffmpeg 7 investigation; removed before merge)
+      // TEMP-TRACE (ffmpeg 8 investigation; removed before merge)
       if (process.env.VLMKIT_VIDEO_TRACE) {
         const so = Buffer.concat(out).toString("utf8");
-        console.error(
-          `[trace] ${bin} ${args.join(" ")}\n[trace] code=${code}\n[trace] stdout=${so.slice(0, 2500)}\n[trace] stderr=${tail
-            .filter((l) => !/showinfo/.test(l))
-            .slice(-12)
-            .join("\n")}`,
+        appendFileSync(
+          process.env.VLMKIT_VIDEO_TRACE,
+          `[trace] ${bin} ${args.join(" ")}\n[trace] code=${code}\n[trace] stdout=${so.slice(0, 2500)}\n[trace] stderr=${tail.filter((l) => !/showinfo/.test(l)).slice(-12).join("\n")}\n`,
         );
       }
       resolvePromise({ code, stdout: Buffer.concat(out).toString("utf8"), stderr: tail });
