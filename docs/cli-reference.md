@@ -1758,7 +1758,7 @@ same warm-up, judges only the windows ending in the span, and never excuses a
 run it explained no step of. A damaged span is still judged only from its start. A span `scan video` wrote without its
 history is reported as not backed (`flash-undersampled`), and `--at` leaves gaps.
 
-What is measured rather than trusted (ffmpeg 6.1.1, Chromium 141 / 149; report
+What is measured rather than trusted (ffmpeg 6.1.1 and 8.0.1, Chromium 141 / 149; report
 `docs/reports/2026-10-13-scan-video-v1.md`):
 
 - **Which frames.** The frame table is ffprobe's decoded frames

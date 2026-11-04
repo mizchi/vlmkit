@@ -95,9 +95,10 @@ jobs:
       # that reason.
       - run: pnpm typecheck
 
-  # The tests that decode with the user's own ffmpeg, on ubuntu-latest's apt ffmpeg (7 or later
-  # when written), beside the 6.1 of the job above: vlmkit says it works with 5.1 or later, and
-  # ffmpeg 7 changed option placement and how colour properties reach the encoder.
+  # The tests that decode with the user's own ffmpeg, on ubuntu-latest's apt ffmpeg (8.0.1 on
+  # Ubuntu 26.04 when added), beside the 6.1 of the job above: vlmkit says it works with 5.1 or
+  # later, and ffmpeg 8 changed option parsing, grey scaling, premultiply rounding, graph threading
+  # and where the encoder takes its colour tags from (.claude/CLAUDE.md, scan video).
   video-ffmpeg-latest:
     runs-on: ubuntu-latest
     timeout-minutes: 20

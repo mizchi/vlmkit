@@ -1161,7 +1161,7 @@ stream's own timeline (a browser's `currentTime`), `index` the position among th
 shows, `key` / `gop` its keyframe flag and its GOP counted in decode order (ffprobe's `pkt_pos`: an
 open GOP's leading B-frames are in the GOP they are decoded in, and keyframes are a run only when
 shown one after another too; every frame carries it, so `--at` keeps where the codec re-quantized), `source.video` how it was decoded. An import gets both from
-ffprobe's `key_frame,best_effort_timestamp_time,pkt_pos` lines (the `--help` recipe). Measured with ffmpeg 6.1.1 and Chromium 141 / 149, and by an
+ffprobe's `key_frame,best_effort_timestamp_time,pkt_pos` lines (the `--help` recipe). Measured with ffmpeg 6.1.1 (and 8.0.1, below) and Chromium 141 / 149, and by an
 adversarial review (54 findings), not to re-learn (`docs/reports/2026-10-13-scan-video-v1.md`):
 
 - **ffprobe's decoded frame list is ffmpeg's output, one to one, with `-copyts` and `-fps_mode
@@ -1207,16 +1207,17 @@ adversarial review (54 findings), not to re-learn (`docs/reports/2026-10-13-scan
 - **Each step's place in the chain is measured** (`filterChain`): non-square pixels resampled square
   after RGB, nearest, expanding (a YUV-domain bicubic resize blended a red/blue edge and, on a
   full-range stream, squeezed it to limited range first: 0/255 came out 16/235); alpha composited over
-  white / black by premultiplying (the negative, for white), so every frame keeps its timestamp — an
+  white / black by multiplying the colour by its own alpha plane (`split`, `alphaextract`, `blend`
+  multiply; the negative, for white), so every frame keeps its timestamp — an
   `overlay` on a colour source takes that source's constant rate; dropping alpha showed the colour under
   transparent pixels (a hidden strobe, or a visible one hidden). Interlaced: split into fields at twice
   the rate (woven, a field-rate strobe was a still comb; bwdif missed it too) — **frame by frame, by each
-  frame's own flag**, in one decode with two named graphs (`showinfo@fields`, `showinfo@frames`): a
+  frame's own flag**, one ffmpeg per named graph (`showinfo@fields`, `showinfo@frames`): a
   broadcast capture that turns interlaced after 2s read as one still comb when the first 30 frames
   decided, and a container's `tt` tag over progressive x264 frames strobed every 1px row. Only a codec
   that flags no frame is split by the tag. The line-doubling `scale` keeps the display aspect, so it
   doubled the SAR (NTSC 8:9 → 16:9, frames 1280 wide): `setsar=sar/2` undoes it. A turned interlaced
-  stream runs with `-autorotate 0` and the chain turns it after the split (`rotationFilters`, ffmpeg
+  stream runs with `-noautorotate` and the chain turns it after the split (`rotationFilters`, ffmpeg
   6.1's own mapping): autorotate turned it first, so 90° split columns and 180° reversed the fields.
   Split by the tag, the frames get the tag's order first (`setfield`): `separatefields` reads each
   frame's flag, and utvideo / ffvhuff / magicyuv / v410 flag nothing, which reads bottom first (a
@@ -1231,9 +1232,25 @@ adversarial review (54 findings), not to re-learn (`docs/reports/2026-10-13-scan
   and carry `fields` and each frame's parity.
 - **A YUV codec's grey frames are luma** (AV1 4:0:0, HEVC RExt; any grey tagged limited, or given
   `--color-range`): limited unless tagged, and converted through YUV — swscale's grey → RGB applies no
-  range (16 stayed 16, measured), and the step to YUV is `scale=in_range=R:out_range=R` first, since
-  the scaler `format` inserts reads grey as full and writes YUV as limited (150/172 came out 145/164).
+  range (16 stayed 16, measured), so limited grey is expanded by a `lut` first and carried as full
+  range, with `scale=in_range=pc:out_range=pc` before the step to YUV, since the scaler `format`
+  inserts reads grey as full and writes YUV as limited (150/172 came out 145/164).
 - **HDR is refused**: ffmpeg passes PQ / HLG code values through as SDR, no tone map, no gamut map.
+- **ffmpeg 8 is held by CI too** (`video-ffmpeg-latest`: ubuntu-latest's apt ffmpeg, 8.0.1 when added,
+  beside the main job's 6.1 on 24.04). What it changed, measured there:
+  - `-autorotate 0` is a flag and an output file named `0` (the decode was refused): `-noautorotate`.
+  - Its scaler leaves grey 16/235 at 16/235 whatever `in_range` says: the `lut` above (identical to
+    6.1's levels on 8 bits, within 1 on 10).
+  - Its `premultiply` rounds 255·255 down, so opaque black over white came out 1: `blend` multiply,
+    exact on both.
+  - Each filter graph runs on its own thread (since 7), and showinfo writes a frame's line in several
+    log calls, so two graphs in one decode interleaved: a frame, or a graph's time base, went missing
+    run to run. One process per graph (a stream mixing interlaced and progressive frames decodes twice).
+  - The encoder takes colour and field tags from the frames: `-color_trc` / `-color_primaries` /
+    `-color_range` / `-field_order` on an output no longer reach the stream. Test fixtures set them with
+    `setparams` (or a stream-copy remux with `-field_order`).
+  - Its GIF demuxer decodes an image with no graphic control extension as its own frame, so that GIF
+    is scanned (both images, as a browser shows them), not refused.
 - **A GIF / APNG is timed and looped as a browser plays it**, not as ffmpeg decodes it. Chromium 141 and
   149 hold any frame of 10ms or less for 100ms — computed on whole ms, so an APNG 1/95s frame is 10 and
   held 100; ffmpeg gives a GIF's 1cs frame 10ms and an APNG's 0 delay 1/15s, and its demuxer delay
