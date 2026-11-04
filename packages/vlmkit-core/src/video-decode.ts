@@ -229,7 +229,10 @@ function run(bin: string, args: readonly string[], onLine?: (line: string) => vo
       if (process.env.VLMKIT_VIDEO_TRACE) {
         const so = Buffer.concat(out).toString("utf8");
         console.error(
-          `[trace] ${bin} ${args.join(" ")}\n[trace] code=${code}\n[trace] stdout=${so.slice(0, 2500)}\n[trace] stderr=${tail.filter((l) => !/showinfo/.test(l)).slice(-12).join("\n")}`,
+          `[trace] ${bin} ${args.join(" ")}\n[trace] code=${code}\n[trace] stdout=${so.slice(0, 2500)}\n[trace] stderr=${tail
+            .filter((l) => !/showinfo/.test(l))
+            .slice(-12)
+            .join("\n")}`,
         );
       }
       resolvePromise({ code, stdout: Buffer.concat(out).toString("utf8"), stderr: tail });
