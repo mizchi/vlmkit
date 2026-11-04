@@ -116,3 +116,5 @@ rules added in rounds 16-18 fires.
 
 Confirmed with the user on 2026-11-04: round 18 is settled. Every point the agents raised was fixed in code,
 with a test that reproduces it, and the full suite passes on the final commit (4698 tests).
+The smaller items were confirmed one by one on the same day: the Jev price in `inspect claims`, the upright
+dial shrinking under 480px, the `not judged` wording, and the closer-sampling advice in `easing-unchecked`.
