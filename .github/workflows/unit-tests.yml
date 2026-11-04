@@ -46,7 +46,10 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Pinned: the video tests are measured on Ubuntu 24.04's ffmpeg 6.1. ubuntu-latest moved to an
+    # image whose apt ffmpeg is 7 or later, where `-reinit_filter` is input-only and the colour
+    # conversion differs (9 tests). Supporting ffmpeg 7+ is its own change; until then this stays.
+    runs-on: ubuntu-24.04
     # The suite is ~6 minutes locally and ~8 in the `bench` job it came from;
     # 20 leaves room for a cold pnpm store without masking a hang.
     timeout-minutes: 20
