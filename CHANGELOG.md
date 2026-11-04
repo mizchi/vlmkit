@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 Dates are YYYY-MM-DD.
 
+## 0.25.1 — 2026-11-04
+
+Fixed:
+
+- `scan video` and `check flash` on a recording work with ffmpeg 8, as well as 6.1. CI now also runs
+  the video tests on ubuntu-latest's ffmpeg, 8.0.1 when this was written. What changed:
+  - a turned interlaced recording was refused, because ffmpeg 8 reads `-autorotate 0` as a flag
+    followed by an output file named `0`; the decode now uses `-noautorotate`;
+  - limited-range grey was left at 16/235; a `lut` now expands it, to the same levels 6.1 gives;
+  - in a recording with alpha, opaque dark pixels came out a level light, because of ffmpeg 8's
+    `premultiply` rounding; compositing now uses `blend`, which is exact on both versions;
+  - a recording that mixes interlaced and progressive frames could lose a frame's showinfo line,
+    because each filter graph runs on its own thread; each graph now gets its own ffmpeg process;
+  - a GIF whose image has no graphic control extension is scanned, not refused, when ffmpeg decodes
+    that image (8 does).
+
 ## 0.25.0 — 2026-11-04
 
 Changed:
