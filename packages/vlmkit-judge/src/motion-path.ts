@@ -214,6 +214,8 @@ export interface MotionSample {
     /** Each axis's scale, when it differs: a scaleY drop-down has scaleX 1. */
     scaleX?: number;
     scaleY?: number;
+    /** The point of its own box a 2D turn of 2° or more keeps still, as a share of the box (0..1). */
+    pivot?: { fx: number; fy: number };
   };
   /** The box may be another element's (it coincides with another target's): left out of geometry. */
   unsure?: boolean;
@@ -236,6 +238,11 @@ const originAt = (name: OriginName) => ({
   fx: name.endsWith("left") ? 0 : name.endsWith("right") ? 1 : 0.5,
   fy: name.startsWith("top") ? 0 : name.startsWith("bottom") ? 1 : 0.5,
 });
+/** The named point within ORIGIN_SNAP of a fixed point, if any. */
+const nearestOrigin = (fx: number, fy: number): OriginName | null =>
+  ORIGIN_NAMES.find(
+    (n) => Math.abs(fx - originAt(n).fx) <= ORIGIN_SNAP && Math.abs(fy - originAt(n).fy) <= ORIGIN_SNAP,
+  ) ?? null;
 const originCss = (name: OriginName) => (name === "center" ? "center" : name.replace("-", " "));
 /** The fixed point named when it is within this (a fraction of the box) of one. */
 const ORIGIN_SNAP = 0.15;
@@ -432,6 +439,14 @@ export interface MotionPathReport {
   excursionPx?: number;
   /** How far it turns over the frames (degrees, clockwise positive) and how fast, when it turns. */
   turn?: { deg: number; perSecond: number; in3d?: boolean };
+  /**
+   * A turn that goes back the other way: the way it turns first and its turning points, signed
+   * degrees from its first frame (clockwise positive), at the frames measured. A bell that swings
+   * 14°, -12°, 8°, -4° and comes to rest nets about 0° and had no turn reported (authoring v1).
+   */
+  swing?: { way: "clockwise" | "counterclockwise"; peaksDeg: number[]; restDeg: number };
+  /** The point its turn keeps still (median over the frames turned 2° or more), when it turns. */
+  pivot?: Pick<ScaleOrigin, "fx" | "fy" | "name">;
   /** On screen, when an ancestor turns it too: how far its drawn angle changes over the frames. */
   screenTurn?: { deg: number; by: string };
   /** Every run of its own animations (ms), when there is more than one. */
@@ -1011,7 +1026,27 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     }
     return { ...seg, travelPx, easing, ...(origin ? { origin } : {}), ...(direction ? { direction } : {}) };
   });
-  if (options.expectOrigin && !reports.some((x) => x.origin)) {
+  // The point a turn keeps still, held to --expect-origin as a scale's is.
+  const pivots = sorted.filter((x) => x.dom?.pivot && !isRest(x)).map((x) => x.dom!.pivot!);
+  const pivotReport =
+    pivots.length > 0
+      ? (() => {
+          const fx = median(pivots.map((p) => p.fx)),
+            fy = median(pivots.map((p) => p.fy));
+          return { fx, fy, name: nearestOrigin(fx, fy) };
+        })()
+      : undefined;
+  if (options.expectOrigin && pivotReport && !reports.some((x) => x.origin)) {
+    const want = originAt(options.expectOrigin);
+    if (Math.abs(pivotReport.fx - want.fx) > ORIGIN_SNAP || Math.abs(pivotReport.fy - want.fy) > ORIGIN_SNAP)
+      findings.push({
+        rule: "origin-mismatch",
+        severity: "fail",
+        atMs: segments[0]!.startMs,
+        message: `it turns about ${describeOrigin(pivotReport)} (that point of its box stays put), not ${describeOrigin({ ...want, name: options.expectOrigin })}: transform-origin: ${originCss(options.expectOrigin)}${sorted.some((x) => x.dom?.svg) ? " (with transform-box: fill-box on an SVG element)" : ""}`,
+      });
+  }
+  if (options.expectOrigin && !reports.some((x) => x.origin) && !pivotReport) {
     findings.push({
       rule: "origin-unchecked",
       severity: "warn",
@@ -1176,11 +1211,14 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
   // How far it turns, and which way: a gear "clockwise, one turn every 2s" had nothing to say it.
   const turned = sorted.filter((x) => Number.isFinite(x.dom?.turnDeg ?? NaN));
   let turnReport: { deg: number; perSecond: number; in3d?: boolean } | undefined;
+  // Over every measured frame, a frame with no angle upright (the page reads none under 0.01°): from
+  // its first turned frame only, a swing that came back to upright read as a 14° turn.
+  const turnFrames = turned.some((x) => x.dom?.rotated3d) ? turned : sorted.filter((x) => x.dom && !x.dom.rotated3d);
   if (turned.length >= 2) {
-    const v = turned.map((x) => x.dom!.turnDeg!);
+    const v = turnFrames.map((x) => x.dom!.turnDeg ?? 0);
     for (let k = 1; k < v.length; k++) v[k] = v[k]! - 360 * Math.round((v[k]! - v[k - 1]!) / 360);
     const deg = v[v.length - 1]! - v[0]!;
-    const span = turned[turned.length - 1]!.atMs - turned[0]!.atMs;
+    const span = turnFrames[turnFrames.length - 1]!.atMs - turnFrames[0]!.atMs;
     if (Math.abs(deg) >= 10 && span > 0)
       turnReport = {
         deg,
@@ -1188,12 +1226,50 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         ...(turned.some((x) => x.dom?.rotated3d) ? { in3d: true } : {}),
       };
   }
+  // Its first turn of 10° or more, which way: a bell that swings 14° clockwise, then back past
+  // upright and on, nets about 0° and read "it does not turn" (authoring v1). The way it first
+  // turns is what --expect-direction judges, as it does for a path's first motion.
+  let firstTurn: { way: "clockwise" | "counterclockwise"; peakDeg: number } | undefined;
+  let swingReport: MotionPathReport["swing"];
+  // A measured frame with no angle is upright: the page reads none under 0.01°, so the bell's
+  // still frames before its swing were missing and the swing began at its 7° frame.
+  const measured = sorted.filter((x) => x.dom && !x.dom.rotated3d);
+  if (turned.length >= 2 && !turned.some((x) => x.dom?.rotated3d)) {
+    const v = measured.map((x) => x.dom!.turnDeg ?? 0);
+    for (let k = 1; k < v.length; k++) v[k] = v[k]! - 360 * Math.round((v[k]! - v[k - 1]!) / 360);
+    const k = v.findIndex((d) => Math.abs(d - v[0]!) >= 10);
+    if (k > 0) {
+      const sign = Math.sign(v[k]! - v[0]!);
+      let peak = v[k]! - v[0]!;
+      for (let j = k; j < v.length && Math.sign(v[j]! - v[0]!) === sign; j++)
+        if (Math.abs(v[j]! - v[0]!) > Math.abs(peak)) peak = v[j]! - v[0]!;
+      firstTurn = { way: sign > 0 ? "clockwise" : "counterclockwise", peakDeg: Math.abs(peak) };
+      // Its turning points: each a local extreme 1° or more from the start, the sign alternating.
+      const rel = v.map((d) => d - v[0]!);
+      const peaks: number[] = [];
+      for (let j = 1; j < rel.length; j++) {
+        const d = rel[j]!;
+        if (Math.abs(d) < 1) continue;
+        const last = peaks[peaks.length - 1];
+        if (last === undefined || Math.sign(last) !== Math.sign(d)) peaks.push(d);
+        else if (Math.abs(d) > Math.abs(last)) peaks[peaks.length - 1] = d;
+      }
+      if (peaks.length >= 2)
+        swingReport = {
+          way: firstTurn.way,
+          peaksDeg: peaks.map((d) => Math.round(d * 10) / 10),
+          restDeg: Math.round(rel[rel.length - 1]! * 10) / 10,
+        };
+    }
+  }
   const turns = turnReport !== undefined;
   // A conic arc that grows or shrinks sweeps a way without anything turning (a usage ring).
   const swept = sorted.filter((x) => Number.isFinite(x.dom?.sweepDeg ?? NaN));
   const sweep = swept.length >= 2 ? swept[swept.length - 1]!.dom!.sweepDeg! - swept[0]!.dom!.sweepDeg! : 0;
   if (options.expectDirection && isTurnWay(options.expectDirection)) {
-    const way = turnReport && !turnReport.in3d ? (turnReport.deg > 0 ? "clockwise" : "counterclockwise") : null;
+    const way =
+      firstTurn?.way ??
+      (turnReport && !turnReport.in3d ? (turnReport.deg > 0 ? "clockwise" : "counterclockwise") : null);
     const sweepWay = !way && Math.abs(sweep) >= 10 ? (sweep > 0 ? "clockwise" : "counterclockwise") : null;
     if (sweepWay && sweepWay !== options.expectDirection)
       findings.push({
@@ -1208,7 +1284,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         severity: "fail",
         atMs: segments[0]!.startMs,
         message: way
-          ? `it turns ${way} (${Math.round(Math.abs(turnReport!.deg))}° over the frames), not ${options.expectDirection}: ${
+          ? `it turns ${way} (${firstTurn && (!turnReport || Math.sign(turnReport.deg) !== (way === "clockwise" ? 1 : -1)) ? `${Math.round(firstTurn.peakDeg)}° first` : `${Math.round(Math.abs(turnReport?.deg ?? firstTurn!.peakDeg))}° over the frames`}), not ${options.expectDirection}: ${
               sorted.some((x) => x.dom?.turnedBy)
                 ? // A counter-rotation turns the other way by design (round 18's label): its own turn
                   // is not what is seen, so name the ancestor and the flag that checks what is.
@@ -1265,18 +1341,31 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
   // frame and back, as its new label wrapped in the still-narrow box (round 12). Measured only.
   if (exact) {
     const boxes = sorted.filter(
-      (x) => !isRest(x) && x.dom && !x.dom.rotated3d && x.dom.opacity >= 0.05 && x.dom.box.width > 0,
+      // A turned box's bounds grow with its angle, so frames it is turned in are left out.
+      (x) =>
+        !isRest(x) &&
+        x.dom &&
+        !x.dom.rotated3d &&
+        Math.abs(x.dom.turnDeg ?? 0) < 0.5 &&
+        x.dom.opacity >= 0.05 &&
+        x.dom.box.width > 0,
     );
+    // The box as laid out, its own scale taken out: a tile growing from 80% over 300ms ease-out
+    // steps 102 → 108px in its first frame, and that is the animation, not a re-flow (authoring v1).
+    const laid = (x: MotionSample, dim: "height" | "width") => {
+      const k = dim === "width" ? (x.dom!.scaleX ?? x.dom!.scale) : (x.dom!.scaleY ?? x.dom!.scale);
+      return k && k > 0.01 ? x.dom!.box[dim] / k : x.dom!.box[dim];
+    };
     for (const dim of ["height", "width"] as const) {
       const steps = boxes
         .slice(1)
-        .map((x, k) => ({ at: x.atMs, from: boxes[k]!, d: x.dom!.box[dim] - boxes[k]!.dom!.box[dim] }));
+        .map((x, k) => ({ at: x.atMs, from: boxes[k]!, d: laid(x, dim) - laid(boxes[k]!, dim) }));
       if (steps.length < 3) continue;
       const big = steps.reduce((a, b) => (Math.abs(b.d) > Math.abs(a.d) ? b : a));
       const others = steps.filter((s) => s !== big).map((s) => Math.abs(s.d));
       const usual = Math.max(0.5, median(others));
       if (Math.abs(big.d) >= 4 && Math.abs(big.d) > 4 * usual) {
-        const a = big.from.dom!.box[dim];
+        const a = laid(big.from, dim);
         findings.push({
           rule: "size-jump",
           severity: "fail",
@@ -1307,7 +1396,11 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
             : turns
               ? // A gear orbiting its SVG's centre read "a scale whose transform-origin…" (round 12).
                 `it turns about a point that is not its own centre (transform-origin)${sorted.some((x) => x.dom?.svg) ? ": on an SVG element transform-origin is measured from the <svg>'s viewBox unless transform-box: fill-box — give it transform-box: fill-box with transform-origin: center" : ""}`
-              : "a keyframe `transform` that replaces the element's own placement, or a scale whose transform-origin is not its centre"
+              : sorted.some((x) => x.dom?.iterations === null || x.dom?.iterations === Infinity)
+                ? // A marquee asked to stop under the pointer kept running: nothing paused it, and
+                  // "a keyframe transform that replaces its placement" sent the agent elsewhere (authoring v1).
+                  "its own animation keeps running through the frames — if an action should stop it (a pointer over a marquee), nothing pauses it: animation-play-state: paused on that state (.strip:hover .track)"
+                : "a keyframe `transform` that replaces the element's own placement, or a scale whose transform-origin is not its centre"
         }`,
       });
     }
@@ -1483,6 +1576,8 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     travelPx: first.travelPx,
     ...(geo.length >= 2 ? { excursionPx: Math.max(...geo.map((p) => dist(p, geo[0]!))) } : {}),
     ...(turnReport ? { turn: turnReport } : {}),
+    ...(swingReport ? { swing: swingReport } : {}),
+    ...(pivotReport ? { pivot: pivotReport } : {}),
     ...(sorted.some((x) => x.dom?.turnedBy) && angles.length >= 2
       ? { screenTurn: { deg: screenTurn, by: sorted.find((x) => x.dom?.turnedBy)!.dom!.turnedBy! } }
       : {}),

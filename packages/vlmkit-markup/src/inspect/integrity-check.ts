@@ -118,6 +118,9 @@ export const COLLECT_OCCLUSIONS = `(() => {
     if (!el || SKIP.has(el.tagName)) continue;
     const style = getComputedStyle(el);
     if (style.visibility === "hidden" || style.display === "none" || style.opacity === "0") continue;
+    // Transparent through an ancestor: content still waiting under its skeleton is not painted, so
+    // nothing covers it (a loading card's content read occluded-text "held 0-1650ms", authoring v1).
+    if (effectiveOpacity(el) < 0.05) continue;
     // The far side of a flip card: turned away with backface-visibility: hidden, it is not painted,
     // so nothing covers it (an answer face read "painted over by" its question, round 9).
     const normalZ = (e) => {

@@ -245,6 +245,32 @@ export async function measureTargets(
           const deg = (Math.atan2(m.b, m.a) * 180) / Math.PI;
           return Math.abs(deg) > 0.01 ? { turnDeg: deg } : {};
         };
+        // The point of its own box a 2D turn keeps still: the fixed point of its transform about its
+        // transform-origin, as a share of its laid-out box. A bell meant to swing from its top had no
+        // way to say so (--expect-origin read only a scale, authoring v1).
+        const pivotOf = (e: Element): { pivot?: { fx: number; fy: number } } => {
+          const m = fullTransform(e);
+          if (!m || !m.is2D) return {};
+          const deg = (Math.atan2(m.b, m.a) * 180) / Math.PI;
+          if (Math.abs(deg) < 2) return {};
+          const he = e as HTMLElement;
+          const bb = (e as SVGGraphicsElement).getBBox?.();
+          // Its laid-out box: an outer <svg> has no offsetWidth, and getBBox is its drawing, not its box.
+          const w = he.offsetWidth ?? (e.clientWidth || bb?.width || 0);
+          const h = he.offsetHeight ?? (e.clientHeight || bb?.height || 0);
+          if (!(w > 0 && h > 0)) return {};
+          const [ox = 0, oy = 0] = getComputedStyle(e).transformOrigin.split(/\s+/).map(parseFloat);
+          // (I - A) y = t, where screen(p) = o + A (p - o) + t; the pivot is o + y.
+          const a11 = 1 - m.a,
+            a12 = -m.c,
+            a21 = -m.b,
+            a22 = 1 - m.d;
+          const det = a11 * a22 - a12 * a21;
+          if (Math.abs(det) < 1e-6) return {};
+          const yx = (m.e * a22 - a12 * m.f) / det,
+            yy = (a11 * m.f - a21 * m.e) / det;
+          return { pivot: { fx: (ox + yx) / w, fy: (oy + yy) / h } };
+        };
         // Its angle as drawn, through every transform up the tree, and the nearest ancestor that turns:
         // a label counter-rotating at 5s inside a dial turning at 4s read only its own turn, 72°/s,
         // while on screen it drifted 18°/s (round 18).
@@ -681,6 +707,22 @@ export async function measureTargets(
               outside++;
               continue;
             }
+            // Under a cover drawn at 60% or less: dimmed, still seen. A Delete button under its dialog's
+            // 50% backdrop read hidden-at-once, "no exit is seen" (authoring v1).
+            if (top && !top.contains(el)) {
+              let coverOp = 1;
+              for (let e: Element | null = top; e; e = e.parentElement) coverOp *= Number(getComputedStyle(e).opacity);
+              // An empty overlay painted with a translucent colour dims the same way (rgba(0,0,0,.5)).
+              const tcs = getComputedStyle(top);
+              const alpha = /rgba?\([^)]*?[,/]\s*([\d.]+)\s*\)/.exec(tcs.backgroundColor);
+              const empty =
+                top.childElementCount === 0 && !(top.textContent ?? "").trim() && tcs.backgroundImage === "none";
+              if (coverOp <= 0.6 || (empty && alpha && Number(alpha[1]) * coverOp <= 0.6)) {
+                inView++;
+                hits++;
+                continue;
+              }
+            }
             inView++;
             missed ??= { x, y, top };
           }
@@ -957,6 +999,7 @@ export async function measureTargets(
           ...(m33 < -0.01 ? { facingAway: true } : {}),
           ...(drawn !== undefined ? { drawn, ...(dashNote ? { dashNote } : {}) } : {}),
           ...turn(el),
+          ...pivotOf(el),
           ...(screenDeg !== undefined ? { screenDeg } : {}),
           ...(turnedBy ? { turnedBy } : {}),
           ...(overriddenBy ? { overriddenBy } : {}),
@@ -2273,6 +2316,47 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
             };
           };
           const turn = (a: number, b: number) => ((b - a + 540) % 360) - 180;
+          // What is in view of it: its children (or itself), clipped by every ancestor that clips and
+          // by the viewport, each with its content. A ticker one copy long and a shimmer whose two ends
+          // are both clipped away jump in their transform and in nothing seen (authoring v1).
+          const inView = (el: Element) => {
+            let clip = { l: 0, t: 0, r: innerWidth, b: innerHeight };
+            for (let n = el.parentElement; n; n = n.parentElement) {
+              const cs = getComputedStyle(n);
+              if (cs.overflowX !== "visible" || cs.overflowY !== "visible" || cs.clipPath !== "none") {
+                const q = n.getBoundingClientRect();
+                clip = {
+                  l: Math.max(clip.l, q.left),
+                  t: Math.max(clip.t, q.top),
+                  r: Math.min(clip.r, q.right),
+                  b: Math.min(clip.b, q.bottom),
+                };
+              }
+            }
+            const parts = el.children.length > 0 ? [...el.children] : [el];
+            return parts
+              .map((c) => ({
+                q: c.getBoundingClientRect(),
+                key: `${c.tagName}.${c.className}|${(c.textContent ?? "").trim().slice(0, 80)}`,
+              }))
+              .filter(
+                ({ q }) =>
+                  q.right > clip.l + 0.5 && q.left < clip.r - 0.5 && q.bottom > clip.t + 0.5 && q.top < clip.b - 0.5,
+              )
+              .map(({ q, key }) => ({ x: q.left, y: q.top, w: q.width, h: q.height, key }));
+          };
+          const sameView = (a: ReturnType<typeof inView>, b: ReturnType<typeof inView>) =>
+            a.length === b.length &&
+            a.every((p) =>
+              b.some(
+                (q) =>
+                  q.key === p.key &&
+                  Math.abs(q.x - p.x) < 1.5 &&
+                  Math.abs(q.y - p.y) < 1.5 &&
+                  Math.abs(q.w - p.w) < 1.5 &&
+                  Math.abs(q.h - p.h) < 1.5,
+              ),
+            );
           for (const sel of sels) {
             const el = document.querySelector(sel);
             if (!el) continue;
@@ -2298,10 +2382,14 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
                 return read(el);
               };
               const p0 = at(d - 2),
-                p1 = at(d - 1),
-                p2 = at(d + 0.001),
-                p3 = at(d + 1);
+                p1 = at(d - 1);
+              // The drawn view either side of the seam, a ms apart as the poses are.
+              const v1 = inView(el);
+              const p2 = at(d + 0.001);
+              const v2 = inView(el);
+              const p3 = at(d + 1);
               a.currentTime = was;
+              const unseen = sameView(v1, v2);
               const rate = Math.max(Math.abs(turn(p0.deg, p1.deg)), Math.abs(turn(p2.deg, p3.deg)));
               const jump = Math.abs(turn(p1.deg, p2.deg));
               const moveRate = Math.max(Math.hypot(p1.x - p0.x, p1.y - p0.y), Math.hypot(p3.x - p2.x, p3.y - p2.y));
@@ -2319,7 +2407,7 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
                   selector: sel,
                   message: `${sel} \`${name}\` turns ${jump.toFixed(1)}° in one step at every loop (${rate.toFixed(2)}° a ms either side)${ends}: each run ends where the next does not begin — end it on the same pose it starts on (360deg, not 350deg)`,
                 });
-              } else if (move > Math.max(1, 3 * moveRate)) {
+              } else if (move > Math.max(1, 3 * moveRate) && !unseen) {
                 out.push({
                   selector: sel,
                   message: `${sel} \`${name}\` jumps ${move.toFixed(1)}px at every loop${ends}: each run ends where the next does not begin — make its last keyframe the first one's pose (a ticker's track one full copy long)`,
@@ -2726,6 +2814,11 @@ export function formatMotionReport(
               ? // In 3D the turn is its face's angle, 0 facing you to 180 turned over: no way round.
                 `, turns over ${Math.round(Math.abs(t.turn.deg))}° in 3D`
               : `, turns ${t.turn.deg > 0 ? "clockwise" : "counterclockwise"} ${Math.round(Math.abs(t.turn.deg))}° (${Math.round(Math.abs(t.turn.perSecond))}°/s${Math.abs(t.turn.perSecond) >= 1 ? `, a turn every ${Math.round(360000 / Math.abs(t.turn.perSecond))}ms` : ""})${t.screenTurn ? ` on its own` : ""}`
+            : ""
+        }${t.pivot && t.turn && !t.turn.in3d && !t.swing ? ` (about ${describeOrigin(t.pivot)})` : ""}${
+          // Back and forth: the way it turns first and its turning points (a bell's swing).
+          t.swing
+            ? `, swings ${t.swing.way} first${t.pivot ? ` about ${describeOrigin(t.pivot)}` : ""}: ${t.swing.peaksDeg.map((d) => `${d > 0 ? "+" : ""}${Math.round(d)}°`).join(", ")}${Math.abs(t.swing.restDeg) < 1 ? ", then upright" : `, ending at ${Math.round(t.swing.restDeg)}°`} (turning points at the frames measured, clockwise +; --at a..b/10ms for exact peaks)`
             : ""
         }${
           // What is seen: an ancestor turns it too, and its own turn is a counter-rotation.
@@ -3247,6 +3340,10 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
   if (
     captured.elsewhere &&
     o.selectors.length > 0 &&
+    // Asked to stay still, staying still is what was checked: the tabs under a sliding indicator
+    // read "if that is what should move, give it as --selector" (authoring v1).
+    !o.expectStill &&
+    !o.selectors.every((sel) => o.stillSelectors.includes(sel)) &&
     r.targets.every((t) => !("best" in t.easing) && t.travelPx < 2 && t.findings.every((f) => f.severity !== "fail"))
   )
     for (const t of r.targets)
@@ -3367,8 +3464,9 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
       // Direction and origin are the path's: a shadow or a colour fitted moves nothing.
       const pathless = r.targets.every(
         (t) =>
-          !("best" in t.easing) ||
-          !(t.easing.channels ?? []).some((c) => ["position", "turn", "gradient"].includes(c.channel)),
+          !t.swing &&
+          (!("best" in t.easing) ||
+            !(t.easing.channels ?? []).some((c) => ["position", "turn", "gradient"].includes(c.channel))),
       );
       // Never seen at all: nothing was checked, not even its timing ("held: --expect-duration 200ms"
       // beside "never seen in any frame", round 14).
@@ -3384,8 +3482,15 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
       );
       const easingMissed = r.targets.filter((t) => !easingChecked.includes(t)).map((t) => t.target);
       const easingOpen = easingChecked.length === 0;
+      // An origin is the scale's, not the path's: nine tiles growing in place travel nothing, and
+      // "--expect-origin center" read "not judged" under lines saying "grows from its centre"
+      // (authoring v1). It is judged wherever a segment has a point it scales about.
+      const originRead = r.targets.some((t) => t.pivot || t.segments.some((g) => g.origin));
       const unjudged = (f: string) =>
-        unseen || ((unfitted || easingOpen) && /easing/.test(f)) || (pathless && /direction|origin/.test(f));
+        unseen ||
+        ((unfitted || easingOpen) && /easing/.test(f)) ||
+        (pathless && /direction/.test(f)) ||
+        (/origin/.test(f) && !originRead);
       const held = asked
         .filter((f) => !failed.has(ruleOf(f)) && !unjudged(f))
         .map((f) =>
