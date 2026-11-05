@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inbox avatar</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #f4f5f7; font-family: system-ui, sans-serif; }
+  .avatar {
+    position: absolute;
+    left: 100px;
+    top: 100px;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    /* the background is cut to the circle by border-radius; no overflow clipping, so the badge is never cut */
+    background:
+      radial-gradient(circle at 50% 36%, #f1c9a5 0 14px, transparent 15px),
+      radial-gradient(ellipse 26px 20px at 50% 92%, #3b5b8c 0 100%, transparent 101%),
+      linear-gradient(160deg, #9ad0ec 0%, #5c8fbf 55%, #2f4e74 100%);
+  }
+  .badge {
+    position: absolute;
+    /* centre on the avatar box's top-right corner (64, 0) */
+    left: 50px;   /* 64 - 28/2 */
+    top: -11px;   /* 0 - 22/2 */
+    box-sizing: border-box;
+    width: 28px;
+    height: 22px;
+    border-radius: 11px;
+    background: #e5243b;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 22px;
+    text-align: center;
+    box-shadow: 0 0 0 2px #f4f5f7;
+    transform-origin: 50% 50%;
+    animation: badge-pop 400ms ease-out 1000ms both;
+  }
+  @keyframes badge-pop {
+    0%   { scale: 0; }
+    65%  { scale: 1.15; }
+    100% { scale: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .badge { animation-duration: 1ms; }
+  }
+</style>
+</head>
+<body>
+  <div class="avatar" role="img" aria-label="User avatar, 3 unread messages">
+    <span class="badge">3</span>
+  </div>
+</body>
+</html>

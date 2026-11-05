@@ -15,6 +15,8 @@ import { runMotionCli } from "./motion-cli.ts";
 const dir = join(import.meta.dirname, "../../../../fixtures/motion-authoring");
 const ref = (name: string) => join(dir, "reference", `${name}.html`);
 const mutant = (name: string) => join(dir, "mutants", `${name}.html`);
+const ref2 = (name: string) => join(dir, "v2", "reference", `${name}.html`);
+const mutant2 = (name: string) => join(dir, "v2", "mutants", `${name}.html`);
 
 const motion = async (page: string, args: string[]) => {
   const lines: string[] = [];
@@ -133,5 +135,58 @@ describe("motion-authoring v1: what the briefs asked, as flags", () => {
     ]);
     assert.equal(r.code, 0, r.out);
     assert.match(r.out, /held: --expect-start \+0,any/, r.out);
+  });
+});
+
+describe("motion-authoring v2: the traps, each caught on its mutant and not on its reference", () => {
+  it(
+    "an SVG needle turning about its base (the right end of its line) is held; about the viewBox centre, fails",
+    T,
+    async () => {
+      const args = ["--selector", ".needle", "--expect-origin", "right"];
+      const good = await motion(ref2("gauge"), args);
+      assert.equal(good.code, 0, good.out);
+      assert.match(good.out, /held: --expect-origin right/, good.out);
+      const bad = await motion(mutant2("gauge-origin"), args);
+      assert.equal(bad.code, 1, bad.out);
+      assert.match(bad.out, /FAIL origin-mismatch .*transform-box: fill-box/, bad.out);
+    },
+  );
+
+  it("a menu clicked again half open: a transition turns round, a @keyframes leaps back to open", T, async () => {
+    const args = [
+      "--click",
+      ".menu-button",
+      "--wait",
+      "125",
+      "--click",
+      ".menu-button",
+      "--selector",
+      ".menu",
+      "--exits",
+    ];
+    const good = await motion(ref2("menu"), args);
+    assert.equal(good.code, 0, good.out);
+    const bad = await motion(mutant2("menu-keyframes"), args);
+    assert.equal(bad.code, 1, bad.out);
+    assert.match(bad.out, /FAIL interrupt-jump/, bad.out);
+  });
+
+  it("a label that wraps onto two rows inside its pill fails --expect-lines 1", T, async () => {
+    const args = ["--click", ".add", "--selector", ".add", "--expect-lines", "1"];
+    const good = await motion(ref2("label"), args);
+    assert.equal(good.code, 0, good.out);
+    const bad = await motion(mutant2("label-wrap"), args);
+    assert.equal(bad.code, 1, bad.out);
+    assert.match(bad.out, /FAIL lines-mismatch/, bad.out);
+  });
+
+  it("a lifted card under the next one fails covered-edge; with a z-index it does not", T, async () => {
+    const args = ["--hover", ".plan:nth-child(2)", "--selector", ".plan:nth-child(2)"];
+    const good = await motion(ref2("lift"), args);
+    assert.equal(good.code, 0, good.out);
+    const bad = await motion(mutant2("lift-noz"), args);
+    assert.equal(bad.code, 1, bad.out);
+    assert.match(bad.out, /FAIL covered-edge/, bad.out);
   });
 });

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Features</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: #f5f6f8; color: #1d2330; font: 16px/1.5 system-ui, sans-serif; }
+  h1 { position: absolute; left: 40px; top: 40px; margin: 0; font-size: 32px; line-height: 48px; }
+  .features {
+    position: absolute; left: 40px; top: 120px;
+    display: grid;
+    grid-template-columns: repeat(3, 360px);
+    grid-template-rows: repeat(2, 160px);
+    gap: 24px;
+    margin: 0; padding: 0;
+  }
+  .feature {
+    width: 360px; height: 160px;
+    padding: 24px;
+    background: #ffffff;
+    border: 1px solid #d5d9e0;
+    border-radius: 8px;
+    animation: feature-in 500ms ease-out backwards;
+  }
+  .feature h2 { margin: 0 0 8px; font-size: 20px; line-height: 28px; }
+  .feature p { margin: 0; font-size: 16px; line-height: 24px; color: #3a4252; }
+  .feature:nth-child(1) { animation-delay: 0ms; }
+  .feature:nth-child(2) { animation-delay: 100ms; }
+  .feature:nth-child(3) { animation-delay: 200ms; }
+  .feature:nth-child(4) { animation-delay: 300ms; }
+  .feature:nth-child(5) { animation-delay: 400ms; }
+  .feature:nth-child(6) { animation-delay: 500ms; }
+  @keyframes feature-in {
+    from { opacity: 0; transform: translateY(32px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .feature { animation: none; }
+  }
+</style>
+</head>
+<body>
+  <h1>Features</h1>
+  <section class="features" aria-label="Features">
+    <div class="feature"><h2>Fast builds</h2><p>Incremental compiles finish before you switch windows.</p></div>
+    <div class="feature"><h2>Safe deploys</h2><p>Every release rolls out gradually and rolls back on error.</p></div>
+    <div class="feature"><h2>Clear logs</h2><p>Structured output you can search, filter and share.</p></div>
+    <div class="feature"><h2>Team access</h2><p>Invite people with roles that match how you work.</p></div>
+    <div class="feature"><h2>Live metrics</h2><p>Watch latency and errors update as traffic arrives.</p></div>
+    <div class="feature"><h2>Open API</h2><p>Automate anything the dashboard can do from a script.</p></div>
+  </section>
+</body>
+</html>

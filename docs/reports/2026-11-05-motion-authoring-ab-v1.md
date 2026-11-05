@@ -111,5 +111,7 @@ it faster. To show what vlmkit adds, the next round needs one or more of these:
 The false alarms above should be fixed first. As things stand, they cost the vlmkit group more time than the
 tool saved it.
 
+Round 2, after the fixes, with briefs built on known traps: `2026-11-05-motion-authoring-ab-v2.md` (12/12 again).
+
 Pages and the oracle: `fixtures/motion-authoring/` (briefs, references, mutants, oracle) and
 `docs/reports/data/2026-11-05-motion-authoring/` (the twelve pages, scored as above).

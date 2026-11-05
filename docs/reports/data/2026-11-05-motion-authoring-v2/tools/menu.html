@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Menu</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh;
+    background: #eef1f5;
+    font: 15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: #1f2933;
+  }
+  .toolbar {
+    position: absolute;
+    left: 40px;
+    top: 40px;
+  }
+  .menu-button {
+    display: block;
+    margin: 0;
+    padding: 8px 18px;
+    border: 1px solid #b8c2cc;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #1f2933;
+    font: inherit;
+    cursor: pointer;
+  }
+  .menu-button:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+  .menu {
+    position: absolute;
+    left: 0;
+    top: 100%;
+    margin-top: 6px;
+    width: 220px;
+    background: #ffffff;
+    border: 1px solid #d3dae1;
+    border-radius: 6px;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
+    overflow: hidden;
+    transform-origin: top;
+    transform: scaleY(0);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      transform 250ms ease-out,
+      opacity 250ms ease-out,
+      visibility 0s linear 250ms;
+  }
+  .menu.open {
+    transform: scaleY(1);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition:
+      transform 250ms ease-out,
+      opacity 250ms ease-out,
+      visibility 0s linear 0s;
+  }
+  .menu ul { list-style: none; margin: 0; padding: 4px 0; }
+  .menu li a {
+    display: block;
+    padding: 8px 14px;
+    color: inherit;
+    text-decoration: none;
+  }
+  .menu li a:hover, .menu li a:focus-visible { background: #eef2ff; outline: none; }
+</style>
+</head>
+<body>
+  <div class="toolbar">
+    <button class="menu-button" type="button" aria-expanded="false" aria-controls="menu">Menu</button>
+    <div class="menu" id="menu">
+      <ul>
+        <li><a href="#new">New file</a></li>
+        <li><a href="#open">Open…</a></li>
+        <li><a href="#save">Save</a></li>
+        <li><a href="#export">Export</a></li>
+        <li><a href="#close">Close</a></li>
+      </ul>
+    </div>
+  </div>
+<script>
+  const button = document.querySelector('.menu-button');
+  const menu = document.querySelector('.menu');
+  button.addEventListener('click', () => {
+    const open = menu.classList.toggle('open');
+    button.setAttribute('aria-expanded', String(open));
+  });
+</script>
+</body>
+</html>

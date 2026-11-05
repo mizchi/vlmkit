@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inbox avatar</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #f4f5f7; font-family: system-ui, sans-serif; }
+  .avatar {
+    position: absolute;
+    left: 100px;
+    top: 100px;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    /* photo-like gradient; the background is cut to the circle by border-radius.
+       No overflow clipping, so the badge (a child) is never cut off. */
+    background:
+      radial-gradient(circle at 50% 38%, #f2c9a8 0 15px, transparent 16px),
+      radial-gradient(ellipse 30px 22px at 50% 100%, #3b5b8c 0 100%, transparent 101%),
+      linear-gradient(160deg, #9fd3e6 0%, #6aa8c9 45%, #c98f6b 100%);
+  }
+  .badge {
+    position: absolute;
+    left: 100%;           /* the avatar box's right edge */
+    top: 0;               /* the avatar box's top edge */
+    translate: -50% -50%; /* centre on the top right corner */
+    box-sizing: border-box;
+    height: 22px;
+    min-width: 22px;
+    padding: 0 6px;
+    border-radius: 11px;
+    background: #e5322d;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 22px;
+    text-align: center;
+    transform-origin: 50% 50%;
+    animation: badge-pop 400ms ease-out 1000ms both;
+  }
+  @keyframes badge-pop {
+    0%   { scale: 0; }
+    60%  { scale: 1.15; }
+    100% { scale: 1; }
+  }
+</style>
+</head>
+<body>
+  <div class="avatar" role="img" aria-label="User avatar, 3 unread"><span class="badge">3</span></div>
+</body>
+</html>

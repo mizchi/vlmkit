@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Speed gauge</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #f4f5f7; }
+  body { width: 1280px; min-height: 800px; position: relative; font-family: system-ui, sans-serif; }
+  svg.gauge {
+    position: absolute; left: 80px; top: 80px;
+    width: 320px; height: 200px; display: block;
+    background: #ffffff; border-radius: 8px;
+  }
+  .dial { fill: #e8ecf2; stroke: #334155; stroke-width: 4; }
+  .tick { stroke: #334155; stroke-width: 3; stroke-linecap: round; }
+  .needle {
+    stroke: #dc2626; stroke-width: 4; stroke-linecap: butt;
+    transform-box: view-box;
+    transform-origin: 160px 170px;
+    transform: rotate(0deg);
+    animation: sweep 1200ms ease-out forwards;
+  }
+  .hub { fill: #334155; }
+  @keyframes sweep {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(120deg); }
+  }
+</style>
+</head>
+<body>
+<svg class="gauge" viewBox="0 0 320 200" width="320" height="200" role="img" aria-label="Speed gauge">
+  <path class="dial" d="M 20 170 A 140 140 0 0 1 300 170 Z"/>
+  <line class="tick" x1="30" y1="170" x2="44" y2="170"/>
+  <line class="tick" x1="160" y1="40" x2="160" y2="54"/>
+  <line class="tick" x1="290" y1="170" x2="276" y2="170"/>
+  <line class="needle" x1="160" y1="170" x2="40" y2="170"/>
+  <circle class="hub" cx="160" cy="170" r="7"/>
+</svg>
+</body>
+</html>

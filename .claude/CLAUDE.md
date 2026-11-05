@@ -506,6 +506,33 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   (suspect), `counter-rotation-drift` (warn), 240 rules, none of the rounds 16-18 rules firing on the repo's 72
   other correct animated pages; a counter-rotation's own turn is not blamed on a wrong sign.
 
+**Writing motion from a brief, with vlmkit and without** (`fixtures/motion-authoring/`, v1 and v2; reports
+`docs/reports/2026-11-05-motion-authoring-ab-v{1,2}.md`). The repair rounds gave agents a broken page. This A/B
+gives fresh agents only a brief, half of them with vlmkit and half with only Playwright, and scores them with
+a hidden oracle that uses plain Playwright. Measured, not to re-learn:
+
+- **24 of 24 pages correct on both sides,** in v1 and in v2, where every brief was built on a trap the repair
+  rounds had found (a lifted card under its neighbour, a clipped badge, an SVG pivot, a menu restarting, a
+  label wrapping, reduced motion hiding everything). With the default model, pausing and seeking
+  `document.getAnimations()` measures CSS animation exactly, and the agents knew the traps.
+- **So vlmkit does not raise the success rate here; it costs more time.** It took 1.1-2.9x as long on 11 of
+  the 12 briefs, and the control agent was slower only on v2's reveal. What it gives is named, repeatable checks
+  the agent did not write (`held: …`). A difference in success rate needs a weaker model, or briefs where the
+  browser's API cannot show the mistake.
+- **What the agents' friction fixed:**
+  - a swing is judged by the way it turns first, with its turning points, and a turn's pivot is held to
+    `--expect-origin`;
+  - `size-jump` ignores its own scale and turn;
+  - no `loop-seam` where the view either side of the seam is the same;
+  - a cover at 60% opacity or less dims, not hides;
+  - the held clock honours a CSS `animation-play-state` pause;
+  - new flags: `--expect-span-of`, `--expect-lines`, `--reduced-motion`, `--expect-start +N` / `any`;
+  - `interrupt-jump` fires on a leap the other way from the motion that follows;
+  - `text-wrap` when a target's text runs to more lines than it should.
+- **Still open** (v2 report): an expectation given once also applies to `--still` targets, and only some
+  per-target flags take `any`. A scale's peak is the sampled frames'. `turn-off-centre` suggests
+  `--expect-still` for a turn about a point that was meant.
+
 ## Generated figures (raster images)
 
 Figures that state structure — dependencies, flows, states, sequences, measurements — are drawn with

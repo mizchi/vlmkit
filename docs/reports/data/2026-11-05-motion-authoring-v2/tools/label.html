@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Product card</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #eef0f3;
+    color: #1d2330;
+  }
+  .card {
+    position: relative;
+    width: 360px;
+    height: 320px;
+    margin: 0;
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 2px 10px rgba(20, 30, 50, 0.08);
+  }
+  .card .add {
+    position: absolute;
+    left: 40px;
+    top: 40px;
+    display: flex;
+    align-items: center;
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+    max-height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 22px;
+    background: #1f6feb;
+    color: #ffffff;
+    font: 600 15px/20px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    white-space: nowrap;
+    overflow: hidden;
+    cursor: pointer;
+    transition: width 300ms ease-out;
+  }
+  .add .icon {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    font-size: 24px;
+    line-height: 1;
+  }
+  .add .label {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    padding-right: 18px;
+    opacity: 0;
+    transition: opacity 300ms ease-out;
+  }
+  .add.added { width: 168px; }
+  .add.added .label { opacity: 1; }
+  .card .info {
+    position: absolute;
+    left: 40px;
+    top: 120px;
+    right: 40px;
+  }
+  .info h2 { margin: 0 0 8px; font-size: 20px; line-height: 28px; }
+  .info p { margin: 0 0 12px; font-size: 14px; line-height: 20px; color: #5a6272; }
+  .info .price { font-size: 18px; font-weight: 700; color: #1d2330; }
+</style>
+</head>
+<body>
+  <article class="card">
+    <button class="add" type="button" aria-label="Add to cart">
+      <span class="icon" aria-hidden="true">+</span>
+      <span class="label">Added to cart</span>
+    </button>
+    <div class="info">
+      <h2>Canvas tote bag</h2>
+      <p>Heavyweight cotton canvas with a reinforced base and an inner pocket.</p>
+      <span class="price">$28.00</span>
+    </div>
+  </article>
+  <script>
+    const add = document.querySelector('.add');
+    add.addEventListener('click', () => {
+      add.classList.add('added');
+      add.setAttribute('aria-label', 'Added to cart');
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Toolbar</title><style>
+body{margin:0;font:15px system-ui,sans-serif;background:#f8fafc}
+button.menu-button{position:absolute;left:40px;top:40px;font:inherit;padding:8px 14px}
+div.menu{position:absolute;left:40px;top:84px;width:220px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;
+transform:scaleY(0);transform-origin:top;opacity:0;transition:transform 250ms ease-out,opacity 250ms ease-out}
+div.menu.open{transform:none;opacity:1}
+div.menu a{display:block;padding:8px 14px;color:#0f172a;text-decoration:none}
+</style></head><body><button class="menu-button">Menu</button>
+<div class="menu"><a href="#">New</a><a href="#">Open</a><a href="#">Save</a><a href="#">Share</a><a href="#">Close</a></div>
+<script>document.querySelector(".menu-button").onclick=()=>document.querySelector(".menu").classList.toggle("open");</script></body></html>
