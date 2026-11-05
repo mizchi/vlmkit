@@ -1,0 +1,12 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Gallery</title><style>
+body{margin:0;background:#fafafa}
+.grid{position:absolute;left:40px;top:40px;display:grid;grid-template-columns:repeat(3,120px);gap:16px}
+div.tile{width:120px;height:120px;border-radius:10px;animation:pop 300ms linear both}
+@keyframes pop{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:none}}
+div.tile:nth-child(2),div.tile:nth-child(4),div.tile:nth-child(6),div.tile:nth-child(8){animation-delay:100ms}
+div.tile:nth-child(1),div.tile:nth-child(3),div.tile:nth-child(7),div.tile:nth-child(9){animation-delay:200ms}
+</style></head><body><div class="grid">
+<div class="tile" style="background:#ef4444"></div><div class="tile" style="background:#f97316"></div><div class="tile" style="background:#eab308"></div>
+<div class="tile" style="background:#22c55e"></div><div class="tile" style="background:#14b8a6"></div><div class="tile" style="background:#3b82f6"></div>
+<div class="tile" style="background:#6366f1"></div><div class="tile" style="background:#a855f7"></div><div class="tile" style="background:#ec4899"></div>
+</div></body></html>

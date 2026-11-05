@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loading card</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: #eef0f3;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: #1f2933;
+  }
+  .card {
+    position: absolute;
+    left: 40px;
+    top: 40px;
+    width: 360px;
+    max-width: calc(100vw - 80px);
+    padding: 20px;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+    display: grid;
+  }
+  /* skeleton and content share one grid cell: same place */
+  .skeleton, .content { grid-area: 1 / 1; }
+
+  .skeleton {
+    position: relative;
+    z-index: 1;                  /* above the not-yet-arrived content */
+    overflow: hidden;            /* the highlight is never seen outside it */
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-top: 4px;
+    animation: skeleton-out 300ms linear 1500ms forwards;
+  }
+  .bar {
+    height: 16px;
+    border-radius: 8px;
+    background: #d9dde3;
+  }
+  .bar:nth-child(1) { width: 60%; height: 20px; border-radius: 10px; }
+  .bar:nth-child(2) { width: 100%; }
+  .bar:nth-child(3) { width: 80%; }
+
+  .shimmer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 80px;
+    height: 100%;
+    background: linear-gradient(90deg,
+      rgba(255,255,255,0) 0%,
+      rgba(255,255,255,0.75) 50%,
+      rgba(255,255,255,0) 100%);
+    pointer-events: none;
+    /* from wholly left of the bars (-80px) to wholly right of them (320px) */
+    transform: translateX(-80px);
+    animation: shimmer-sweep 1200ms linear infinite;
+  }
+
+  .content {
+    opacity: 0;
+    visibility: hidden;          /* takes no clicks before it arrives */
+    animation: content-in 300ms linear 1500ms both;
+  }
+  .content h2 {
+    margin: 0 0 8px;
+    font-size: 20px;
+    line-height: 28px;
+    font-weight: 600;
+  }
+  .content p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 20px;
+    color: #52606d;
+  }
+
+  @keyframes shimmer-sweep {
+    from { transform: translateX(-80px); }
+    to   { transform: translateX(320px); }
+  }
+  @keyframes skeleton-out {
+    from { opacity: 1; visibility: visible; }
+    to   { opacity: 0; visibility: hidden; }
+  }
+  @keyframes content-in {
+    from { opacity: 0; visibility: visible; }
+    to   { opacity: 1; visibility: visible; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .shimmer {
+      animation: none;
+      transform: translateX(120px);   /* held still, over the bars */
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="skeleton" aria-hidden="true">
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <span class="shimmer"></span>
+    </div>
+    <div class="content">
+      <h2>Monthly revenue</h2>
+      <p>$48,250 this month, up 12% on last month.</p>
+      <p>Updated a moment ago from the billing service.</p>
+    </div>
+  </div>
+</body>
+</html>

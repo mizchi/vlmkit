@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; color: #1f2328; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { padding: 40px; }
+  nav.tabs {
+    position: relative;
+    display: flex;
+    width: max-content;
+    margin: 0;
+    padding: 0;
+    border-bottom: 0;
+  }
+  button.tab {
+    flex: none;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    font: inherit;
+    font-size: 16px;
+    line-height: 20px;
+    padding: 12px 20px;
+    color: #57606a;
+    cursor: pointer;
+  }
+  button.tab[aria-selected="true"] { color: #0b57d0; }
+  button.tab:focus-visible { outline: 2px solid #0b57d0; outline-offset: -2px; }
+  span.indicator {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 3px;
+    width: 0;
+    background: #0b57d0;
+    pointer-events: none;
+    transform: translateX(0);
+  }
+  span.indicator.ready {
+    transition: transform 300ms ease-in-out, width 300ms ease-in-out;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    span.indicator.ready { transition: none; }
+  }
+  .panel { margin-top: 32px; max-width: 640px; line-height: 1.5; }
+  .panel h1 { font-size: 24px; margin: 0 0 12px; }
+  .panel p { margin: 0 0 12px; color: #424a53; }
+  .panel[hidden] { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <nav class="tabs" role="tablist" aria-label="Settings sections">
+    <button class="tab" role="tab" id="t-overview" aria-controls="p-overview" aria-selected="true">Overview</button><button class="tab" role="tab" id="t-activity" aria-controls="p-activity" aria-selected="false" tabindex="-1">Activity</button><button class="tab" role="tab" id="t-settings" aria-controls="p-settings" aria-selected="false" tabindex="-1">Settings</button><button class="tab" role="tab" id="t-billing" aria-controls="p-billing" aria-selected="false" tabindex="-1">Billing and invoices</button>
+    <span class="indicator" aria-hidden="true"></span>
+  </nav>
+  <section class="panel" role="tabpanel" id="p-overview" aria-labelledby="t-overview">
+    <h1>Overview</h1>
+    <p>Your account is in good standing. Two team members joined this month.</p>
+  </section>
+  <section class="panel" role="tabpanel" id="p-activity" aria-labelledby="t-activity" hidden>
+    <h1>Activity</h1>
+    <p>Recent sign-ins and changes to your workspace appear here.</p>
+  </section>
+  <section class="panel" role="tabpanel" id="p-settings" aria-labelledby="t-settings" hidden>
+    <h1>Settings</h1>
+    <p>Change your display name, language and notification preferences.</p>
+  </section>
+  <section class="panel" role="tabpanel" id="p-billing" aria-labelledby="t-billing" hidden>
+    <h1>Billing and invoices</h1>
+    <p>Your plan renews on the first of each month. Past invoices can be downloaded below.</p>
+  </section>
+</main>
+<script>
+  (function () {
+    var nav = document.querySelector('nav.tabs');
+    var tabs = Array.prototype.slice.call(nav.querySelectorAll('button.tab'));
+    var indicator = nav.querySelector('span.indicator');
+
+    function place(tab) {
+      var navBox = nav.getBoundingClientRect();
+      var box = tab.getBoundingClientRect();
+      indicator.style.transform = 'translateX(' + (box.left - navBox.left) + 'px)';
+      indicator.style.width = box.width + 'px';
+    }
+
+    function select(tab) {
+      tabs.forEach(function (t) {
+        var on = t === tab;
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+        t.tabIndex = on ? 0 : -1;
+        document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+      });
+      place(tab);
+    }
+
+    tabs.forEach(function (tab, i) {
+      tab.addEventListener('click', function () { select(tab); });
+      tab.addEventListener('keydown', function (e) {
+        var next = null;
+        if (e.key === 'ArrowRight') next = tabs[(i + 1) % tabs.length];
+        else if (e.key === 'ArrowLeft') next = tabs[(i - 1 + tabs.length) % tabs.length];
+        else if (e.key === 'Home') next = tabs[0];
+        else if (e.key === 'End') next = tabs[tabs.length - 1];
+        if (next) { e.preventDefault(); next.focus(); select(next); }
+      });
+    });
+
+    // Initial placement without animation, then enable the transition.
+    place(tabs.find(function (t) { return t.getAttribute('aria-selected') === 'true'; }) || tabs[0]);
+    indicator.getBoundingClientRect();
+    indicator.classList.add('ready');
+
+    // If fonts load later and widths change, re-place without sliding.
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(function () {
+        indicator.classList.remove('ready');
+        place(tabs.find(function (t) { return t.getAttribute('aria-selected') === 'true'; }));
+        indicator.getBoundingClientRect();
+        indicator.classList.add('ready');
+      });
+    }
+  })();
+</script>
+</body>
+</html>

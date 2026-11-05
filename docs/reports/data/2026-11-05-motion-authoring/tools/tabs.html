@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings</title>
+<style>
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #ffffff;
+    color: #1f2933;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  nav.tabs {
+    position: relative;
+    display: flex;
+    width: max-content;
+    margin: 0;
+    padding: 0;
+    position: absolute;
+    top: 40px;
+    left: 40px;
+    border-bottom: 0;
+  }
+  button.tab {
+    appearance: none;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 12px 20px;
+    font: inherit;
+    font-size: 16px;
+    line-height: 1.25;
+    color: #52606d;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  button.tab[aria-selected="true"] { color: #1d4ed8; }
+  button.tab:focus-visible { outline: 2px solid #1d4ed8; outline-offset: -2px; }
+  span.indicator {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 3px;
+    width: 0;
+    background: #1d4ed8;
+    transform: translateX(0);
+    pointer-events: none;
+  }
+  span.indicator.ready {
+    transition: transform 300ms ease-in-out, width 300ms ease-in-out;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    span.indicator.ready { transition: none; }
+  }
+  @media (max-width: 600px) {
+    nav.tabs { max-width: calc(100% - 80px); overflow-x: auto; scrollbar-width: none; }
+  }
+  main {
+    position: absolute;
+    top: 120px;
+    left: 40px;
+    right: 40px;
+    max-width: 720px;
+  }
+  main h1 { font-size: 24px; margin: 0 0 12px; }
+  main p { font-size: 16px; line-height: 1.5; margin: 0 0 12px; color: #3e4c59; }
+</style>
+</head>
+<body>
+  <nav class="tabs" role="tablist" aria-label="Settings sections">
+    <button class="tab" role="tab" id="tab-overview" aria-controls="panel" aria-selected="true">Overview</button>
+    <button class="tab" role="tab" id="tab-activity" aria-controls="panel" aria-selected="false" tabindex="-1">Activity</button>
+    <button class="tab" role="tab" id="tab-settings" aria-controls="panel" aria-selected="false" tabindex="-1">Settings</button>
+    <button class="tab" role="tab" id="tab-billing" aria-controls="panel" aria-selected="false" tabindex="-1">Billing and invoices</button>
+    <span class="indicator" aria-hidden="true"></span>
+  </nav>
+  <main id="panel" role="tabpanel" aria-labelledby="tab-overview">
+    <h1 id="panel-title">Overview</h1>
+    <p id="panel-text">Your account at a glance: plan, usage this month and the people who can sign in.</p>
+  </main>
+<script>
+  const tabs = Array.from(document.querySelectorAll('button.tab'));
+  const indicator = document.querySelector('span.indicator');
+  const panel = document.getElementById('panel');
+  const title = document.getElementById('panel-title');
+  const text = document.getElementById('panel-text');
+  const copy = {
+    'tab-overview': 'Your account at a glance: plan, usage this month and the people who can sign in.',
+    'tab-activity': 'Recent sign-ins, changes to your settings and exports, newest first.',
+    'tab-settings': 'Language, time zone, notifications and the security of your account.',
+    'tab-billing': 'Your payment method, billing address and every invoice issued so far.'
+  };
+  function place(tab) {
+    const t = tab.getBoundingClientRect();
+    const n = tab.parentElement.getBoundingClientRect();
+    indicator.style.width = t.width + 'px';
+    indicator.style.transform = 'translateX(' + (t.left - n.left + tab.parentElement.scrollLeft) + 'px)';
+  }
+  function select(tab) {
+    tabs.forEach(t => {
+      const on = t === tab;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+    });
+    panel.setAttribute('aria-labelledby', tab.id);
+    title.textContent = tab.textContent;
+    text.textContent = copy[tab.id];
+    place(tab);
+  }
+  tabs.forEach((tab, i) => {
+    tab.addEventListener('click', () => select(tab));
+    tab.addEventListener('keydown', e => {
+      let next = null;
+      if (e.key === 'ArrowRight') next = tabs[(i + 1) % tabs.length];
+      else if (e.key === 'ArrowLeft') next = tabs[(i - 1 + tabs.length) % tabs.length];
+      else if (e.key === 'Home') next = tabs[0];
+      else if (e.key === 'End') next = tabs[tabs.length - 1];
+      if (next) { e.preventDefault(); select(next); next.focus(); }
+    });
+  });
+  // Place under the initial tab with no transition, then enable it.
+  place(tabs.find(t => t.getAttribute('aria-selected') === 'true'));
+  void indicator.offsetWidth;
+  indicator.classList.add('ready');
+  window.addEventListener('resize', () => {
+    place(tabs.find(t => t.getAttribute('aria-selected') === 'true'));
+  });
+</script>
+</body>
+</html>

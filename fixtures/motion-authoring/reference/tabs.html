@@ -1,0 +1,20 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Settings</title><style>
+body{margin:0;font:16px/1.4 system-ui,sans-serif;color:#1d2330;background:#fff}
+nav.tabs{position:absolute;left:40px;top:40px;display:flex;border-bottom:1px solid #d9dde5}
+button.tab{font:inherit;padding:12px 20px;margin:0;border:0;background:none;cursor:pointer;color:#4a5263}
+button.tab[aria-selected="true"]{color:#1d2330}
+span.indicator{position:absolute;left:0;bottom:0;height:3px;width:var(--w,0);background:#2563eb;transform:translateX(var(--x,0));
+transition:transform 300ms ease-in-out,width 300ms ease-in-out}
+@media (prefers-reduced-motion:reduce){span.indicator{transition:none}}
+main{position:absolute;left:40px;top:120px;width:600px}
+</style></head><body>
+<nav class="tabs" role="tablist"><button class="tab" role="tab" aria-selected="true">Overview</button><button class="tab" role="tab" aria-selected="false">Activity</button><button class="tab" role="tab" aria-selected="false">Settings</button><button class="tab" role="tab" aria-selected="false">Billing and invoices</button><span class="indicator" aria-hidden="true"></span></nav>
+<main><h1>Overview</h1><p>Your workspace at a glance.</p></main>
+<script>
+const nav=document.querySelector("nav.tabs"),ind=nav.querySelector(".indicator");
+function place(t){ind.style.setProperty("--x",t.offsetLeft+"px");ind.style.setProperty("--w",t.offsetWidth+"px");}
+place(nav.querySelector('[aria-selected="true"]'));
+nav.addEventListener("click",e=>{const t=e.target.closest("button.tab");if(!t)return;
+for(const b of nav.querySelectorAll("button.tab"))b.setAttribute("aria-selected",String(b===t));place(t);
+document.querySelector("main h1").textContent=t.textContent;});
+</script></body></html>
