@@ -216,6 +216,8 @@ export interface MotionSample {
     scaleY?: number;
     /** How many lines its text runs to (distinct line boxes), when it has text. */
     lines?: number;
+    /** Its text overflows its own height and it clips it (overflow not visible). */
+    textClipped?: boolean;
     /** The point of its own box a 2D turn of 2° or more keeps still, as a share of the box (0..1). */
     pivot?: { fx: number; fy: number };
   };
@@ -303,6 +305,8 @@ export interface MotionPathOptions {
   /** How long one run must take (ms), and how many runs (null: infinite). */
   expectDurationMs?: number;
   expectIterations?: number | null;
+  /** How many lines its text runs to in every frame it is shown in (a label kept on one line). */
+  expectLines?: number;
   /** Its centre must not move: only its size, opacity or colour change (a dialog that stays centred). */
   expectStill?: boolean;
   /** Its angle on screen must not change (a label kept level inside a turning dial). */
@@ -335,6 +339,7 @@ export type MotionRule =
   | "invisible-blocker"
   | "size-jump"
   | "text-wrap"
+  | "lines-mismatch"
   | "turn-off-centre"
   | "channel-step"
   | "inert-offset"
@@ -1046,7 +1051,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         rule: "origin-mismatch",
         severity: "fail",
         atMs: segments[0]!.startMs,
-        message: `it turns about ${describeOrigin(pivotReport)} (that point of its box stays put), not ${describeOrigin({ ...want, name: options.expectOrigin })}: transform-origin: ${originCss(options.expectOrigin)}${sorted.some((x) => x.dom?.svg) ? " (with transform-box: fill-box on an SVG element)" : ""}`,
+        message: `it turns about ${describeOrigin(pivotReport).startsWith("no point") ? "a point outside its box" : `${describeOrigin(pivotReport)} (that point of its box stays put)`}, not ${describeOrigin({ ...want, name: options.expectOrigin })}: transform-origin: ${originCss(options.expectOrigin)}${sorted.some((x) => x.dom?.svg) ? " — on an SVG element transform-origin is measured from the viewBox's corner unless transform-box: fill-box, so give it fill-box, or the origin in the SVG's own units" : ""}`,
       });
   }
   if (options.expectOrigin && !reports.some((x) => x.origin) && !pivotReport) {
@@ -1392,6 +1397,30 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         x.dom.lines > restLines &&
         x.dom.opacity >= 0.05,
     );
+    // On more than one line and cut off by its own box: the wrap is there at rest too, so no frame has
+    // more lines than rest, and the second line is clipped away (the label-wrap mutant, authoring v2).
+    const cut = sorted.find((x) => (x.dom?.lines ?? 0) > 1 && x.dom?.textClipped && x.dom.opacity >= 0.05);
+    // Expected on so many lines: a pill whose label wraps to two lines that fit inside it is not cut
+    // off, and only the brief says it should be one line (authoring v2).
+    if (options.expectLines !== undefined) {
+      const off = sorted.find(
+        (x) => x.dom?.lines !== undefined && x.dom.lines !== options.expectLines && x.dom.opacity >= 0.05,
+      );
+      if (off)
+        findings.push({
+          rule: "lines-mismatch",
+          severity: "fail",
+          atMs: off.atMs,
+          message: `its text runs to ${off.dom!.lines} lines at ${ms(off.atMs)}${isRest(off) ? " (at rest)" : ""}, not ${options.expectLines}${options.expectLines === 1 ? ": white-space: nowrap keeps it on one line, and the box needs room for it at rest (its width from the text's, not a wrap's)" : ""}`,
+        });
+    }
+    if (!wrapped && cut)
+      findings.push({
+        rule: "text-wrap",
+        severity: "fail",
+        atMs: cut.atMs,
+        message: `its text runs to ${cut.dom!.lines} lines at ${ms(cut.atMs)}, and its own box cuts off what does not fit (overflow: hidden): it wraps where it should stay on one line — white-space: nowrap on it`,
+      });
     if (wrapped && restLines !== undefined)
       findings.push({
         rule: "text-wrap",

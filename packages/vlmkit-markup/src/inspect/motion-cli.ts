@@ -250,18 +250,33 @@ export async function measureTargets(
         // way to say so (--expect-origin read only a scale, authoring v1).
         // How many lines its text runs to: a button widening into "Added to cart" wrapped it onto a
         // second line half way, inside a fixed height that hid the wrap from its box (authoring v2).
-        const textLines = (e: Element): { lines?: number } => {
+        const textLines = (e: Element): { lines?: number; textClipped?: boolean } => {
           const walker = document.createTreeWalker(e, NodeFilter.SHOW_TEXT);
-          const tops = new Set<number>();
+          // Rows of each text node, the most of any: a label wrapped onto two rows is two lines, and a
+          // taller "+" beside it (overlapping both rows) is not a third.
+          let lines = 0;
           let seen = 0;
           for (let node = walker.nextNode(); node && seen < 40; node = walker.nextNode()) {
             if (!(node.nodeValue ?? "").trim()) continue;
             seen++;
             const range = document.createRange();
             range.selectNodeContents(node);
-            for (const q of range.getClientRects()) if (q.width > 1 && q.height > 1) tops.add(Math.round(q.top / 2));
+            const rows: [number, number][] = [];
+            for (const q of range.getClientRects()) {
+              if (!(q.width > 1 && q.height > 1)) continue;
+              const row = rows.find(
+                ([t, b]) => Math.min(b, q.bottom) - Math.max(t, q.top) >= 0.5 * Math.min(b - t, q.height),
+              );
+              if (!row) rows.push([q.top, q.bottom]);
+            }
+            lines = Math.max(lines, rows.length);
           }
-          return tops.size > 0 ? { lines: tops.size } : {};
+          if (lines === 0) return {};
+          // Lines it cuts off itself: a wrapped label inside a fixed height with overflow: hidden.
+          const cs = getComputedStyle(e);
+          const he = e as HTMLElement;
+          const clips = cs.overflowY !== "visible" && he.scrollHeight > he.clientHeight + 1;
+          return { lines, ...(clips ? { textClipped: true } : {}) };
         };
         const pivotOf = (e: Element): { pivot?: { fx: number; fy: number } } => {
           const m = fullTransform(e);
@@ -1121,6 +1136,7 @@ each forbidden statement is. vlmkit judges the motion from that:
   invisible-blocker at rest it is transparent and still takes clicks at its centre
   size-jump        its width or height steps in one frame while it eases (its text re-wrapping)
   text-wrap        its text runs to more lines mid-motion than at rest (white-space: nowrap)
+  lines-mismatch   its text runs to another number of lines than --expect-lines
   turn-off-centre  it turns and its centre is carried round: another transform-origin (warn)
   held-by-fill     after an action nothing changes, and its own finished animation holds what the
                    action sets (a forwards fill under :hover)
@@ -1214,6 +1230,8 @@ an easing is checked on each channel that changes.
   --still <css>           One target's centre must not move (repeat): the article a notice
                           slides over, beside the notice that moves. Measured as a --selector
                           too, so it need not be given twice
+  --expect-lines <n>      Its text runs to n lines in every frame it is shown in (a label that
+                          stays on one line while its button widens). Once, or per target
   --expect-span-of <css>  At rest its left and right edges are that element's, within 1px (a tab
                           indicator ending under its tab). Repeat: one per target ("any" skips)
   --reduced-motion        Load the page under prefers-reduced-motion: reduce. After an action, a
@@ -1273,6 +1291,8 @@ export interface MotionCliOptions {
   expectDurationMs?: number[];
   /** How many times it runs (null: infinite), per target in order. */
   expectIterations?: (number | null)[];
+  /** How many lines each target's text runs to in every frame (once for all, or per target). */
+  expectLines?: number[];
   expectDirection?: (MotionDirection | undefined)[];
   exits: boolean;
   /** --selector targets meant to leave, by selector. */
@@ -1336,6 +1356,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   let expectStaggerMs: number | undefined;
   let expectDurationMs: number[] | undefined;
   let expectIterations: (number | null)[] | undefined;
+  let expectLines: number[] | undefined;
   let expectDirection: (MotionDirection | undefined)[] | undefined;
   let at: number[] | undefined;
   let startMs: number | undefined;
@@ -1449,6 +1470,18 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
               const n = Number(v);
               if (!Number.isInteger(n) || n < 1)
                 throw new MotionUsageError(`--expect-iterations takes whole numbers or infinite, got ${v}`);
+              return n;
+            }),
+        );
+        break;
+      case "--expect-lines":
+        (expectLines ??= []).push(
+          ...value(a, argv[++i])
+            .split(",")
+            .map((x) => {
+              const n = Number(x.trim());
+              if (!Number.isInteger(n) || n < 1)
+                throw new MotionUsageError(`--expect-lines takes whole numbers, got ${x}`);
               return n;
             }),
         );
@@ -1627,6 +1660,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   for (const [flag, xs] of [
     ["--expect-duration", expectDurationMs],
     ["--expect-iterations", expectIterations],
+    ["--expect-lines", expectLines],
     ["--expect-direction", expectDirection],
   ] as const) {
     // With --every-action, one per action is per step: a drawer that opens leftwards and closes
@@ -1678,6 +1712,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
     ...(expectStaggerMs !== undefined ? { expectStaggerMs } : {}),
     ...(expectDurationMs ? { expectDurationMs } : {}),
     ...(expectIterations ? { expectIterations } : {}),
+    ...(expectLines ? { expectLines } : {}),
     ...(expectDirection ? { expectDirection } : {}),
     exits,
     exitSelectors,
@@ -3316,6 +3351,7 @@ function* argvExpects(o: MotionCliOptions): Generator<string> {
   if (o.expectStartMs) yield "start";
   if (o.expectDurationMs) yield "duration";
   if (o.expectIterations) yield "iterations";
+  if (o.expectLines) yield "lines";
   if (o.expectDirection) yield "direction";
   if (o.expectStill) yield "still";
   if (o.expectUpright) yield "upright";
@@ -3477,6 +3513,7 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
     ...(o.expectStaggerMs !== undefined ? { expectStaggerMs: o.expectStaggerMs } : {}),
     ...(o.expectDurationMs ? { expectDurationMs: o.expectDurationMs } : {}),
     ...(o.expectIterations ? { expectIterations: o.expectIterations } : {}),
+    ...(o.expectLines ? { expectLines: o.expectLines } : {}),
     ...(o.expectDirection ? { expectDirection: o.expectDirection } : {}),
     ...(o.expectStill ? { expectStill: true } : {}),
     ...(o.expectUpright ? { expectUpright: true } : {}),
@@ -3660,7 +3697,9 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
                       ? "upright-mismatch"
                       : /span-of/.test(flag)
                         ? "span-mismatch"
-                        : "still-mismatch";
+                        : /lines/.test(flag)
+                          ? "lines-mismatch"
+                          : "still-mismatch";
       // A path never fitted (never seen, or under 2px of travel) checked no easing, direction or
       // origin: "held: --expect-direction up" sat under "travels 0px" on a card that never moved
       // (round 13).

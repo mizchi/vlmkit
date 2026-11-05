@@ -145,6 +145,7 @@ export interface MotionCheckOptions {
   /** How long one run takes (ms) and how many runs (null: infinite): one for all, or per target. */
   expectDurationMs?: readonly number[];
   expectIterations?: readonly (number | null)[];
+  expectLines?: readonly number[];
   /** Which way each target's first segment moves: one for all, or per target. */
   expectDirection?: readonly (MotionDirection | undefined)[];
   /** Every target's centre must not move: only its size and opacity change. */
@@ -418,6 +419,7 @@ export async function checkMotionFrames(
         ...(perTarget(options.expectDirection, i) !== undefined
           ? { expectDirection: perTarget(options.expectDirection, i)! }
           : {}),
+        ...(perTarget(options.expectLines, i) !== undefined ? { expectLines: perTarget(options.expectLines, i)! } : {}),
         ...(perTarget(options.expectIterations, i) !== undefined
           ? { expectIterations: perTarget(options.expectIterations, i)! }
           : {}),
