@@ -214,6 +214,8 @@ export interface MotionSample {
     /** Each axis's scale, when it differs: a scaleY drop-down has scaleX 1. */
     scaleX?: number;
     scaleY?: number;
+    /** How many lines its text runs to (distinct line boxes), when it has text. */
+    lines?: number;
     /** The point of its own box a 2D turn of 2° or more keeps still, as a share of the box (0..1). */
     pivot?: { fx: number; fy: number };
   };
@@ -332,6 +334,7 @@ export type MotionRule =
   | "pushed"
   | "invisible-blocker"
   | "size-jump"
+  | "text-wrap"
   | "turn-off-centre"
   | "channel-step"
   | "inert-offset"
@@ -1375,6 +1378,27 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         break;
       }
     }
+  }
+
+  // Its text on more lines mid-motion than at rest: it wraps while its box is still too narrow, even
+  // where a fixed height hides the wrap from its size (a button widening into its label, authoring v2).
+  if (exact) {
+    const restLines = sorted.filter(isRest).at(-1)?.dom?.lines ?? sorted.at(-1)?.dom?.lines;
+    const wrapped = sorted.find(
+      (x) =>
+        !isRest(x) &&
+        x.dom?.lines !== undefined &&
+        restLines !== undefined &&
+        x.dom.lines > restLines &&
+        x.dom.opacity >= 0.05,
+    );
+    if (wrapped && restLines !== undefined)
+      findings.push({
+        rule: "text-wrap",
+        severity: "fail",
+        atMs: wrapped.atMs,
+        message: `its text runs to ${wrapped.dom!.lines} lines at ${ms(wrapped.atMs)} and ${restLines} at rest: it wraps while its box is still narrow — white-space: nowrap on it keeps it on one line while it widens`,
+      });
   }
 
   // Turned in 3D, a box's centre is the bounds of a turned shape under perspective, not a place.

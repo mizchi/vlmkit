@@ -248,18 +248,49 @@ export async function measureTargets(
         // The point of its own box a 2D turn keeps still: the fixed point of its transform about its
         // transform-origin, as a share of its laid-out box. A bell meant to swing from its top had no
         // way to say so (--expect-origin read only a scale, authoring v1).
+        // How many lines its text runs to: a button widening into "Added to cart" wrapped it onto a
+        // second line half way, inside a fixed height that hid the wrap from its box (authoring v2).
+        const textLines = (e: Element): { lines?: number } => {
+          const walker = document.createTreeWalker(e, NodeFilter.SHOW_TEXT);
+          const tops = new Set<number>();
+          let seen = 0;
+          for (let node = walker.nextNode(); node && seen < 40; node = walker.nextNode()) {
+            if (!(node.nodeValue ?? "").trim()) continue;
+            seen++;
+            const range = document.createRange();
+            range.selectNodeContents(node);
+            for (const q of range.getClientRects()) if (q.width > 1 && q.height > 1) tops.add(Math.round(q.top / 2));
+          }
+          return tops.size > 0 ? { lines: tops.size } : {};
+        };
         const pivotOf = (e: Element): { pivot?: { fx: number; fy: number } } => {
           const m = fullTransform(e);
           if (!m || !m.is2D) return {};
           const deg = (Math.atan2(m.b, m.a) * 180) / Math.PI;
           if (Math.abs(deg) < 2) return {};
-          const he = e as HTMLElement;
-          const bb = (e as SVGGraphicsElement).getBBox?.();
-          // Its laid-out box: an outer <svg> has no offsetWidth, and getBBox is its drawing, not its box.
-          const w = he.offsetWidth ?? (e.clientWidth || bb?.width || 0);
-          const h = he.offsetHeight ?? (e.clientHeight || bb?.height || 0);
-          if (!(w > 0 && h > 0)) return {};
-          const [ox = 0, oy = 0] = getComputedStyle(e).transformOrigin.split(/\s+/).map(parseFloat);
+          const cs = getComputedStyle(e);
+          const [ox = 0, oy = 0] = cs.transformOrigin.split(/\s+/).map(parseFloat);
+          // Its box, and the origin in the same coordinates. On an SVG element both are user space:
+          // the origin is from the viewBox's corner (transform-box: view-box, the default) or from
+          // its own bounding box (fill-box), and a <line> has a box with no height (a gauge needle
+          // read no pivot at all, authoring v2).
+          let bx = 0,
+            by = 0,
+            w: number,
+            h: number,
+            orx = ox,
+            ory = oy;
+          if (e instanceof SVGGraphicsElement && !(e instanceof SVGSVGElement)) {
+            const bb = e.getBBox();
+            ({ x: bx, y: by, width: w, height: h } = bb);
+            if (cs.transformBox === "fill-box") ((orx = bb.x + ox), (ory = bb.y + oy));
+          } else {
+            const he = e as HTMLElement;
+            // Its laid-out box: an outer <svg> has no offsetWidth.
+            w = he.offsetWidth ?? e.clientWidth;
+            h = he.offsetHeight ?? e.clientHeight;
+          }
+          if (!(w > 0 || h > 0)) return {};
           // (I - A) y = t, where screen(p) = o + A (p - o) + t; the pivot is o + y.
           const a11 = 1 - m.a,
             a12 = -m.c,
@@ -269,7 +300,11 @@ export async function measureTargets(
           if (Math.abs(det) < 1e-6) return {};
           const yx = (m.e * a22 - a12 * m.f) / det,
             yy = (a11 * m.f - a21 * m.e) / det;
-          return { pivot: { fx: (ox + yx) / w, fy: (oy + yy) / h } };
+          const px = orx + yx - bx,
+            py = ory + yy - by;
+          // Along an axis the box has no extent, a pivot on it is its middle.
+          const frac = (v: number, size: number) => (size > 0 ? v / size : Math.abs(v) < 1 ? 0.5 : v > 0 ? 9 : -9);
+          return { pivot: { fx: frac(px, w), fy: frac(py, h) } };
         };
         // Its angle as drawn, through every transform up the tree, and the nearest ancestor that turns:
         // a label counter-rotating at 5s inside a dial turning at 4s read only its own turn, 72°/s,
@@ -674,6 +709,31 @@ export async function measureTargets(
             }
           }
         }
+        // A cover it shows through: drawn at 60% opacity or less, or painting no more than that
+        // itself (a translucent fill, no image, border or text of its own) — a dialog's wrapper over a
+        // 50% backdrop dims the Delete button under it, it does not hide it (authoring v1).
+        const seeThrough = (top: Element) => {
+          let op = 1;
+          for (let e: Element | null = top; e; e = e.parentElement) op *= Number(getComputedStyle(e).opacity);
+          if (op <= 0.6) return true;
+          const tcs = getComputedStyle(top);
+          const m = /rgba?\(([^)]*)\)/.exec(tcs.backgroundColor);
+          const parts = m ? m[1]!.split(/[\s,/]+/).filter(Boolean) : [];
+          const alpha = parts.length === 4 ? Number(parts[3]) : tcs.backgroundColor === "transparent" ? 0 : 1;
+          const ownText = [...top.childNodes].some((c) => c.nodeType === 3 && (c.textContent ?? "").trim());
+          const bordered = ["top", "right", "bottom", "left"].some(
+            (k) =>
+              parseFloat(tcs.getPropertyValue(`border-${k}-width`)) > 0 &&
+              tcs.getPropertyValue(`border-${k}-style`) !== "none",
+          );
+          return (
+            !ownText &&
+            !bordered &&
+            tcs.backgroundImage === "none" &&
+            alpha * op <= 0.6 &&
+            !/^(IMG|VIDEO|CANVAS|svg|IFRAME|INPUT|BUTTON|TEXTAREA|SELECT)$/i.test(top.tagName)
+          );
+        };
         for (let gy = 0; gy < 5; gy++) {
           for (let gx = 0; gx < 5; gx++) {
             const x = r.x + ((gx + 0.5) / 5) * r.width;
@@ -709,19 +769,10 @@ export async function measureTargets(
             }
             // Under a cover drawn at 60% or less: dimmed, still seen. A Delete button under its dialog's
             // 50% backdrop read hidden-at-once, "no exit is seen" (authoring v1).
-            if (top && !top.contains(el)) {
-              let coverOp = 1;
-              for (let e: Element | null = top; e; e = e.parentElement) coverOp *= Number(getComputedStyle(e).opacity);
-              // An empty overlay painted with a translucent colour dims the same way (rgba(0,0,0,.5)).
-              const tcs = getComputedStyle(top);
-              const alpha = /rgba?\([^)]*?[,/]\s*([\d.]+)\s*\)/.exec(tcs.backgroundColor);
-              const empty =
-                top.childElementCount === 0 && !(top.textContent ?? "").trim() && tcs.backgroundImage === "none";
-              if (coverOp <= 0.6 || (empty && alpha && Number(alpha[1]) * coverOp <= 0.6)) {
-                inView++;
-                hits++;
-                continue;
-              }
+            if (top && !top.contains(el) && seeThrough(top)) {
+              inView++;
+              hits++;
+              continue;
             }
             inView++;
             missed ??= { x, y, top };
@@ -907,7 +958,7 @@ export async function measureTargets(
             if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight || !inClips(x, y)) continue;
             n++;
             const top = document.elementFromPoint(x, y);
-            if (!top || el.contains(top) || top.contains(el)) continue;
+            if (!top || el.contains(top) || top.contains(el) || seeThrough(top)) continue;
             covered++;
             by ??= top;
           }
@@ -1000,6 +1051,7 @@ export async function measureTargets(
           ...(drawn !== undefined ? { drawn, ...(dashNote ? { dashNote } : {}) } : {}),
           ...turn(el),
           ...pivotOf(el),
+          ...textLines(el),
           ...(screenDeg !== undefined ? { screenDeg } : {}),
           ...(turnedBy ? { turnedBy } : {}),
           ...(overriddenBy ? { overriddenBy } : {}),
@@ -1068,10 +1120,13 @@ each forbidden statement is. vlmkit judges the motion from that:
   pushed           moves with no animation of its own: a layout property animated elsewhere (warn)
   invisible-blocker at rest it is transparent and still takes clicks at its centre
   size-jump        its width or height steps in one frame while it eases (its text re-wrapping)
+  text-wrap        its text runs to more lines mid-motion than at rest (white-space: nowrap)
   turn-off-centre  it turns and its centre is carried round: another transform-origin (warn)
   held-by-fill     after an action nothing changes, and its own finished animation holds what the
                    action sets (a forwards fill under :hover)
   target-unchanged nothing about the target changes while another element animates: the trigger (warn)
+  reduced-motion-moves under --reduced-motion, a target that still moves (warn)
+  span-mismatch    at rest its left and right edges are not those of --expect-span-of's element
   inert-offset     its animation moves top / left on a position: static box, where they do nothing (warn)
   channel-step     a colour, gradient or shadow changes all at once between two frames (fail in
                    one frame; warn when the frames are too far apart to tell)
@@ -1121,14 +1176,17 @@ an easing is checked on each channel that changes.
                           Measured with --selector; every scale's point or edge is printed
                           with or without it
   --expect-start <ms>     When its own animation begins (page time). Comma-separated, one per
-                          target in order: "200,280,360,440". Measured with --selector
+                          target in order: "200,280,360,440"; "+50ms" counts from the last
+                          action instead (a close's start), and "any" leaves a target out.
+                          Measured with --selector
   --expect-stagger <ms>   Each target begins this long after the one before it, in the order
                           given (from the first target's --expect-start, or its measured start)
   --expect-duration <ms>  How long one run of its own animation takes ("280ms", "1.2s").
                           Once for every target, or comma-separated per target. --selector
   --expect-direction <d>  Which way its (first) motion goes: left | right | up | down — "slides in
                           from the right edge" moves left — or which way it turns: clockwise |
-                          counterclockwise. Once for every target, or per target
+                          counterclockwise — a swing by the way it turns first. Once for every
+                          target, or per target ("any" leaves one out)
   --expect-iterations <n> How many times it runs: 3, or infinite. Once for every target, or
                           comma-separated per target. --selector
   --expect-still          Its centre must not move: only its size and opacity change (a dialog
@@ -1153,8 +1211,14 @@ an easing is checked on each channel that changes.
                           --wait 100 --click .menu-btn" lands the second click 100ms into the
                           opening; a target that jumps when it lands is \`interrupt-jump\` (fail)
   --exits                 The targets are meant to leave (gone at rest is their end)
-  --still <css>           One --selector target's centre must not move (repeat): the article a
-                          notice slides over, beside the notice that moves
+  --still <css>           One target's centre must not move (repeat): the article a notice
+                          slides over, beside the notice that moves. Measured as a --selector
+                          too, so it need not be given twice
+  --expect-span-of <css>  At rest its left and right edges are that element's, within 1px (a tab
+                          indicator ending under its tab). Repeat: one per target ("any" skips)
+  --reduced-motion        Load the page under prefers-reduced-motion: reduce. After an action, a
+                          target that changes at once with no motion is what is asked, not
+                          \`snapped\`; one that still moves says so (\`reduced-motion-moves\`, warn)
   --exit <css>            One --selector target is meant to leave, the others are not (repeat):
                           a flip card's front face turned away, beside its back turning in
   --at <instants>         Frames to shoot (default: 11 per segment + rest); the segments stay
@@ -1196,13 +1260,20 @@ export interface MotionCliOptions {
   expectEasing?: EasingName[][];
   /** Each --expect-origin given: one for every target, or one per target. */
   expectOrigin?: OriginName[];
-  expectStartMs?: number[];
+  /** One per target, in order; undefined where `any` was given. */
+  expectStartMs?: (number | undefined)[];
+  /** Per entry of expectStartMs: given as `+Nms`, counted from the last action's start. */
+  expectStartAfterAction?: boolean[];
+  /** Load the page with prefers-reduced-motion: reduce (a click whose motion should then be gone). */
+  reducedMotion?: boolean;
+  /** Per target: at rest its left and right edges are those of this element (undefined: not asked). */
+  expectSpanOf?: (string | undefined)[];
   expectStaggerMs?: number;
   /** How long one run of each target's own animation takes (ms), per target in order. */
   expectDurationMs?: number[];
   /** How many times it runs (null: infinite), per target in order. */
   expectIterations?: (number | null)[];
-  expectDirection?: MotionDirection[];
+  expectDirection?: (MotionDirection | undefined)[];
   exits: boolean;
   /** --selector targets meant to leave, by selector. */
   exitSelectors: string[];
@@ -1258,11 +1329,14 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   const forbid: string[] = [];
   let expectEasing: EasingName[][] | undefined;
   let expectOrigin: OriginName[] | undefined;
-  let expectStartMs: number[] | undefined;
+  let expectStartMs: (number | undefined)[] | undefined;
+  let expectStartAfterAction: boolean[] | undefined;
+  let reducedMotion = false;
+  let expectSpanOf: (string | undefined)[] | undefined;
   let expectStaggerMs: number | undefined;
   let expectDurationMs: number[] | undefined;
   let expectIterations: (number | null)[] | undefined;
-  let expectDirection: MotionDirection[] | undefined;
+  let expectDirection: (MotionDirection | undefined)[] | undefined;
   let at: number[] | undefined;
   let startMs: number | undefined;
   let endMs: number | undefined;
@@ -1335,11 +1409,14 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
       case "--expect-start":
         // One time per target, in the order given: parseInstants sorts and dedupes, which paired
         // "400,0" with the targets as "0,400" (round 4).
-        (expectStartMs ??= []).push(
-          ...value(a, argv[++i])
-            .split(",")
-            .map((x) => one(a, x.trim())),
-        );
+        // `any` leaves a target out; `+50ms` counts from the last action's start, so a close's start
+        // can be said without knowing when its click lands (authoring v1).
+        for (const x of value(a, argv[++i])
+          .split(",")
+          .map((v) => v.trim())) {
+          (expectStartAfterAction ??= []).push(x.startsWith("+"));
+          (expectStartMs ??= []).push(x === "any" || x === "-" ? undefined : one(a, x.replace(/^\+/, "")));
+        }
         break;
       case "--expect-duration":
         (expectDurationMs ??= []).push(
@@ -1354,8 +1431,10 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
             .split(",")
             .map((x) => {
               const v = x.trim().replace(/wards?$/, "");
+              // `any`: this target's direction is not asked (a still target beside one that moves).
+              if (v === "any" || v === "-") return undefined;
               if (!(MOTION_DIRECTIONS as readonly string[]).includes(v))
-                throw new MotionUsageError(`--expect-direction takes ${MOTION_DIRECTIONS.join(", ")}, got ${x}`);
+                throw new MotionUsageError(`--expect-direction takes ${MOTION_DIRECTIONS.join(", ")} or any, got ${x}`);
               return v as MotionDirection;
             }),
         );
@@ -1448,6 +1527,16 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
       case "--still":
         stillSelectors.push(value(a, argv[++i]).trim());
         break;
+      case "--reduced-motion":
+        reducedMotion = true;
+        break;
+      case "--expect-span-of": {
+        // One per target, in order ("any" leaves one out): a tab indicator ends exactly under the
+        // tab it moved to, and nothing could say so (authoring v1).
+        const v = value(a, argv[++i]).trim();
+        (expectSpanOf ??= []).push(v === "any" || v === "-" ? undefined : v);
+        break;
+      }
       case "--exits":
         exits = true;
         break;
@@ -1500,6 +1589,9 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
     // Without Jev nothing can read a statement or find a target by its words: the page measures
     // each --selector, and those name the targets when no --target does.
     if (forbid.length > 0) throw new MotionUsageError("--forbid is a statement Jev reads from the frames: add --jev");
+    // --still / --exit name what to measure as well: `--still .delete` was refused, "names no
+    // --selector" (authoring v1).
+    for (const sel of [...stillSelectors, ...exitSelectors]) if (!selectors.includes(sel)) selectors.push(sel);
     if (selectors.length === 0) {
       throw new MotionUsageError(
         "give each target a --selector (measured from the page, no key), or add --jev to find --target by its words",
@@ -1580,6 +1672,9 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
     ...(expectEasing ? { expectEasing } : {}),
     ...(expectOrigin ? { expectOrigin } : {}),
     ...(expectStartMs ? { expectStartMs } : {}),
+    ...(expectStartAfterAction?.some(Boolean) ? { expectStartAfterAction } : {}),
+    ...(reducedMotion ? { reducedMotion } : {}),
+    ...(expectSpanOf ? { expectSpanOf } : {}),
     ...(expectStaggerMs !== undefined ? { expectStaggerMs } : {}),
     ...(expectDurationMs ? { expectDurationMs } : {}),
     ...(expectIterations ? { expectIterations } : {}),
@@ -1802,6 +1897,14 @@ interface Captured {
   elsewhere?: string[];
   /** The --selector targets just before the last action, and that action. */
   beforeLast?: { action: string; targets: (MotionDom | null)[] };
+  /** The page time the last action landed at. */
+  lastActionAtMs?: number;
+  /** --expect-span-of, read at rest: each target's left/right against the element it should match. */
+  spans?: (
+    | { of: string; left: number; right: number; wantLeft: number; wantRight: number }
+    | { of: string; missing: true }
+    | null
+  )[];
   /** The page's scroll position across the frames shot, when it moved (a clamp at the page's end). */
   scrolled?: { from: number; to: number };
   /**
@@ -1815,6 +1918,16 @@ interface Captured {
 }
 
 /** Do one action on the held page; an element it cannot reach is the user's error, named. */
+/** A page at the run's viewport and scale, with reduced motion emulated under --reduced-motion. */
+async function openMotionPage(
+  browser: import("playwright").Browser,
+  o: Pick<MotionCliOptions, "viewport" | "deviceScale" | "reducedMotion">,
+): Promise<import("playwright").Page> {
+  const page = await browser.newPage({ viewport: o.viewport, deviceScaleFactor: o.deviceScale });
+  await page.emulateMedia({ reducedMotion: o.reducedMotion ? "reduce" : "no-preference" });
+  return page;
+}
+
 async function runAction(page: import("playwright").Page, act: MotionAction): Promise<void> {
   if (act.kind === "wait") return;
   try {
@@ -1890,7 +2003,7 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
     await import("@mizchi/vlmkit-animation-eval/frames-capture.ts");
   const url = sourceToUrl(o.source);
   return withBrowser(async (browser) => {
-    let page = await browser.newPage({ viewport: o.viewport, deviceScaleFactor: o.deviceScale });
+    let page = await openMotionPage(browser, o);
     try {
       let timeline = await openHeldTimeline(page, url);
       let held = await timeline.animations();
@@ -1905,6 +2018,8 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
       // The last action landed while the one before was still moving: its targets just before it.
       let interrupt: Captured["interrupt"];
       let lastBefore: Captured["beforeLast"];
+      // When the last action lands on the page clock: `--expect-start +50ms` counts from here.
+      let lastActionAtMs: number | undefined;
       if (o.actions.length > 0) {
         let beforeClick: Awaited<ReturnType<typeof measureTargets>> = [];
         const scrolled = () => page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }));
@@ -1945,6 +2060,7 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
           if (k === steps.length - 1) {
             beforeClick = o.selectors.length > 0 ? await measureTargets(page, o.selectors) : [];
             lastBefore = { action: describeAction(act), targets: beforeClick };
+            lastActionAtMs = clockNow;
             scrollBefore = await scrolled();
             heldBefore = held.length;
             if (k > 0 && steps[k - 1]!.waitAfter !== undefined)
@@ -2058,7 +2174,7 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
         // at 200ms read unchanged at every frame of --at 150..300/1f, round 13).
         if (held.length > 0 || ranTo !== null) {
           await page.close();
-          page = await browser.newPage({ viewport: o.viewport, deviceScaleFactor: o.deviceScale });
+          page = await openMotionPage(browser, o);
           timeline = await openHeldTimeline(page, url);
         }
       }
@@ -2276,6 +2392,24 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
         frames.push(frame);
       }
       const written = await writer.finish();
+      // At rest (the last frame shot), each target's span against the element it should match.
+      const spans = o.expectSpanOf
+        ? await page
+            .evaluate(
+              ({ sels, of }) =>
+                sels.map((sel, i) => {
+                  const other = of.length === 1 ? of[0] : of[i];
+                  if (!other) return null;
+                  const a = document.querySelector(sel)?.getBoundingClientRect();
+                  const b = document.querySelector(other)?.getBoundingClientRect();
+                  return a && b
+                    ? { of: other, left: a.left, right: a.right, wantLeft: b.left, wantRight: b.right }
+                    : { of: other, missing: true as const };
+                }),
+              { sels: o.selectors, of: o.expectSpanOf },
+            )
+            .catch(() => [])
+        : undefined;
       const delays = o.selectors.length > 0 ? await delaySources(page, o.selectors) : undefined;
       // Where a repeating run ends against where the next begins: a spinner whose keyframes end at
       // 350deg jumped 10deg forward once a second, and every frame read "follows linear in its
@@ -2584,12 +2718,14 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
         textLines,
         context,
         ...(delays ? { delays } : {}),
+        ...(spans ? { spans } : {}),
         ...(layoutMovers.length > 0 ? { layoutMovers } : {}),
         ...(seams.length > 0 ? { seams } : {}),
         ...(replays.length > 0 ? { replays } : {}),
         ...(forever ? { forever: true } : {}),
         ...(interrupt ? { interrupt } : {}),
         ...(lastBefore ? { beforeLast: lastBefore } : {}),
+        ...(lastActionAtMs !== undefined ? { lastActionAtMs } : {}),
         ...(elsewhere.length > 0 ? { elsewhere } : {}),
         ...(scrollYs.length > 1 && Math.max(...scrollYs) - Math.min(...scrollYs) >= 1
           ? { scrolled: { from: scrollYs[0]!, to: scrollYs[scrollYs.length - 1]! } }
@@ -2635,7 +2771,24 @@ export function interruptJumps(
     }
     const jump = geo(a, b);
     const opJump = Math.abs(a.opacity - b.opacity);
-    if ((jump >= 8 && jump > 2 * step) || (opJump >= 0.2 && opJump > 2 * opStep)) {
+    // A jump the other way from where its new motion then goes: a menu half open (121px) clicked
+    // shut leapt to 177px and folded from there. An ease-out close's first step is large, so "more
+    // than twice any step after" missed it (authoring v2).
+    const last = doms[doms.length - 1]!;
+    const dims = (x: MotionDom) => [
+      x.box.width,
+      x.box.height,
+      x.box.x + x.box.width / 2,
+      x.box.y + x.box.height / 2,
+      x.opacity * 100,
+    ];
+    const [da, db, dl] = [dims(a), dims(b), dims(last)];
+    const backwards = da.some((v, k) => {
+      const leap = db[k]! - v,
+        then = dl[k]! - db[k]!;
+      return Math.abs(leap) >= 8 && Math.abs(then) >= 8 && Math.sign(leap) === -Math.sign(then);
+    });
+    if ((jump >= 8 && jump > 2 * step) || (opJump >= 0.2 && opJump > 2 * opStep) || backwards) {
       out.push({
         selector: sel,
         message: `${sel} jumps the moment ${it.action} lands at ${Math.round(it.atMs)}ms: ${Math.round(a.box.width)}x${Math.round(a.box.height)}${opJump >= 0.05 ? ` at opacity ${a.opacity.toFixed(2)}` : ""} → ${Math.round(b.box.width)}x${Math.round(b.box.height)}${opJump >= 0.05 ? ` at ${b.opacity.toFixed(2)}` : ""} within a frame, more than it moves in any frame after (${Math.round(step)}px). Its new motion starts from its own first keyframe, not from where the one it cut into had got to: a @keyframes animation always starts from its \`from\`, a transition reverses from where it is — move the two states into one transition`,
@@ -3002,7 +3155,7 @@ async function scrollSweep(o: MotionCliOptions): Promise<number | null> {
     await import("@mizchi/vlmkit-animation-eval/frames-capture.ts");
   const url = sourceToUrl(o.source);
   return withBrowser(async (browser) => {
-    const page = await browser.newPage({ viewport: o.viewport, deviceScaleFactor: o.deviceScale });
+    const page = await openMotionPage(browser, o);
     try {
       await page.goto(url, { waitUntil: "load" });
       const driven = await page.evaluate((sels) => {
@@ -3255,6 +3408,16 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
         );
         return 2;
       }
+      // Under reduced motion, going at once is what is asked: a tab indicator that jumps to the new
+      // tab could not be checked at all (authoring v1).
+      if (o.reducedMotion) {
+        console.log(
+          `inspect motion: ${o.source} — under prefers-reduced-motion: reduce, after ${o.actions.map(describeAction).join(", ")}, no animation or transition started`,
+        );
+        for (const c of e.changed) console.log(`    ${c} at once, with no motion: what reduced motion asks for`);
+        console.log(`  no fail; measured from the page, no model asked`);
+        return 0;
+      }
       console.log(
         `inspect motion: ${o.source} — after ${o.actions.map(describeAction).join(", ")}, no animation or transition started`,
       );
@@ -3304,7 +3467,13 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
     ...(o.deviceScale !== 1 ? { frameScale: o.deviceScale } : {}),
     ...motionEasingOptions(o.expectEasing),
     ...(o.expectOrigin ? { expectOrigin: o.expectOrigin.length === 1 ? o.expectOrigin[0]! : o.expectOrigin } : {}),
-    ...(o.expectStartMs ? { expectStartMs: o.expectStartMs } : {}),
+    ...(o.expectStartMs
+      ? {
+          expectStartMs: o.expectStartMs.map((v, i) =>
+            v !== undefined && o.expectStartAfterAction?.[i] ? v + (captured.lastActionAtMs ?? 0) : v,
+          ),
+        }
+      : {}),
     ...(o.expectStaggerMs !== undefined ? { expectStaggerMs: o.expectStaggerMs } : {}),
     ...(o.expectDurationMs ? { expectDurationMs: o.expectDurationMs } : {}),
     ...(o.expectIterations ? { expectIterations: o.expectIterations } : {}),
@@ -3335,6 +3504,39 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
           },
     );
   }
+  // Its span at rest against the element it should match (a tab indicator under its tab).
+  for (const [i, t] of r.targets.entries()) {
+    const sp = captured.spans?.[i];
+    if (!sp) continue;
+    if ("missing" in sp) {
+      t.findings.push({
+        rule: "span-mismatch" as (typeof t.findings)[number]["rule"],
+        severity: "fail",
+        atMs: captured.endMs,
+        message: `--expect-span-of ${sp.of}: it or ${sp.of} is not on the page at rest`,
+      });
+      continue;
+    }
+    const dl = sp.left - sp.wantLeft,
+      dr = sp.right - sp.wantRight;
+    if (Math.abs(dl) > 1 || Math.abs(dr) > 1)
+      t.findings.push({
+        rule: "span-mismatch" as (typeof t.findings)[number]["rule"],
+        severity: "fail",
+        atMs: captured.endMs,
+        message: `at rest it spans ${sp.left.toFixed(1)}..${sp.right.toFixed(1)}px across, and ${sp.of} spans ${sp.wantLeft.toFixed(1)}..${sp.wantRight.toFixed(1)}px: its left edge is ${dl.toFixed(1)}px and its right edge ${dr.toFixed(1)}px off${Math.abs(dl) < 1.5 && Math.abs(dr) < 1.5 ? " — whole pixels where the box has fractions (offsetLeft / offsetWidth round; getBoundingClientRect does not)" : ""}`,
+      });
+  }
+  // Under reduced motion a target that still moves is named: what the preference asks to go at once.
+  if (o.reducedMotion)
+    for (const t of r.targets)
+      if (t.travelPx >= 2 || "best" in t.easing)
+        t.findings.push({
+          rule: "reduced-motion-moves" as (typeof t.findings)[number]["rule"],
+          severity: "warn",
+          atMs: captured.startMs,
+          message: `it still moves under prefers-reduced-motion: reduce (travels ${Math.round(t.travelPx)}px${"best" in t.easing ? `, ${t.easing.best}` : ""}): if reduced motion should make it go at once, an @media (prefers-reduced-motion: reduce) rule with transition: none (or animation: none) does that`,
+        });
   // Nothing about any target changed while something else on the page animated: the target is
   // likely the trigger, not what moves.
   if (
@@ -3367,7 +3569,7 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
     startMs: captured.startMs,
     endMs: captured.endMs,
     segments: captured.segments,
-    passed: r.passed && jumps.length === 0,
+    passed: r.passed && jumps.length === 0 && r.targets.every((t) => t.findings.every((f) => f.severity !== "fail")),
     targets: r.targets,
     forbidden: r.forbidden,
     answers: r.frames,
@@ -3456,7 +3658,9 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
                     ? "direction-mismatch"
                     : /upright/.test(flag)
                       ? "upright-mismatch"
-                      : "still-mismatch";
+                      : /span-of/.test(flag)
+                        ? "span-mismatch"
+                        : "still-mismatch";
       // A path never fitted (never seen, or under 2px of travel) checked no easing, direction or
       // origin: "held: --expect-direction up" sat under "travels 0px" on a card that never moved
       // (round 13).
@@ -3520,7 +3724,9 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
     }
     console.log(`${lines.join("\n")}\n  report: ${saved}`);
   }
-  return r.passed && jumps.length === 0 ? 0 : 1;
+  // Fails added here (span-mismatch, hidden-at-once) count as the judge's do.
+  const passed = r.passed && r.targets.every((t) => t.findings.every((f) => f.severity !== "fail"));
+  return passed && jumps.length === 0 ? 0 : 1;
 }
 
 if (isCliEntry(import.meta.url, "motion")) {

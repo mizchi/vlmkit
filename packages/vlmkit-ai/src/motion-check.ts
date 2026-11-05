@@ -146,7 +146,7 @@ export interface MotionCheckOptions {
   expectDurationMs?: readonly number[];
   expectIterations?: readonly (number | null)[];
   /** Which way each target's first segment moves: one for all, or per target. */
-  expectDirection?: readonly MotionDirection[];
+  expectDirection?: readonly (MotionDirection | undefined)[];
   /** Every target's centre must not move: only its size and opacity change. */
   expectStill?: boolean;
   /** Its angle on screen must not change (a label kept level inside a turning dial). */
