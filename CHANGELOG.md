@@ -3,6 +3,60 @@
 All notable changes to this project will be documented in this file.
 Dates are YYYY-MM-DD.
 
+## 0.25.2 — 2026-11-06
+
+Added:
+
+- `inspect motion` flags for what a brief asks:
+  - `--expect-span-of <css>`: at rest, the target's left and right edges match that element's;
+  - `--expect-lines <n>`: its text stays on n lines in every frame;
+  - `--reduced-motion`: the page loads under `prefers-reduced-motion: reduce`;
+  - `--expect-start +N`: a start counted from the last action;
+  - `--expect-origin X,Y`: a turn's pivot in the element's own units (viewBox units on SVG).
+- `any` leaves a target out of every per-target `--expect-*`, and `--still` / `--exit` name their own
+  `--selector`.
+- `--expect-origin` judges a turn's pivot, and a width or height change by the edge that stays put.
+- New `inspect motion` rules:
+  - `text-wrap` and `lines-mismatch`: text that runs to more lines mid-motion, or other than expected;
+  - `span-mismatch`: the edges at rest are not the named element's;
+  - `reduced-motion-moves`: under `--reduced-motion`, a target still moves;
+  - `reduced-motion-hides` and `reduced-motion-misplaced`: with `--reduced-motion` and nothing
+    animating, a target not shown from the first frame, or off where it rests with motion.
+- `interrupt-jump` also fires on a leap backwards.
+- A swing is reported by the way it turns first, with its turning points.
+
+Changed:
+
+- An `--expect-*` given once applies to the moving targets, not to `--still` / `--exit` ones. When it
+  fails one of several targets, the message says it was given once.
+- A target that fades out over the motion's last frames and is gone at rest is a warn, taken as
+  leaving. A target that pops back to hidden is still `absent-at-rest`.
+- Wording:
+  - the edge that stays put is given with its coordinate;
+  - a settle-back says "shrinks towards";
+  - the scale range is in frame order;
+  - a turn in place "stays in place".
+- A gate's unknown `--out` points at `--frames`, and a short flag no longer gets a two-letter
+  "did you mean".
+
+Fixed:
+
+- False alarms found by agents writing motion from a brief:
+  - `size-jump` on a box's own scale;
+  - `loop-seam` on a ticker one copy long and on a shimmer clipped at both ends;
+  - `covered-edge` outside a round target's corners;
+  - a 50% backdrop read as hiding what it dims;
+  - occluded transparent text in `check integrity`.
+- The held clock honours a CSS `animation-play-state: paused`.
+- The frame a motion begins on was dropped when the clock's running sum came out a rounding error
+  past it.
+
+Docs:
+
+- Three A/B rounds of agents writing CSS animation from a brief, with vlmkit and without, scored by
+  hidden oracles: `docs/reports/2026-11-05-motion-authoring-ab-v1.md`, `-v2.md` and
+  `2026-11-06-motion-authoring-ab-small.md`.
+
 ## 0.25.1 — 2026-11-04
 
 Fixed:
