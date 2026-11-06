@@ -1,0 +1,17 @@
+{
+  "exit": 1,
+  "output": "inspect motion: fixtures/motion-authoring/v2/mutants/label-wrap.html — 11 frames over 17..317ms + 1 at rest (<out>/f/frames.json)\n  target \".add\", begins at 17ms, runs 300ms: travels 26px rightwards over the frames measured (its centre: its box grows 53px from its left edge, which stays put at x = 40), follows ease-out exactly (measured: no other curve comes close)\n    frames (time, share of its on-screen part seen [op = opacity, on-screen = share of its box in the viewport, when partial], centre): 17ms 1.00 (62,62), 47ms 1.00 (66,62), 77ms 1.00 (70,62), 107ms 1.00 (74,62), 137ms 1.00 (77,62), 167ms 1.00 (80,62), 197ms 1.00 (83,62), 227ms 1.00 (85,62), 257ms 1.00 (87,62), 287ms 1.00 (88,62), 316ms 1.00 (88,62), 617ms 1.00 (89,62)\n    FAIL lines-mismatch at 17ms: its text runs to 2 lines at 17ms, not 1: white-space: nowrap keeps it on one line, and the box needs room for it at rest (its width from the text's, not a wrap's)\n  1 fail; measured from the page, no model asked (--jev adds Jev's reading and the --forbid statements)\n  look at the frames: vlmkit snapshot strip --manifest <out>/f/frames.json --max-frames 6 --columns 3 --crop 0,0,185,142 --out <out>/f/strip.png\n  the first fail's own frame (17ms, .add lines-mismatch): <out>/f/0000-t000017.png\n  report: <out>/f/motion-report.json\n",
+  "images": [
+    {
+      "file": "evidence-1.webp",
+      "caption": "The widening, from the click to rest. \"Added to cart\" is on two lines in every frame it is shown in.",
+      "width": 587,
+      "height": 342,
+      "kind": "evidence"
+    }
+  ],
+  "thenExit": 0,
+  "thenOutput": "\nStrip\n  Frames: 6 (2 row(s) x 3 column(s))\n  Sheet:  587x342 png\n  <out>/strip.png\n",
+  "command": "vlmkit inspect motion fixtures/motion-authoring/v2/mutants/label-wrap.html --click .add --selector .add --expect-lines 1 --frames {out}/f",
+  "thenCommand": "vlmkit snapshot strip --manifest {out}/f/frames.json --max-frames 6 --columns 3 --crop 0,0,185,142 --out {out}/strip.png"
+}

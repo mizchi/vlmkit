@@ -3072,6 +3072,18 @@ export function formatMotionReport(
   // Where a scale grows from, and when the target's own animation begins: printed whether or
   // not they were expected, since round 3's wrong transform-origin and missing stagger each
   // passed "follows ease-out exactly" with nothing on screen that said where or when.
+  // A turn's pivot, said as a point: one outside the box read "about no point of its box (it moves
+  // as well as it scales)" — a scale's wording — on a needle turning about a point above it.
+  const pivotText = (p: Parameters<typeof describeOrigin>[0] & { ux?: number; uy?: number }) => {
+    const own =
+      p.ux !== undefined && p.uy !== undefined
+        ? `${Math.round(p.ux * 10) / 10},${Math.round(p.uy * 10) / 10} in its own units`
+        : "";
+    const d = describeOrigin(p);
+    if (d.startsWith("no point")) return own ? `${own}, outside its box` : "a point outside its box";
+    // A named point is enough; an unnamed one is given as a point too (the flag to hold it there).
+    return own && !p.name ? `${d}, ${own}` : d;
+  };
   const grows = (g: { origin?: Parameters<typeof describeOrigin>[0] }, shrinks = false) =>
     g.origin ? `; the scale ${shrinks ? "shrinks towards" : "grows from"} ${describeOrigin(g.origin)}` : "";
   const begins = (t: { startsAtMs?: number; durationMs?: number; iterations?: number | null; runs?: number[] }) =>
@@ -3119,10 +3131,10 @@ export function formatMotionReport(
                 `, turns over ${Math.round(Math.abs(t.turn.deg))}° in 3D`
               : `, turns ${t.turn.deg > 0 ? "clockwise" : "counterclockwise"} ${Math.round(Math.abs(t.turn.deg))}° (${Math.round(Math.abs(t.turn.perSecond))}°/s${Math.abs(t.turn.perSecond) >= 1 ? `, a turn every ${Math.round(360000 / Math.abs(t.turn.perSecond))}ms` : ""})${t.screenTurn ? ` on its own` : ""}`
             : ""
-        }${t.pivot && t.turn && !t.turn.in3d && !t.swing ? ` (about ${describeOrigin(t.pivot)})` : ""}${
+        }${t.pivot && t.turn && !t.turn.in3d && !t.swing ? ` (about ${pivotText(t.pivot)})` : ""}${
           // Back and forth: the way it turns first and its turning points (a bell's swing).
           t.swing
-            ? `, swings ${t.swing.way} first${t.pivot ? ` about ${describeOrigin(t.pivot)}` : ""}: ${t.swing.peaksDeg.map((d) => `${d > 0 ? "+" : ""}${Math.round(d)}°`).join(", ")}${Math.abs(t.swing.restDeg) < 1 ? ", then upright" : `, ending at ${Math.round(t.swing.restDeg)}°`} (turning points at the frames measured, clockwise +; --at a..b/10ms for exact peaks)`
+            ? `, swings ${t.swing.way} first${t.pivot ? ` about ${pivotText(t.pivot)}` : ""}: ${t.swing.peaksDeg.map((d) => `${d > 0 ? "+" : ""}${Math.round(d)}°`).join(", ")}${Math.abs(t.swing.restDeg) < 1 ? ", then upright" : `, ending at ${Math.round(t.swing.restDeg)}°`} (turning points at the frames measured, clockwise +; --at a..b/10ms for exact peaks)`
             : ""
         }${
           // What is seen: an ancestor turns it too, and its own turn is a counter-rotation.
