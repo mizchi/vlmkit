@@ -7,7 +7,12 @@
  * snapshot of the login screen would be judged three times as the page that was asked for.
  */
 import { readAll, readFlag, readInt } from "@mizchi/vlmkit-core/arg-reader.ts";
-import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
+import {
+  COLOR_SCHEME_INPUT,
+  PAGE_LOAD_INPUTS,
+  parseColorScheme,
+  parsePageLoad,
+} from "@mizchi/vlmkit-core/page-load.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding, RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { tierIssues } from "@mizchi/vlmkit-core/plugin/rule-prose.ts";
@@ -24,6 +29,7 @@ export interface StyleScanReport {
   source: string;
   out: string;
   redirect: string | null;
+  colorScheme?: StyleSnapshot["colorScheme"];
   viewport: StyleSnapshot["viewport"];
   exclude: string[];
   /** What each gate will judge: samples, boxes, fields and links. */
@@ -42,7 +48,8 @@ function formatStyleScan(report: StyleScanReport, rules?: RuleView): string {
     `${BOLD}${CYAN}vlmkit scan style${RESET}`,
     `${DIM}source: ${report.source}${RESET}`,
     "",
-    `snapshot: ${report.out}  (${report.viewport.width}x${report.viewport.height}, one page load)`,
+    `snapshot: ${report.out}  (${report.viewport.width}x${report.viewport.height}` +
+      `${report.colorScheme ? `, ${report.colorScheme} scheme` : ""}, one page load)`,
     `  design       ${report.counts.designSamples} role sample(s)${report.exclude.length ? `, --exclude ${report.exclude.join(" ")}` : ""}`,
     `  composition  ${report.counts.compositionBoxes} box(es)`,
     `  color        ${report.counts.colorControls} field(s), ${report.counts.colorLinks} link(s)`,
@@ -115,6 +122,7 @@ snapshot is one render: its --viewport applies to all three, and --exclude
       kind: "path",
       description: "Playwright storage state for pages behind a login",
     },
+    COLOR_SCHEME_INPUT,
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
@@ -134,6 +142,7 @@ snapshot is one render: its --viewport applies to all three, and --exclude
       ...(exclude.length > 0 ? { exclude } : {}),
       ...(storageState ? { storageState } : {}),
       ...parsePageLoad(argv),
+      ...parseColorScheme(argv),
     };
   },
   run: async (options) => {
@@ -142,6 +151,7 @@ snapshot is one render: its --viewport applies to all three, and --exclude
       source: snapshot.source,
       out: options.out,
       redirect: snapshot.redirect,
+      ...(snapshot.colorScheme ? { colorScheme: snapshot.colorScheme } : {}),
       viewport: snapshot.viewport,
       exclude: snapshot.exclude,
       counts: {

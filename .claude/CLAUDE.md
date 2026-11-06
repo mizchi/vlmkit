@@ -1682,8 +1682,13 @@ looking, not by a gate**, which is why `markup-assist`'s done condition now ends
 - **`shot --element` takes the first match** (`footer` hit a pull quote's `<footer>`), and a full
   walk stops at 16 screens — the `[judge]` line says `STOPPED SHORT` and `check` refuses the shot as
   the round's full page until `--max-tiles` reaches the end.
-- **No gate emulates `prefers-color-scheme`.** A page that follows the OS theme gets its dark theme
-  judged by eye (`shot --dark`); the demo sites use `?theme=dark` so the gates can reach it.
+- **The paint-reading gates take `--color-scheme dark`** (`check integrity`, `check a11y contrast`,
+  `check color` / `design` / `composition`, `scan style`, which records it for `--from`; since
+  2026-11-06, issue #217). Before that no gate emulated `prefers-color-scheme`, which is why the demo
+  sites use `?theme=dark` and `shot --dark` exists. The flag is a fragment of its own
+  (`COLOR_SCHEME_INPUT` in `page-load.ts`), not part of `PAGE_LOAD_INPUTS`: a gate declares it only
+  when it honours it. Known answers: `fixtures/color-scheme/follows-os.html`, held by
+  `gates/color-scheme.test.ts`.
 - **`--allow` matches the path a gate prints** (`ul.grid>li.card>div.body>h2>a`), not a CSS selector,
   and says "matched nothing" when it does not apply.
 

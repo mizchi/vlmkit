@@ -12,6 +12,7 @@
 import { resolve } from "node:path";
 import { readFile } from "node:fs/promises";
 import { settlePage, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
+import { applyColorScheme, type ColorScheme } from "@mizchi/vlmkit-core/page-load.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
@@ -42,6 +43,8 @@ export interface DesignPolicyOptions extends DesignJudgeOptions {
   timeout?: number;
   /** Replay network responses from a Playwright HAR for deterministic URL gates. */
   storageState?: string;
+  /** `prefers-color-scheme` to emulate (`--color-scheme`). */
+  colorScheme?: ColorScheme;
 }
 
 /**
@@ -175,6 +178,7 @@ export function buildDesignSampleScript(excludeSelectors: readonly string[] = []
 export async function runDesignPolicyCheck(options: DesignPolicyOptions): Promise<DesignPolicyReport> {
   return await withBrowser(async (browser) => {
     const page = await browser.newPage(withAuthState({ viewport: { width: 1280, height: 900 } }, options.storageState));
+    await applyColorScheme(page, options.colorScheme);
     if (options.har) {
       await page.routeFromHAR(resolve(options.har), { notFound: "abort" });
     }
@@ -203,13 +207,17 @@ export async function runDesignPolicyCheck(options: DesignPolicyOptions): Promis
 export function judgeCollectedDesign(
   input: DesignPolicyInput,
   redirect: string | null,
-  options: DesignJudgeOptions & { source: string },
+  options: DesignJudgeOptions & { source: string; colorScheme?: ColorScheme },
 ): DesignPolicyReport {
   const judged = judgeDesignPolicy(input, options);
   if (redirect) {
     judged.findings.unshift({ kind: "redirected", severity: "suspect", message: redirect });
   }
-  return recordDesignRun({ source: options.source, ...judged });
+  return recordDesignRun({
+    source: options.source,
+    ...(options.colorScheme ? { colorScheme: options.colorScheme } : {}),
+    ...judged,
+  });
 }
 
 /**
@@ -244,6 +252,8 @@ export function formatDesignReport(report: DesignPolicyReport, rules?: RuleView)
   lines.push("");
   lines.push(`${BOLD}${CYAN}vlmkit check design${RESET}`);
   lines.push(`${DIM}source: ${report.source}${RESET}`);
+  if (report.colorScheme)
+    lines.push(`${DIM}color scheme: ${report.colorScheme} (prefers-color-scheme emulated)${RESET}`);
   lines.push("");
   // A finding's `kind` is the rule id on this gate, and its declared severity travels with it,
   // so the settings apply row by row. Everything above the Findings block — coverage, role

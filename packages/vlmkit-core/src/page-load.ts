@@ -69,7 +69,17 @@ export interface PageLoadOptions {
   timeout?: number;
   /** Replay network responses from a Playwright HAR. See `applyHar`. */
   har?: string;
+  /**
+   * `prefers-color-scheme` to emulate. Not one of the three load knobs: it is declared by
+   * `COLOR_SCHEME_INPUT`, only on gates that honour it, and carried here so `pickPageLoad`
+   * hands it to `openSource` with the rest.
+   */
+  colorScheme?: ColorScheme;
 }
+
+/** The schemes a gate can be asked to judge a page in. */
+export const COLOR_SCHEMES = ["light", "dark"] as const;
+export type ColorScheme = (typeof COLOR_SCHEMES)[number];
 
 /**
  * `inputs` fragment. Spread at the END of a gate's `inputs` array so the
@@ -98,8 +108,39 @@ export const PAGE_LOAD_INPUTS: readonly GateInput[] = [
   },
 ];
 
+/**
+ * `--color-scheme light|dark`, for a gate whose judgement reads paint (contrast, invisible
+ * text, palette). Kept apart from `PAGE_LOAD_INPUTS` on purpose: a gate that declares it must
+ * honour it (`applyColorScheme` before its navigation, or `pickPageLoad` into `openSource`),
+ * and most load-honouring gates have no reason to.
+ *
+ * Why it exists: no paint-reading gate emulated `prefers-color-scheme`, so a page that follows
+ * the OS theme had its dark theme judged by eye only (the demo sites took `?theme=dark` instead).
+ */
+export const COLOR_SCHEME_INPUT: GateInput = {
+  name: "color-scheme",
+  kind: "string",
+  description: "Emulate prefers-color-scheme while judging (a page that follows the OS theme)",
+  choices: COLOR_SCHEMES,
+  defaultDescription: "light",
+};
+
+/** Read `--color-scheme`; absent gives an absent key. */
+export function parseColorScheme(argv: readonly string[]): { colorScheme?: ColorScheme } {
+  const colorScheme = readChoice(argv, "color-scheme", COLOR_SCHEMES);
+  return colorScheme ? { colorScheme } : {};
+}
+
+/** Emulate the scheme on a page before it navigates, so its first style already matches. */
+export async function applyColorScheme(page: Page, colorScheme: ColorScheme | undefined): Promise<void> {
+  if (colorScheme) await page.emulateMedia({ colorScheme });
+}
+
 /** The flag spellings, for `readPositionals` value-flag lists. */
 export const PAGE_LOAD_VALUE_FLAGS: readonly string[] = ["--timeout", "--wait-until", "--har"];
+
+/** `--color-scheme`'s spelling, for the value-flag lists of the gates that declare it. */
+export const COLOR_SCHEME_VALUE_FLAGS: readonly string[] = ["--color-scheme"];
 
 /**
  * Read the three flags off argv. Absent flags produce absent keys, so spreading
@@ -117,7 +158,7 @@ export function parsePageLoad(argv: readonly string[]): PageLoadOptions {
 }
 
 /**
- * Narrow a wider options object down to just these three keys.
+ * Narrow a wider options object down to these three keys, plus `colorScheme` when set.
  *
  * For measurement modules that load through `openSource`: spreading the whole
  * gate options object into it would also hand over `outputDir`, `reportPath` and
@@ -129,6 +170,7 @@ export function pickPageLoad(options: PageLoadOptions): PageLoadOptions {
     ...(options.waitUntil ? { waitUntil: options.waitUntil } : {}),
     ...(options.timeout !== undefined ? { timeout: options.timeout } : {}),
     ...(options.har ? { har: options.har } : {}),
+    ...(options.colorScheme ? { colorScheme: options.colorScheme } : {}),
   };
 }
 

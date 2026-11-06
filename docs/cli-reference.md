@@ -451,6 +451,7 @@ rects instead of a page — no browser, no DOM:
 ```bash
 vlmkit check integrity --elements elements.json --image frame.png
 vlmkit check integrity page.html --reduced-motion   # the page as prefers-reduced-motion: reduce leaves it
+vlmkit check integrity page.html --color-scheme dark  # a page that follows the OS theme, judged in its dark one
 ```
 
 `elements.json` is the same schema `diff png --elements-json` accepts (`path`, `tag`,
@@ -543,6 +544,8 @@ vlmkit check design        <html|url>          # coherence of the scale the page
 vlmkit check composition   <html|url>          # 近接/整列/対比: label grouping, page rails, declared type hierarchy (--elements for a scene)
 vlmkit check color         <html|url>          # palette by role (base/body ink/link ink) + where colour alone carries meaning (--elements for a scene)
 vlmkit check theme         <html|url>          # dark mode by media query OR root class / attribute (detected); unthemed components
+# --color-scheme dark on check integrity / a11y contrast / color / design / composition / scan style:
+# judge a page that follows prefers-color-scheme in its dark theme (the report says which it judged)
 vlmkit check perf          <html|url>          # Web Vitals (CLS / LCP / FCP)
 vlmkit check grounding     <html|url>          # Screenshot-space action map for a computer-use agent (see below)
 vlmkit check drift component <html> --selector .card

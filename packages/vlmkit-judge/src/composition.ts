@@ -203,6 +203,8 @@ export interface RailNearMiss {
 }
 
 export interface CompositionReport {
+  /** The `prefers-color-scheme` the page was judged in, when one was emulated (`--color-scheme`). */
+  colorScheme?: "light" | "dark";
   source: string;
   /** 近接 */
   labels: LabelGap[];

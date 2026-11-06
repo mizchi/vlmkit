@@ -17,6 +17,7 @@ import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { applyAllowRules, type IntegrityAllowRule } from "./integrity-exemption.ts";
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { applyHar, settlePage, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
+import { applyColorScheme, type ColorScheme } from "@mizchi/vlmkit-core/page-load.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { extractComponentsFromRgba } from "../component/component-bbox.ts";
@@ -709,6 +710,8 @@ export interface IntegrityOptions {
   timeline?: { at?: readonly number[]; frames?: string };
   /** Load every page with prefers-reduced-motion: reduce emulated. */
   reducedMotion?: boolean;
+  /** Load every page with this prefers-color-scheme emulated (`--color-scheme`). */
+  colorScheme?: ColorScheme;
 }
 
 export const DEFAULT_INTEGRITY_VIEWPORTS = [
@@ -765,6 +768,7 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
       const page = await browser.newPage(withAuthState({ viewport }, options.storageState));
       // Round 9: tiles a reduce rule left at opacity 0 were invisible text no gate could reach.
       if (options.reducedMotion) await page.emulateMedia({ reducedMotion: "reduce" });
+      await applyColorScheme(page, options.colorScheme);
       // Through `applyHar`, not a local `routeFromHAR`: the shared helper reads the
       // recording and can therefore tell a request the fixture never held from a
       // resource the page actually broke. Without that, an out-of-date HAR reads as
@@ -1032,6 +1036,7 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
             ...(options.timeline.frames ? { frames: options.timeline.frames } : {}),
             ...(options.storageState ? { storageState: options.storageState } : {}),
             ...(options.reducedMotion ? { reducedMotion: true } : {}),
+            ...(options.colorScheme ? { colorScheme: options.colorScheme } : {}),
             ...(options.har ? { har: options.har } : {}),
             ...(options.timeout !== undefined ? { timeout: options.timeout } : {}),
             ...(options.waitUntil ? { waitUntil: options.waitUntil } : {}),
@@ -1117,6 +1122,7 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
   return {
     source: options.source,
     verdict,
+    ...(options.colorScheme ? { colorScheme: options.colorScheme } : {}),
     findings,
     exempted,
     viewports: stats,
@@ -1142,6 +1148,8 @@ export function formatIntegrityReport(report: IntegrityReport, rules?: RuleView)
   const lines: string[] = [];
   lines.push(`${BOLD}${CYAN}vlmkit check integrity${RESET}`);
   lines.push(`${DIM}source: ${report.source}${RESET}`);
+  if (report.colorScheme)
+    lines.push(`${DIM}color scheme: ${report.colorScheme} (prefers-color-scheme emulated)${RESET}`);
   lines.push("");
   // Honour the project's rule settings in the PROSE, not only in the exit code.
   // `--rule low-contrast-text=off` used to print `3 finding(s) suppressed by rule

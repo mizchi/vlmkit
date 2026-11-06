@@ -11,7 +11,12 @@
 
 import { readAll, readChoice, readFlag, readInt, readNumber } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
-import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
+import {
+  COLOR_SCHEME_INPUT,
+  PAGE_LOAD_INPUTS,
+  parseColorScheme,
+  parsePageLoad,
+} from "@mizchi/vlmkit-core/page-load.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import {
   DESIGN_ALLOW_HELP,
@@ -121,6 +126,7 @@ docs/design/design-policy-metrics.md`,
       description: "Playwright storage state for pages behind a login",
     },
     // Spread, not re-declared — see the note in `integrity.gate.ts`.
+    COLOR_SCHEME_INPUT,
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
@@ -141,6 +147,11 @@ docs/design/design-policy-metrics.md`,
     }
     const elements = readFlag(argv, "elements");
     if (elements) {
+      if (parseColorScheme(argv).colorScheme) {
+        throw new UsageError(
+          "--color-scheme emulates the page's prefers-color-scheme; a scene has no media query. Write the scene from the scheme you want judged.",
+        );
+      }
       // Mutually exclusive with a page, as in `check integrity` and `check color`.
       if (firstPositionalOrUndefined(argv, valueFlags)) {
         throw new UsageError("check design takes either a page source or --elements, not both.");
@@ -188,12 +199,17 @@ docs/design/design-policy-metrics.md`,
       ...(waitUntil ? { waitUntil } : {}),
       ...(storageState ? { storageState } : {}),
       ...(har ? { har } : {}),
+      ...parseColorScheme(argv),
     };
   },
   run: async (options) => {
     if (options.fromPath) {
       const snapshot = await readStyleSnapshot(options.fromPath);
-      return judgeCollectedDesign(snapshot.design, snapshot.redirect, { ...options, source: snapshot.source });
+      return judgeCollectedDesign(snapshot.design, snapshot.redirect, {
+        ...options,
+        source: snapshot.source,
+        ...(snapshot.colorScheme ? { colorScheme: snapshot.colorScheme } : {}),
+      });
     }
     return options.elementsPath
       ? runSceneDesignPolicyCheck({ ...options, elementsPath: options.elementsPath })

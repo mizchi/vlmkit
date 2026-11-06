@@ -19,7 +19,12 @@
 
 import { readAll, readFlag, readInt } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
-import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
+import {
+  COLOR_SCHEME_INPUT,
+  PAGE_LOAD_INPUTS,
+  parseColorScheme,
+  parsePageLoad,
+} from "@mizchi/vlmkit-core/page-load.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { firstPositional, firstPositionalOrUndefined } from "@mizchi/vlmkit-core/plugin/args.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
@@ -168,6 +173,7 @@ norm). Study: docs/reports/2026-09-23-color-roles-v1.md`,
       },
       { name: "report", placeholder: "path", kind: "path", description: "Markdown report path" },
       // Spread, not re-declared — see the note in `integrity.gate.ts`.
+      COLOR_SCHEME_INPUT,
       ...PAGE_LOAD_INPUTS,
     ],
     parse: (argv) => {
@@ -191,6 +197,11 @@ norm). Study: docs/reports/2026-09-23-color-roles-v1.md`,
       }
       const elements = readFlag(argv, "elements");
       if (elements) {
+        if (parseColorScheme(argv).colorScheme) {
+          throw new UsageError(
+            "--color-scheme emulates the page's prefers-color-scheme; a scene has no media query. Write the scene from the scheme you want judged.",
+          );
+        }
         // Mutually exclusive with a page, as in `check integrity`: the two inputs are judged by
         // the same rules, but a run that measured one of two named inputs would be ambiguous.
         if (firstPositionalOrUndefined(argv, ["--viewport", "--allow", "--storage-state", "--report", "--elements"])) {
@@ -231,6 +242,7 @@ norm). Study: docs/reports/2026-09-23-color-roles-v1.md`,
         ...(pageLoad.timeout !== undefined ? { timeout: pageLoad.timeout } : {}),
         ...(pageLoad.waitUntil ? { waitUntil: pageLoad.waitUntil } : {}),
         ...(pageLoad.har ? { har: pageLoad.har } : {}),
+        ...parseColorScheme(argv),
       };
     },
     run: async (options) => {
@@ -239,6 +251,7 @@ norm). Study: docs/reports/2026-09-23-color-roles-v1.md`,
         return await judgeCollectedColorRoles(snapshot.color, snapshot.redirect, {
           ...options,
           source: snapshot.source,
+          ...(snapshot.colorScheme ? { colorScheme: snapshot.colorScheme } : {}),
         });
       }
       return options.elementsPath
