@@ -21,7 +21,12 @@ import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { readAll, readChoice, readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
-import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
+import {
+  COLOR_SCHEME_INPUT,
+  PAGE_LOAD_INPUTS,
+  parseColorScheme,
+  parsePageLoad,
+} from "@mizchi/vlmkit-core/page-load.ts";
 import {
   type IntegrityOptions,
   type IntegrityReport,
@@ -178,12 +183,18 @@ ${ALLOW_HELP}`,
     // fragment: v5's CI agent found the `--wait-until` hint present on `check copy`
     // and `check breakpoints` and absent here — "and integrity is the gate you reach
     // for first."
+    COLOR_SCHEME_INPUT,
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
     const elements = readFlag(argv, "elements");
     const image = readFlag(argv, "image");
     if (elements) {
+      if (parseColorScheme(argv).colorScheme) {
+        throw new UsageError(
+          "--color-scheme emulates the page's prefers-color-scheme; a scene has no media query. Write the scene from the scheme you want judged.",
+        );
+      }
       // Image mode. Deliberately mutually exclusive with a page source rather than
       // "source wins" or "both are measured": the two paths evaluate different rule sets,
       // so a run that quietly picked one would make its verdict ambiguous.
@@ -254,6 +265,7 @@ ${ALLOW_HELP}`,
       ...(har ? { har } : {}),
       ...(allow.length > 0 ? { allow } : {}),
       ...(argv.includes("--reduced-motion") ? { reducedMotion: true } : {}),
+      ...parseColorScheme(argv),
       ...(timeline
         ? {
             timeline: {

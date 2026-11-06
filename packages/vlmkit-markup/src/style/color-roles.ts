@@ -13,7 +13,7 @@ import { settlePage, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
-import { type PageLoadOptions } from "@mizchi/vlmkit-core/page-load.ts";
+import { applyColorScheme, type PageLoadOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { applyRuleTiers, hiddenByRuleNote } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
@@ -261,6 +261,7 @@ export function formatColorRolesReport(report: ColorRolesReport, rules?: RuleVie
   out.push("");
   out.push(`${BOLD}${CYAN}vlmkit check color${RESET}`);
   out.push(`${DIM}source: ${report.source}${RESET}`);
+  if (report.colorScheme) out.push(`${DIM}color scheme: ${report.colorScheme} (prefers-color-scheme emulated)${RESET}`);
   out.push("");
   // The prose has to know when a rule was turned off or re-tuned, or it prints a
   // verdict drawn from findings the reader can no longer see.
@@ -348,6 +349,7 @@ export async function runColorRolesCheck(options: ColorRolesOptions): Promise<Co
   return await withBrowser(async (browser) => {
     const width = options.viewport ?? 1280;
     const page = await browser.newPage(withAuthState({ viewport: { width, height: 900 } }, options.storageState));
+    await applyColorScheme(page, options.colorScheme);
     if (options.har) await page.routeFromHAR(resolve(options.har), { notFound: "abort" });
     // Redirects only mean something for http(s); the URL itself comes from the shared converter.
     const isUrl = /^https?:\/\//.test(options.source);
@@ -371,9 +373,10 @@ export async function runColorRolesCheck(options: ColorRolesOptions): Promise<Co
 export async function judgeCollectedColorRoles(
   input: ColorRolesInput,
   redirect: string | null,
-  options: Pick<ColorRolesOptions, "source" | "allow" | "reportPath">,
+  options: Pick<ColorRolesOptions, "source" | "allow" | "reportPath" | "colorScheme">,
 ): Promise<ColorRolesReport> {
   const report = judgeColorRoles(input, { source: options.source, allow: options.allow });
+  if (options.colorScheme) report.colorScheme = options.colorScheme;
   if (redirect) {
     report.findings.unshift({ kind: "redirected", severity: "suspect", message: redirect });
   }

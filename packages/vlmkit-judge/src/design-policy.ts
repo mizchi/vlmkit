@@ -163,6 +163,8 @@ export interface DesignFinding {
 }
 
 export interface DesignPolicyReport {
+  /** The `prefers-color-scheme` the page was judged in, when one was emulated (`--color-scheme`). */
+  colorScheme?: "light" | "dark";
   source: string;
   roles: {
     role: string;

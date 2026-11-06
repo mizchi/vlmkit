@@ -24,6 +24,7 @@
 import { join } from "node:path";
 import type { Browser, Page } from "playwright";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
+import { applyColorScheme, type ColorScheme } from "@mizchi/vlmkit-core/page-load.ts";
 import {
   captureStable,
   defaultTimelineInstants,
@@ -142,6 +143,7 @@ export async function sampleIntegrityTimeline(
     at?: readonly number[];
     storageState?: string;
     reducedMotion?: boolean;
+    colorScheme?: ColorScheme;
     har?: string;
     timeout?: number;
     waitUntil?: "domcontentloaded" | "load" | "networkidle";
@@ -152,6 +154,7 @@ export async function sampleIntegrityTimeline(
 ): Promise<TimelineSweep> {
   const page = await browser.newPage(withAuthState({ viewport }, options.storageState));
   if (options.reducedMotion) await page.emulateMedia({ reducedMotion: "reduce" });
+  await applyColorScheme(page, options.colorScheme);
   try {
     const timeline = await openHeldTimeline(page, url, options);
     const held = await timeline.animations();

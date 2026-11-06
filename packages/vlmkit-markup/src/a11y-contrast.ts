@@ -94,6 +94,8 @@ export interface ContrastFinding {
 export interface A11yContrastReport {
   html: string;
   viewport: { width: number; height: number };
+  /** The `prefers-color-scheme` the page was judged in, when one was emulated (`--color-scheme`). */
+  colorScheme?: "light" | "dark";
   screenshot: string;
   totalText: number;
   failures: ContrastFinding[];
@@ -334,6 +336,7 @@ export async function runA11yContrast(options: A11yContrastOptions): Promise<A11
   return {
     html: htmlPath,
     viewport,
+    ...(options.colorScheme ? { colorScheme: options.colorScheme } : {}),
     screenshot: screenshotPath,
     totalText: samples.length,
     failures: applied.kept,
@@ -361,6 +364,8 @@ export function formatA11yContrastReport(report: A11yContrastReport, rules?: Rul
   const lines: string[] = [];
   lines.push(`  ${BOLD}${CYAN}vlmkit check a11y contrast${RESET}`);
   lines.push(`  ${DIM}html: ${report.html}${RESET}`);
+  if (report.colorScheme)
+    lines.push(`  ${DIM}color scheme: ${report.colorScheme} (prefers-color-scheme emulated)${RESET}`);
   lines.push(
     `  ${DIM}inspected ${report.totalText} text-bearing element(s)` +
       // Stated on the coverage line, not buried: "0 failures over 59" and "0 failures over 59, 26

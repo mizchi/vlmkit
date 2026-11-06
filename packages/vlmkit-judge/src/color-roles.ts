@@ -308,6 +308,8 @@ export interface ColorRolesInput {
 }
 
 export interface ColorRolesReport extends Omit<ColorRolesInput, "controls" | "links"> {
+  /** The `prefers-color-scheme` the page was judged in, when one was emulated (`--color-scheme`). */
+  colorScheme?: "light" | "dark";
   source: string;
   controls: ControlBoundary[];
   links: LinkCue[];

@@ -103,6 +103,8 @@ export interface IntegrityViewportStats {
 export interface IntegrityReport {
   source: string;
   verdict: "clean" | "defects";
+  /** The `prefers-color-scheme` the page was judged in, when one was emulated (`--color-scheme`). */
+  colorScheme?: "light" | "dark";
   /**
    * `--allow` rules that matched nothing this run. Surfaced so an exemption
    * outliving the pattern it covered gets deleted instead of quietly widening

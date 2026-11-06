@@ -105,16 +105,21 @@ export { RULE_SETTINGS } from "./rules.ts";
  * and the navigation used a hand-rolled default anyway.
  */
 export {
+  COLOR_SCHEMES,
+  COLOR_SCHEME_INPUT,
+  COLOR_SCHEME_VALUE_FLAGS,
   DEFAULT_PAGE_LOAD_TIMEOUT_MS,
   DEFAULT_PAGE_LOAD_WAIT_UNTIL,
   PAGE_LOAD_INPUTS,
   PAGE_LOAD_VALUE_FLAGS,
   PAGE_LOAD_WAIT_UNTIL,
+  applyColorScheme,
   navigationOptions,
+  parseColorScheme,
   parsePageLoad,
   pickPageLoad,
 } from "../page-load.ts";
-export type { PageLoadOptions, PageLoadWaitUntil } from "../page-load.ts";
+export type { ColorScheme, PageLoadOptions, PageLoadWaitUntil } from "../page-load.ts";
 
 // argv reading — the primitives.
 export {

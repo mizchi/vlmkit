@@ -38,6 +38,7 @@ const COMMON_VALUE_FLAGS = [
   "--timeout",
   "--wait-until",
   "--har",
+  "--color-scheme",
   "--storage-state",
   "--allow",
   "--contract",

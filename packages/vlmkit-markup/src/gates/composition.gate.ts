@@ -17,7 +17,12 @@
 
 import { readAll, readFlag, readInt } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
-import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
+import {
+  COLOR_SCHEME_INPUT,
+  PAGE_LOAD_INPUTS,
+  parseColorScheme,
+  parsePageLoad,
+} from "@mizchi/vlmkit-core/page-load.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { firstPositional, firstPositionalOrUndefined } from "@mizchi/vlmkit-core/plugin/args.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
@@ -152,6 +157,7 @@ docs/design/composition-metrics.md`,
       description: "Playwright storage state for pages behind a login",
     },
     // Spread, not re-declared — see the note in `integrity.gate.ts`.
+    COLOR_SCHEME_INPUT,
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
@@ -164,6 +170,11 @@ docs/design/composition-metrics.md`,
     }
     const elements = readFlag(argv, "elements");
     if (elements) {
+      if (parseColorScheme(argv).colorScheme) {
+        throw new UsageError(
+          "--color-scheme emulates the page's prefers-color-scheme; a scene has no media query. Write the scene from the scheme you want judged.",
+        );
+      }
       // Mutually exclusive with a page, as in `check integrity`, `check color` and `check design`.
       if (firstPositionalOrUndefined(argv, valueFlags)) {
         throw new UsageError("check composition takes either a page source or --elements, not both.");
@@ -199,6 +210,7 @@ docs/design/composition-metrics.md`,
       ...(pageLoad.timeout !== undefined ? { timeout: pageLoad.timeout } : {}),
       ...(pageLoad.waitUntil ? { waitUntil: pageLoad.waitUntil } : {}),
       ...(pageLoad.har ? { har: pageLoad.har } : {}),
+      ...parseColorScheme(argv),
     };
   },
   run: async (options) => {
@@ -207,6 +219,7 @@ docs/design/composition-metrics.md`,
       return judgeCollectedComposition(snapshot.composition, snapshot.redirect, {
         ...options,
         source: snapshot.source,
+        ...(snapshot.colorScheme ? { colorScheme: snapshot.colorScheme } : {}),
       });
     }
     return options.elementsPath

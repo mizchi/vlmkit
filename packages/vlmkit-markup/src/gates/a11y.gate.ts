@@ -21,7 +21,12 @@
 import { join } from "node:path";
 import { readAll, readChoice, readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { parseSelectorAllowRules, selectorAllowHelp } from "../inspect/selector-exemption.ts";
-import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
+import {
+  COLOR_SCHEME_INPUT,
+  PAGE_LOAD_INPUTS,
+  parseColorScheme,
+  parsePageLoad,
+} from "@mizchi/vlmkit-core/page-load.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import {
@@ -117,6 +122,7 @@ threshold for its font size and weight.`,
       }),
     },
     ...REPORT_INPUTS("a11y-contrast"),
+    COLOR_SCHEME_INPUT,
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
@@ -128,6 +134,7 @@ threshold for its font size and weight.`,
       ...(allow.length > 0 ? { allow } : {}),
       ...reportFlags(argv, "a11y-contrast", htmlPath),
       ...parsePageLoad(argv),
+      ...parseColorScheme(argv),
     };
   },
   run: (options) => runA11yContrast(options),

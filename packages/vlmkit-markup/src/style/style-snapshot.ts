@@ -22,7 +22,7 @@ import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { settlePage, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
-import type { PageLoadOptions } from "@mizchi/vlmkit-core/page-load.ts";
+import { applyColorScheme, type ColorScheme, type PageLoadOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { firstPositionalOrUndefined } from "@mizchi/vlmkit-core/plugin/args.ts";
 import { buildDesignSampleScript, type DesignPolicyInput } from "./design-policy.ts";
@@ -40,6 +40,8 @@ export interface StyleSnapshot {
   source: string;
   /** `describeRedirect`'s message when the URL landed elsewhere, else null. */
   redirect: string | null;
+  /** The `prefers-color-scheme` emulated at capture (`scan style --color-scheme`); absent: the default. */
+  colorScheme?: ColorScheme;
   /** One width for all three: a snapshot is one render. */
   viewport: { width: number; height: number };
   /** `--exclude` selectors applied to the design collection at capture time. */
@@ -68,6 +70,7 @@ export async function captureStyleSnapshot(options: StyleSnapshotOptions): Promi
   const snapshot = await withBrowser(async (browser) => {
     const width = options.viewport ?? 1280;
     const page = await browser.newPage(withAuthState({ viewport: { width, height: 900 } }, options.storageState));
+    await applyColorScheme(page, options.colorScheme);
     if (options.har) await page.routeFromHAR(resolve(options.har), { notFound: "abort" });
     const isUrl = /^https?:\/\//.test(options.source);
     await page.goto(sourceToUrl(options.source), {
@@ -84,6 +87,7 @@ export async function captureStyleSnapshot(options: StyleSnapshotOptions): Promi
       format: STYLE_SNAPSHOT_FORMAT,
       source: options.source,
       redirect,
+      ...(options.colorScheme ? { colorScheme: options.colorScheme } : {}),
       viewport: { width, height: 900 },
       exclude,
       design,
@@ -121,7 +125,7 @@ export async function readStyleSnapshot(path: string): Promise<StyleSnapshot> {
 }
 
 /** Flags a live run reads while loading the page; with `--from` the page was loaded at capture. */
-const CAPTURE_FLAGS = ["viewport", "storage-state", "timeout", "wait-until", "har", "elements"];
+const CAPTURE_FLAGS = ["viewport", "storage-state", "timeout", "wait-until", "har", "color-scheme", "elements"];
 
 /**
  * `--from` for a gate: the snapshot path, or undefined when the flag is absent. Refuses a page

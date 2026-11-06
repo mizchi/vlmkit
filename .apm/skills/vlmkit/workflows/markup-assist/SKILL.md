@@ -113,7 +113,8 @@ once before declaring done. Warns are acceptable; suspects are not.
 **Then look at it.** Green gates are not the end of the loop. Take
 full-page screenshots at desktop and phone width (one screen per image,
 so text stays readable) and of every state the task names — a menu
-open, an error shown, a second theme — read each one, and write down
+open, an error shown, a second theme (a page that follows the OS theme:
+run the gates again with `--color-scheme dark`) — read each one, and write down
 what is in it before deciding it is fine. A defect the eye finds is a
 defect: fix it, re-shoot, look again. In this repo's demo-site round
 (2026-09-23, six sites built by agents with every gate available) 96 of

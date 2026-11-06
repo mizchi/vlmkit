@@ -8,6 +8,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { settlePage, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
+import { applyColorScheme, type ColorScheme } from "@mizchi/vlmkit-core/page-load.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
@@ -89,6 +90,7 @@ export interface CompositionOptions extends CompositionJudgeOptions {
   waitUntil?: "domcontentloaded" | "load" | "networkidle";
   timeout?: number;
   har?: string;
+  colorScheme?: ColorScheme;
   storageState?: string;
   /** Viewport width. Composition is a function of width, so it is reported. */
   viewport?: number;
@@ -103,6 +105,7 @@ export async function runCompositionCheck(options: CompositionOptions): Promise<
   return await withBrowser(async (browser) => {
     const width = options.viewport ?? 1280;
     const page = await browser.newPage(withAuthState({ viewport: { width, height: 900 } }, options.storageState));
+    await applyColorScheme(page, options.colorScheme);
     if (options.har) await page.routeFromHAR(resolve(options.har), { notFound: "abort" });
     // Redirects only mean something for http(s); the URL itself comes from the shared converter.
     const isUrl = /^https?:\/\//.test(options.source);
@@ -128,13 +131,17 @@ export async function runCompositionCheck(options: CompositionOptions): Promise<
 export function judgeCollectedComposition(
   input: CompositionInput,
   redirect: string | null,
-  options: CompositionJudgeOptions & { source: string },
+  options: CompositionJudgeOptions & { source: string; colorScheme?: ColorScheme },
 ): CompositionReport {
   const judged = judgeComposition(input, options);
   if (redirect) {
     judged.findings.unshift({ kind: "redirected", severity: "suspect", message: redirect });
   }
-  return recordCompositionRun({ source: options.source, ...judged });
+  return recordCompositionRun({
+    source: options.source,
+    ...(options.colorScheme ? { colorScheme: options.colorScheme } : {}),
+    ...judged,
+  });
 }
 
 /**
@@ -175,6 +182,8 @@ export function formatCompositionReport(report: CompositionReport, rules?: RuleV
   lines.push("");
   lines.push(`${BOLD}${CYAN}vlmkit check composition${RESET}`);
   lines.push(`${DIM}source: ${report.source}${RESET}`);
+  if (report.colorScheme)
+    lines.push(`${DIM}color scheme: ${report.colorScheme} (prefers-color-scheme emulated)${RESET}`);
   lines.push("");
   const tiers = applyRuleTiers(report.findings, (f) => ({ rule: f.kind, emitted: f.severity }), rules);
   const shown = tiers.shown;
