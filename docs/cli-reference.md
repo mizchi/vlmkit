@@ -1047,6 +1047,8 @@ vlmkit inspect claims   <html|url|shot.png> --forbid "an error message" --expect
   # --json. Answers within 0.3 of the threshold are marked uncertain. Gate on the
   # deterministic checks; this is a model's reading of the pixels.
 vlmkit inspect motion   <html|url> --selector .toast [--target "the green Saved toast"] [--jev] [--expect-easing ease-out,ease-in] [--expect-origin bottom-left] [--expect-stagger 80] [--exits]
+vlmkit inspect motion   canvas.html --track 800,360,80,80 --target square --start 200 --end 800   # no element: found by its pixels (position only), no key; frames.json too
+vlmkit inspect motion   page.html --selector .menu --click .toggle --baseline .vlmkit/motion/menu.json  # first pass writes it; later runs fail baseline-mismatch naming what changed (--update-baseline)
   # Is a CSS animation visually broken? Frames on the held clock (11 per span of motion + rest).
   # Without --jev, no key: each --selector measured from the page per frame (box, opacity, scale,
   # own animation time, and the share of it that is topmost — a clip or a cover). With --jev,

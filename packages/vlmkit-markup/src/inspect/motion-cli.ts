@@ -9,7 +9,7 @@
  * Exit 0 nothing fails, 1 a fail, 2 usage. Advisory: a model's reading of the pixels; the
  * deterministic motion checks (`check animation`, `check integrity --timeline`) are what to gate on.
  */
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
@@ -1303,6 +1303,14 @@ an easing is checked on each channel that changes.
                           of its whole motion — a change of mind mid-motion. "--click .menu-btn
                           --wait 100 --click .menu-btn" lands the second click 100ms into the
                           opening; a target that jumps when it lands is \`interrupt-jump\` (fail)
+  --baseline <file>       Hold this run to an approved one. With no file there, a run that passes
+                          writes it (each target's start, duration, runs, travel, direction,
+                          easing, origin, pivot, turn and place at rest); with one, a change past a
+                          frame, 2px, 2° or 5% of a travel — or another named easing — is
+                          \`baseline-mismatch\` (fail), naming what changed
+                          Targets are matched by name: give a --track one a --target, so a
+                          region drawn again a pixel off is still the same target
+  --update-baseline       Write --baseline again from this run (it must pass): a change that is meant
   --exits                 The targets are meant to leave (gone at rest is their end)
   --still <css>           One target's centre must not move (repeat): the article a notice
                           slides over, beside the notice that moves. Measured as a --selector
@@ -1399,6 +1407,10 @@ export interface MotionCliOptions {
   json: boolean;
   /** Sample the motion each action starts, one run per action, instead of the last one's only. */
   everyAction?: boolean;
+  /** Hold the run to an approved one (`--baseline <file>`): written by the first passing run. */
+  baseline?: string;
+  /** Write the baseline again from this run (`--update-baseline`), when it passes. */
+  updateBaseline?: boolean;
   /** One step of an --every-action run: the actions before it were sampled in their own steps. */
   inEveryAction?: boolean;
   /** Ask TypeSafe Jev. Without it every target is a --selector, measured from the page alone. */
@@ -1458,6 +1470,8 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   let json = false;
   let exits = false;
   let everyAction = false;
+  let baseline: string | undefined;
+  let updateBaseline = false;
   const exitSelectors: string[] = [];
   const stillSelectors: string[] = [];
   let noForbid = false;
@@ -1693,6 +1707,12 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
       case "--every-action":
         everyAction = true;
         break;
+      case "--baseline":
+        baseline = value(a, argv[++i]);
+        break;
+      case "--update-baseline":
+        updateBaseline = true;
+        break;
       case "--jev":
         jev = true;
         break;
@@ -1815,6 +1835,12 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
     for (const sel of list)
       if (!selectors.includes(sel))
         throw new MotionUsageError(`${flag} ${sel} names no --selector: give the same selector to both`);
+  if (updateBaseline && !baseline)
+    throw new MotionUsageError("--update-baseline needs --baseline <file>: the file to write");
+  if (baseline && everyAction)
+    throw new MotionUsageError(
+      "--baseline with --every-action: one baseline holds one sampled motion; give each action its own run with its own --baseline",
+    );
   if (selectors.length > 0 && fromFrames)
     throw new MotionUsageError("--selector measures a live page: give the page, not frames.json");
   // On a page the span comes from its animations, --at or not; saved frames carry none.
@@ -1863,6 +1889,8 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
     expectStill,
     expectUpright,
     ...(everyAction ? { everyAction } : {}),
+    ...(baseline ? { baseline } : {}),
+    ...(updateBaseline ? { updateBaseline } : {}),
   };
 }
 
@@ -3930,14 +3958,73 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
         atMs: captured.startMs,
         message: `nothing about it changes, while ${captured.elsewhere.join(", ")} ${captured.elsewhere.length === 1 ? "animates" : "animate"}: if that is what should move, give it as --selector (the element that moves, not the one that starts it)`,
       });
-  const jumps = [
+  const jumps: ({ selector: string; message: string } | { selector: string; message: string; rule: string })[] = [
     ...interruptJumps(captured, o.selectors),
     ...(captured.seams ?? []).map((s) => ({ ...s, rule: "loop-seam" })),
     ...(captured.replays ?? []).filter((s) => !s.warn).map((s) => ({ ...s, rule: "replayed" })),
   ];
   const warnsAfter = (captured.replays ?? []).filter((s) => s.warn).map((s) => ({ ...s, rule: "replayed" }));
+  // Held to an approved run (issue #214): what each target's line reports, against what it reported then.
+  let baselineNote: string | undefined;
+  let baselineJson: Record<string, unknown> | undefined;
+  if (o.baseline) {
+    const { summarizeMotion, compareMotionBaseline, parseMotionBaseline, MOTION_BASELINE_FORMAT } =
+      await import("@mizchi/vlmkit-judge/motion-baseline.ts");
+    const path = resolve(o.baseline);
+    const summary = summarizeMotion(r.targets);
+    const existing = await readFile(path, "utf-8").catch(() => null);
+    const failing =
+      !r.passed || jumps.length > 0 || r.targets.some((t) => t.findings.some((f) => f.severity === "fail"));
+    if (existing === null || o.updateBaseline) {
+      if (failing) {
+        baselineNote = `baseline: not ${existing === null ? "written" : "rewritten"} (${path}): this run fails, and a failing run is not one to hold later runs to — fix it first`;
+        baselineJson = { path, written: false };
+      } else {
+        // The flags as given, for whoever reads the file: a baseline does not check them again.
+        const expected = argv.flatMap((x, k) =>
+          x.startsWith("--expect-")
+            ? [argv[k + 1] !== undefined && !argv[k + 1]!.startsWith("--") ? `${x} ${argv[k + 1]}` : x]
+            : [],
+        );
+        await mkdir(dirname(path), { recursive: true });
+        await writeFile(
+          path,
+          `${JSON.stringify({ format: MOTION_BASELINE_FORMAT, source: o.source, expected, targets: summary }, null, 2)}\n`,
+        );
+        baselineNote = `baseline: ${existing === null ? "written" : "rewritten"} to ${path} (${summary.length} target${summary.length === 1 ? "" : "s"}); a later run with --baseline ${o.baseline} is held to it`;
+        baselineJson = { path, written: true };
+      }
+    } else {
+      let base;
+      try {
+        base = parseMotionBaseline(existing, o.baseline);
+      } catch (e) {
+        console.error(`error: ${(e as Error).message}`);
+        return 2;
+      }
+      const changes = compareMotionBaseline(base.targets, summary);
+      for (const c of changes) {
+        const message = `changed since the baseline (${o.baseline}): ${c.changes.join("; ")} — if the change is meant, write it again with --update-baseline`;
+        const t = r.targets.find((x) => x.target === c.target);
+        if (t)
+          t.findings.push({
+            rule: "baseline-mismatch" as (typeof t.findings)[number]["rule"],
+            severity: "fail",
+            atMs: captured.startMs,
+            message,
+          });
+        else jumps.push({ selector: c.target, message: `${c.target}: ${message}`, rule: "baseline-mismatch" });
+      }
+      baselineNote =
+        changes.length === 0
+          ? `baseline: held to ${path} — nothing changed past its tolerances (a frame, 2px, 2°, 5% of a travel, a clearly fitted easing)`
+          : `baseline: ${changes.length} of ${Math.max(summary.length, base.targets.length)} target${base.targets.length === 1 ? "" : "s"} changed since ${path}`;
+      baselineJson = { path, changes };
+    }
+  }
   const json = {
     source: o.source,
+    ...(baselineJson ? { baseline: baselineJson } : {}),
     ...(jumps.length > 0 ? { interruptJumps: jumps } : {}),
     ...(warnsAfter.length > 0 ? { warnings: warnsAfter } : {}),
     frames: captured.manifest,
@@ -4098,6 +4185,10 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
           : []),
       ];
       if (notes.length > 0) lines.splice(at < 0 ? lines.length : at, 0, ...notes);
+    }
+    if (baselineNote) {
+      const at = lines.findIndex((l) => /^ {2}(no fail|\d+ fail)/.test(l));
+      lines.splice(at < 0 ? lines.length : at, 0, `  ${baselineNote}`);
     }
     console.log(`${lines.join("\n")}\n  report: ${saved}`);
   }
