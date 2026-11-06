@@ -554,6 +554,31 @@ a hidden oracle that uses plain Playwright. Measured, not to re-learn:
     "did you mean".
 - **Still open:** a scale's peak is the sampled frames' (said as "peaking at … in the frames measured").
 
+**Motion no element describes, and motion held to an approved run** (issues #213, #214; tests
+`motion-track.test.ts`, `motion-baseline-cli.test.ts`). The A/B reports' fairer test was motion the
+browser's API cannot show; these are its first two tools. Measured building them, not to re-learn:
+
+- **`--track x,y,w,h`** (`@mizchi/vlmkit-judge/pixel-track.ts`, pure): the region the target fills in
+  the last frame shot is the template, with a margin of its ground so a flat shape has edges; each
+  frame is searched shrunk (template ~8px on its short side), then at full resolution around the
+  best place, then a parabola gives the part of a pixel (a square 0.25px off is found within 0.1).
+  The match against the template's own contrast is the share seen. Position only — not size,
+  turn or opacity — and the output says so. Not `flash-motion.ts`'s block matcher: that follows a
+  block between consecutive frames, this finds one picture in frames far apart.
+- **A script's picture is the last animation frame's.** Shot between frames it is up to 16ms old,
+  and a linear slide read a 17px jump into rest; with `--track` each instant is put on the nearest
+  frame and the clock run to it. A span given by `--end` is shot at every frame (up to 120): with 11,
+  a 200px jump where the slide is slow sat at the jump rule's threshold. A canvas page lists no
+  animation, so it needs `--end` (the error says so). `fixtures/motion-track/slide.html` (intact,
+  linear, jump, left) and its CSS twin read the same: 600px rightwards, ease-out exactly.
+- **`--baseline <file>`** (`@mizchi/vlmkit-judge/motion-baseline.ts`, `vlmkit-motion-baseline/1`):
+  written only by a passing run, from each target's line; held to with a frame for a time, 2px for a
+  place, 2° for a turn, 5% for a travel, and an easing only when both runs fit theirs 1.5x ahead
+  (`easing-unchecked`'s margin). Targets are matched by name. On the authoring fixtures each
+  reference passes its own baseline, and tabs-ease, bell-centre, grid-linear, gauge-origin and
+  label-wrap fail it naming the change; lift-noz holds it (its defect is paint order, which
+  `covered-edge` catches: a baseline keeps motion numbers, not pixels).
+
 ## Generated figures (raster images)
 
 Figures that state structure — dependencies, flows, states, sequences, measurements — are drawn with

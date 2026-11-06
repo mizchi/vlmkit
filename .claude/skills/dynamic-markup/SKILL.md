@@ -255,6 +255,16 @@ vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ea
   broken pages by the expected rule, with all 7 intact pages passing. The one it cannot see is
   text left lying on other text (`overlap-rest`): that is `check integrity`'s `text-collision`,
   or `--jev`, whose default `--forbid` statement asks it.
+- **A canvas, WebGL or a sprite a script draws has no element to measure: `--track x,y,w,h`**
+  (the region it fills in the last frame, CSS px) finds it in every frame by its pixels, no key,
+  and every rule above judges it. Position only — not its size, turn or opacity. A script's motion
+  lists no animation, so give its span: `--start <ms> --end <ms>`. Saved frames (`frames.json`,
+  a recording through `scan video`) take `--track` too.
+- **Once the motion is right, keep it right: `--baseline <file>`.** The first passing run writes
+  what each target's line measured (start, duration, travel, direction, easing, origin, pivot,
+  turn, place at rest); a later run is held to it and fails `baseline-mismatch` naming what
+  changed ("follows ease-in-out → ease"). `--update-baseline` rewrites it when a change is meant.
+  Name a `--track` target with `--target`, since targets are matched by name.
 - **With `--jev`, still pass `--selector` on your own page.** Without it a model boxes the
   target, and look-alike siblings (three stat cards) get swapped between frames; with it the
   geometry is the page's, and Jev only says whether it can be seen (and whether text is printed
