@@ -1,5 +1,5 @@
 name: vlmkit
-version: 0.25.1
+version: 0.25.2
 # Publish only the lightweight automatic router and its bundled workflows.
 includes:
   - .apm/skills/vlmkit/
