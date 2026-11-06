@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Canvas slide</title>
+<!--
+  A square drawn on a canvas by requestAnimationFrame: no element moves, so only its pixels say
+  where it is (`inspect motion --track`). It slides from x=200 to x=800 (its left edge) at y=360,
+  beginning at 200ms and taking 600ms, eased out (CSS ease-out, cubic-bezier(0, 0, 0.58, 1)).
+
+  ?kind=intact   as above (the CSS twin is slide-css.html)
+  ?kind=linear   the same slide at a constant speed
+  ?kind=jump     eased out, but 200px further on from 70% of its time (where it is slow): a jump,
+                 and it rests at 1000
+  ?kind=left     the slide reversed: from 800 to 200
+-->
+<style>
+  html, body { margin: 0; background: #ffffff; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="stage" width="1280" height="800"></canvas>
+<script>
+  const kind = new URLSearchParams(location.search).get("kind") || "intact";
+  const ctx = document.getElementById("stage").getContext("2d");
+  // CSS's cubic-bezier, solved for x by Newton then bisection, as browsers do.
+  function bezier(x1, y1, x2, y2) {
+    const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx;
+    const cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by;
+    const sx = (t) => ((ax * t + bx) * t + cx) * t;
+    const sy = (t) => ((ay * t + by) * t + cy) * t;
+    const dx = (t) => (3 * ax * t + 2 * bx) * t + cx;
+    return (x) => {
+      let t = x;
+      for (let i = 0; i < 8; i++) {
+        const e = sx(t) - x;
+        if (Math.abs(e) < 1e-7) return sy(t);
+        const d = dx(t);
+        if (Math.abs(d) < 1e-6) break;
+        t -= e / d;
+      }
+      let lo = 0, hi = 1;
+      t = x;
+      while (lo < hi && Math.abs(sx(t) - x) > 1e-7) {
+        if (sx(t) < x) lo = t; else hi = t;
+        t = (lo + hi) / 2;
+        if (hi - lo < 1e-9) break;
+      }
+      return sy(t);
+    };
+  }
+  const easeOut = bezier(0, 0, 0.58, 1);
+  const from = kind === "left" ? 800 : 200;
+  const to = kind === "left" ? 200 : 800;
+  function draw(now) {
+    const t = Math.min(1, Math.max(0, (now - 200) / 600));
+    const p = kind === "linear" ? t : easeOut(t);
+    let x = from + (to - from) * p;
+    if (kind === "jump" && t >= 0.7) x += 200;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, 1280, 800);
+    ctx.fillStyle = "#2563eb";
+    ctx.fillRect(x, 360, 80, 80);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(x + 24, 384, 32, 32);
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+</script>
+</body>
+</html>

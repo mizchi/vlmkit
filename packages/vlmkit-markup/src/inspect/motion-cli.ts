@@ -24,6 +24,7 @@ import {
   type OriginPoint,
 } from "@mizchi/vlmkit-judge/motion-path.ts";
 import { frameTimeMs, parseFramesManifest, parseInstants } from "@mizchi/vlmkit-judge/frames.ts";
+import { parseTrackRegion, type TrackBox } from "@mizchi/vlmkit-judge/pixel-track.ts";
 import type { MotionCheckReport, MotionDom, MotionFrame } from "@mizchi/vlmkit-ai/motion-check.ts";
 
 /** Each selector's element as rendered: border box, opacity through its ancestors, transform scale. */
@@ -1166,6 +1167,7 @@ export const DEFAULT_MOTION_FORBID = "two lines of text printed on top of each o
 
 export const MOTION_USAGE = `Usage: vlmkit inspect motion <page.html|url> --selector <css>... [--target "<name>"]... [options]
        vlmkit inspect motion <page.html|url|frames.json> --jev --target "<what moves>"... [--selector <css>]... [--forbid "<statement>"]...
+       vlmkit inspect motion <page.html|frames.json> --track <x,y,w,h>... --end <ms> [--start <ms>]   (a canvas, a recording: by its pixels)
 
 Is an animation visually broken? The page's clock is held and the motion shot at
 instants and once at rest. Without --jev, no key: each --selector is measured
@@ -1238,6 +1240,11 @@ an easing is checked on each channel that changes.
                           --jev, every target is one. With --jev, it pairs with the --target in the
                           same position and Jev only says whether it can be seen — a "seen" whose
                           box misses the element is set aside. Use it whenever the page is yours
+  --track <x,y,w,h>       A target with no element to measure — a canvas, WebGL, a sprite a script
+                          draws, a recording (repeat): the region it fills in the LAST frame
+                          shot (CSS px; its rest), found in every frame by its pixels. Gives where
+                          it is and how well it matches, not its size, turn or opacity. No key,
+                          and saved frames.json work too. After the --selector targets in order
   --target <words>        A name for the --selector in the same position (default: the selector).
                           With --jev, what moves by what only it shows: "the card labelled Users
                           showing 1,284", not "the Users card" (look-alike cards get swapped)
@@ -1349,6 +1356,8 @@ export interface MotionCliOptions {
   source: string;
   targets: string[];
   selectors: string[];
+  /** `--track` regions (CSS px, in the last frame shot): targets found by their pixels, after the selectors. */
+  tracks: TrackBox[];
   forbid: string[];
   /** Each --expect-easing given, in order: one for every target, or one per target. */
   expectEasing?: EasingName[][];
@@ -1426,6 +1435,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   const positional: string[] = [];
   const targets: string[] = [];
   const selectors: string[] = [];
+  const tracks: TrackBox[] = [];
   const forbid: string[] = [];
   let expectEasing: EasingName[][] | undefined;
   let expectOrigin: (OriginName | OriginPoint | undefined)[] | undefined;
@@ -1589,6 +1599,16 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
       case "--selector":
         selectors.push(value(a, argv[++i]).trim());
         break;
+      case "--track": {
+        const v = value(a, argv[++i]);
+        const box = parseTrackRegion(v);
+        if (!box)
+          throw new MotionUsageError(
+            `--track takes x,y,w,h in CSS px (the region the target fills in the last frame), got ${v}`,
+          );
+        tracks.push(box);
+        break;
+      }
       case "--click":
       case "--hover":
         actions.push({ kind: a === "--click" ? "click" : "hover", selector: value(a, argv[++i]).trim() });
@@ -1712,9 +1732,15 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
     );
   }
   if (noForbid && forbid.length > 0) throw new MotionUsageError("--no-forbid with --forbid: pick one");
-  if (/(^|\/)frames\.json$/.test(positional[0]!) && !jev) {
-    throw new MotionUsageError("saved frames have no page to measure: add --jev to ask Jev of them");
+  if (/(^|\/)frames\.json$/.test(positional[0]!) && !jev && tracks.length === 0) {
+    throw new MotionUsageError(
+      "saved frames have no page to measure: give --track x,y,w,h to find a target by its pixels, or add --jev to ask Jev of them",
+    );
   }
+  if (jev && tracks.length > 0)
+    throw new MotionUsageError(
+      "--track finds a target by its pixels, with no model: drop --jev, or describe it with --target for Jev",
+    );
   if (!jev) {
     // Without Jev nothing can read a statement or find a target by its words: the page measures
     // each --selector, and those name the targets when no --target does.
@@ -1722,17 +1748,19 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
     // --still / --exit name what to measure as well: `--still .delete` was refused, "names no
     // --selector" (authoring v1).
     for (const sel of [...stillSelectors, ...exitSelectors]) if (!selectors.includes(sel)) selectors.push(sel);
-    if (selectors.length === 0) {
+    if (selectors.length === 0 && tracks.length === 0) {
       throw new MotionUsageError(
-        "give each target a --selector (measured from the page, no key), or add --jev to find --target by its words",
+        "give each target a --selector (measured from the page, no key), a --track x,y,w,h (found by its pixels: a canvas or a recording), or add --jev to find --target by its words",
       );
     }
     // A --target names the selector in its position; the rest are named by their selectors (the
     // help said so, and 3 --selector with 1 --target was refused, round 9).
-    if (targets.length < selectors.length) targets.push(...selectors.slice(targets.length));
-    if (targets.length !== selectors.length) {
+    // Then each --track, named by its region.
+    const measured = [...selectors, ...tracks.map((b) => `region ${b.x},${b.y} ${b.width}x${b.height}`)];
+    if (targets.length < measured.length) targets.push(...measured.slice(targets.length));
+    if (targets.length !== measured.length) {
       throw new MotionUsageError(
-        `${selectors.length} --selector for ${targets.length} --target: without --jev every target is measured, so each needs one`,
+        `${measured.length} --selector / --track for ${targets.length} --target: without --jev every target is measured, so each needs one`,
       );
     }
   } else if (!noForbid && forbid.length === 0) forbid.push(DEFAULT_MOTION_FORBID);
@@ -1799,6 +1827,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
     source: positional[0]!,
     targets,
     selectors,
+    tracks,
     forbid,
     ...(expectEasing ? { expectEasing } : {}),
     ...(expectOrigin ? { expectOrigin } : {}),
@@ -2003,6 +2032,10 @@ async function delaySources(page: import("playwright").Page, selectors: readonly
 
 interface Captured {
   frames: MotionFrame[];
+  /** Device pixels per CSS px of the frames, when read back from a frames.json. */
+  deviceScale?: number;
+  /** --track targets (after the --selector ones), found by their pixels. */
+  tracked?: number;
   startMs: number;
   endMs: number;
   segments: { startMs: number; endMs: number }[];
@@ -2463,7 +2496,14 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
           ? [...new Set(o.at)].sort((a, b) => a - b)
           : given
             ? (() => {
-                const m = motionInstants(startMs, endMs);
+                // A script's motion has no keyframes to plan by and a --track costs nothing a frame:
+                // every frame of the span (up to 120). With 11, a 200px jump between two of them sat
+                // at the jump rule's threshold.
+                const n =
+                  o.tracks.length > 0
+                    ? Math.min(120, Math.max(11, Math.round(((endMs - startMs) * 60) / 1000)))
+                    : undefined;
+                const m = motionInstants(startMs, endMs, n);
                 return [...m.motion, m.rest];
               })()
             : forever
@@ -2473,6 +2513,18 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
         // clockNow is a sum of frame times and an instant is computed from a start: the same frame can
         // differ by an ulp, and the frame a close begins on (233.33ms on CI) was dropped by it.
         .filter((t) => t >= clockNow - 1e-6);
+      // What a script draws (a --track target) is the picture of the last animation frame run:
+      // shot between frames, it is up to 16ms old, and a linear slide read a 17px jump into rest.
+      // Each instant is put on the nearest frame, and the clock is run to it: the last one inside the
+      // motion (799ms) lands on its end (800ms), drawn at its last step.
+      if (o.tracks.length > 0)
+        instants.splice(
+          0,
+          instants.length,
+          ...[...new Set(instants.map((t) => frameTimeMs(Math.round((t * 60) / 1000))))].filter(
+            (t) => t >= clockNow - 1e-6,
+          ),
+        );
       const writer = await frameWriter(resolve(o.frames), {
         tool: "inspect motion",
         url,
@@ -2944,8 +2996,54 @@ async function readFrames(o: MotionCliOptions): Promise<Captured> {
   );
   const startMs = o.startMs ?? frames[0]?.atMs ?? 0;
   const files = new Map(manifest.frames.map((f) => [f.atMs, join(dirname(path), f.file)]));
-  return { frames, startMs, endMs: o.endMs!, segments: [{ startMs, endMs: o.endMs! }], manifest: path, files };
+  return {
+    frames,
+    startMs,
+    endMs: o.endMs!,
+    segments: [{ startMs, endMs: o.endMs! }],
+    manifest: path,
+    files,
+    deviceScale: manifest.source.deviceScaleFactor ?? 1,
+  };
 }
+
+/**
+ * Each `--track` region found in every frame by its pixels (`trackRegion`), as the frame's measure
+ * of that target: its box, and how well it matches as the share seen. The template is the last
+ * frame shot (the rest frame on a page), where the region was given. No opacity, scale or turn is
+ * measured: they stay 1, 1 and none.
+ */
+export async function applyTracks(
+  frames: MotionFrame[],
+  tracks: readonly TrackBox[],
+  before: number,
+  deviceScale: number,
+): Promise<void> {
+  if (tracks.length === 0 || frames.length === 0) return;
+  const { decodePngPixels } = await import("@mizchi/vlmkit-core/png-decode.ts");
+  const { trackRegion } = await import("@mizchi/vlmkit-judge/pixel-track.ts");
+  const decoded = frames.map((f) => decodePngPixels(f.png));
+  const k = scaleBox(deviceScale);
+  for (const [j, region] of tracks.entries()) {
+    const found = trackRegion(decoded, k(region));
+    for (const [n, f] of frames.entries()) {
+      const r = found[n]!;
+      const dom = f.dom ?? Array.from({ length: before }, () => null);
+      dom[before + j] = {
+        box: scaleBox(1 / deviceScale)(r.box),
+        opacity: 1,
+        scale: 1,
+        visible: r.present,
+        onScreen: 1,
+      };
+      f.dom = dom;
+    }
+  }
+}
+
+const scaleBox =
+  (k: number) =>
+  (b: TrackBox): TrackBox => ({ x: b.x * k, y: b.y * k, width: b.width * k, height: b.height * k });
 
 /**
  * The part of a path across its way: "travels 200px rightwards" read as a straight slide for a
@@ -3231,9 +3329,11 @@ export function formatMotionReport(
   }
   lines.push(
     `  ${fails === 0 ? "no fail" : `${fails} fail`}${warns ? `, ${warns} warn` : ""}; ${
-      r.calls === 0
-        ? "measured from the page, no model asked (--jev adds Jev's reading and the --forbid statements)"
-        : `${r.model}, ${r.calls} requests, $${r.costUsd.toFixed(5)} — ${captured.frames[0]?.dom?.some(Boolean) ? "positions measured from the page; whether it can be seen, and the statements, are a model's reading" : "a model's reading of the pixels, not a measurement"}`
+      r.calls === 0 && captured.tracked
+        ? `${captured.tracked === r.targets.length ? "" : "the --selector targets measured from the page, "}${captured.tracked === 1 ? "the --track target" : `${captured.tracked} --track targets`} found by ${captured.tracked === 1 ? "its" : "their"} pixels — where ${captured.tracked === 1 ? "it is" : "each is"} and how well ${captured.tracked === 1 ? "it matches" : "each matches"}, not size, turn or opacity; no model asked`
+        : r.calls === 0
+          ? "measured from the page, no model asked (--jev adds Jev's reading and the --forbid statements)"
+          : `${r.model}, ${r.calls} requests, $${r.costUsd.toFixed(5)} — ${captured.frames[0]?.dom?.some(Boolean) ? "positions measured from the page; whether it can be seen, and the statements, are a model's reading" : "a model's reading of the pixels, not a measurement"}`
     }`,
   );
   // Cropped to where the targets move when that is a small part of the frame: eleven 1280px
@@ -3651,6 +3751,13 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
     // is from the first frame, against where it rests with motion. "no animation … nothing to
     // sample" read as a broken page (v2 and the small-model round's reveal).
     if (e instanceof NothingAnimatesError && o.reducedMotion && o.actions.length === 0 && !o.jev) return reducedRest(o);
+    // A canvas runs no animation the page can list: its span is the one thing it cannot tell.
+    if (e instanceof NothingAnimatesError && o.tracks.length > 0) {
+      console.error(
+        "error: no CSS animation or transition runs on the page, so the motion's span cannot be read from it: a --track target drawn by a script (a canvas, requestAnimationFrame) needs --end <ms>, when its motion is over (frames run from --start, 0 by default), or --at <instants>",
+      );
+      return 2;
+    }
     if (e instanceof SnappedError) {
       if (e.changed.length === 0 && e.heldBy.length > 0) {
         console.log(
@@ -3703,6 +3810,8 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
     console.error(`error: ${e.message}`);
     return 2;
   }
+  await applyTracks(captured.frames, o.tracks, o.selectors.length, captured.deviceScale ?? o.deviceScale);
+  if (o.tracks.length > 0) captured.tracked = o.tracks.length;
   const { checkMotionFrames } = await import("@mizchi/vlmkit-ai/motion-check.ts");
   // The pointer leaving what showed a target: gone at rest is its end. A repaired help bubble failed
   // absent-at-rest after --hover .help --leave until --exits was added (round 14).

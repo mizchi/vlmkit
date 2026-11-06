@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CSS slide</title>
+<!-- slide.html?kind=intact written in CSS: the same square, path, start, duration and easing. -->
+<style>
+  html, body { margin: 0; background: #ffffff; }
+  .square {
+    position: absolute; left: 800px; top: 360px; width: 80px; height: 80px; box-sizing: border-box;
+    border: 24px solid #2563eb; background: #ffffff;
+    animation: slide 600ms ease-out 200ms both;
+  }
+  @keyframes slide { from { transform: translateX(-600px); } to { transform: translateX(0); } }
+</style>
+</head>
+<body>
+<div class="square"></div>
+</body>
+</html>
