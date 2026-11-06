@@ -18,6 +18,7 @@ import {
   judgeMotionPath,
   type EasingName,
   type OriginName,
+  type OriginPoint,
   type MotionDirection,
   type MotionPathReport,
   type MotionSample,
@@ -133,6 +134,8 @@ export interface MotionCheckOptions {
   targetEasing?: readonly (EasingName | readonly EasingName[] | undefined)[];
   /** The point a scale grows from: every target's, or per target in order. */
   expectOrigin?: OriginName | readonly (OriginName | undefined)[];
+  /** The point a turn keeps still, in the element's own units: every target's, or per target in order. */
+  expectPivot?: readonly (OriginPoint | undefined)[];
   /** When each target's own animation begins (page ms), per target in order. */
   expectStartMs?: readonly (number | undefined)[];
   /**
@@ -143,9 +146,9 @@ export interface MotionCheckOptions {
   /** Device pixels per CSS px in the frames (a 2x capture): the frame's size in CSS px is its size over this. */
   frameScale?: number;
   /** How long one run takes (ms) and how many runs (null: infinite): one for all, or per target. */
-  expectDurationMs?: readonly number[];
-  expectIterations?: readonly (number | null)[];
-  expectLines?: readonly number[];
+  expectDurationMs?: readonly (number | undefined)[];
+  expectIterations?: readonly (number | null | undefined)[];
+  expectLines?: readonly (number | undefined)[];
   /** Which way each target's first segment moves: one for all, or per target. */
   expectDirection?: readonly (MotionDirection | undefined)[];
   /** Every target's centre must not move: only its size and opacity change. */
@@ -374,10 +377,25 @@ export async function checkMotionFrames(
   const domAt = new Map(frames.map((f) => [f.atMs, f.dom]));
 
   // One value is every target's; several are the targets' in order.
+  // A value given once is not a --still or --exit target's when other targets move: a pill's
+  // `--expect-direction up` failed the backdrop beside it, and `--expect-lines 1` a still paragraph
+  // (authoring v2 and the small-model round). Given per target, it is that target's.
+  const side = (i: number) => !!(options.expectStillFor?.[i] || options.exitsFor?.[i]);
+  const someMain = options.targets.some((_, i) => !side(i));
+  const sharedOff = (i: number) => side(i) && someMain;
   const perTarget = <T>(xs: readonly T[] | undefined, i: number): T | undefined =>
-    xs === undefined ? undefined : xs.length === 1 ? xs[0] : xs[i];
+    xs === undefined ? undefined : xs.length === 1 ? (sharedOff(i) ? undefined : xs[0]) : xs[i];
   const originFor = (i: number) =>
-    typeof options.expectOrigin === "string" ? options.expectOrigin : options.expectOrigin?.[i];
+    typeof options.expectOrigin === "string"
+      ? sharedOff(i)
+        ? undefined
+        : options.expectOrigin
+      : options.expectOrigin?.length === 1
+        ? sharedOff(i)
+          ? undefined
+          : options.expectOrigin[0]
+        : options.expectOrigin?.[i];
+  const easingFor = (i: number) => options.targetEasing?.[i] ?? (sharedOff(i) ? undefined : options.expectEasing);
   // A stagger is relative to the first target: its own expected start if given, else where it
   // was measured to begin (judged once the first target is).
   let staggerFrom: number | undefined = options.expectStartMs?.[0];
@@ -408,10 +426,9 @@ export async function checkMotionFrames(
         ...(frameSize ? { frame: frameSize } : {}),
         presenceThreshold: threshold,
         ...(options.exits || options.exitsFor?.[i] ? { exits: true } : {}),
-        ...((options.targetEasing?.[i] ?? options.expectEasing)
-          ? { expectEasing: (options.targetEasing?.[i] ?? options.expectEasing)! }
-          : {}),
+        ...(easingFor(i) ? { expectEasing: easingFor(i)! } : {}),
         ...(originFor(i) ? { expectOrigin: originFor(i)! } : {}),
+        ...(perTarget(options.expectPivot, i) ? { expectPivot: perTarget(options.expectPivot, i)! } : {}),
         ...(startFor(i) !== undefined ? { expectStartMs: startFor(i)!, expectStartFrom: startFrom(i) } : {}),
         ...(perTarget(options.expectDurationMs, i) !== undefined
           ? { expectDurationMs: perTarget(options.expectDurationMs, i)! }
@@ -431,6 +448,33 @@ export async function checkMotionFrames(
     if (i === 0) staggerFrom ??= judged.startsAtMs;
     return judged;
   });
+
+  // A value given once is every target's: say so where it fails one of several. A backdrop that
+  // only fades failed `--expect-direction up` meant for the dialog beside it, and the message read
+  // as the page's fault (the small-model round).
+  if (options.targets.length > 1) {
+    const once: [string, string, boolean][] = [
+      ["direction-mismatch", "--expect-direction", options.expectDirection?.length === 1],
+      ["duration-mismatch", "--expect-duration", options.expectDurationMs?.length === 1],
+      ["iterations-mismatch", "--expect-iterations", options.expectIterations?.length === 1],
+      ["lines-mismatch", "--expect-lines", options.expectLines?.length === 1],
+      [
+        "origin-mismatch",
+        "--expect-origin",
+        typeof options.expectOrigin === "string" ||
+          options.expectOrigin?.length === 1 ||
+          options.expectPivot?.length === 1,
+      ],
+      ["easing-mismatch", "--expect-easing", !!options.expectEasing && !options.targetEasing],
+      ["still-mismatch", "--expect-still", !!options.expectStill],
+    ];
+    for (const t of targets)
+      for (const f of t.findings) {
+        const hit = once.find(([rule, , given]) => given && f.rule === rule);
+        if (hit)
+          f.message += ` (${hit[1]} was given once, so it is every target's: give one per target in order${hit[1] === "--expect-still" ? ", or --still <css> for the one that stays" : ", any for one it does not describe"})`;
+      }
+  }
 
   const forbidden: ForbidFinding[] = [];
   forbid.forEach((statement, i) => {

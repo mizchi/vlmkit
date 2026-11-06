@@ -21,6 +21,7 @@ import {
   type MotionDirection,
   type EasingName,
   type OriginName,
+  type OriginPoint,
 } from "@mizchi/vlmkit-judge/motion-path.ts";
 import { frameTimeMs, parseFramesManifest, parseInstants } from "@mizchi/vlmkit-judge/frames.ts";
 import type { MotionCheckReport, MotionDom, MotionFrame } from "@mizchi/vlmkit-ai/motion-check.ts";
@@ -278,7 +279,7 @@ export async function measureTargets(
           const clips = cs.overflowY !== "visible" && he.scrollHeight > he.clientHeight + 1;
           return { lines, ...(clips ? { textClipped: true } : {}) };
         };
-        const pivotOf = (e: Element): { pivot?: { fx: number; fy: number } } => {
+        const pivotOf = (e: Element): { pivot?: { fx: number; fy: number; ux: number; uy: number } } => {
           const m = fullTransform(e);
           if (!m || !m.is2D) return {};
           const deg = (Math.atan2(m.b, m.a) * 180) / Math.PI;
@@ -319,7 +320,17 @@ export async function measureTargets(
             py = ory + yy - by;
           // Along an axis the box has no extent, a pivot on it is its middle.
           const frac = (v: number, size: number) => (size > 0 ? v / size : Math.abs(v) < 1 ? 0.5 : v > 0 ? 9 : -9);
-          return { pivot: { fx: frac(px, w), fy: frac(py, h) } };
+          // And in its own units, as transform-origin is written: an SVG element's user space (the
+          // viewBox's), else px from its box's corner.
+          const svgOwn = e instanceof SVGGraphicsElement && !(e instanceof SVGSVGElement);
+          return {
+            pivot: {
+              fx: frac(px, w),
+              fy: frac(py, h),
+              ux: svgOwn ? orx + yx : px,
+              uy: svgOwn ? ory + yy : py,
+            },
+          };
         };
         // Its angle as drawn, through every transform up the tree, and the nearest ancestor that turns:
         // a label counter-rotating at 5s inside a dial turning at 4s read only its own turn, 72°/s,
@@ -969,8 +980,56 @@ export async function measureTargets(
             pts.push([r.x + 2, r.y + f * r.height], [r.right - 2, r.y + f * r.height]);
             pts.push([r.x + f * r.width, r.y + 2], [r.x + f * r.width, r.bottom - 2]);
           }
+          // Inside its own rounded corners only: a 44px round button read "46% of its edge covered" by
+          // the card behind its square box's corners (the small-model round).
+          const cs = getComputedStyle(el);
+          const ow = (el as HTMLElement).offsetWidth || r.width,
+            oh = (el as HTMLElement).offsetHeight || r.height;
+          const kx = r.width / ow,
+            ky = r.height / oh;
+          const radius = (v: string): [number, number] => {
+            const [a = "0", b = a] = v.split(/\s+/);
+            const len = (t: string, side: number) =>
+              t.endsWith("%") ? (parseFloat(t) / 100) * side : parseFloat(t) || 0;
+            return [len(a, ow) * kx, len(b, oh) * ky];
+          };
+          const [tl, tr, br, bl] = [
+            radius(cs.borderTopLeftRadius),
+            radius(cs.borderTopRightRadius),
+            radius(cs.borderBottomRightRadius),
+            radius(cs.borderBottomLeftRadius),
+          ];
+          // Radii that overlap are scaled down together, as CSS does.
+          const fit = Math.min(
+            1,
+            r.width / Math.max(1e-9, tl[0] + tr[0]),
+            r.width / Math.max(1e-9, bl[0] + br[0]),
+            r.height / Math.max(1e-9, tl[1] + bl[1]),
+            r.height / Math.max(1e-9, tr[1] + br[1]),
+          );
+          const inShape = (x: number, y: number) => {
+            const corner = (cx: number, cy: number, [rx, ry]: [number, number], inX: boolean, inY: boolean) => {
+              const ex = rx * fit,
+                ey = ry * fit;
+              if (ex <= 0 || ey <= 0 || !inX || !inY) return true;
+              return ((x - cx) / ex) ** 2 + ((y - cy) / ey) ** 2 <= 1;
+            };
+            return (
+              corner(r.x + tl[0] * fit, r.y + tl[1] * fit, tl, x < r.x + tl[0] * fit, y < r.y + tl[1] * fit) &&
+              corner(r.right - tr[0] * fit, r.y + tr[1] * fit, tr, x > r.right - tr[0] * fit, y < r.y + tr[1] * fit) &&
+              corner(
+                r.right - br[0] * fit,
+                r.bottom - br[1] * fit,
+                br,
+                x > r.right - br[0] * fit,
+                y > r.bottom - br[1] * fit,
+              ) &&
+              corner(r.x + bl[0] * fit, r.bottom - bl[1] * fit, bl, x < r.x + bl[0] * fit, y > r.bottom - bl[1] * fit)
+            );
+          };
           for (const [x, y] of pts) {
             if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight || !inClips(x, y)) continue;
+            if (!inShape(x, y)) continue;
             n++;
             const top = document.elementFromPoint(x, y);
             if (!top || el.contains(top) || top.contains(el) || seeThrough(top)) continue;
@@ -1118,12 +1177,14 @@ each forbidden statement is. vlmkit judges the motion from that:
 
   target-lost      not shown between frames that show it (clipped, covered, snapped off-screen)
   target-hidden    shown in no frame at all, rest included (clipped or covered from the start)
-  absent-at-rest   shown in motion, gone once it stops (unless --exits says it leaves)
+  absent-at-rest   shown in motion, gone once it stops (unless --exits says it leaves; a warn when
+                   it fades out over the motion's last frames: taken as leaving)
   snap-back        back where it started once it stops (fill-mode missing)
   jump             one step far faster than its neighbours (keyframe gap)
   easing-mismatch  the path follows another easing than --expect-easing
   target-static    shown and still from the first frame (warn: not animating?)
-  origin-mismatch  a scale grows from another point than --expect-origin (transform-origin)
+  origin-mismatch  a scale grows from, a turn turns about, or a width change keeps, another point
+                   than --expect-origin (transform-origin)
   start-mismatch   its animation begins at another time than --expect-start / --expect-stagger
   duration-mismatch one run takes another time than --expect-duration
   iterations-mismatch it runs another number of times than --expect-iterations
@@ -1142,6 +1203,10 @@ each forbidden statement is. vlmkit judges the motion from that:
                    action sets (a forwards fill under :hover)
   target-unchanged nothing about the target changes while another element animates: the trigger (warn)
   reduced-motion-moves under --reduced-motion, a target that still moves (warn)
+  reduced-motion-hides with --reduced-motion and nothing animating, a target not shown from the
+                   first frame (animation: none over a base of opacity 0)
+  reduced-motion-misplaced with --reduced-motion and nothing animating, a target more than 1px
+                   off where the page rests with motion
   span-mismatch    at rest its left and right edges are not those of --expect-span-of's element
   inert-offset     its animation moves top / left on a position: static box, where they do nothing (warn)
   channel-step     a colour, gradient or shadow changes all at once between two frames (fail in
@@ -1186,11 +1251,15 @@ an easing is checked on each channel that changes.
                           ease-in-out). Comma-separated, one per segment: "ease-out,ease-in" for
                           an entrance and an exit; \`any\` leaves a segment unchecked ("ease-out,any")
   --expect-origin <name>  ${ORIGIN_NAMES.join(" | ")}: the point a scale grows
-                          from (the point of its box that stays put). Once for every target, or
-                          repeated per target in order. A scale along one axis (scaleY, a
-                          drop-down) keeps an edge: top | bottom (left | right for scaleX).
-                          Measured with --selector; every scale's point or edge is printed
-                          with or without it
+                          from, a turn turns about, or a width / height change keeps (the edge
+                          a pill widens from). Or X,Y in the element's own units, as
+                          transform-origin takes them: an SVG element's viewBox units (a needle
+                          turning about the dial's centre: 160,170), else px from its box's
+                          top-left corner — checked on a turn. Once for every target, or
+                          repeated per target in order ("any" leaves one out). A scale along
+                          one axis (scaleY, a drop-down) keeps an edge: top | bottom (left |
+                          right for scaleX). Measured with --selector; every scale's point or
+                          edge is printed with or without it
   --expect-start <ms>     When its own animation begins (page time). Comma-separated, one per
                           target in order: "200,280,360,440"; "+50ms" counts from the last
                           action instead (a close's start), and "any" leaves a target out.
@@ -1198,13 +1267,14 @@ an easing is checked on each channel that changes.
   --expect-stagger <ms>   Each target begins this long after the one before it, in the order
                           given (from the first target's --expect-start, or its measured start)
   --expect-duration <ms>  How long one run of its own animation takes ("280ms", "1.2s").
-                          Once for every target, or comma-separated per target. --selector
+                          Once for every target, or comma-separated per target ("any" leaves
+                          one out). --selector
   --expect-direction <d>  Which way its (first) motion goes: left | right | up | down — "slides in
                           from the right edge" moves left — or which way it turns: clockwise |
                           counterclockwise — a swing by the way it turns first. Once for every
                           target, or per target ("any" leaves one out)
   --expect-iterations <n> How many times it runs: 3, or infinite. Once for every target, or
-                          comma-separated per target. --selector
+                          comma-separated per target ("any" leaves one out). --selector
   --expect-still          Its centre must not move: only its size and opacity change (a dialog
                           that stays centred while it grows in). --selector
   --expect-upright        Its angle on screen must not change, through every transform up the tree
@@ -1229,14 +1299,18 @@ an easing is checked on each channel that changes.
   --exits                 The targets are meant to leave (gone at rest is their end)
   --still <css>           One target's centre must not move (repeat): the article a notice
                           slides over, beside the notice that moves. Measured as a --selector
-                          too, so it need not be given twice
+                          too, so it need not be given twice. An --expect-* given once is the
+                          moving targets', not a --still or --exit one's
   --expect-lines <n>      Its text runs to n lines in every frame it is shown in (a label that
                           stays on one line while its button widens). Once, or per target
+                          ("any" leaves one out)
   --expect-span-of <css>  At rest its left and right edges are that element's, within 1px (a tab
                           indicator ending under its tab). Repeat: one per target ("any" skips)
   --reduced-motion        Load the page under prefers-reduced-motion: reduce. After an action, a
                           target that changes at once with no motion is what is asked, not
-                          \`snapped\`; one that still moves says so (\`reduced-motion-moves\`, warn)
+                          \`snapped\`; one that still moves says so (\`reduced-motion-moves\`, warn).
+                          With no action and nothing animating, each target is judged from the
+                          first frame: shown, and where the page rests with motion
   --exit <css>            One --selector target is meant to leave, the others are not (repeat):
                           a flip card's front face turned away, beside its back turning in
   --at <instants>         Frames to shoot (default: 11 per segment + rest); the segments stay
@@ -1255,6 +1329,8 @@ Advisory: gate on check animation / check integrity --timeline.
 Measured: https://github.com/mizchi/vlmkit/blob/main/docs/reports/2026-10-18-jev-motion.md`;
 
 export class MotionUsageError extends Error {}
+/** Nothing animates or transitions at load (and no action starts anything). */
+export class NothingAnimatesError extends MotionUsageError {}
 
 /** After --click nothing animated: the targets that changed did so in one frame. */
 export class SnappedError extends Error {
@@ -1276,8 +1352,12 @@ export interface MotionCliOptions {
   forbid: string[];
   /** Each --expect-easing given, in order: one for every target, or one per target. */
   expectEasing?: EasingName[][];
-  /** Each --expect-origin given: one for every target, or one per target. */
-  expectOrigin?: OriginName[];
+  /**
+   * Each --expect-origin given: one for every target, or one per target. A point is in the
+   * element's own units (an SVG element's user space, else CSS px from its box's corner);
+   * undefined where `any` was given.
+   */
+  expectOrigin?: (OriginName | OriginPoint | undefined)[];
   /** One per target, in order; undefined where `any` was given. */
   expectStartMs?: (number | undefined)[];
   /** Per entry of expectStartMs: given as `+Nms`, counted from the last action's start. */
@@ -1288,11 +1368,11 @@ export interface MotionCliOptions {
   expectSpanOf?: (string | undefined)[];
   expectStaggerMs?: number;
   /** How long one run of each target's own animation takes (ms), per target in order. */
-  expectDurationMs?: number[];
+  expectDurationMs?: (number | undefined)[];
   /** How many times it runs (null: infinite), per target in order. */
-  expectIterations?: (number | null)[];
+  expectIterations?: (number | null | undefined)[];
   /** How many lines each target's text runs to in every frame (once for all, or per target). */
-  expectLines?: number[];
+  expectLines?: (number | undefined)[];
   expectDirection?: (MotionDirection | undefined)[];
   exits: boolean;
   /** --selector targets meant to leave, by selector. */
@@ -1348,15 +1428,15 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   const selectors: string[] = [];
   const forbid: string[] = [];
   let expectEasing: EasingName[][] | undefined;
-  let expectOrigin: OriginName[] | undefined;
+  let expectOrigin: (OriginName | OriginPoint | undefined)[] | undefined;
   let expectStartMs: (number | undefined)[] | undefined;
   let expectStartAfterAction: boolean[] | undefined;
   let reducedMotion = false;
   let expectSpanOf: (string | undefined)[] | undefined;
   let expectStaggerMs: number | undefined;
-  let expectDurationMs: number[] | undefined;
-  let expectIterations: (number | null)[] | undefined;
-  let expectLines: number[] | undefined;
+  let expectDurationMs: (number | undefined)[] | undefined;
+  let expectIterations: (number | null | undefined)[] | undefined;
+  let expectLines: (number | undefined)[] | undefined;
   let expectDirection: (MotionDirection | undefined)[] | undefined;
   let at: number[] | undefined;
   let startMs: number | undefined;
@@ -1414,7 +1494,20 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
         break;
       }
       case "--expect-origin": {
-        const v = value(a, argv[++i])
+        const raw = value(a, argv[++i]).trim();
+        // `any` leaves a target out; a point is the element's own units, as transform-origin is: a
+        // gauge's needle turning about (160, 170) of its viewBox had only keywords to say it with
+        // (the small-model round).
+        if (raw === "any" || raw === "-") {
+          (expectOrigin ??= []).push(undefined);
+          break;
+        }
+        const pt = /^(-?\d+(?:\.\d+)?)(?:px)?\s*[, ]\s*(-?\d+(?:\.\d+)?)(?:px)?$/.exec(raw);
+        if (pt) {
+          (expectOrigin ??= []).push({ x: Number(pt[1]), y: Number(pt[2]) });
+          break;
+        }
+        const v = raw
           .trim()
           .replace(/\s+/g, "-")
           .replace(/^centre$/, "center");
@@ -1422,7 +1515,9 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
         const flip = v.split("-").reverse().join("-");
         const n = (ORIGIN_NAMES as readonly string[]).includes(v) ? v : flip;
         if (!(ORIGIN_NAMES as readonly string[]).includes(n)) {
-          throw new MotionUsageError(`--expect-origin takes ${ORIGIN_NAMES.join(", ")}; got ${argv[i]}`);
+          throw new MotionUsageError(
+            `--expect-origin takes ${ORIGIN_NAMES.join(", ")}, a point X,Y in the element's own units (an SVG element's viewBox units, else px from its box's top-left corner) or any; got ${argv[i]}`,
+          );
         }
         (expectOrigin ??= []).push(n as OriginName);
         break;
@@ -1443,7 +1538,7 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
         (expectDurationMs ??= []).push(
           ...value(a, argv[++i])
             .split(",")
-            .map((x) => one(a, x.trim())),
+            .map((x) => (x.trim() === "any" || x.trim() === "-" ? undefined : one(a, x.trim()))),
         );
         break;
       case "--expect-direction":
@@ -1466,10 +1561,11 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
             .split(",")
             .map((x) => {
               const v = x.trim();
+              if (v === "any" || v === "-") return undefined;
               if (v === "infinite") return null;
               const n = Number(v);
               if (!Number.isInteger(n) || n < 1)
-                throw new MotionUsageError(`--expect-iterations takes whole numbers or infinite, got ${v}`);
+                throw new MotionUsageError(`--expect-iterations takes whole numbers, infinite or any, got ${v}`);
               return n;
             }),
         );
@@ -1479,9 +1575,10 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
           ...value(a, argv[++i])
             .split(",")
             .map((x) => {
+              if (x.trim() === "any" || x.trim() === "-") return undefined;
               const n = Number(x.trim());
               if (!Number.isInteger(n) || n < 1)
-                throw new MotionUsageError(`--expect-lines takes whole numbers, got ${x}`);
+                throw new MotionUsageError(`--expect-lines takes whole numbers or any, got ${x}`);
               return n;
             }),
         );
@@ -2348,7 +2445,7 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
               `no animation or transition on the page at load: the animation is declared inside @media ${dead[0]}, which never matches — the browser does not know the media feature${feature ? ` \`${feature}\`` : ""} (or its value), so the query is false for everyone${near && near[1] <= 3 && near[0] !== feature ? ` (did you mean \`${near[0]}\`?)` : ""}, so it applies for nobody`,
             );
           }
-          throw new MotionUsageError(
+          throw new NothingAnimatesError(
             `no animation or transition on the page${ranTo !== null ? `, at load or after its timers ran (to ${ranTo}ms)` : " at load"}: nothing to sample. If one should run, it never starts — check animation lists what does; a misspelt transition-property or animation-name, a media query that never matches, a transition to height: auto (which needs interpolate-size: allow-keywords), or a class added in the same frame as the style it transitions from, are the usual causes. If a click starts it, give --click <css>. To shoot the page anyway, give --end <ms> (with --start, or --at for the instants)`,
           );
         }
@@ -2866,7 +2963,13 @@ function acrossText(d: { way: string; from: { x: number; y: number }; to: { x: n
  */
 function growsFromEdge(t: {
   path: { x: number; y: number; width?: number; height?: number; rest: boolean }[];
+  turn?: unknown;
+  swing?: unknown;
+  pivot?: unknown;
 }): string {
+  // A turned box's bounds grow as it turns: a needle read "its box grows 104px from its bottom
+  // edge" (authoring v2).
+  if (t.turn || t.swing || t.pivot) return "";
   const p = t.path.filter((q) => q.width !== undefined && q.height !== undefined);
   if (p.length < 2) return "";
   const a = p[0]!;
@@ -2966,8 +3069,8 @@ export function formatMotionReport(
   // Where a scale grows from, and when the target's own animation begins: printed whether or
   // not they were expected, since round 3's wrong transform-origin and missing stagger each
   // passed "follows ease-out exactly" with nothing on screen that said where or when.
-  const grows = (g: { origin?: Parameters<typeof describeOrigin>[0] }) =>
-    g.origin ? `; the scale grows from ${describeOrigin(g.origin)}` : "";
+  const grows = (g: { origin?: Parameters<typeof describeOrigin>[0] }, shrinks = false) =>
+    g.origin ? `; the scale ${shrinks ? "shrinks towards" : "grows from"} ${describeOrigin(g.origin)}` : "";
   const begins = (t: { startsAtMs?: number; durationMs?: number; iterations?: number | null; runs?: number[] }) =>
     (t.startsAtMs !== undefined ? `, begins at ${Math.round(t.startsAtMs)}ms` : "") +
     (t.durationMs !== undefined ? `, runs ${Math.round(t.durationMs)}ms` : "") +
@@ -2992,9 +3095,16 @@ export function formatMotionReport(
       (f) =>
         (f.rule === "jump" || f.rule === "snap-back") && (!seg0 || (f.atMs >= seg0.startMs && f.atMs <= seg0.endMs)),
     );
+    // A swing or a turn in place: its centre stays, and "travels 0px … no easing fit" read as a
+    // failure beside a bell that swung exactly as asked (authoring v2).
+    const inPlace = !!(t.swing || (t.turn && !t.turn.in3d)) && t.travelPx < 2;
+    const turnsInPlace = inPlace && !("best" in t.easing);
+    // A shrink says so: a card settling back read "the scale grows … from 1.00 to 1.08" (authoring v2).
+    const ks0 = doms.map((d) => d!.scale).filter((k): k is number => typeof k === "number" && k > 0);
+    const shrinks = ks0.length >= 2 && ks0[ks0.length - 1]! < ks0[0]! - 0.005;
     if (t.segments.length <= 1) {
       lines.push(
-        `  target ${JSON.stringify(t.target)}${begins(t)}: travels ${Math.round(t.travelPx)}px${t.segments[0]?.direction ? ` ${t.segments[0].direction.way}wards${acrossText(t.segments[0].direction)}` : ""} over the frames measured${
+        `  target ${JSON.stringify(t.target)}${begins(t)}: ${inPlace ? "stays in place" : `travels ${Math.round(t.travelPx)}px`}${t.segments[0]?.direction ? ` ${t.segments[0].direction.way}wards${acrossText(t.segments[0].direction)}` : ""} over the frames measured${
           // A gear orbiting back to its start read "travels 0px" (round 12).
           t.excursionPx !== undefined && t.excursionPx >= Math.max(4, t.travelPx * 2)
             ? ` (ending where it began; ${Math.round(t.excursionPx)}px away at most, between)`
@@ -3022,16 +3132,21 @@ export function formatMotionReport(
           t.sweepDeg !== undefined
             ? `, its conic arc sweeps ${t.sweepDeg > 0 ? "clockwise" : "counterclockwise"} ${Math.round(Math.abs(t.sweepDeg))}°`
             : ""
-        }, ${fitText(t.easing, broken)}${(() => {
+        }, ${turnsInPlace ? (t.swing ? "a swing back and forth, so no single curve is fitted to it" : "its turn is not fitted to a curve (its centre does not travel)") : fitText(t.easing, broken)}${(() => {
           const e = doms.find((d) => d!.ownEasing)?.ownEasing;
           return e ? ` (its own timing function is ${e}: the curve names here are the nearest built-in ones)` : "";
-        })()}${t.segments[0] ? grows(t.segments[0]) : ""}${(() => {
-          // How far it scales: a pulse to 104% was only in the JSON (round 18).
-          const ks = doms.map((d) => d!.scale).filter((k): k is number => typeof k === "number" && k > 0);
+        })()}${t.segments[0] ? grows(t.segments[0], shrinks) : ""}${(() => {
+          // How far it scales: a pulse to 104% was only in the JSON (round 18). In frame order, so
+          // a settle-back reads 1.08 to 1.00, with a peak past both ends said as one.
+          const ks = ks0;
           if (ks.length < 2) return "";
           const lo = Math.min(...ks);
           const hi = Math.max(...ks);
-          return hi - lo >= 0.01 ? ` (its scale goes from ${lo.toFixed(2)} to ${hi.toFixed(2)})` : "";
+          if (hi - lo < 0.01) return "";
+          const a = ks[0]!,
+            b = ks[ks.length - 1]!;
+          const peak = hi > Math.max(a, b) + 0.005 ? hi : lo < Math.min(a, b) - 0.005 ? lo : undefined;
+          return ` (its scale goes from ${a.toFixed(2)} to ${b.toFixed(2)}${peak !== undefined ? `, ${peak === hi ? "peaking" : "dipping"} at ${peak.toFixed(2)} in the frames measured` : ""})`;
         })()}`,
       );
     } else {
@@ -3347,6 +3462,92 @@ async function scrollSweep(o: MotionCliOptions): Promise<number | null> {
   });
 }
 
+/**
+ * Reduced motion with nothing animating: each target from the first frame, shown and where the
+ * page rests with motion (its finite animations finished). A reveal left at opacity 0 by
+ * `animation: none`, or a card left 32px below its place, fails.
+ */
+async function reducedRest(o: MotionCliOptions): Promise<number> {
+  const { withBrowser } = await import("@mizchi/vlmkit-core/browser-launch.ts");
+  const { sourceToUrl } = await import("@mizchi/vlmkit-core/page-open.ts");
+  const url = sourceToUrl(o.source);
+  return withBrowser(async (browser) => {
+    const still = await openMotionPage(browser, o);
+    const moving = await openMotionPage(browser, { ...o, reducedMotion: false });
+    try {
+      await still.goto(url, { waitUntil: "load" });
+      await moving.goto(url, { waitUntil: "load" });
+      const a = await measureTargets(still, o.selectors);
+      const forever = await moving.evaluate(async (sels) => {
+        for (const an of document.getAnimations()) {
+          try {
+            if (an.effect?.getComputedTiming().endTime !== Infinity) an.finish();
+          } catch {}
+        }
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        return sels.map((sel) => {
+          const el = document.querySelector(sel);
+          return (
+            !!el && el.getAnimations({ subtree: false }).some((x) => x.effect?.getComputedTiming().endTime === Infinity)
+          );
+        });
+      }, o.selectors);
+      const b = await measureTargets(moving, o.selectors);
+      const lines = [
+        `inspect motion: ${o.source} — under prefers-reduced-motion: reduce nothing animates at load; each target from the first frame, against where the page rests with motion`,
+      ];
+      let fails = 0;
+      const pos = (d: MotionDom) =>
+        `${Math.round(d.box.x)},${Math.round(d.box.y)} ${Math.round(d.box.width)}x${Math.round(d.box.height)}`;
+      o.targets.forEach((t, i) => {
+        const r = a[i],
+          m = b[i];
+        if (!r) {
+          lines.push(`  target ${JSON.stringify(t)}: matches nothing on the page`);
+          lines.push(`    FAIL reduced-motion-hides: ${o.selectors[i]} matches no element`);
+          fails++;
+          return;
+        }
+        const seen = r.opacity >= 0.05 && (r.visible ?? 1) >= 0.5;
+        lines.push(
+          `  target ${JSON.stringify(t)}: ${seen ? "shown" : "not shown"} from the first frame (opacity ${r.opacity.toFixed(2)}${r.visible !== undefined ? `, ${r.visible.toFixed(2)} seen` : ""}), at ${pos(r)}${m ? `; with motion it rests at ${pos(m)}` : ""}`,
+        );
+        if (!seen) {
+          fails++;
+          lines.push(
+            `    FAIL reduced-motion-hides: ${r.hiddenBy ?? `it renders at opacity ${r.opacity.toFixed(2)}`} — with no animation left to bring it in, it stays as its first keyframe or base style leaves it (animation: none over a base of opacity 0 is the usual cause: give the base its resting style, or keep the entrance with a backwards fill)`,
+          );
+          return;
+        }
+        if (m && !forever[i]) {
+          const off = Math.max(
+            Math.abs(r.box.x - m.box.x),
+            Math.abs(r.box.y - m.box.y),
+            Math.abs(r.box.width - m.box.width),
+            Math.abs(r.box.height - m.box.height),
+          );
+          if (off > 1) {
+            fails++;
+            lines.push(
+              `    FAIL reduced-motion-misplaced: ${Math.round(off)}px off where it rests with motion — what reduced motion leaves on screen is the base style, not the animation's end (a translate kept in the base, or a fill the reduced rule dropped)`,
+            );
+          }
+        } else if (m && forever[i]) lines.push(`    (it animates forever with motion: its place is not compared)`);
+      });
+      lines.push(
+        fails === 0
+          ? "  no fail; measured from the page, no model asked"
+          : `  ${fails} fail; measured from the page, no model asked`,
+      );
+      console.log(lines.join("\n"));
+      return fails === 0 ? 0 : 1;
+    } finally {
+      await still.close();
+      await moving.close();
+    }
+  });
+}
+
 /** The --expect-* the options carry, by name. */
 function* argvExpects(o: MotionCliOptions): Generator<string> {
   if (o.expectEasing) yield "easing";
@@ -3431,6 +3632,10 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
   try {
     captured = /(^|\/)frames\.json$/.test(o.source) ? await readFrames(o) : await captureMotion(o);
   } catch (e) {
+    // Under reduced motion a page that animates nothing is what was asked: judge where each target
+    // is from the first frame, against where it rests with motion. "no animation … nothing to
+    // sample" read as a broken page (v2 and the small-model round's reveal).
+    if (e instanceof NothingAnimatesError && o.reducedMotion && o.actions.length === 0 && !o.jev) return reducedRest(o);
     if (e instanceof SnappedError) {
       if (e.changed.length === 0 && e.heldBy.length > 0) {
         console.log(
@@ -3505,7 +3710,13 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
     jev: o.jev,
     ...(o.deviceScale !== 1 ? { frameScale: o.deviceScale } : {}),
     ...motionEasingOptions(o.expectEasing),
-    ...(o.expectOrigin ? { expectOrigin: o.expectOrigin.length === 1 ? o.expectOrigin[0]! : o.expectOrigin } : {}),
+    // Keywords and points apart: a point is a turn's pivot in the element's own units.
+    ...(o.expectOrigin
+      ? {
+          expectOrigin: o.expectOrigin.map((v) => (typeof v === "string" ? v : undefined)),
+          expectPivot: o.expectOrigin.map((v) => (v && typeof v === "object" ? v : undefined)),
+        }
+      : {}),
     ...(o.expectStartMs
       ? {
           expectStartMs: o.expectStartMs.map((v, i) =>
@@ -3731,7 +3942,7 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
       // An origin is the scale's, not the path's: nine tiles growing in place travel nothing, and
       // "--expect-origin center" read "not judged" under lines saying "grows from its centre"
       // (authoring v1). It is judged wherever a segment has a point it scales about.
-      const originRead = r.targets.some((t) => t.pivot || t.segments.some((g) => g.origin));
+      const originRead = r.targets.some((t) => t.pivot || t.growsFrom || t.segments.some((g) => g.origin));
       const unjudged = (f: string) =>
         unseen ||
         ((unfitted || easingOpen) && /easing/.test(f)) ||

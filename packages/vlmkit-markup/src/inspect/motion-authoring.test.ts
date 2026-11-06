@@ -17,6 +17,7 @@ const ref = (name: string) => join(dir, "reference", `${name}.html`);
 const mutant = (name: string) => join(dir, "mutants", `${name}.html`);
 const ref2 = (name: string) => join(dir, "v2", "reference", `${name}.html`);
 const mutant2 = (name: string) => join(dir, "v2", "mutants", `${name}.html`);
+const small = (name: string) => join(dir, "small", `${name}.html`);
 
 const motion = async (page: string, args: string[]) => {
   const lines: string[] = [];
@@ -191,4 +192,69 @@ describe("motion-authoring v2: the traps, each caught on its mutant and not on i
     assert.equal(bad.code, 1, bad.out);
     assert.match(bad.out, /FAIL covered-edge/, bad.out);
   });
+});
+
+describe("motion-authoring, the small-model round: what its agents hit", () => {
+  it("a turn's point in the SVG's own units: --expect-origin 160,170 holds, another point fails", T, async () => {
+    const good = await motion(ref2("gauge"), ["--selector", ".needle", "--expect-origin", "160,170"]);
+    assert.equal(good.code, 0, good.out);
+    assert.match(good.out, /held: --expect-origin 160,170/, good.out);
+    const off = await motion(ref2("gauge"), ["--selector", ".needle", "--expect-origin", "100,100"]);
+    assert.equal(off.code, 1, off.out);
+    assert.match(off.out, /FAIL origin-mismatch .*turns about 160,170 in its own units/, off.out);
+    // A keyword that names the wrong point says the point it does turn about, in those units.
+    const named = await motion(ref2("gauge"), ["--selector", ".needle", "--expect-origin", "center"]);
+    assert.match(named.out, /--expect-origin 160,170/, named.out);
+    // With none asked, the warning names --expect-origin first.
+    const none = await motion(ref2("gauge"), ["--selector", ".needle"]);
+    assert.match(none.out, /warn turn-off-centre .*--expect-origin 160,170 holds it there/, none.out);
+    assert.doesNotMatch(none.out, /its box grows/, none.out);
+  });
+
+  it(
+    "a pill widening from its left edge: --expect-origin left holds, right fails; no covered-edge for its round corners",
+    T,
+    async () => {
+      const args = ["--click", "button.add", "--selector", "button.add"];
+      const left = await motion(small("round-button"), [...args, "--expect-origin", "left"]);
+      assert.equal(left.code, 0, left.out);
+      assert.match(left.out, /held: --expect-origin left/, left.out);
+      assert.match(left.out, /which stays put at x = 40\)/, left.out);
+      assert.doesNotMatch(left.out, /covered-edge/, left.out);
+      const right = await motion(small("round-button"), [...args, "--expect-origin", "right"]);
+      assert.equal(right.code, 1, right.out);
+      assert.match(right.out, /FAIL origin-mismatch .*grows from its left edge/, right.out);
+    },
+  );
+
+  it("a menu closed by a second click fades out: gone at rest is taken as leaving, not a fail", T, async () => {
+    const r = await motion(ref2("menu"), ["--click", ".menu-button", "--click", ".menu-button", "--selector", ".menu"]);
+    assert.equal(r.code, 0, r.out);
+    assert.match(r.out, /warn absent-at-rest .*fades out .*taken as leaving/, r.out);
+  });
+
+  it("--reduced-motion with nothing animating judges each target from the first frame", T, async () => {
+    const boxes = Array.from({ length: 6 }, (_, i) => ["--selector", `div.feature:nth-child(${i + 1})`]).flat();
+    const good = await motion(ref2("reveal"), ["--reduced-motion", ...boxes]);
+    assert.equal(good.code, 0, good.out);
+    assert.match(good.out, /shown from the first frame .*with motion it rests at/, good.out);
+    const bad = await motion(mutant2("reveal-hidden"), ["--reduced-motion", ...boxes]);
+    assert.equal(bad.code, 1, bad.out);
+    assert.match(bad.out, /FAIL reduced-motion-hides/, bad.out);
+  });
+
+  it(
+    "an --expect-* given once is the moving targets', not a --still one's; failing, it says it was given once",
+    T,
+    async () => {
+      const base = ["--click", ".delete", "--selector", ".dialog"];
+      const still = await motion(ref("modal"), [...base, "--still", ".backdrop", "--expect-direction", "up"]);
+      assert.equal(still.code, 0, still.out);
+      const both = await motion(ref("modal"), [...base, "--selector", ".backdrop", "--expect-direction", "up"]);
+      assert.equal(both.code, 1, both.out);
+      assert.match(both.out, /--expect-direction was given once, so it is every target's/, both.out);
+      const any = await motion(ref("modal"), [...base, "--selector", ".backdrop", "--expect-duration", "250,any"]);
+      assert.equal(any.code, 0, any.out);
+    },
+  );
 });

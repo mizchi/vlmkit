@@ -218,8 +218,11 @@ export interface MotionSample {
     lines?: number;
     /** Its text overflows its own height and it clips it (overflow not visible). */
     textClipped?: boolean;
-    /** The point of its own box a 2D turn of 2° or more keeps still, as a share of the box (0..1). */
-    pivot?: { fx: number; fy: number };
+    /**
+     * The point of its own box a 2D turn of 2° or more keeps still, as a share of the box (0..1),
+     * and in its own units (`ux`, `uy`: an SVG element's user space, else px from its box's corner).
+     */
+    pivot?: { fx: number; fy: number; ux?: number; uy?: number };
   };
   /** The box may be another element's (it coincides with another target's): left out of geometry. */
   unsure?: boolean;
@@ -238,6 +241,14 @@ export const ORIGIN_NAMES = [
   "bottom-right",
 ] as const;
 export type OriginName = (typeof ORIGIN_NAMES)[number];
+/** A point in an element's own units, as transform-origin takes one. */
+export interface OriginPoint {
+  x: number;
+  y: number;
+}
+/** How far (own units) a turn's measured pivot may be from the point expected. */
+const PIVOT_TOLERANCE = 2;
+const fmtPoint = (x: number, y: number) => `${Math.round(x * 10) / 10},${Math.round(y * 10) / 10}`;
 const originAt = (name: OriginName) => ({
   fx: name.endsWith("left") ? 0 : name.endsWith("right") ? 1 : 0.5,
   fy: name.startsWith("top") ? 0 : name.startsWith("bottom") ? 1 : 0.5,
@@ -296,6 +307,8 @@ export interface MotionPathOptions {
   minFitTravelPx?: number;
   /** The point a scale must grow from (or shrink to): measured, the point of its box that stays put. */
   expectOrigin?: OriginName;
+  /** The point a turn must keep still, in the element's own units (an SVG element's viewBox units). */
+  expectPivot?: OriginPoint;
   /** When its own animation must begin (page ms): measured from the element's animation time. */
   expectStartMs?: number;
   /** Where `expectStartMs` comes from, named in a start-mismatch ("--expect-start 0 + 1 × --expect-stagger 80"). */
@@ -392,6 +405,10 @@ export interface ScaleOrigin {
 }
 
 /** "its top-right corner", "its centre", "the point 30% across and 80% down its box". */
+/** The pivot in the element's own units, for a line: " (160,170 in its own units)". */
+const ownUnits = (p: { ux?: number; uy?: number }) =>
+  p.ux !== undefined && p.uy !== undefined ? ` (${fmtPoint(p.ux, p.uy)} in its own units)` : "";
+
 export function describeOrigin(o: Pick<ScaleOrigin, "fx" | "fy" | "name">): string {
   // A point far outside the box is no transform-origin: the box moves as well as it scales (a
   // keyframe transform replacing a centring translate read "the point 1857% across", round 8).
@@ -454,7 +471,12 @@ export interface MotionPathReport {
    */
   swing?: { way: "clockwise" | "counterclockwise"; peaksDeg: number[]; restDeg: number };
   /** The point its turn keeps still (median over the frames turned 2° or more), when it turns. */
-  pivot?: Pick<ScaleOrigin, "fx" | "fy" | "name">;
+  pivot?: Pick<ScaleOrigin, "fx" | "fy" | "name"> & { ux?: number; uy?: number };
+  /**
+   * The point of its box a change of size keeps still (a width transition that widens from its left
+   * edge), as a share of the box per axis that grows (null: that axis does not change size).
+   */
+  growsFrom?: Pick<ScaleOrigin, "fx" | "fy" | "name">;
   /** On screen, when an ancestor turns it too: how far its drawn angle changes over the frames. */
   screenTurn?: { deg: number; by: string };
   /** Every run of its own animations (ms), when there is more than one. */
@@ -629,7 +651,30 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     // A face turned away at rest is the far side of what turned, not a loss.
     const goneAtRest =
       restSamples.length > 0 && restSamples.every((s) => !shown(s)) && !restSamples.some((s) => s.dom?.facingAway);
-    if (goneAtRest && motion.length > 0 && !options.exits) {
+    // Faded out over the motion's last frames (a skeleton crossfading into its content, a shimmer
+    // whose parent fades): gone at rest is where the fade ends, not a loss. A pop back to hidden
+    // (an entrance with no fill) is full opacity in its last motion frame, and still fails. Both
+    // a loader and a closed menu read "FAIL absent-at-rest" until --exits (the small-model round).
+    const motionDom = judged.filter((s) => !isRest(s) && s.dom);
+    const lastOp = motionDom.at(-1)?.dom?.opacity;
+    const fadedOut =
+      lastOp !== undefined &&
+      lastOp < 0.2 &&
+      motionDom.some((s) => s.dom!.opacity >= 0.5) &&
+      motionDom.length >= 3 &&
+      (() => {
+        // Its opacity comes down over frames, not in one step.
+        const k = motionDom.findLastIndex((s) => s.dom!.opacity >= 0.5);
+        return motionDom.slice(k + 1).some((s) => s.dom!.opacity > lastOp + 0.05 && s.dom!.opacity < 0.5);
+      })();
+    if (goneAtRest && motion.length > 0 && !options.exits && fadedOut) {
+      findings.push({
+        rule: "absent-at-rest",
+        severity: "warn",
+        atMs: restSamples[0]!.atMs,
+        message: `it fades out over the motion's last frames (opacity ${lastOp!.toFixed(2)} at ${ms(motionDom.at(-1)!.atMs)}) and is gone at rest: taken as leaving — if it should stay, that is the defect (--exits says it is meant to)`,
+      });
+    } else if (goneAtRest && motion.length > 0 && !options.exits) {
       findings.push({
         rule: "absent-at-rest",
         severity: "fail",
@@ -1041,7 +1086,13 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
       ? (() => {
           const fx = median(pivots.map((p) => p.fx)),
             fy = median(pivots.map((p) => p.fy));
-          return { fx, fy, name: nearestOrigin(fx, fy) };
+          const own = pivots.filter((p) => typeof p.ux === "number" && typeof p.uy === "number");
+          return {
+            fx,
+            fy,
+            name: nearestOrigin(fx, fy),
+            ...(own.length > 0 ? { ux: median(own.map((p) => p.ux!)), uy: median(own.map((p) => p.uy!)) } : {}),
+          };
         })()
       : undefined;
   if (options.expectOrigin && pivotReport && !reports.some((x) => x.origin)) {
@@ -1051,10 +1102,76 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
         rule: "origin-mismatch",
         severity: "fail",
         atMs: segments[0]!.startMs,
-        message: `it turns about ${describeOrigin(pivotReport).startsWith("no point") ? "a point outside its box" : `${describeOrigin(pivotReport)} (that point of its box stays put)`}, not ${describeOrigin({ ...want, name: options.expectOrigin })}: transform-origin: ${originCss(options.expectOrigin)}${sorted.some((x) => x.dom?.svg) ? " — on an SVG element transform-origin is measured from the viewBox's corner unless transform-box: fill-box, so give it fill-box, or the origin in the SVG's own units" : ""}`,
+        message: `it turns about ${describeOrigin(pivotReport).startsWith("no point") ? "a point outside its box" : `${describeOrigin(pivotReport)} (that point of its box stays put)`}${ownUnits(pivotReport)}, not ${describeOrigin({ ...want, name: options.expectOrigin })}: transform-origin: ${originCss(options.expectOrigin)}${
+          sorted.some((x) => x.dom?.svg)
+            ? // The needle turning about its base read "give it fill-box" though its origin was
+              // right: the keyword names a point of the line's box, not the dial's centre (small-model round).
+              ` — on an SVG element transform-origin is measured from the viewBox's corner unless transform-box: fill-box. If the point it turns about is the one meant, say it in the SVG's units: --expect-origin ${pivotReport.ux !== undefined ? fmtPoint(pivotReport.ux, pivotReport.uy!) : "X,Y"}`
+            : ""
+        }`,
       });
   }
-  if (options.expectOrigin && !reports.some((x) => x.origin) && !pivotReport) {
+  if (options.expectPivot) {
+    const want = options.expectPivot;
+    if (!pivotReport || pivotReport.ux === undefined)
+      findings.push({
+        rule: "origin-unchecked",
+        severity: "warn",
+        atMs: segments[0]!.startMs,
+        message: `--expect-origin ${fmtPoint(want.x, want.y)} was expected but not checked: ${
+          pivots.length === 0
+            ? "it does not turn by 2° or more in a 2D transform (a point is checked for a turn; name an edge or corner for a scale)"
+            : "its turn's point was not measured in its own units"
+        }`,
+      });
+    else if (Math.hypot(pivotReport.ux - want.x, pivotReport.uy! - want.y) > PIVOT_TOLERANCE)
+      findings.push({
+        rule: "origin-mismatch",
+        severity: "fail",
+        atMs: segments[0]!.startMs,
+        message: `it turns about ${fmtPoint(pivotReport.ux, pivotReport.uy!)} in its own units${sorted.some((x) => x.dom?.svg) ? " (the SVG's user space)" : " (px from its box's top-left corner)"}, not ${fmtPoint(want.x, want.y)}: ${
+          sorted.some((x) => x.dom?.svg)
+            ? "transform-origin on an SVG element is measured from the viewBox's corner (transform-box: view-box, the default), or from its own box with fill-box"
+            : "set transform-origin to that point"
+        }`,
+      });
+  }
+  // A box that changes size with no scale (a width transition): the edge it keeps is its origin.
+  // "--expect-origin left" read "not judged" on a pill widening from its left edge (small-model round).
+  const sized = sorted.filter((x) => x.dom && x.present >= thr && !x.unsure);
+  const growsFrom = (() => {
+    if (sized.length < 2 || reports.some((x) => x.origin) || pivotReport) return undefined;
+    const a = sized[0]!.dom!.box,
+      b = sized[sized.length - 1]!.dom!.box;
+    const axis = (lo0: number, len0: number, lo1: number, len1: number) => {
+      if (Math.abs(len1 - len0) < 4) return null;
+      const hi0 = lo0 + len0,
+        hi1 = lo1 + len1;
+      if (Math.abs(lo1 - lo0) <= 1) return 0;
+      if (Math.abs(hi1 - hi0) <= 1) return 1;
+      const mid0 = lo0 + len0 / 2,
+        mid1 = lo1 + len1 / 2;
+      return Math.abs(mid1 - mid0) <= 1 ? 0.5 : undefined;
+    };
+    const fx = axis(a.x, a.width, b.x, b.width),
+      fy = axis(a.y, a.height, b.y, b.height);
+    if (fx === undefined || fy === undefined || (fx === null && fy === null)) return undefined;
+    return { fx, fy, name: fx !== null && fy !== null ? nearestOrigin(fx, fy) : null };
+  })();
+  if (options.expectOrigin && growsFrom) {
+    const want = originAt(options.expectOrigin);
+    const off =
+      (growsFrom.fx !== null && Math.abs(growsFrom.fx - want.fx) > ORIGIN_SNAP) ||
+      (growsFrom.fy !== null && Math.abs(growsFrom.fy - want.fy) > ORIGIN_SNAP);
+    if (off)
+      findings.push({
+        rule: "origin-mismatch",
+        severity: "fail",
+        atMs: segments[0]!.startMs,
+        message: `its box grows from ${describeOrigin(growsFrom)} (that ${growsFrom.fx === null || growsFrom.fy === null ? "edge" : "point"} stays put), not ${describeOrigin({ fx: growsFrom.fx === null ? null : want.fx, fy: growsFrom.fy === null ? null : want.fy, name: options.expectOrigin })}`,
+      });
+  }
+  if (options.expectOrigin && !reports.some((x) => x.origin) && !pivotReport && !growsFrom) {
     findings.push({
       rule: "origin-unchecked",
       severity: "warn",
@@ -1324,12 +1441,19 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
           }),
         )
       : far;
-    if (far >= floor && unexplained >= floor) {
+    // Its pivot was asked for: the origin checks hold it (or fail it) there, and a needle turning
+    // about its base on purpose warned "give it --expect-still" (v2, the small-model round).
+    if (far >= floor && unexplained >= floor && !options.expectOrigin && !options.expectPivot) {
+      const where = pivotReport
+        ? `about ${describeOrigin(pivotReport).startsWith("no point") ? "a point outside its box" : describeOrigin(pivotReport)}${ownUnits(pivotReport)}`
+        : "about a point that is not its own centre";
+      const pointFlag =
+        pivotReport?.ux !== undefined ? fmtPoint(pivotReport.ux, pivotReport.uy!) : (pivotReport?.name ?? "<point>");
       findings.push({
         rule: "turn-off-centre",
         severity: "warn",
         atMs: segments[0]!.startMs,
-        message: `it turns, and its centre is carried up to ${Math.round(far)}px from where it starts: it turns about a point that is not its own centre (transform-origin)${sorted.some((x) => x.dom?.svg) ? ` — on an SVG element transform-origin is measured from the <svg>'s viewBox unless transform-box: fill-box` : ""}. If it should turn in place, give it --expect-still to make this a fail`,
+        message: `it turns, and its centre is carried up to ${Math.round(far)}px from where it starts: it turns ${where} (transform-origin)${sorted.some((x) => x.dom?.svg) ? ` — on an SVG element transform-origin is measured from the <svg>'s viewBox unless transform-box: fill-box` : ""}. If that is the point meant, --expect-origin ${pointFlag} holds it there; if it should turn in place, --expect-still makes this a fail`,
       });
     }
   }
@@ -1631,6 +1755,7 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     ...(turnReport ? { turn: turnReport } : {}),
     ...(swingReport ? { swing: swingReport } : {}),
     ...(pivotReport ? { pivot: pivotReport } : {}),
+    ...(growsFrom ? { growsFrom } : {}),
     ...(sorted.some((x) => x.dom?.turnedBy) && angles.length >= 2
       ? { screenTurn: { deg: screenTurn, by: sorted.find((x) => x.dom?.turnedBy)!.dom!.turnedBy! } }
       : {}),

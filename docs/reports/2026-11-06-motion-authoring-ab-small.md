@@ -87,3 +87,31 @@ evidence that vlmkit is what makes it possible. Briefs where the browser's own A
 a fairer test: motion a script drives, pixels a computed style does not describe, or a recording.
 
 Pages: `docs/reports/data/2026-11-06-motion-authoring-small/` (24 pages, scored as above).
+
+## Fixed after this round
+
+Every item above except the run ledger and `reduced-motion-ignored` on briefs with no policy (both
+deliberate):
+
+- **Flags given once.** An `--expect-*` given once is the moving targets', not a `--still` or
+  `--exit` target's. When one fails a target beside others, it says it was given once and how to
+  give one per target. Every per-target flag takes `any` (`--expect-duration 250,any`).
+- **A pivot in SVG units.** `--expect-origin 160,170` holds a turn to a point in the element's own
+  units, the viewBox's on SVG (2 units of tolerance). `--expect-origin center` on the needle now
+  names that point as the flag to give, instead of advising `fill-box`. `turn-off-centre` names
+  `--expect-origin` before `--expect-still`.
+- **A width change's origin.** `--expect-origin left` on a pill that widens from its left edge is
+  judged by the edge that stays: held, and `right` fails.
+- **Exits.** A target whose opacity comes down over the motion's last frames and is gone at rest
+  (a skeleton crossfading, a shimmer inside it, a menu closed by a second click) is a warn, taken as
+  leaving. An entrance that pops back to hidden is still `absent-at-rest`.
+- **`covered-edge` on a round button.** Only points inside the target's rounded corners are probed.
+- **`--reduced-motion` with nothing animating** judges each target from the first frame: not shown is
+  `reduced-motion-hides`, and more than 1px off where the page rests with motion is
+  `reduced-motion-misplaced`. It catches v2's `reveal-hidden` mutant and passes its reference.
+- **Wording.** A turned box is no longer said to grow from an edge. A settle-back "shrinks towards"
+  its origin. The scale range is in frame order, with a peak said as one. A swing "stays in place".
+  `check animation --out` points at `--frames`.
+
+`motion-authoring.test.ts` holds each, on the v1 and v2 references and mutants and on
+`fixtures/motion-authoring/small/round-button.html`.

@@ -661,12 +661,16 @@ export async function runGateCli<Report, Options>(
   const unknown = unknownGateFlags(gate, argv);
   if (unknown.length > 0) {
     // The nearest option by name, when one is close: the warning alone was missed (round 12).
+    // Two letters apart is a typo only in a long name: `--out` read "did you mean --at?" on check
+    // animation, whose output flag is --frames (the small-model round). What other commands call
+    // their output directory is named as such.
+    const names = (gate.inputs ?? []).map((i) => `--${i.name}`);
+    const outputs = ["--out", "--output", "--out-dir", "--outdir"];
     const near = unknown.flatMap((flag) => {
-      const best = (gate.inputs ?? [])
-        .map((i) => `--${i.name}`)
-        .map((name) => ({ name, d: editDistance(flag, name) }))
-        .sort((x, y) => x.d - y.d)[0];
-      return best && best.d <= 2 ? [`${flag} → ${best.name}`] : [];
+      if (outputs.includes(flag) && names.includes("--frames")) return [`${flag} → --frames`];
+      const best = names.map((name) => ({ name, d: editDistance(flag, name) })).sort((x, y) => x.d - y.d)[0];
+      const word = flag.replace(/^--/, "").length;
+      return best && best.d <= Math.min(2, Math.max(1, Math.floor(word / 3))) ? [`${flag} → ${best.name}`] : [];
     });
     (options.err ?? ((text: string) => console.error(text)))(
       `warn: ${unknown.join(", ")} ${unknown.length === 1 ? "is not an option" : "are not options"} of vlmkit ${gateCommandString(gate)} and ${unknown.length === 1 ? "was" : "were"} ignored (--help lists its options)${near.length > 0 ? `; did you mean ${near.join(", ")}?` : ""}`,

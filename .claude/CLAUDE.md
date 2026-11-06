@@ -535,9 +535,24 @@ a hidden oracle that uses plain Playwright. Measured, not to re-learn:
   - new flags: `--expect-span-of`, `--expect-lines`, `--reduced-motion`, `--expect-start +N` / `any`;
   - `interrupt-jump` fires on a leap the other way from the motion that follows;
   - `text-wrap` when a target's text runs to more lines than it should.
-- **Still open** (v2 report): an expectation given once also applies to `--still` targets, and only some
-  per-target flags take `any`. A scale's peak is the sampled frames'. `turn-off-centre` suggests
-  `--expect-still` for a turn about a point that was meant.
+- **Fixed after the small-model round:**
+  - an `--expect-*` given once is the moving targets', not a `--still` / `--exit` one's, and failing
+    one of several it says it was given once;
+  - every per-target flag takes `any`;
+  - `--expect-origin X,Y` is a turn's pivot in the element's own units (an SVG element's viewBox
+    units, as transform-origin takes them), and `turn-off-centre` and a keyword's `origin-mismatch`
+    print that point as the flag to give;
+  - `--expect-origin` on a width or height change is judged by the edge that stays;
+  - `covered-edge` probes only inside the target's rounded corners;
+  - a target that fades out over the motion's last frames and is gone at rest is a warn, taken as
+    leaving (a pop back to hidden is still a fail);
+  - `--reduced-motion` on a page where nothing animates judges each target from the first frame:
+    `reduced-motion-hides` and `reduced-motion-misplaced`, against where the page rests with motion;
+  - wording: a turned box's bounds are no longer "grows from its edge", a settle-back says
+    "shrinks towards", the scale range is in frame order, and a turn in place "stays in place";
+  - a gate's unknown `--out` points at `--frames`, and a short flag no longer gets a two-letter
+    "did you mean".
+- **Still open:** a scale's peak is the sampled frames' (said as "peaking at … in the frames measured").
 
 ## Generated figures (raster images)
 
