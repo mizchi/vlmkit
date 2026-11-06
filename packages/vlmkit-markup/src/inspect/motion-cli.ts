@@ -2469,7 +2469,10 @@ async function captureMotion(o: MotionCliOptions): Promise<Captured> {
             : forever
               ? motionInstants(startMs, endMs, 31).motion
               : [...plan.motion, plan.rest]
-      ).filter((t) => t >= clockNow);
+      )
+        // clockNow is a sum of frame times and an instant is computed from a start: the same frame can
+        // differ by an ulp, and the frame a close begins on (233.33ms on CI) was dropped by it.
+        .filter((t) => t >= clockNow - 1e-6);
       const writer = await frameWriter(resolve(o.frames), {
         tool: "inspect motion",
         url,
