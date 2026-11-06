@@ -2,7 +2,7 @@
 
 How this product landing page (review) was judged, in order. Rendered from `judgment.sqlite` by `examples/sites/judge.mjs`; the published page, with the screens the log keeps and every gate output, is <https://mizchi.github.io/vlmkit/judgment/>.
 
-**10** rounds · **183** gate runs (1 failing) · **994** screens in 167 shots (386 kept) · **167** looks · defects: **38** by eye, **3** by a gate · 13 gate false positive(s)
+**11** rounds · **184** gate runs (1 failing) · **1029** screens in 171 shots (419 kept) · **171** looks · defects: **38** by eye, **3** by a gate · 13 gate false positive(s)
 
 Brief: [`../sites/briefs/landing-review.md`](../sites/briefs/landing-review.md)
 
@@ -781,5 +781,18 @@ Brief: [`../sites/briefs/landing-review.md`](../sites/briefs/landing-review.md)
 - **S167** http://127.0.0.1:4190/?lang=en&theme=light · 375×812 · full page, 19 screen(s) ([screens](https://mizchi.github.io/vlmkit/judgment/#S167))
   - 👁 **L167**: Full-page walk, phone 375, light, English, 19 screens to the footer. As R9's S160 everywhere but the table (screens 13-14): "diff png --jev" and "inspect motion --jev" chips on one line each, the note now five lines, still one quiet paragraph above 06. No overlap, no sideways scroll.
 - **done**: R10 changes the Jev table's commands to the --jev switch (diff png --jev, inspect motion --jev) and its note to say Jev is opt-in and that inspect motion with --selector alone caught 6 of the 7. Gates clean (integrity en/light and ja/dark, copy, contrast, composition); full walks at 1280 and 375 and close-ups in both languages show no new defect.
+
+### R11 · the feature gallery link counts the four motion demos: Eighteen features / 18の機能 (reviewer)
+
+- **G184** `vlmkit check integrity 'http://127.0.0.1:4190/?lang=en&theme=light'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 3 exempted) ([output](https://mizchi.github.io/vlmkit/judgment/#G184))
+- **S168** http://127.0.0.1:4190/?lang=en&theme=light · 1280×800 · element .demo-changelog[href="./demos/"] (screens not kept)
+  - 👁 **L168**: English, light, the gallery link itself (element .demo-changelog[href="./demos/"]): "Eighteen features, one defect each →", underlined, on one line. The gallery now has 18 demos with the four motion demos.
+- **S169** http://127.0.0.1:4190/?lang=ja&theme=dark · 1280×800 · element .demo-changelog[href="./demos/"] (screens not kept)
+  - 👁 **L169**: Japanese, dark, the same link: "18の機能を、1つずつの欠陥で →", underlined, light text on the dark surface, on one line.
+- **S170** http://127.0.0.1:4190/?lang=en&theme=light · 1280×800 · full page, 14 screen(s) ([screens](https://mizchi.github.io/vlmkit/judgment/#S170))
+  - 👁 **L170**: Desktop 1280, light, English, all 14 screens. Screen 1 the dark hero with v0.25.2 in the eyebrow and the real-run panel; 2-4 the four numbers, real output's three panels and the three cases, unchanged. Screen 5: under the solitaire still the three links, the last now "Eighteen features, one defect each →" on one line, same size and underline as "Six more sites, and how each was judged". Screens 6-9 the loop, route the task, principle figure and the three cards; 10 the Jev table (four rows) and its note; 11-12 the skills section with 13 workflows and the three installers; 13-14 start now and the footer with its three links. Nothing clipped or overlapping; the only change is the count.
+- **S171** http://127.0.0.1:4190/?lang=en&theme=light · 375×812 · full page, 19 screen(s) ([screens](https://mizchi.github.io/vlmkit/judgment/#S171))
+  - 👁 **L171**: Phone 375, light, English, all 19 screens. Screens 1-7 the hero (v0.25.2), the real-run panel, real output's panels stacked, the four numbers 2x2 and the three cases, the solitaire still and its numbers, unchanged. Screen 8: the stacked links, the last "Eighteen features, one defect each →" on one line. Screens 9-12 the loop, route the task, principle and its small figure, cards one per row; 13-14 the Jev rows stacked with their labels; 15-18 the skills section (13 workflows, five categories, the guide link) and the three installers; 19 start now and the footer, one link per line. No horizontal overflow, nothing clipped.
+- **done**: R11 changes one string: the feature gallery link counts the four motion demos (Eighteen features / 18の機能), in index.html and content.js. Gated (G184 integrity, clean) and walked at desktop and phone width; the link reads right in English light and Japanese dark, and nothing else on the page moved.
 
 _The 527 screens were taken as JPEG and re-encoded as WebP (quality 0.75) after the round: 22.9 MB → 12.0 MB._
