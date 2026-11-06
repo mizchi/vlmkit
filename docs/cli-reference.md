@@ -594,6 +594,29 @@ being applied — the gate it silenced runs unmuted and the run exits non-zero,
 because a stale entry is a config defect even when the page now passes.
 Worked example: [`examples/vlmkit.gates.json`](../examples/vlmkit.gates.json).
 
+A gate entry may also be `{ "motion": { ... } }`: what a brief asks of a page's motion, per target,
+compiled to the `inspect motion` command it stands for (`gates list` prints it). Every key is
+checked, and the command is read by `inspect motion`'s own parser before anything runs, so a
+misspelt expectation is a config error naming its JSON path. Worked example: every motion-authoring
+brief, in [`fixtures/motion-authoring/vlmkit.gates.json`](../fixtures/motion-authoring/vlmkit.gates.json).
+
+```json
+{ "motion": {
+    "actions": [{ "click": ".delete" }],
+    "targets": [
+      { "selector": ".dialog", "easing": "ease-out", "duration": 250, "direction": "up" },
+      { "selector": ".backdrop", "easing": "linear", "duration": 200 },
+      { "selector": ".delete", "still": true }
+    ],
+    "baseline": ".vlmkit/motion/confirm.json" } }
+```
+
+Per target: `selector` or `track` (`[x, y, w, h]`), `name`, `easing` (one, or one per segment),
+`origin` (a keyword or `[x, y]`), `start`, `duration`, `iterations`, `direction`, `lines`, `spanOf`,
+`still`, `exit`. For the run: `actions` (`click` / `hover` / `leave` / `scroll` / `wait`),
+`stagger`, `exits`, `reducedMotion`, `upright`, `everyAction`, `start`, `end`, `at`, `viewport`,
+`deviceScale`, `baseline`, `frames`.
+
 An optional `webServer` block starts a dev server before the run and stops it
 after — including on a thrown error or Ctrl-C — so a config with URL sources is
 committable on its own instead of needing a wrapper script that does start /

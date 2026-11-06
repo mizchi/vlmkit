@@ -494,6 +494,17 @@ describe("gateReported", () => {
   const A11Y_TOUCH = "  vlmkit check a11y touch\n  inspected 6 interactive element(s)\n  ✓ 0 undersized target(s)";
   const TOKENS = "  vlmkit check tokens\n  scale: 4 8 16\n  ✗ 2 off-scale value(s)";
 
+  it("counts inspect motion's report as having run, and its usage error as not (issue #215)", () => {
+    const report = [
+      "inspect motion: mutants/tabs-ease.html — 11 frames over 333..633ms + 1 at rest (out/frames.json)",
+      '  target "span.indicator", begins at 333ms, runs 300ms: travels 345px rightwards',
+      "    FAIL easing-mismatch at 333ms: the path follows ease, not ease-in-out",
+      "  1 fail; measured from the page, no model asked",
+    ].join("\n");
+    assert.equal(gateReported(report), true);
+    assert.equal(gateReported("error: --expect-easing takes linear, ease, …; got foo\n"), false);
+  });
+
   it("counts a gate with no verdict line as having run", () => {
     for (const [name, output] of [
       ["a11y contrast", A11Y_CONTRAST],

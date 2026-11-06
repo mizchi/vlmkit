@@ -466,6 +466,10 @@ export function gateReported(output: string): boolean {
   // non-empty line, indented or not, and a harness failure prints `error: …` or a
   // raw stack and no banner. Verified across all of them rather than assumed twice.
   if (/^\s*vlmkit\s+\S/m.test(stripAnsi(output))) return true;
+  // `inspect motion` is not a registered gate and opens with `inspect motion: <page> — N frames…`.
+  // A declared { "motion": ... } entry runs it from `gates run`, and every page that failed its
+  // motion was counted "DID NOT RUN" (issue #215). Its usage errors print `error: …` and no banner.
+  if (/^\s*inspect motion: \S/m.test(stripAnsi(output))) return true;
   if (/^\s*(verdict|status):/m.test(output)) return true;
   // `--json` in the gate string: a report is a report even without prose.
   const trimmed = output.trim();

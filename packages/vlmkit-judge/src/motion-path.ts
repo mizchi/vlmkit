@@ -153,6 +153,8 @@ export interface MotionSample {
     rotated3d?: boolean;
     edgeOn?: boolean;
     facingAway?: boolean;
+    /** Its own opacity, before its ancestors': unchanged while it fades, the fade is an ancestor's. */
+    ownOpacity?: number;
     /** How far it is turned (degrees): from its normal in 3D, or its 2D rotation. */
     turnDeg?: number;
     /** A dashed stroke: the share of its line its dashes draw (0-1), and the pattern, for the message. */
@@ -891,8 +893,17 @@ export function judgeMotionPath(samples: readonly MotionSample[], options: Motio
     }
     easing = fits[0] ? { ...fits[0], channels: fits } : { skipped: skipped ?? "nothing about it changes" };
     if (expected) {
+      // Its own opacity never changes over the segment: the fade it shows is an ancestor's (a
+      // shimmer inside a skeleton that crossfades), and its own expected curve says nothing of it.
+      // A linear shimmer failed "the opacity follows ease, not linear" for its parent's fade.
+      const own = sorted
+        .filter((x) => x.atMs >= seg.startMs && x.atMs <= seg.endMs)
+        .map((x) => x.dom?.ownOpacity)
+        .filter((v): v is number => typeof v === "number");
+      const inheritedFade = own.length >= 2 && Math.max(...own) - Math.min(...own) < 0.01;
       for (const fit of fits) {
         if (fit.best === expected) continue;
+        if (fit.channel === "opacity" && inheritedFade) continue;
         // A box around the part that is not covered moves differently from the element: when
         // frames inside the segment show it not at all, say so beside the mismatch.
         const hidden =

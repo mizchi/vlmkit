@@ -1,0 +1,854 @@
+{
+  "pages": [
+    {
+      "id": "tabs",
+      "source": "reference/tabs.html",
+      "gates": [
+        {
+          "motion": {
+            "actions": [
+              {
+                "click": "button.tab:nth-child(4)"
+              }
+            ],
+            "targets": [
+              {
+                "selector": "span.indicator",
+                "easing": "ease-in-out",
+                "duration": 300,
+                "direction": "right",
+                "spanOf": "button.tab:nth-child(4)"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "tabs-ease (mutant)",
+      "source": "mutants/tabs-ease.html",
+      "gates": [
+        {
+          "motion": {
+            "actions": [
+              {
+                "click": "button.tab:nth-child(4)"
+              }
+            ],
+            "targets": [
+              {
+                "selector": "span.indicator",
+                "easing": "ease-in-out",
+                "duration": 300,
+                "direction": "right",
+                "spanOf": "button.tab:nth-child(4)"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "grid",
+      "source": "reference/grid.html",
+      "gates": [
+        {
+          "motion": {
+            "targets": [
+              {
+                "selector": ".tile:nth-child(1)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 200
+              },
+              {
+                "selector": ".tile:nth-child(2)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 100
+              },
+              {
+                "selector": ".tile:nth-child(3)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 200
+              },
+              {
+                "selector": ".tile:nth-child(4)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 100
+              },
+              {
+                "selector": ".tile:nth-child(5)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 0
+              },
+              {
+                "selector": ".tile:nth-child(6)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 100
+              },
+              {
+                "selector": ".tile:nth-child(7)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 200
+              },
+              {
+                "selector": ".tile:nth-child(8)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 100
+              },
+              {
+                "selector": ".tile:nth-child(9)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 200
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "grid-linear (mutant)",
+      "source": "mutants/grid-linear.html",
+      "gates": [
+        {
+          "motion": {
+            "targets": [
+              {
+                "selector": ".tile:nth-child(1)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 200
+              },
+              {
+                "selector": ".tile:nth-child(2)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 100
+              },
+              {
+                "selector": ".tile:nth-child(3)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 200
+              },
+              {
+                "selector": ".tile:nth-child(4)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 100
+              },
+              {
+                "selector": ".tile:nth-child(5)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 0
+              },
+              {
+                "selector": ".tile:nth-child(6)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 100
+              },
+              {
+                "selector": ".tile:nth-child(7)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 200
+              },
+              {
+                "selector": ".tile:nth-child(8)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 100
+              },
+              {
+                "selector": ".tile:nth-child(9)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 200
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "grid-backwards-ok (mutant)",
+      "source": "mutants/grid-backwards-ok.html",
+      "gates": [
+        {
+          "motion": {
+            "targets": [
+              {
+                "selector": ".tile:nth-child(1)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 200
+              },
+              {
+                "selector": ".tile:nth-child(2)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 100
+              },
+              {
+                "selector": ".tile:nth-child(3)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 200
+              },
+              {
+                "selector": ".tile:nth-child(4)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 100
+              },
+              {
+                "selector": ".tile:nth-child(5)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 0
+              },
+              {
+                "selector": ".tile:nth-child(6)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 100
+              },
+              {
+                "selector": ".tile:nth-child(7)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 200
+              },
+              {
+                "selector": ".tile:nth-child(8)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 100
+              },
+              {
+                "selector": ".tile:nth-child(9)",
+                "easing": "ease-out",
+                "origin": "center",
+                "duration": 300,
+                "start": 200
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "bell",
+      "source": "reference/bell.html",
+      "gates": [
+        {
+          "motion": {
+            "targets": [
+              {
+                "selector": ".bell-icon",
+                "direction": "clockwise",
+                "origin": "top",
+                "start": 800,
+                "duration": 700,
+                "iterations": 1
+              },
+              {
+                "selector": "button.bell",
+                "still": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "bell-centre (mutant)",
+      "source": "mutants/bell-centre.html",
+      "gates": [
+        {
+          "motion": {
+            "targets": [
+              {
+                "selector": ".bell-icon",
+                "direction": "clockwise",
+                "origin": "top",
+                "start": 800,
+                "duration": 700,
+                "iterations": 1
+              },
+              {
+                "selector": "button.bell",
+                "still": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "marquee",
+      "source": "reference/marquee.html",
+      "gates": [
+        {
+          "motion": {
+            "actions": [
+              {
+                "hover": ".strip"
+              }
+            ],
+            "targets": [
+              {
+                "selector": ".track",
+                "still": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "marquee-nopause (mutant)",
+      "source": "mutants/marquee-nopause.html",
+      "gates": [
+        {
+          "motion": {
+            "actions": [
+              {
+                "hover": ".strip"
+              }
+            ],
+            "targets": [
+              {
+                "selector": ".track",
+                "still": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "modal-open",
+      "source": "reference/modal.html",
+      "gates": [
+        {
+          "motion": {
+            "actions": [
+              {
+                "click": ".delete"
+              }
+            ],
+            "targets": [
+              {
+                "selector": ".dialog",
+                "easing": "ease-out",
+                "duration": 250,
+                "direction": "up"
+              },
+              {
+                "selector": ".backdrop",
+                "easing": "linear",
+                "duration": 200
+              },
+              {
+                "selector": ".delete",
+                "still": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "modal-close",
+      "source": "reference/modal.html",
+      "gates": [
+        {
+          "motion": {
+            "actions": [
+              {
+                "click": ".delete"
+              },
+              {
+                "click": ".cancel"
+              }
+            ],
+            "targets": [
+              {
+                "selector": ".dialog",
+                "duration": 150,
+                "exit": true
+              },
+              {
+                "selector": ".backdrop",
+                "duration": 150,
+                "exit": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "modal-blocker (mutant)",
+      "source": "mutants/modal-blocker.html",
+      "gates": [
+        {
+          "motion": {
+            "actions": [
+              {
+                "click": ".delete"
+              },
+              {
+                "click": ".cancel"
+              }
+            ],
+            "targets": [
+              {
+                "selector": ".dialog",
+                "duration": 150,
+                "exit": true
+              },
+              {
+                "selector": ".backdrop",
+                "duration": 150,
+                "exit": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "skeleton",
+      "source": "reference/skeleton.html",
+      "gates": [
+        {
+          "motion": {
+            "targets": [
+              {
+                "selector": ".shimmer",
+                "easing": "linear",
+                "duration": 1200,
+                "iterations": "infinite",
+                "direction": "right"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "skeleton-ease (mutant)",
+      "source": "mutants/skeleton-ease.html",
+      "gates": [
+        {
+          "motion": {
+            "targets": [
+              {
+                "selector": ".shimmer",
+                "easing": "linear",
+                "duration": 1200,
+                "iterations": "infinite",
+                "direction": "right"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "v2 badge",
+      "source": "v2/reference/badge.html",
+      "gates": [
+        {
+          "motion": {
+            "targets": [
+              {
+                "selector": ".badge",
+                "origin": "center",
+                "start": 1000,
+                "duration": 400
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "v2 badge-clipped (mutant)",
+      "source": "v2/mutants/badge-clipped.html",
+      "gates": [
+        {
+          "motion": {
+            "targets": [
+              {
+                "selector": ".badge",
+                "origin": "center",
+                "start": 1000,
+                "duration": 400
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "v2 gauge",
+      "source": "v2/reference/gauge.html",
+      "gates": [
+        {
+          "motion": {
+            "targets": [
+              {
+                "selector": ".needle",
+                "origin": [
+                  160,
+                  170
+                ],
+                "direction": "clockwise",
+                "easing": "ease-out",
+                "duration": 1200
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "v2 gauge-origin (mutant)",
+      "source": "v2/mutants/gauge-origin.html",
+      "gates": [
+        {
+          "motion": {
+            "targets": [
+              {
+                "selector": ".needle",
+                "origin": [
+                  160,
+                  170
+                ],
+                "direction": "clockwise",
+                "easing": "ease-out",
+                "duration": 1200
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "v2 label",
+      "source": "v2/reference/label.html",
+      "gates": [
+        {
+          "motion": {
+            "actions": [
+              {
+                "click": ".add"
+              }
+            ],
+            "targets": [
+              {
+                "selector": ".add",
+                "origin": "left",
+                "easing": "ease-out",
+                "duration": 300,
+                "lines": 1
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "v2 label-wrap (mutant)",
+      "source": "v2/mutants/label-wrap.html",
+      "gates": [
+        {
+          "motion": {
+            "actions": [
+              {
+                "click": ".add"
+              }
+            ],
+            "targets": [
+              {
+                "selector": ".add",
+                "origin": "left",
+                "easing": "ease-out",
+                "duration": 300,
+                "lines": 1
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "v2 lift",
+      "source": "v2/reference/lift.html",
+      "gates": [
+        {
+          "motion": {
+            "actions": [
+              {
+                "hover": ".plan:nth-child(2)"
+              }
+            ],
+            "targets": [
+              {
+                "selector": ".plan:nth-child(2)",
+                "origin": "center",
+                "easing": "ease-out",
+                "duration": 200
+              },
+              {
+                "selector": ".plan:nth-child(1)",
+                "still": true
+              },
+              {
+                "selector": ".plan:nth-child(3)",
+                "still": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "v2 lift-noz (mutant)",
+      "source": "v2/mutants/lift-noz.html",
+      "gates": [
+        {
+          "motion": {
+            "actions": [
+              {
+                "hover": ".plan:nth-child(2)"
+              }
+            ],
+            "targets": [
+              {
+                "selector": ".plan:nth-child(2)",
+                "origin": "center",
+                "easing": "ease-out",
+                "duration": 200
+              },
+              {
+                "selector": ".plan:nth-child(1)",
+                "still": true
+              },
+              {
+                "selector": ".plan:nth-child(3)",
+                "still": true
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "v2 menu",
+      "source": "v2/reference/menu.html",
+      "gates": [
+        {
+          "motion": {
+            "actions": [
+              {
+                "click": ".menu-button"
+              },
+              {
+                "wait": 125
+              },
+              {
+                "click": ".menu-button"
+              }
+            ],
+            "targets": [
+              {
+                "selector": ".menu",
+                "origin": "top"
+              }
+            ],
+            "exits": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "v2 menu-keyframes (mutant)",
+      "source": "v2/mutants/menu-keyframes.html",
+      "gates": [
+        {
+          "motion": {
+            "actions": [
+              {
+                "click": ".menu-button"
+              },
+              {
+                "wait": 125
+              },
+              {
+                "click": ".menu-button"
+              }
+            ],
+            "targets": [
+              {
+                "selector": ".menu",
+                "origin": "top"
+              }
+            ],
+            "exits": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "v2 reveal",
+      "source": "v2/reference/reveal.html",
+      "gates": [
+        {
+          "motion": {
+            "targets": [
+              {
+                "selector": "div.feature:nth-child(1)",
+                "direction": "up",
+                "easing": "ease-out",
+                "duration": 500
+              },
+              {
+                "selector": "div.feature:nth-child(2)",
+                "direction": "up",
+                "easing": "ease-out",
+                "duration": 500
+              },
+              {
+                "selector": "div.feature:nth-child(3)",
+                "direction": "up",
+                "easing": "ease-out",
+                "duration": 500
+              },
+              {
+                "selector": "div.feature:nth-child(4)",
+                "direction": "up",
+                "easing": "ease-out",
+                "duration": 500
+              },
+              {
+                "selector": "div.feature:nth-child(5)",
+                "direction": "up",
+                "easing": "ease-out",
+                "duration": 500
+              },
+              {
+                "selector": "div.feature:nth-child(6)",
+                "direction": "up",
+                "easing": "ease-out",
+                "duration": 500
+              }
+            ],
+            "stagger": 100
+          }
+        }
+      ]
+    },
+    {
+      "id": "v2 reveal-reduced",
+      "source": "v2/reference/reveal.html",
+      "gates": [
+        {
+          "motion": {
+            "reducedMotion": true,
+            "targets": [
+              {
+                "selector": "div.feature:nth-child(1)"
+              },
+              {
+                "selector": "div.feature:nth-child(2)"
+              },
+              {
+                "selector": "div.feature:nth-child(3)"
+              },
+              {
+                "selector": "div.feature:nth-child(4)"
+              },
+              {
+                "selector": "div.feature:nth-child(5)"
+              },
+              {
+                "selector": "div.feature:nth-child(6)"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "v2 reveal-hidden (mutant)",
+      "source": "v2/mutants/reveal-hidden.html",
+      "gates": [
+        {
+          "motion": {
+            "reducedMotion": true,
+            "targets": [
+              {
+                "selector": "div.feature:nth-child(1)"
+              },
+              {
+                "selector": "div.feature:nth-child(2)"
+              },
+              {
+                "selector": "div.feature:nth-child(3)"
+              },
+              {
+                "selector": "div.feature:nth-child(4)"
+              },
+              {
+                "selector": "div.feature:nth-child(5)"
+              },
+              {
+                "selector": "div.feature:nth-child(6)"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

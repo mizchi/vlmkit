@@ -260,6 +260,10 @@ vlmkit inspect motion attempt.html --selector .toast --expect-easing ease-out,ea
   and every rule above judges it. Position only — not its size, turn or opacity. A script's motion
   lists no animation, so give its span: `--start <ms> --end <ms>`. Saved frames (`frames.json`,
   a recording through `scan video`) take `--track` too.
+- **Write the brief's expectations down once: `{ "motion": ... }` in `vlmkit.gates.json`.** Each
+  target carries its own (`{"selector": ".menu", "origin": "top", "duration": 250}`), the entry is
+  compiled to the `inspect motion` command, and `vlmkit gates run` checks it again in CI. Mapping a
+  brief to flags by hand each session, and counting per-target lists, is what it replaces.
 - **Once the motion is right, keep it right: `--baseline <file>`.** The first passing run writes
   what each target's line measured (start, duration, travel, direction, easing, origin, pivot,
   turn, place at rest); a later run is held to it and fails `baseline-mismatch` naming what

@@ -1344,6 +1344,8 @@ Advisory: gate on check animation / check integrity --timeline.
 Measured: https://github.com/mizchi/vlmkit/blob/main/docs/reports/2026-10-18-jev-motion.md`;
 
 export class MotionUsageError extends Error {}
+/** An action's pointer is caught by another element on top of its target: a fail, not a usage error. */
+export class ActionBlockedError extends Error {}
 /** Nothing animates or transitions at load (and no action starts anything). */
 export class NothingAnimatesError extends MotionUsageError {}
 
@@ -1505,7 +1507,10 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
         // `any` leaves that segment unchecked: a brief that names the entrance's easing and not
         // the fade's had an agent guess `linear` and fail a correct page (round 2).
         const bad = names.filter((e) => e !== "any" && !(EASING_NAMES as string[]).includes(e));
-        if (bad.length > 0 || names.length === 0 || names.every((e) => e === "any")) {
+        // All `any` is one target left out when the flag is repeated per target (a declared
+        // { "motion": ... } entry writes one per target); given only once, it checks nothing, and
+        // that is refused after the loop.
+        if (bad.length > 0 || names.length === 0) {
           throw new MotionUsageError(
             `--expect-easing takes ${EASING_NAMES.join(", ")} (comma-separated per segment); got ${bad.join(", ")}${
               bad.some((b) => /cubic-bezier|linear\(|steps\(/.test(b))
@@ -1787,6 +1792,10 @@ export function parseMotionArgs(argv: string[]): MotionCliOptions {
   if (targets.length === 0 && noForbid)
     throw new MotionUsageError("nothing to check: give --target, or drop --no-forbid");
   if (expectEasing && targets.length === 0) throw new MotionUsageError("--expect-easing needs a --target to follow");
+  if (expectEasing?.length === 1 && expectEasing[0]!.every((e) => e === undefined))
+    throw new MotionUsageError(
+      "--expect-easing any, given once, checks nothing: name the curve, or leave the flag out (`any` leaves one target out when the flag is given per target)",
+    );
   if (expectEasing && expectEasing.length > 1 && expectEasing.length > targets.length) {
     throw new MotionUsageError(
       `${expectEasing.length} --expect-easing for ${targets.length} --target: give one for every target, or one per target in order`,
@@ -2137,6 +2146,32 @@ async function runAction(page: import("playwright").Page, act: MotionAction): Pr
       if (!found) throw new Error(`matches nothing on the page`);
     } else await page.evaluate((y) => window.scrollTo({ top: y, behavior: "instant" as ScrollBehavior }), act.y);
   } catch (e) {
+    // The pointer could not reach it: something else is on top of it where it would land. That is
+    // the page's defect, not the command's (a confirm dialog's backdrop left at opacity 0 over the
+    // Delete button read "error: page.click: Timeout 5000ms exceeded" and "did not run").
+    if ((act.kind === "click" || act.kind === "hover") && /Timeout/.test(String(e))) {
+      const cover = await page
+        .evaluate((sel) => {
+          const el = document.querySelector(sel);
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          if (!top || top === el || el.contains(top)) return null;
+          const name = (n: Element) =>
+            n.localName + (n.id ? `#${n.id}` : "") + [...n.classList].map((c) => `.${c}`).join("");
+          const cs = getComputedStyle(top);
+          return { by: name(top), opacity: Number(cs.opacity), visibility: cs.visibility };
+        }, act.selector)
+        .catch(() => null);
+      if (cover)
+        throw new ActionBlockedError(
+          `${describeAction(act)}: the pointer cannot reach it — ${cover.by} is on top of it at its centre${
+            cover.opacity < 0.05
+              ? ` (at opacity ${cover.opacity.toFixed(2)}: invisible, and it still takes the pointer)`
+              : ""
+          }. If ${cover.by} is meant to be gone, take it out of hit-testing too (pointer-events: none, visibility: hidden, or display: none once it has faded)`,
+        );
+    }
     throw new MotionUsageError(`${describeAction(act)}: ${(e as Error).message.split("\n")[0]}`);
   }
 }
@@ -3834,6 +3869,13 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
       console.log(`  ${e.changed.length} fail; measured from the page, no model asked`);
       return 1;
     }
+    if (e instanceof ActionBlockedError) {
+      console.log(`inspect motion: ${o.source} — an action could not reach its target`);
+      console.log(`    FAIL action-blocked: ${e.message}`);
+      console.log(`  no frames written: the motion it starts never began`);
+      console.log(`  1 fail; measured from the page, no model asked`);
+      return 1;
+    }
     if (!(e instanceof MotionUsageError)) throw e;
     console.error(`error: ${e.message}`);
     return 2;
@@ -4159,13 +4201,26 @@ async function runMotionOptions(o: MotionCliOptions, argv: string[]): Promise<nu
         ((unfitted || easingOpen) && /easing/.test(f)) ||
         (pathless && /direction/.test(f)) ||
         (/origin/.test(f) && !originRead);
-      const held = asked
-        .filter((f) => !failed.has(ruleOf(f)) && !unjudged(f))
-        .map((f) =>
-          /easing/.test(f) && easingMissed.length > 0
-            ? `${f} (not checked on ${easingMissed.map((x) => JSON.stringify(x)).join(", ")}: no curve fitted there)`
-            : f,
-        );
+      // --expect-easing repeated is one per target in order: each speaks for its own target, and one
+      // that is all `any` asks nothing (a declared { "motion": ... } entry writes one per target, and
+      // "(not checked on .delete …)" was said once per flag for one target that moves nothing).
+      const perTarget = asked.filter((f) => /^--expect-easing\b/.test(f)).length > 1;
+      // Each asked flag with the target it speaks for (the k-th --expect-easing, when per target).
+      let easingSeen = 0;
+      const askedFor = asked.map((f) => ({
+        f,
+        target: /^--expect-easing\b/.test(f) && perTarget ? r.targets[easingSeen++]?.target : undefined,
+      }));
+      const held = askedFor
+        .filter(({ f }) => !failed.has(ruleOf(f)) && !unjudged(f))
+        .filter(({ f }) => !(perTarget && /^--expect-easing (any,)*any$/.test(f)))
+        .map(({ f, target }) => {
+          if (!/easing/.test(f) || easingMissed.length === 0) return f;
+          const missed = perTarget ? (target && easingMissed.includes(target) ? [target] : []) : easingMissed;
+          return missed.length > 0
+            ? `${f} (not checked on ${missed.map((x) => JSON.stringify(x)).join(", ")}: no curve fitted there)`
+            : f;
+        });
       const skipped = asked.filter((f) => !failed.has(ruleOf(f)) && unjudged(f));
       const at = lines.findIndex((l) => /^ {2}(no fail|\d+ fail)/.test(l));
       const notes = [

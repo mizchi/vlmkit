@@ -578,6 +578,20 @@ browser's API cannot show; these are its first two tools. Measured building them
   reference passes its own baseline, and tabs-ease, bell-centre, grid-linear, gauge-origin and
   label-wrap fail it naming the change; lift-noz holds it (its defect is paint order, which
   `covered-edge` catches: a baseline keeps motion numbers, not pixels).
+- **`{ "motion": ... }` in `vlmkit.gates.json`** (issue #215, `@mizchi/vlmkit-core/motion-spec.ts`):
+  per-target expectations compiled to the `inspect motion` command line at parse time, so the plan,
+  suppressions and `gates list` see one command string; selector targets go before track ones (the
+  order the command line measures them), per-target values are filled with `any`. `gates run`
+  reads each `inspect motion` job with the motion CLI's own parser before anything runs.
+  `fixtures/motion-authoring/vlmkit.gates.json` declares all 12 briefs: every reference passes and
+  every mutant fails as compiled (`motion-spec-config.test.ts`). Declaring them found four things the
+  flags had hidden, now fixed: `--expect-easing any` was refused even as one target's entry of a
+  per-target list; `held:` repeated a per-target easing's "not checked on …" once per flag; a
+  shimmer's expected `linear` failed on its parent's fade (its own opacity never changes: that
+  fade is not its easing); and a click caught by an invisible element on top (`modal-blocker`'s
+  backdrop at opacity 0) was a usage error, exit 2 — it is `action-blocked` (fail), naming the
+  cover. `gates run` counted every failing `inspect motion` job "DID NOT RUN": its banner is
+  `inspect motion: …`, not `vlmkit …`.
 
 ## Generated figures (raster images)
 
