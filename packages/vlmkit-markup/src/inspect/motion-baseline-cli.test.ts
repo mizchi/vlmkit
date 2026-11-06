@@ -66,6 +66,8 @@ describe("inspect motion --baseline: a motion held to the run that was approved"
     );
   });
 
+  // The label's widths come from its font, which differs by machine (52px here, 54px on CI): the
+  // shape of the change is held, not its pixels.
   it("gauge and label (v2): where the needle turns and how far the button widens", T, async () => {
     await held(
       v2("reference", "gauge"),
@@ -77,7 +79,7 @@ describe("inspect motion --baseline: a motion held to the run that was approved"
       v2("reference", "label"),
       v2("mutants", "label-wrap"),
       ["--click", ".add", "--selector", ".add"],
-      /travels 52px → 27px; rests at \(114,62\) → \(89,62\)/,
+      /travels \d+px → \d+px; rests at \(\d+,62\) → \(\d+,62\)/,
     );
   });
 
