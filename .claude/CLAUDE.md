@@ -593,6 +593,25 @@ browser's API cannot show; these are its first two tools. Measured building them
   cover. `gates run` counted every failing `inspect motion` job "DID NOT RUN": its banner is
   `inspect motion: …`, not `vlmkit …`.
 
+**`vlmkit check auto <page>`** (issue #216, `src/cli/commands/auto-cli.ts`): one probe reads the page
+(text, controls, width queries, `prefers-color-scheme: dark`, animation / transition rules, scrollers,
+sticky, snap, canvas, video), `chooseGates` (pure) picks the gates with a reason each, and they run in
+parallel through the batch runner; `scan style` captures the page beside them and `check design` /
+`composition` / `color` judge its snapshot with `--from` (no page: `runJob` passes none). Not chosen,
+each named when the page suggests it: `check copy`, `verify flow`, `check layout`, `inspect motion` —
+they need an input the page cannot give. Measured building it, not to re-learn:
+
+- **A stylesheet linked from a `file:` page is cross-origin in Chromium**, so the CSSOM saw none of the
+  demo sites' width queries and `check breakpoints` was never chosen. A sheet the page cannot read is
+  read again outside it (from disk, or through the context's request) and scanned as text
+  (`scanCssText`; a count, not a parse).
+- **`check animation` only where something plays from load** (an animation rule or one running): on a
+  page whose motion is hover transitions it evaluates 0 animations. magazine's log ran it seven times
+  and each read 0; check auto leaves it out there and chooses `check motion`.
+- `auto-cli.test.ts` holds each of the six demo sites to its judgment log: every gate the log ran that
+  check auto can choose is chosen (magazine's `check animation` the one known exception, for the
+  reason above). On checkout: 12 gates, 12.6s wall against 28.4s one by one.
+
 ## Generated figures (raster images)
 
 Figures that state structure — dependencies, flows, states, sequences, measurements — are drawn with

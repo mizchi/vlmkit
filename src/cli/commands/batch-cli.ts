@@ -239,7 +239,8 @@ function runJob(job: BatchJob, cliEntry: string, json = false): Promise<BatchJob
     ...process.execArgv,
     cliEntry,
     ...tokenizeCommand(job.gate),
-    job.page,
+    // No page for a gate that reads its input from a flag (`check design --from snap.json`).
+    ...(job.page ? [job.page] : []),
     // Under `--json` the children are asked for JSON too, so the run's machine
     // output carries the gates' own envelopes instead of their terminal text.
     ...(json ? ["--json"] : []),
@@ -505,7 +506,8 @@ export function formatBatchSummary(
   options: { showOutput?: boolean; outputDir?: string } = {},
 ): string {
   const lines: string[] = [];
-  const pages = new Set(summary.jobs.map((j) => j.page));
+  // A job with no page (`check design --from snap.json`) is not a page of its own.
+  const pages = new Set(summary.jobs.map((j) => j.page).filter(Boolean));
   const gates = [...new Set(summary.jobs.map((j) => j.gate))];
   lines.push("");
   lines.push(`${BOLD}${CYAN}vlmkit batch${RESET}`);
