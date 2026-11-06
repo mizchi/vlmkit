@@ -105,6 +105,17 @@ const atNew = (page, t) =>
       a.currentTime = t;
     }
   }, t);
+// A CSS animation paused through the API outlives its animation-name: one the oracle paused is
+// cancelled once its element no longer lists it, as the browser would have dropped it.
+const dropStale = (page) =>
+  page.evaluate(() => {
+    for (const a of window.__pre ?? []) {
+      if (typeof CSSAnimation === "undefined" || !(a instanceof CSSAnimation)) continue;
+      const el = a.effect?.target;
+      const names = el ? getComputedStyle(el).animationName.split(",").map((x) => x.trim()) : [];
+      if (!names.includes(a.animationName)) a.cancel();
+    }
+  });
 const newEnd = (page) =>
   page.evaluate(() => Math.max(0, ...document.getAnimations().filter((a) => !window.__pre?.has(a)).map((a) => a.effect.getComputedTiming().endTime)));
 const near = (a, b, tol) => Math.abs(a - b) <= tol;
@@ -283,6 +294,7 @@ if (kind === "tabs") {
   ok("nothing else moves", near(del1.x, del0.x, 0.5) && near(del1.y, del0.y, 0.5), del1);
   await mark(page);
   await must("Cancel can be clicked", () => page.click("button.cancel", { timeout: 2000 }));
+  await dropStale(page);
   const closeEnd = await newEnd(page);
   const c75 = await sample(75);
   ok("closing: both half faded at 75ms", c75.dl && c75.bd && c75.dl.opacity > 0.2 && c75.dl.opacity < 0.85 && c75.bd.opacity > 0.1 && c75.bd.opacity < 0.45, { dialog: c75.dl?.opacity, backdrop: c75.bd?.opacity });

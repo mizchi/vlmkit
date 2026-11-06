@@ -112,6 +112,7 @@ The false alarms above should be fixed first. As things stand, they cost the vlm
 tool saved it.
 
 Round 2, after the fixes, with briefs built on known traps: `2026-11-05-motion-authoring-ab-v2.md` (12/12 again).
+Round 3, the same briefs on a smaller model: `2026-11-06-motion-authoring-ab-small.md` (motion right on all 24; two static misses).
 
 Pages and the oracle: `fixtures/motion-authoring/` (briefs, references, mutants, oracle) and
 `docs/reports/data/2026-11-05-motion-authoring/` (the twelve pages, scored as above).

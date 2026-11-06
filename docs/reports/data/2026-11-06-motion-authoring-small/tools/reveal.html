@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Features that slide in</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --ink: #1d2433;
+    --muted: #4a5468;
+    --accent: #2563eb;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    min-height: 800px;
+  }
+  .features {
+    margin: 120px 0 0 40px;
+    display: grid;
+    grid-template-columns: repeat(3, 360px);
+    grid-auto-rows: 160px;
+    gap: 24px;
+    padding: 0;
+    list-style: none;
+  }
+  .feature {
+    box-sizing: border-box;
+    width: 360px;
+    height: 160px;
+    margin: 0;
+    padding: 20px 24px;
+    background: var(--card);
+    border: 1px solid #dfe3ea;
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(20, 30, 50, 0.06);
+    overflow: hidden;
+    animation: feature-slide-in 500ms ease-out both;
+  }
+  .feature:nth-child(1) { animation-delay: 0ms; }
+  .feature:nth-child(2) { animation-delay: 100ms; }
+  .feature:nth-child(3) { animation-delay: 200ms; }
+  .feature:nth-child(4) { animation-delay: 300ms; }
+  .feature:nth-child(5) { animation-delay: 400ms; }
+  .feature:nth-child(6) { animation-delay: 500ms; }
+  .feature h2 {
+    margin: 0 0 8px;
+    font-size: 20px;
+    line-height: 1.25;
+    font-weight: 650;
+    color: var(--ink);
+  }
+  .feature p {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.45;
+    color: var(--muted);
+  }
+  @keyframes feature-slide-in {
+    from {
+      opacity: 0;
+      transform: translateY(32px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @media (max-width: 1247px) {
+    .features {
+      margin: 120px 0 0 16px;
+      grid-template-columns: 360px;
+      max-width: calc(100vw - 32px);
+    }
+    .feature {
+      width: auto;
+      max-width: 100%;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .feature {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
+  }
+</style>
+</head>
+<body>
+  <ul class="features">
+    <li class="feature">
+      <h2>Fast by default</h2>
+      <p>Pages load quickly because nothing is fetched that the first view does not need.</p>
+    </li>
+    <li class="feature">
+      <h2>Works offline</h2>
+      <p>Saved work stays on the device and syncs the moment a connection returns.</p>
+    </li>
+    <li class="feature">
+      <h2>Private settings</h2>
+      <p>Choices you make are kept to your account and never shared with other people.</p>
+    </li>
+    <li class="feature">
+      <h2>Clear history</h2>
+      <p>Every change is recorded with a time and an author, so nothing is lost.</p>
+    </li>
+    <li class="feature">
+      <h2>Team sharing</h2>
+      <p>Invite colleagues to a project and set what each of them is allowed to edit.</p>
+    </li>
+    <li class="feature">
+      <h2>Simple export</h2>
+      <p>Download your results as a spreadsheet or a plain text file in one click.</p>
+    </li>
+  </ul>
+</body>
+</html>

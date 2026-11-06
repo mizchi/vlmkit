@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inbox avatar with count</title>
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #f4f5f7; }
+  body { position: relative; font-family: system-ui, sans-serif; }
+
+  /* The avatar: a 64x64 circle at (100, 100). No overflow clipping, so the badge child is never cut. */
+  .avatar {
+    position: absolute;
+    left: 100px;
+    top: 100px;
+    width: 64px;
+    height: 64px;
+    box-sizing: border-box;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 35% 30%, rgba(255,255,255,0.45) 0, rgba(255,255,255,0) 45%),
+      linear-gradient(135deg, #f6b98a 0%, #c9674f 45%, #5b3a5e 100%);
+  }
+
+  /* The count badge: a red pill, 22px tall, its centre on the avatar's top-right corner (164, 100). */
+  .badge {
+    position: absolute;
+    left: 100%;
+    top: 0;
+    box-sizing: border-box;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 11px;
+    background: #e02424;
+    color: #ffffff;
+    font: 700 13px/22px system-ui, sans-serif;
+    text-align: center;
+    white-space: nowrap;
+    transform: translate(-50%, -50%) scale(0);
+    transform-origin: 50% 50%;
+    animation: pop 400ms ease-out 1000ms both;
+  }
+
+  @keyframes pop {
+    0%   { transform: translate(-50%, -50%) scale(0); }
+    70%  { transform: translate(-50%, -50%) scale(1.15); }
+    100% { transform: translate(-50%, -50%) scale(1); }
+  }
+
+</style>
+</head>
+<body>
+  <div class="avatar" role="img" aria-label="Your avatar">
+    <span class="badge" aria-label="3 unread">3</span>
+  </div>
+</body>
+</html>

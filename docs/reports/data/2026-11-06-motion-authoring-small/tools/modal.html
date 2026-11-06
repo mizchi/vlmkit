@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project settings</title>
+<style>
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: #f4f5f7;
+    color: #1d2330;
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    overflow: hidden;
+  }
+  main { padding: 120px 40px 40px; }
+  h1 { font-size: 28px; margin: 0 0 12px; }
+  p { margin: 0; max-width: 60ch; color: #4a5365; }
+
+  /* The red delete button, 40px from the top-left corner of the page. */
+  button.delete {
+    position: absolute;
+    left: 40px;
+    top: 40px;
+    margin: 0;
+    padding: 10px 18px;
+    border: 0;
+    border-radius: 6px;
+    background: #d92d20;
+    color: #fff;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  /* Closed: nothing of the overlay is drawn, hit or hovered. */
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    z-index: 100;
+  }
+  .backdrop.opening {
+    visibility: visible;
+    pointer-events: auto;
+    animation: backdrop-in 200ms linear both;
+  }
+  .backdrop.closing {
+    visibility: visible;
+    pointer-events: none;
+    animation: backdrop-out 150ms linear both;
+  }
+  @keyframes backdrop-in  { from { opacity: 0; } to { opacity: 0.5; } }
+  @keyframes backdrop-out { from { opacity: 0.5; } to { opacity: 0; } }
+
+  /* Centred 400x220 by margins, so the transform is free for the motion. */
+  .dialog {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    width: 400px;
+    height: 220px;
+    margin: -110px 0 0 -200px;
+    box-sizing: border-box;
+    padding: 28px;
+    background: #fff;
+    color: #1d2330;
+    border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    z-index: 101;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .dialog.opening {
+    visibility: visible;
+    pointer-events: auto;
+    animation: dialog-in 250ms ease-out 50ms both;
+  }
+  .dialog.closing {
+    visibility: visible;
+    pointer-events: none;
+    animation: dialog-out 150ms linear both;
+  }
+  @keyframes dialog-in {
+    from { opacity: 0; transform: translateY(24px) scale(0.95); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes dialog-out {
+    from { opacity: 1; transform: translateY(0) scale(1); }
+    to   { opacity: 0; transform: translateY(0) scale(1); }
+  }
+  .dialog h2 { font-size: 20px; margin: 0; }
+  .dialog p { color: #4a5365; margin: 0; }
+  .dialog .actions { display: flex; justify-content: flex-end; }
+  button.cancel {
+    margin: 0;
+    padding: 9px 16px;
+    border: 1px solid #cfd4dd;
+    border-radius: 6px;
+    background: #fff;
+    color: #1d2330;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+  <button class="delete" type="button">Delete project</button>
+
+  <main>
+    <h1>Project settings</h1>
+    <p>Manage the name, members and visibility of this project.</p>
+  </main>
+
+  <div class="backdrop" aria-hidden="true"></div>
+
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+    <h2 id="confirm-title">Delete this project?</h2>
+    <p>This removes the project and all of its files.</p>
+    <div class="actions">
+      <button class="cancel" type="button">Cancel</button>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var deleteBtn = document.querySelector('button.delete');
+      var backdrop = document.querySelector('div.backdrop');
+      var dialog = document.querySelector('div.dialog');
+      var cancelBtn = document.querySelector('button.cancel');
+
+      deleteBtn.addEventListener('click', function () {
+        if (dialog.classList.contains('opening')) return;
+        backdrop.classList.remove('closing');
+        dialog.classList.remove('closing');
+        backdrop.classList.add('opening');
+        dialog.classList.add('opening');
+      });
+
+      cancelBtn.addEventListener('click', function () {
+        backdrop.classList.remove('opening');
+        dialog.classList.remove('opening');
+        backdrop.classList.add('closing');
+        dialog.classList.add('closing');
+      });
+
+      // Once the close animations end, drop the state classes so nothing is left over the page.
+      backdrop.addEventListener('animationend', function (e) {
+        if (e.animationName === 'backdrop-out') backdrop.classList.remove('closing');
+      });
+      dialog.addEventListener('animationend', function (e) {
+        if (e.animationName === 'dialog-out') dialog.classList.remove('closing');
+      });
+    })();
+  </script>
+</body>
+</html>

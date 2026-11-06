@@ -2882,8 +2882,11 @@ function growsFromEdge(t: {
     const endA = a[axis] + a[size]! / 2;
     const endB = b[axis] + b[size]! / 2;
     const edge = Math.abs(startB - startA) <= 1 ? lo : Math.abs(endB - endA) <= 1 ? hi : null;
+    // Where the edge stays, as a number: an agent took "stays put" for the 40px a brief asked for when
+    // the box sat at 41 (a card's 1px border; motion-authoring small-model round).
+    const at = edge === lo ? startA : endA;
     if (edge)
-      return ` (its centre: its box ${grew > 0 ? "grows" : "shrinks"} ${Math.round(Math.abs(grew))}px from its ${edge} edge, which stays put)`;
+      return ` (its centre: its box ${grew > 0 ? "grows" : "shrinks"} ${Math.round(Math.abs(grew))}px from its ${edge} edge, which stays put at ${axis} = ${Math.round(at * 10) / 10})`;
   }
   return "";
 }

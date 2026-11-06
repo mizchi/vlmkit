@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notification bell</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --surface: #ffffff;
+    --ink: #1f2330;
+    --accent: #2563eb;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+    min-height: 800px;
+  }
+
+  header.app-header {
+    position: relative;
+    height: 72px;
+    display: flex;
+    align-items: center;
+    padding: 0 32px;
+    background: var(--surface);
+    border-bottom: 1px solid #e2e5ea;
+  }
+  header.app-header h1 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+  }
+
+  /* 48x48 button, right edge 32px from the viewport's right, top 24px from the top. */
+  button.bell {
+    position: absolute;
+    top: 24px;
+    right: 32px;
+    width: 48px;
+    height: 48px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 12px;
+    background: #eef2ff;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  button.bell:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* 28x28, centred in the 48x48 button (10px each side). Origin: top centre, where a bell hangs. */
+  .bell-icon {
+    display: block;
+    width: 28px;
+    height: 28px;
+    transform-origin: 50% 0;
+    animation: bell-ring 700ms ease-in-out 800ms 1 normal both;
+  }
+
+  /* Five swings of 140ms each: right to 14deg, left to 12deg, right to 8deg, left to 4deg, rest. */
+  @keyframes bell-ring {
+    0%   { transform: rotate(0deg); }
+    20%  { transform: rotate(14deg); }
+    40%  { transform: rotate(-12deg); }
+    60%  { transform: rotate(8deg); }
+    80%  { transform: rotate(-4deg); }
+    100% { transform: rotate(0deg); }
+  }
+</style>
+</head>
+<body>
+  <header class="app-header">
+    <h1>Inbox</h1>
+    <button class="bell" type="button" aria-label="Notifications">
+      <svg class="bell-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+        <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+      </svg>
+    </button>
+  </header>
+</body>
+</html>

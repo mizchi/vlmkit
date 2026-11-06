@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A loading card</title>
+<style>
+  :root {
+    --page: #eceef1;
+    --card: #ffffff;
+    --bar: #dde1e7;
+    --shine: rgba(255, 255, 255, 0.85);
+    --ink: #1d2330;
+    --muted: #5b6474;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { margin: 0; }
+
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    min-height: 800px;
+    width: 1280px;
+  }
+
+  /* 360px card, 40px from the top and left of the page. */
+  .card {
+    position: absolute;
+    left: 40px;
+    top: 40px;
+    width: 360px;
+    padding: 20px;
+    background: var(--card);
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(20, 30, 50, 0.08), 0 4px 14px rgba(20, 30, 50, 0.06);
+    display: grid;
+  }
+
+  /* Loading state: three grey bars, a highlight sweeping across them. */
+  .skeleton {
+    grid-area: 1 / 1;
+    position: relative;
+    overflow: hidden;
+    animation: skeleton-out 300ms ease 1500ms forwards;
+  }
+
+  .bar {
+    display: block;
+    height: 16px;
+    border-radius: 8px;
+    background: var(--bar);
+    margin-bottom: 12px;
+  }
+  .bar:last-child { margin-bottom: 0; }
+  .bar.w1 { width: 100%; }
+  .bar.w2 { width: 70%; }
+  .bar.w3 { width: 45%; }
+
+  /* 80px band. At 0 it lies wholly left of the bars (right edge at -20px);
+     at the end of the sweep it lies wholly right of them (left edge at 340px,
+     bars end at 320px). Linear, constant speed, 1200ms per crossing. */
+  .shimmer {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 80px;
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      var(--shine) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    transform: translateX(-100px);
+    animation: sweep 1200ms linear infinite;
+    pointer-events: none;
+  }
+
+  /* Loaded state: the real content, in the same place as the skeleton. */
+  .content {
+    grid-area: 1 / 1;
+    opacity: 0;
+    animation: content-in 300ms ease 1500ms forwards;
+  }
+
+  .content h2 {
+    margin: 0 0 8px;
+    font-size: 18px;
+    line-height: 24px;
+    font-weight: 600;
+  }
+
+  .content p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--muted);
+  }
+
+  @keyframes sweep {
+    from { transform: translateX(-100px); }
+    to   { transform: translateX(340px); }
+  }
+
+  @keyframes skeleton-out {
+    from { opacity: 1; visibility: visible; }
+    to   { opacity: 0; visibility: hidden; }
+  }
+
+  @keyframes content-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  /* Reduced motion: the highlight stays still, over the bars; the content still arrives. */
+  @media (prefers-reduced-motion: reduce) {
+    .shimmer {
+      animation: none;
+      transform: translateX(120px);
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="skeleton" aria-hidden="true">
+      <span class="bar w1"></span>
+      <span class="bar w2"></span>
+      <span class="bar w3"></span>
+      <span class="shimmer"></span>
+    </div>
+    <div class="content">
+      <h2>Quarterly revenue</h2>
+      <p>Up 12% on the same quarter last year.</p>
+      <p>Updated a few minutes ago from the ledger.</p>
+    </div>
+  </div>
+</body>
+</html>

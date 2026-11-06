@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add to cart</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    width: 1280px;
+    height: 800px;
+    background: #f3f4f6;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: #111827;
+  }
+  .card {
+    position: relative;
+    margin: 0;
+    width: 320px;
+    height: 300px;
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .card .media {
+    display: block;
+    width: 100%;
+    height: 160px;
+    background: linear-gradient(135deg, #bfdbfe, #93c5fd);
+  }
+  .card .title {
+    position: absolute;
+    left: 24px;
+    top: 184px;
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 24px;
+  }
+  .card .price {
+    position: absolute;
+    left: 24px;
+    top: 220px;
+    margin: 0;
+    font-size: 16px;
+    line-height: 22px;
+    color: #374151;
+  }
+  button.add {
+    position: absolute;
+    left: 40px;
+    top: 40px;
+    width: 44px;
+    height: 44px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 22px;
+    background: #2563eb;
+    color: #ffffff;
+    overflow: hidden;
+    white-space: nowrap;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    transition: width 300ms ease-out;
+    font: inherit;
+  }
+  button.add .icon {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: 500;
+    line-height: 1;
+  }
+  button.add .label {
+    flex: 0 0 auto;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 44px;
+    padding-right: 16px;
+    opacity: 0;
+    transition: opacity 300ms ease-out;
+  }
+  button.add.added {
+    width: 180px;
+  }
+  button.add.added .label {
+    opacity: 1;
+  }
+</style>
+</head>
+<body>
+<article class="card">
+  <span class="media" aria-hidden="true"></span>
+  <h2 class="title">Trail Runner</h2>
+  <p class="price">$89.00</p>
+  <button class="add" type="button" aria-label="Add to cart"><span class="icon" aria-hidden="true">+</span><span class="label">Added to cart</span></button>
+</article>
+<script>
+  document.querySelector('button.add').addEventListener('click', function (e) {
+    e.currentTarget.classList.add('added');
+  });
+</script>
+</body>
+</html>

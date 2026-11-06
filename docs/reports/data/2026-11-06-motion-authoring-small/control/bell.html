@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notification bell</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --ink: #1f2430;
+    --bell: #3b4250;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+    width: 1280px;
+    height: 800px;
+    overflow: hidden;
+  }
+  header.app-header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1280px;
+    height: 72px;
+    background: #ffffff;
+    border-bottom: 1px solid #e3e6eb;
+  }
+  header.app-header .title {
+    position: absolute;
+    left: 32px;
+    top: 22px;
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+  }
+  /* 48x48, right edge 32px from the viewport's right (1280 - 32 - 48 = 1200),
+     top edge 24px from the top. The button never moves. */
+  button.bell {
+    position: absolute;
+    left: 1200px;
+    top: 24px;
+    width: 48px;
+    height: 48px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  button.bell:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+  }
+  /* 28x28, centred in the 48x48 button: a 10px inset on each side. */
+  .bell-icon {
+    display: block;
+    width: 28px;
+    height: 28px;
+    color: var(--bell);
+    fill: currentColor;
+    /* the top centre of the icon, where a bell hangs */
+    transform-origin: 50% 0;
+    transform: rotate(0deg);
+    animation: bell-ring 700ms ease-in-out 800ms 1 backwards;
+  }
+  /* 700ms from the first swing to rest: right 14, left 12, right 8, left 4, upright. */
+  @keyframes bell-ring {
+    0%   { transform: rotate(0deg); }
+    25%  { transform: rotate(14deg); }
+    50%  { transform: rotate(-12deg); }
+    75%  { transform: rotate(8deg); }
+    88%  { transform: rotate(-4deg); }
+    100% { transform: rotate(0deg); }
+  }
+</style>
+</head>
+<body>
+  <header class="app-header">
+    <h1 class="title">Dashboard</h1>
+    <button class="bell" type="button" aria-label="Notifications">
+      <svg class="bell-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6V11c0-3.07-1.64-5.64-4.5-6.32V4a1.5 1.5 0 0 0-3 0v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+      </svg>
+    </button>
+  </header>
+</body>
+</html>

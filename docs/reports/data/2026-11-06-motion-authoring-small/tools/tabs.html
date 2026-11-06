@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings tabs</title>
+<style>
+  :root {
+    --ink: #1d2433;
+    --muted: #5b6475;
+    --line: #d9dde5;
+    --accent: #2563eb;
+    --surface: #ffffff;
+    --page: #f5f6f8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #e6e9ef;
+      --muted: #a4acbb;
+      --line: #3a4150;
+      --accent: #7aa7ff;
+      --surface: #171b24;
+      --page: #0f131a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #e6e9ef;
+    --muted: #a4acbb;
+    --line: #3a4150;
+    --accent: #7aa7ff;
+    --surface: #171b24;
+    --page: #0f131a;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { margin: 0; }
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    min-height: 800px;
+  }
+
+  /* The tabs sit at 40px / 40px from the top-left of the page. */
+  .screen { padding: 40px; }
+
+  nav.tabs {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    width: max-content;
+  }
+
+  button.tab {
+    appearance: none;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.25;
+    padding: 12px 20px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  button.tab[aria-selected="true"] {
+    color: var(--ink);
+  }
+  button.tab:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  /* Bar under the selected tab: 3px tall, bottom on the tabs' bottom edge.
+     Left and width are set by the script from the selected tab's box. */
+  span.indicator {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 3px;
+    width: 0;
+    background: var(--accent);
+    transform: translateX(0);
+    transition: transform 300ms ease-in-out, width 300ms ease-in-out;
+    pointer-events: none;
+  }
+
+  .panel {
+    margin-top: 32px;
+    max-width: 640px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 24px;
+  }
+  .panel h2 { margin: 0 0 8px; font-size: 20px; }
+  .panel p { margin: 0; color: var(--muted); }
+
+  @media (prefers-reduced-motion: reduce) {
+    span.indicator { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="screen">
+  <nav class="tabs" role="tablist" aria-label="Settings sections">
+    <button class="tab" role="tab" type="button" aria-selected="true" id="tab-overview" aria-controls="panel-overview">Overview</button>
+    <button class="tab" role="tab" type="button" aria-selected="false" id="tab-activity" aria-controls="panel-activity">Activity</button>
+    <button class="tab" role="tab" type="button" aria-selected="false" id="tab-settings" aria-controls="panel-settings">Settings</button>
+    <button class="tab" role="tab" type="button" aria-selected="false" id="tab-billing" aria-controls="panel-billing">Billing and invoices</button>
+    <span class="indicator" aria-hidden="true"></span>
+  </nav>
+
+  <section class="panel" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview">
+    <h2>Overview</h2>
+    <p>Your workspace is on the Team plan. Three members are active this month.</p>
+  </section>
+  <section class="panel" id="panel-activity" role="tabpanel" aria-labelledby="tab-activity" hidden>
+    <h2>Activity</h2>
+    <p>The last sign-in was from a new device two hours ago.</p>
+  </section>
+  <section class="panel" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
+    <h2>Settings</h2>
+    <p>Workspace name, time zone and default language.</p>
+  </section>
+  <section class="panel" id="panel-billing" role="tabpanel" aria-labelledby="tab-billing" hidden>
+    <h2>Billing and invoices</h2>
+    <p>The next invoice is issued on the first day of the month.</p>
+  </section>
+</div>
+
+<script>
+(function () {
+  var nav = document.querySelector('nav.tabs');
+  var indicator = nav.querySelector('span.indicator');
+  var tabs = Array.prototype.slice.call(nav.querySelectorAll('button.tab'));
+
+  // Place the indicator under a tab: its left edge and width match the tab,
+  // expressed relative to the nav (the indicator's containing block).
+  function place(tab, instant) {
+    var navBox = nav.getBoundingClientRect();
+    var box = tab.getBoundingClientRect();
+    if (instant) {
+      // Set without a transition: the first placement is not a move.
+      indicator.style.transition = 'none';
+      indicator.style.width = box.width + 'px';
+      indicator.style.transform = 'translateX(' + (box.left - navBox.left) + 'px)';
+      void indicator.offsetWidth;
+      indicator.style.transition = '';
+      return;
+    }
+    indicator.style.width = box.width + 'px';
+    indicator.style.transform = 'translateX(' + (box.left - navBox.left) + 'px)';
+  }
+
+  function select(tab) {
+    tabs.forEach(function (t) {
+      var on = t === tab;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+      var panel = document.getElementById(t.getAttribute('aria-controls'));
+      if (panel) panel.hidden = !on;
+    });
+    place(tab);
+  }
+
+  tabs.forEach(function (tab) {
+    tab.addEventListener('click', function () { select(tab); });
+  });
+
+  // Initial position without an animation: Overview is selected on open.
+  place(tabs[0], true);
+
+  window.addEventListener('resize', function () {
+    place(nav.querySelector('button.tab[aria-selected="true"]'), true);
+  });
+})();
+</script>
+</body>
+</html>

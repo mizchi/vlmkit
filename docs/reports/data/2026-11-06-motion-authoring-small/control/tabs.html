@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings tabs</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #ffffff; color: #111827;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  nav.tabs { position: relative; display: flex; margin: 40px 0 0 40px; width: max-content; }
+  nav.tabs button.tab {
+    margin: 0; border: 0; border-radius: 0; background: none;
+    padding: 12px 20px; font: inherit; font-size: 16px; line-height: 20px;
+    color: #4b5563; cursor: pointer; white-space: nowrap;
+  }
+  nav.tabs button.tab[aria-selected="true"] { color: #111827; }
+  nav.tabs button.tab:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
+  span.indicator {
+    position: absolute; left: 0; bottom: 0; height: 3px; width: 0;
+    background: #2563eb; pointer-events: none;
+    transition: left 300ms ease-in-out, width 300ms ease-in-out;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    span.indicator { transition: none; }
+  }
+  main.panel { margin: 32px 0 0 40px; max-width: 640px; }
+  main.panel h2 { font-size: 20px; margin: 0 0 8px; }
+  main.panel p { font-size: 15px; line-height: 22px; margin: 0; color: #374151; }
+</style>
+</head>
+<body>
+<nav class="tabs" role="tablist">
+  <button class="tab" role="tab" type="button" aria-selected="true">Overview</button>
+  <button class="tab" role="tab" type="button" aria-selected="false">Activity</button>
+  <button class="tab" role="tab" type="button" aria-selected="false">Settings</button>
+  <button class="tab" role="tab" type="button" aria-selected="false">Billing and invoices</button>
+  <span class="indicator" aria-hidden="true"></span>
+</nav>
+<main class="panel">
+  <h2>Account overview</h2>
+  <p>Your workspace is on the Team plan. Review recent activity, change preferences, or download past invoices from the tabs above.</p>
+</main>
+<script>
+  (function () {
+    var nav = document.querySelector('nav.tabs');
+    var indicator = nav.querySelector('span.indicator');
+    var tabs = Array.prototype.slice.call(nav.querySelectorAll('button.tab'));
+
+    function place(tab) {
+      // Subpixel positions from the layout, relative to the nav (its offset parent).
+      var navBox = nav.getBoundingClientRect();
+      var tabBox = tab.getBoundingClientRect();
+      indicator.style.left = (tabBox.left - navBox.left) + 'px';
+      indicator.style.width = tabBox.width + 'px';
+    }
+
+    // Initial placement without animating from nothing.
+    indicator.style.transition = 'none';
+    place(tabs.filter(function (t) { return t.getAttribute('aria-selected') === 'true'; })[0] || tabs[0]);
+    void indicator.offsetWidth; // force layout so the placement is committed
+    indicator.style.transition = '';
+
+    tabs.forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        tabs.forEach(function (t) { t.setAttribute('aria-selected', t === tab ? 'true' : 'false'); });
+        place(tab);
+      });
+    });
+  })();
+</script>
+</body>
+</html>

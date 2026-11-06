@@ -125,3 +125,5 @@ These are the next fixes:
   - `check integrity` at the brief's one viewport.
 
 Pages and the oracle: `fixtures/motion-authoring/v2/` and `docs/reports/data/2026-11-05-motion-authoring-v2/`.
+
+A smaller model on the same briefs: `2026-11-06-motion-authoring-ab-small.md`.

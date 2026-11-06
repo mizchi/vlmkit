@@ -519,6 +519,12 @@ a hidden oracle that uses plain Playwright. Measured, not to re-learn:
   the 12 briefs, and the control agent was slower only on v2's reveal. What it gives is named, repeatable checks
   the agent did not write (`held: …`). A difference in success rate needs a weaker model, or briefs where the
   browser's API cannot show the mistake.
+- **A smaller model does not change it** (`docs/reports/2026-11-06-motion-authoring-ab-small.md`, the same 12 briefs):
+  every page's motion was right in both groups. The misses were static: both wrote `li.feature` for the brief's
+  `div.feature`, and the vlmkit agent left a button at 41 for 40 (a card's 1px border), reading "stays put" as "at 40".
+  So the edge that stays is now said with its place. Control was 1.5-5x faster. The oracle's fault found there:
+  a CSS animation paused through the API outlives its `animation-name`, so `oracle.mjs` drops it after a class swap
+  (`dropStale`), as v2's did.
 - **What the agents' friction fixed:**
   - a swing is judged by the way it turns first, with its turning points, and a turn's pivot is held to
     `--expect-origin`;

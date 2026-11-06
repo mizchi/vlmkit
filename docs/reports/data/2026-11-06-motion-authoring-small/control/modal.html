@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project settings</title>
+<style>
+  html, body { margin: 0; padding: 0; }
+  body {
+    width: 1280px;
+    height: 800px;
+    overflow: hidden;
+    position: relative;
+    background: #f4f5f7;
+    color: #1d1f24;
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+
+  /* The page itself */
+  button.delete {
+    position: absolute;
+    left: 40px;
+    top: 40px;
+    margin: 0;
+    padding: 10px 18px;
+    border: 0;
+    border-radius: 4px;
+    background: #d93025;
+    color: #fff;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .project-title {
+    position: absolute;
+    left: 40px;
+    top: 120px;
+    margin: 0;
+    font-size: 28px;
+    font-weight: 700;
+  }
+  .project-note {
+    position: absolute;
+    left: 40px;
+    top: 170px;
+    margin: 0;
+    color: #555b66;
+  }
+
+  /* Backdrop: transparent -> 50% black, linear, 200ms, starts on click. */
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    opacity: 0;
+    pointer-events: none;
+  }
+  body.is-open .backdrop {
+    animation: backdrop-in 200ms linear forwards;
+    pointer-events: auto;
+  }
+  body.is-closing .backdrop {
+    animation: backdrop-out 150ms linear forwards;
+    pointer-events: none;
+  }
+
+  /* Dialog wrapper: centres the 400x220 dialog in the viewport. */
+  .dialog-wrap {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .dialog {
+    box-sizing: border-box;
+    width: 400px;
+    height: 220px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+    opacity: 0;
+  }
+  .dialog p {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+  }
+  .dialog .actions {
+    display: flex;
+    justify-content: flex-end;
+  }
+  button.cancel {
+    margin: 0;
+    padding: 9px 16px;
+    border: 1px solid #b8bec9;
+    border-radius: 4px;
+    background: #fff;
+    color: #1d1f24;
+    font: inherit;
+    cursor: pointer;
+  }
+  body.is-open .dialog-wrap {
+    pointer-events: none;
+  }
+  body.is-open .dialog {
+    animation: dialog-in 250ms ease-out 50ms both;
+    pointer-events: auto;
+  }
+  body.is-closing .dialog {
+    animation: dialog-out 150ms linear forwards;
+    pointer-events: none;
+  }
+
+  @keyframes backdrop-in {
+    from { opacity: 0; }
+    to   { opacity: 0.5; }
+  }
+  @keyframes backdrop-out {
+    from { opacity: 0.5; }
+    to   { opacity: 0; }
+  }
+  @keyframes dialog-in {
+    from { opacity: 0; transform: translateY(24px) scale(0.95); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes dialog-out {
+    from { opacity: 1; }
+    to   { opacity: 0; }
+  }
+</style>
+</head>
+<body>
+  <button type="button" class="delete">Delete project</button>
+  <h1 class="project-title">Atlas website</h1>
+  <p class="project-note">Owned by the design team. Last edited yesterday.</p>
+
+  <div class="backdrop"></div>
+  <div class="dialog-wrap">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-q">
+      <p id="confirm-q">Delete this project? This cannot be undone.</p>
+      <div class="actions">
+        <button type="button" class="cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  (function () {
+    var body = document.body;
+    var del = document.querySelector('button.delete');
+    var cancel = document.querySelector('button.cancel');
+    var backdrop = document.querySelector('.backdrop');
+
+    del.addEventListener('click', function () {
+      body.classList.remove('is-closing');
+      body.classList.add('is-open');
+    });
+
+    cancel.addEventListener('click', function () {
+      if (!body.classList.contains('is-open')) return;
+      body.classList.add('is-closing');
+    });
+
+    // When the closing fade ends, the overlay is gone: reset to the idle state.
+    backdrop.addEventListener('animationend', function (e) {
+      if (e.animationName === 'backdrop-out') {
+        body.classList.remove('is-closing', 'is-open');
+      }
+    });
+  })();
+</script>
+</body>
+</html>

@@ -176,6 +176,8 @@ describe("motion-authoring v2: the traps, each caught on its mutant and not on i
     const args = ["--click", ".add", "--selector", ".add", "--expect-lines", "1"];
     const good = await motion(ref2("label"), args);
     assert.equal(good.code, 0, good.out);
+    // The edge that stays is said with its place: a page 1px off the brief's 40 read "stays put".
+    assert.match(good.out, /from its left edge, which stays put at x = 40\)/, good.out);
     const bad = await motion(mutant2("label-wrap"), args);
     assert.equal(bad.code, 1, bad.out);
     assert.match(bad.out, /FAIL lines-mismatch/, bad.out);
