@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Features that slide in</title>
+<style>
+  :root {
+    --surface: #ffffff;
+    --ink: #1a1d24;
+    --muted: #4a5160;
+    --border: #d5d9e2;
+    --accent: #2457d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --surface: #161a22;
+      --ink: #eef1f6;
+      --muted: #b4bccb;
+      --border: #333a48;
+      --accent: #7aa2ff;
+    }
+  }
+  :root[data-theme="dark"] {
+    --surface: #161a22;
+    --ink: #eef1f6;
+    --muted: #b4bccb;
+    --border: #333a48;
+    --accent: #7aa2ff;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+  }
+
+  body {
+    background: var(--surface);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    width: 1280px;
+    height: 800px;
+    overflow: hidden;
+  }
+
+  .features {
+    position: absolute;
+    left: 40px;
+    top: 120px;
+    width: 1128px;
+    height: 344px;
+    display: grid;
+    grid-template-columns: repeat(3, 360px);
+    grid-template-rows: 160px 160px;
+    gap: 24px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .feature {
+    width: 360px;
+    height: 160px;
+    margin: 0;
+    padding: 20px 22px;
+    overflow: hidden;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    animation-name: slide-in;
+    animation-duration: 500ms;
+    animation-timing-function: ease-out;
+    animation-fill-mode: both;
+    animation-iteration-count: 1;
+  }
+
+  .feature:nth-child(1) { animation-delay: 0ms; }
+  .feature:nth-child(2) { animation-delay: 100ms; }
+  .feature:nth-child(3) { animation-delay: 200ms; }
+  .feature:nth-child(4) { animation-delay: 300ms; }
+  .feature:nth-child(5) { animation-delay: 400ms; }
+  .feature:nth-child(6) { animation-delay: 500ms; }
+
+  .feature h2 {
+    margin: 0 0 10px;
+    font-size: 20px;
+    line-height: 1.25;
+    font-weight: 650;
+    color: var(--accent);
+  }
+
+  .feature p {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--muted);
+  }
+
+  @keyframes slide-in {
+    from {
+      opacity: 0;
+      transform: translateY(32px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .feature {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
+  }
+</style>
+</head>
+<body>
+  <ul class="features">
+    <li class="feature">
+      <h2>Fast by default</h2>
+      <p>Pages load quickly because nothing is shipped that the first view does not need.</p>
+    </li>
+    <li class="feature">
+      <h2>Clear structure</h2>
+      <p>Every section has a heading, and headings follow the order of the content.</p>
+    </li>
+    <li class="feature">
+      <h2>Works offline</h2>
+      <p>Once opened, the page keeps working without a network connection.</p>
+    </li>
+    <li class="feature">
+      <h2>Accessible</h2>
+      <p>Keyboard support, readable contrast and respect for reduced motion come built in.</p>
+    </li>
+    <li class="feature">
+      <h2>Easy to change</h2>
+      <p>Colours and spacing live in a few tokens, so a restyle touches one place.</p>
+    </li>
+    <li class="feature">
+      <h2>Yours to keep</h2>
+      <p>The whole page is one file with no build step and no external dependencies.</p>
+    </li>
+  </ul>
+</body>
+</html>

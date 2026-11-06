@@ -506,6 +506,54 @@ Measured (`docs/reports/2026-10-18-jev-motion.md`), not to re-learn:
   (suspect), `counter-rotation-drift` (warn), 240 rules, none of the rounds 16-18 rules firing on the repo's 72
   other correct animated pages; a counter-rotation's own turn is not blamed on a wrong sign.
 
+**Writing motion from a brief, with vlmkit and without** (`fixtures/motion-authoring/`, v1 and v2; reports
+`docs/reports/2026-11-05-motion-authoring-ab-v{1,2}.md`). The repair rounds gave agents a broken page. This A/B
+gives fresh agents only a brief, half of them with vlmkit and half with only Playwright, and scores them with
+a hidden oracle that uses plain Playwright. Measured, not to re-learn:
+
+- **24 of 24 pages correct on both sides,** in v1 and in v2, where every brief was built on a trap the repair
+  rounds had found (a lifted card under its neighbour, a clipped badge, an SVG pivot, a menu restarting, a
+  label wrapping, reduced motion hiding everything). With the default model, pausing and seeking
+  `document.getAnimations()` measures CSS animation exactly, and the agents knew the traps.
+- **So vlmkit does not raise the success rate here; it costs more time.** It took 1.1-2.9x as long on 11 of
+  the 12 briefs, and the control agent was slower only on v2's reveal. What it gives is named, repeatable checks
+  the agent did not write (`held: …`). A difference in success rate needs a weaker model, or briefs where the
+  browser's API cannot show the mistake.
+- **A smaller model does not change it** (`docs/reports/2026-11-06-motion-authoring-ab-small.md`, the same 12 briefs):
+  every page's motion was right in both groups. The misses were static: both wrote `li.feature` for the brief's
+  `div.feature`, and the vlmkit agent left a button at 41 for 40 (a card's 1px border), reading "stays put" as "at 40".
+  So the edge that stays is now said with its place. Control was 1.5-5x faster. The oracle's fault found there:
+  a CSS animation paused through the API outlives its `animation-name`, so `oracle.mjs` drops it after a class swap
+  (`dropStale`), as v2's did.
+- **What the agents' friction fixed:**
+  - a swing is judged by the way it turns first, with its turning points, and a turn's pivot is held to
+    `--expect-origin`;
+  - `size-jump` ignores its own scale and turn;
+  - no `loop-seam` where the view either side of the seam is the same;
+  - a cover at 60% opacity or less dims, not hides;
+  - the held clock honours a CSS `animation-play-state` pause;
+  - new flags: `--expect-span-of`, `--expect-lines`, `--reduced-motion`, `--expect-start +N` / `any`;
+  - `interrupt-jump` fires on a leap the other way from the motion that follows;
+  - `text-wrap` when a target's text runs to more lines than it should.
+- **Fixed after the small-model round:**
+  - an `--expect-*` given once is the moving targets', not a `--still` / `--exit` one's, and failing
+    one of several it says it was given once;
+  - every per-target flag takes `any`;
+  - `--expect-origin X,Y` is a turn's pivot in the element's own units (an SVG element's viewBox
+    units, as transform-origin takes them), and `turn-off-centre` and a keyword's `origin-mismatch`
+    print that point as the flag to give;
+  - `--expect-origin` on a width or height change is judged by the edge that stays;
+  - `covered-edge` probes only inside the target's rounded corners;
+  - a target that fades out over the motion's last frames and is gone at rest is a warn, taken as
+    leaving (a pop back to hidden is still a fail);
+  - `--reduced-motion` on a page where nothing animates judges each target from the first frame:
+    `reduced-motion-hides` and `reduced-motion-misplaced`, against where the page rests with motion;
+  - wording: a turned box's bounds are no longer "grows from its edge", a settle-back says
+    "shrinks towards", the scale range is in frame order, and a turn in place "stays in place";
+  - a gate's unknown `--out` points at `--frames`, and a short flag no longer gets a two-letter
+    "did you mean".
+- **Still open:** a scale's peak is the sampled frames' (said as "peaking at … in the frames measured").
+
 ## Generated figures (raster images)
 
 Figures that state structure — dependencies, flows, states, sequences, measurements — are drawn with

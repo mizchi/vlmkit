@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Partner logos</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #f5f6f8; color: #1d2330;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .strip {
+    position: absolute; left: 40px; top: 40px;
+    width: 1200px; height: 80px;
+    overflow: hidden;
+    background: #ffffff;
+    border-radius: 8px;
+  }
+  .track {
+    position: absolute; left: 0; top: 10px;
+    display: flex; gap: 20px;
+    width: max-content;
+    animation: marquee 16s linear infinite;
+    will-change: transform;
+  }
+  .strip:hover .track { animation-play-state: paused; }
+  .logo {
+    flex: 0 0 140px;
+    width: 140px; height: 60px;
+    display: flex; align-items: center; justify-content: center;
+    background: #e8ebf1; border-radius: 6px;
+    font-size: 18px; font-weight: 600; color: #2b3445;
+    white-space: nowrap;
+  }
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-1280px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .track { animation: none; transform: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="strip" aria-label="Our partners">
+    <div class="track">
+      <span class="logo">Northwind</span>
+      <span class="logo">Contoso</span>
+      <span class="logo">Fabrikam</span>
+      <span class="logo">Initech</span>
+      <span class="logo">Globex</span>
+      <span class="logo">Umbrella</span>
+      <span class="logo">Hooli</span>
+      <span class="logo">Vandelay</span>
+      <span class="logo" aria-hidden="true">Northwind</span>
+      <span class="logo" aria-hidden="true">Contoso</span>
+      <span class="logo" aria-hidden="true">Fabrikam</span>
+      <span class="logo" aria-hidden="true">Initech</span>
+      <span class="logo" aria-hidden="true">Globex</span>
+      <span class="logo" aria-hidden="true">Umbrella</span>
+      <span class="logo" aria-hidden="true">Hooli</span>
+      <span class="logo" aria-hidden="true">Vandelay</span>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,10 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Features</title><style>
+body{margin:0;font:15px/1.4 system-ui,sans-serif;background:#fff}
+.grid{position:absolute;left:40px;top:120px;display:grid;grid-template-columns:repeat(3,360px);gap:24px}
+div.feature{opacity:0;height:160px;box-sizing:border-box;padding:20px;border:1px solid #e5e7eb;border-radius:12px;animation:up 500ms ease-out forwards;animation-delay:calc(var(--i)*100ms)}
+@keyframes up{from{opacity:0;transform:translateY(32px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){div.feature{animation:none}}
+</style></head><body><div class="grid">
+<div class="feature" style="--i:0"><h3>Fast</h3><p>Pages load quickly.</p></div><div class="feature" style="--i:1"><h3>Safe</h3><p>Data stays yours.</p></div><div class="feature" style="--i:2"><h3>Open</h3><p>Export anything.</p></div>
+<div class="feature" style="--i:3"><h3>Shared</h3><p>Invite your team.</p></div><div class="feature" style="--i:4"><h3>Quiet</h3><p>No noisy alerts.</p></div><div class="feature" style="--i:5"><h3>Kind</h3><p>Help when you need it.</p></div>
+</div></body></html>

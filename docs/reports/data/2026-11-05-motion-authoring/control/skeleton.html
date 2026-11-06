@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loading card</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #eef0f3;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: #1f2933;
+  }
+  .card {
+    position: absolute;
+    left: 40px;
+    top: 40px;
+    width: 360px;
+    padding: 20px;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+    display: grid;
+  }
+  .skeleton, .content {
+    grid-area: 1 / 1;
+    width: 320px;
+  }
+  .skeleton {
+    position: relative;
+    overflow: hidden;          /* the highlight is never seen outside the skeleton */
+    align-self: start;
+    animation: fade-out 300ms linear 1500ms both;
+  }
+  .bar {
+    display: block;
+    height: 14px;
+    border-radius: 7px;
+    background: #d9dde3;
+  }
+  .bar + .bar { margin-top: 12px; }
+  .bar-1 { width: 320px; height: 20px; border-radius: 10px; }
+  .bar-2 { width: 280px; }
+  .bar-3 { width: 200px; }
+  .shimmer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 80px;
+    height: 100%;
+    background: linear-gradient(90deg,
+      rgba(255,255,255,0) 0%,
+      rgba(255,255,255,0.75) 50%,
+      rgba(255,255,255,0) 100%);
+    transform: translateX(-80px);   /* wholly left of the bars */
+    animation: sweep 1200ms linear infinite;
+    pointer-events: none;
+  }
+  @keyframes sweep {
+    from { transform: translateX(-80px); }  /* right edge at bars' left edge */
+    to   { transform: translateX(320px); }  /* left edge at bars' right edge */
+  }
+  .content {
+    opacity: 0;
+    animation: fade-in 300ms linear 1500ms both;
+  }
+  .content h2 {
+    margin: 0;
+    font-size: 18px;
+    line-height: 20px;
+    font-weight: 600;
+  }
+  .content p {
+    margin: 12px 0 0;
+    font-size: 14px;
+    line-height: 14px;
+    color: #52606d;
+  }
+  .content p + p { margin-top: 12px; }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes fade-out {
+    0%   { opacity: 1; visibility: visible; }
+    99.9% { visibility: visible; }
+    100% { opacity: 0; visibility: hidden; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .shimmer {
+      animation: none;
+      transform: translateX(120px);   /* held still across the bars */
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="skeleton" aria-hidden="true">
+      <span class="bar bar-1"></span>
+      <span class="bar bar-2"></span>
+      <span class="bar bar-3"></span>
+      <span class="shimmer"></span>
+    </div>
+    <div class="content">
+      <h2>Monthly revenue</h2>
+      <p>$48,200 this month, up 12% on last.</p>
+      <p>Updated a moment ago.</p>
+    </div>
+  </div>
+</body>
+</html>

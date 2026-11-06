@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notifications</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: #f5f6f8; color: #1f2430; }
+  .app-header {
+    position: relative;
+    height: 96px;
+    background: #ffffff;
+    border-bottom: 1px solid #e2e5ea;
+  }
+  .app-title {
+    position: absolute;
+    left: 32px; top: 24px;
+    margin: 0;
+    height: 48px; line-height: 48px;
+    font-size: 22px; font-weight: 700;
+  }
+  .bell {
+    position: absolute;
+    top: 24px;
+    right: 32px;
+    width: 48px;
+    height: 48px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 12px;
+    background: #eef1f6;
+    color: #2b3445;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+  }
+  .bell:hover { background: #e3e8f0; }
+  .bell:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+  .bell-icon {
+    display: block;
+    width: 28px;
+    height: 28px;
+    transform-origin: 50% 0;
+    animation: bell-ring 700ms linear 800ms 1 both;
+  }
+  .bell-icon svg { display: block; width: 28px; height: 28px; }
+  @keyframes bell-ring {
+    0%   { transform: rotate(0deg);   animation-timing-function: ease-out; }
+    14%  { transform: rotate(14deg);  animation-timing-function: ease-in-out; }
+    38%  { transform: rotate(-12deg); animation-timing-function: ease-in-out; }
+    60%  { transform: rotate(8deg);   animation-timing-function: ease-in-out; }
+    80%  { transform: rotate(-4deg);  animation-timing-function: ease-in-out; }
+    100% { transform: rotate(0deg); }
+  }
+  main { padding: 32px; }
+  main p { margin: 0; color: #5b6475; }
+</style>
+</head>
+<body>
+  <header class="app-header">
+    <h1 class="app-title">Dashboard</h1>
+    <button class="bell" type="button" aria-label="Notifications">
+      <span class="bell-icon" aria-hidden="true">
+        <svg viewBox="0 0 28 28" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2v2"/>
+          <path d="M7 19V12a7 7 0 0 1 14 0v7l2 3H5z" fill="currentColor" fill-opacity="0.12"/>
+          <path d="M11.5 24.5a2.6 2.6 0 0 0 5 0"/>
+        </svg>
+      </span>
+    </button>
+  </header>
+  <main><p>You have new notifications.</p></main>
+</body>
+</html>

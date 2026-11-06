@@ -1615,6 +1615,27 @@ ${ANIMATION_HELPERS_JS}
     return d;
   };
   const unit = (k) => (k === "turn" ? "°" : k === "opacity" || k === "scale" ? "%" : "px");
+  // What is in view of it: its children (or itself), clipped by every clipping ancestor and the
+  // viewport, with their content. A ticker one copy long and a shimmer clipped away at both ends
+  // jump in their transform and in nothing seen (authoring v1).
+  const inView = (el) => {
+    let clip = { l: 0, t: 0, r: innerWidth, b: innerHeight };
+    for (let n = el.parentElement; n; n = n.parentElement) {
+      const cs = getComputedStyle(n);
+      if (cs.overflowX !== "visible" || cs.overflowY !== "visible" || cs.clipPath !== "none") {
+        const q = n.getBoundingClientRect();
+        clip = { l: Math.max(clip.l, q.left), t: Math.max(clip.t, q.top), r: Math.min(clip.r, q.right), b: Math.min(clip.b, q.bottom) };
+      }
+    }
+    const parts = el.children.length > 0 ? [...el.children] : [el];
+    return parts
+      .map((c) => ({ q: c.getBoundingClientRect(), key: c.tagName + "." + c.className + "|" + (c.textContent || "").trim().slice(0, 80) }))
+      .filter(({ q }) => q.right > clip.l + 0.5 && q.left < clip.r - 0.5 && q.bottom > clip.t + 0.5 && q.top < clip.b - 0.5)
+      .map(({ q, key }) => ({ x: q.left, y: q.top, w: q.width, h: q.height, key }));
+  };
+  const sameView = (a, b) =>
+    a.length === b.length &&
+    a.every((p) => b.some((q) => q.key === p.key && Math.abs(q.x - p.x) < 1.5 && Math.abs(q.y - p.y) < 1.5 && Math.abs(q.w - p.w) < 1.5 && Math.abs(q.h - p.h) < 1.5));
   const describe = (el) => {
     let n = el, why = null;
     for (let depth = 0; n && depth < 4 && !why; n = n.parentElement, depth++) {
@@ -1639,7 +1660,7 @@ ${ANIMATION_HELPERS_JS}
     try {
       const repeats = !Number.isFinite(t.iterations) || t.iterations > 1;
       if (repeats) {
-        const why = describe(el) || (/spin|load|busy|progress/i.test(name + " " + (el.className && el.className.baseVal !== undefined ? el.className.baseVal : el.className)) ? "named " + name : null);
+        const why = describe(el) || (/spin|load|busy|progress|shimmer|skeleton|marquee|ticker/i.test(name + " " + (el.className && el.className.baseVal !== undefined ? el.className.baseVal : el.className)) ? "named " + name : null);
         if (why) out.indicators.push({ index, selector, name, why });
       }
       const frames = anim.effect.getKeyframes ? anim.effect.getKeyframes() : [];
@@ -1647,11 +1668,16 @@ ${ANIMATION_HELPERS_JS}
       if (repeats && !stepped && !String(t.direction).startsWith("alternate") && props.length > 0) {
         const at = (ms) => { anim.currentTime = ms; return pose(el, props); };
         const end = delay + d;
-        const a = at(end - 2), b = at(end - 1), c = at(end + 0.001), e = at(end + 1);
+        const a = at(end - 2), b = at(end - 1);
+        const v1 = inView(el);
+        const c = at(end + 0.001);
+        const v2 = inView(el);
+        const e = at(end + 1);
         const before = diff(a, b), across = diff(b, c), after = diff(c, e);
+        const unseen = sameView(v1, v2);
         for (const k of Object.keys(across)) {
           const usual = Math.max(before[k], after[k]);
-          if (across[k] >= 2 && across[k] > 4 * usual + 0.5) {
+          if (across[k] >= 2 && across[k] > 4 * usual + 0.5 && !((k === "x" || k === "y") && unseen)) {
             const first = frames[0], last = frames[frames.length - 1];
             const prop = k === "turn" || k === "x" || k === "y" || k === "scale" ? "transform" : k.replace(/\\d+$/, "");
             out.seams.push({
@@ -2071,6 +2097,24 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
     // which would erase the author-vs-us distinction in `playState` that
     // `restTimeForAnimation` depends on — a redesign, not a filter change.
     const evaluable = timings.filter((t) => t.index >= 0 && t.durationMs > 0).slice(0, maxAnimations);
+    // For each animation, the animations on its ancestors: an ancestor's fade-out at rest hid a
+    // skeleton's shimmer in every frame, and the shimmer read "no visible effect" (authoring v1).
+    const ancestorsOf: Record<number, number[]> = await page
+      .evaluate(() => {
+        const list = (window as unknown as { __vlmkitAnims?: Animation[] }).__vlmkitAnims ?? [];
+        const target = (a: Animation) => (a.effect as KeyframeEffect | null)?.target ?? null;
+        const out: Record<number, number[]> = {};
+        list.forEach((a, i) => {
+          const el = target(a);
+          if (!el) return;
+          out[i] = list
+            .map((b, j) => ({ b, j }))
+            .filter(({ b, j }) => j !== i && target(b) !== el && target(b)?.contains(el))
+            .map(({ j }) => j);
+        });
+        return out;
+      })
+      .catch(() => ({}));
 
     // Two back-to-back rest captures with nothing seeked in between: the
     // second becomes the evaluation baseline, and their delta exposes motion
@@ -2092,7 +2136,10 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       // that ends hidden (a toast's exit, fill forwards) hid this one's every frame: a toast's
       // entrance read "no visible effect". They are seeked to the same page time with it.
       const siblings = timings.filter(
-        (t) => t.index >= 0 && t.index !== timing.index && t.selector === timing.selector,
+        (t) =>
+          t.index >= 0 &&
+          t.index !== timing.index &&
+          (t.selector === timing.selector || (ancestorsOf[timing.index] ?? []).includes(t.index)),
       );
       const frames: AnimationFrameStat[] = [];
       const rowFrames: RgbaFrame[] = [];

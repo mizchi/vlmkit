@@ -567,6 +567,19 @@ export const HOLD_TIMELINE_SCRIPT = `(() => {
   //
   // Returns how many animations it ended: their finish events are dispatched when the browser next
   // renders (the clock's rendered()), and what those start can itself end before t.
+  // Whether this CSS animation's own entry in animation-play-state is "paused" now.
+  const cssPlayPaused = (anim) => {
+    try {
+      if (typeof CSSAnimation === "undefined" || !(anim instanceof CSSAnimation)) return false;
+      const el = anim.effect && anim.effect.target;
+      if (!el) return false;
+      const cs = getComputedStyle(el, anim.effect.pseudoElement || null);
+      const names = cs.animationName.split(",").map((n) => n.trim());
+      const states = cs.animationPlayState.split(",").map((n) => n.trim());
+      const i = names.indexOf(anim.animationName);
+      return (states[i < 0 ? 0 : i % states.length] || "running") === "paused";
+    } catch { return false; }
+  };
   window.__vlmkitSeekTimeline = (t) => {
     collectLate();
     const zero = clockNow() === 0;
@@ -627,6 +640,21 @@ export const HOLD_TIMELINE_SCRIPT = `(() => {
         watch(h);
       }
       if (h.pagePaused || h.anim.playbackRate === 0) return;
+      // Paused by its CSS while held (a marquee's animation-play-state: paused on :hover): it stays
+      // where it is, and carries on from there once its CSS runs it again. Seeked through the pause,
+      // a hovered strip read "travels 309px" and still-mismatch (authoring v1).
+      const cssPaused = cssPlayPaused(h.anim);
+      if (cssPaused) {
+        if (h.cssPausedAt === undefined) h.cssPausedAt = Math.min(Math.max(local(h, h.lastT ?? t), 0), end);
+        h.lastT = t;
+        return;
+      }
+      if (h.cssPausedAt !== undefined) {
+        h.anchor = h.cssPausedAt;
+        h.anchorAt = t;
+        h.cssPausedAt = undefined;
+      }
+      h.lastT = t;
       if (!reached(h, t, end)) {
         place(h, t, end);
         return;

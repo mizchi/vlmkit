@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Menu</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #eef0f4;
+    font: 15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: #1d2330;
+    min-height: 800px;
+  }
+  .toolbar {
+    position: relative;
+    height: 112px;
+    background: #dfe3ea;
+    border-bottom: 1px solid #c8ced8;
+  }
+  .menu-button {
+    position: absolute;
+    left: 40px;
+    top: 40px;
+    height: 36px;
+    padding: 0 18px;
+    margin: 0;
+    border: 1px solid #3b4a63;
+    border-radius: 6px;
+    background: #2f3d55;
+    color: #ffffff;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .menu-button:focus-visible { outline: 3px solid #6a9cff; outline-offset: 2px; }
+  .menu {
+    position: absolute;
+    left: 40px;
+    top: 76px; /* button top 40 + height 36: directly below */
+    width: 220px;
+    margin: 0;
+    padding: 6px 0;
+    list-style: none;
+    background: #ffffff;
+    border: 1px solid #c8ced8;
+    border-radius: 0 0 6px 6px;
+    box-shadow: 0 6px 18px rgba(20, 30, 50, 0.18);
+    z-index: 10;
+    transform-origin: top left;
+    transform: scaleY(0);
+    opacity: 0;
+    visibility: hidden;
+    transition: transform 250ms ease-out, opacity 250ms ease-out, visibility 250ms;
+  }
+  .menu.open {
+    transform: scaleY(1);
+    opacity: 1;
+    visibility: visible;
+  }
+  .menu a {
+    display: block;
+    padding: 8px 16px;
+    color: #1d2330;
+    text-decoration: none;
+  }
+  .menu a:hover, .menu a:focus-visible { background: #e8eefb; outline: none; }
+  main { padding: 32px 40px; }
+  h1 { font-size: 24px; margin: 0 0 8px; }
+  p { margin: 0; max-width: 60ch; }
+</style>
+</head>
+<body>
+  <div class="toolbar">
+    <button class="menu-button" type="button" aria-expanded="false" aria-controls="menu">Menu</button>
+    <div class="menu" id="menu" role="menu">
+      <a href="#" role="menuitem">New file</a>
+      <a href="#" role="menuitem">Open…</a>
+      <a href="#" role="menuitem">Save</a>
+      <a href="#" role="menuitem">Export</a>
+      <a href="#" role="menuitem">Settings</a>
+    </div>
+  </div>
+  <main>
+    <h1>Workspace</h1>
+    <p>Open the menu from the toolbar. It can be clicked again at any moment, and it turns back from where it is.</p>
+  </main>
+<script>
+  const button = document.querySelector('.menu-button');
+  const menu = document.querySelector('.menu');
+  button.addEventListener('click', () => {
+    const open = menu.classList.toggle('open');
+    button.setAttribute('aria-expanded', String(open));
+  });
+</script>
+</body>
+</html>

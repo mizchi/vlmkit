@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notifications</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #f5f6f8;
+    color: #1f2430;
+    min-height: 100vh;
+  }
+  .app-header {
+    position: relative;
+    height: 96px;
+    background: #ffffff;
+    border-bottom: 1px solid #e2e5ea;
+  }
+  .app-header .brand {
+    position: absolute;
+    left: 32px;
+    top: 24px;
+    height: 48px;
+    line-height: 48px;
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+  }
+  .bell {
+    position: absolute;
+    top: 24px;
+    right: 32px;
+    width: 48px;
+    height: 48px;
+    margin: 0;
+    padding: 0;
+    border: 1px solid #d5d9e0;
+    border-radius: 12px;
+    background: #ffffff;
+    color: #1f2430;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .bell:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+  .bell-icon {
+    display: block;
+    width: 28px;
+    height: 28px;
+    flex: none;
+    transform-origin: 50% 0;
+    animation: ring 700ms linear 800ms 1 both;
+  }
+  /* 0 -> +14 (right) -> -12 (left) -> +8 -> -4 -> 0, each swing 140ms */
+  @keyframes ring {
+    0%   { transform: rotate(0deg);   animation-timing-function: ease-in-out; }
+    20%  { transform: rotate(14deg);  animation-timing-function: ease-in-out; }
+    40%  { transform: rotate(-12deg); animation-timing-function: ease-in-out; }
+    60%  { transform: rotate(8deg);   animation-timing-function: ease-in-out; }
+    80%  { transform: rotate(-4deg);  animation-timing-function: ease-in-out; }
+    100% { transform: rotate(0deg); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bell-icon { animation: none; }
+  }
+  main { padding: 32px; }
+  main p { margin: 0; color: #4a5160; }
+</style>
+</head>
+<body>
+  <header class="app-header">
+    <h1 class="brand">Workspace</h1>
+    <button class="bell" type="button" aria-label="Notifications">
+      <svg class="bell-icon" viewBox="0 0 28 28" width="28" height="28" aria-hidden="true">
+        <path d="M14 3a1.5 1.5 0 0 1 1.5 1.5v.7a7 7 0 0 1 5.5 6.8v5l2 3v1H5v-1l2-3v-5a7 7 0 0 1 5.5-6.8v-.7A1.5 1.5 0 0 1 14 3z" fill="currentColor"/>
+        <path d="M11 22h6a3 3 0 0 1-6 0z" fill="currentColor"/>
+      </svg>
+    </button>
+  </header>
+  <main>
+    <p>You have new notifications.</p>
+  </main>
+</body>
+</html>

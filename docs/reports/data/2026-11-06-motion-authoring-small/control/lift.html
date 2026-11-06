@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan cards that lift</title>
+<style>
+  html, body { margin: 0; padding: 0; }
+  body {
+    position: relative;
+    width: 1280px;
+    height: 800px;
+    overflow: hidden;
+    background: #eef1f5;
+    color: #1f2937;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+
+  .plans {
+    position: absolute;
+    left: 80px;
+    top: 120px;
+    display: flex;
+    gap: 8px;
+  }
+
+  .plan {
+    position: relative;
+    z-index: 1;
+    box-sizing: border-box;
+    flex: 0 0 300px;
+    width: 300px;
+    height: 380px;
+    padding: 32px 24px 24px;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border: 1px solid #d5dbe5;
+    border-radius: 14px;
+    box-shadow: none;
+    transform: scale(1);
+    transform-origin: 50% 50%;
+    /* leaving: the card settles back over 200ms, and stays on top until it is back at rest */
+    transition: transform 200ms ease-out, box-shadow 200ms ease-out, z-index 0s 200ms;
+  }
+
+  .plan:hover {
+    z-index: 2;
+    transform: scale(1.08);
+    box-shadow: 0 16px 32px rgba(15, 23, 42, 0.16);
+    /* lifting: on top at once, grows over 200ms, slowing at the end */
+    transition: transform 200ms ease-out, box-shadow 200ms ease-out, z-index 0s 0s;
+  }
+
+  .tag {
+    position: absolute;
+    top: -8px;
+    right: 16px;
+    box-sizing: border-box;
+    height: 24px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 16px;
+    color: #fff;
+  }
+  .plan.starter .tag { background: #0f766e; }
+  .plan.team .tag { background: #1d4ed8; }
+  .plan.scale .tag { background: #7c3aed; }
+
+  .plan h2 {
+    margin: 0 0 8px;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 26px;
+  }
+  .price {
+    margin: 0;
+    font-size: 36px;
+    font-weight: 800;
+    line-height: 44px;
+  }
+  .price span {
+    font-size: 15px;
+    font-weight: 500;
+    color: #6b7280;
+  }
+  .plan ul {
+    margin: 16px 0 0;
+    padding-left: 18px;
+    font-size: 15px;
+    line-height: 22px;
+  }
+  .plan li + li { margin-top: 4px; }
+
+  .plan button {
+    margin-top: auto;
+    width: 100%;
+    height: 44px;
+    border: 0;
+    border-radius: 8px;
+    background: #2563eb;
+    color: #fff;
+    font: inherit;
+    font-size: 16px;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+  <section class="plans" aria-label="Plans">
+    <div class="plan starter">
+      <span class="tag">Starter</span>
+      <h2>Solo</h2>
+      <p class="price">$9 <span>/ month</span></p>
+      <ul>
+        <li>1 workspace</li>
+        <li>5 projects</li>
+        <li>Email support</li>
+      </ul>
+      <button type="button">Choose Solo</button>
+    </div>
+    <div class="plan team">
+      <span class="tag">Team</span>
+      <h2>Pro</h2>
+      <p class="price">$29 <span>/ month</span></p>
+      <ul>
+        <li>5 workspaces</li>
+        <li>Unlimited projects</li>
+        <li>Priority support</li>
+      </ul>
+      <button type="button">Choose Pro</button>
+    </div>
+    <div class="plan scale">
+      <span class="tag">Scale</span>
+      <h2>Business</h2>
+      <p class="price">$79 <span>/ month</span></p>
+      <ul>
+        <li>Unlimited workspaces</li>
+        <li>SSO and audit log</li>
+        <li>Dedicated manager</li>
+      </ul>
+      <button type="button">Choose Business</button>
+    </div>
+  </section>
+</body>
+</html>

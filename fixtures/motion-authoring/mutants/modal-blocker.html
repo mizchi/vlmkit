@@ -1,0 +1,18 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Project</title><style>
+body{margin:0;font:15px/1.4 system-ui,sans-serif;color:#1d2330}
+button.delete{position:absolute;left:40px;top:40px;font:inherit;padding:10px 16px;border:0;border-radius:8px;background:#dc2626;color:#fff;cursor:pointer}
+div.backdrop{position:fixed;inset:0;background:#000;opacity:0;transition:opacity 150ms linear}
+div.dialog{position:fixed;left:440px;top:290px;width:400px;height:220px;box-sizing:border-box;padding:24px;background:#fff;border-radius:12px;
+opacity:0;visibility:hidden;transform:translateY(24px) scale(.95);transition:opacity 150ms linear,transform 0s 150ms,visibility 0s 150ms}
+body.open div.backdrop{opacity:.5;visibility:visible;transition:opacity 200ms linear}
+body.open div.dialog{opacity:1;visibility:visible;transform:none;transition:opacity 250ms ease-out 50ms,transform 250ms ease-out 50ms}
+button.cancel{font:inherit;padding:8px 14px;margin-top:24px}
+</style></head><body>
+<h1 style="position:absolute;left:40px;top:80px">Project Atlas</h1>
+<button class="delete">Delete project</button>
+<div class="backdrop"></div>
+<div class="dialog" role="dialog" aria-modal="true"><p>Delete Project Atlas? This cannot be undone.</p><button class="cancel">Cancel</button></div>
+<script>
+document.querySelector(".delete").onclick=()=>document.body.classList.add("open");
+document.querySelector(".cancel").onclick=()=>document.body.classList.remove("open");
+</script></body></html>

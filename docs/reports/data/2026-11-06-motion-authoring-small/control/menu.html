@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A menu that can change its mind</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 1280px;
+    height: 800px;
+    overflow: hidden;
+    background: #eef1f5;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  body {
+    position: relative;
+  }
+
+  /* The toolbar button: 40px from the left and 40px from the top. */
+  .menu-button {
+    position: absolute;
+    left: 40px;
+    top: 40px;
+    width: 120px;
+    height: 40px;
+    margin: 0;
+    padding: 0 16px;
+    box-sizing: border-box;
+    border: 0;
+    border-radius: 6px;
+    background: #2563eb;
+    color: #ffffff;
+    font: inherit;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 40px;
+    text-align: center;
+    cursor: pointer;
+  }
+
+  .menu-button:focus-visible {
+    outline: 3px solid #1e3a8a;
+    outline-offset: 2px;
+  }
+
+  /*
+   * The panel is always laid out (never display:none) so that a transition
+   * has a live box to start from and to return to. Closed: height 0, faded out.
+   * Open: full height (5 items x 40px), faded in. Both properties share one
+   * 250ms ease-out transition, so a click mid-way reverses from the current
+   * height and opacity rather than restarting from either end.
+   */
+  .menu {
+    position: absolute;
+    left: 40px;
+    top: 80px;
+    width: 220px;
+    height: 0;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+    background: #ffffff;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      height 250ms ease-out,
+      opacity 250ms ease-out,
+      visibility 250ms ease-out;
+  }
+
+  .menu.open {
+    height: 200px;
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .menu ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .menu li {
+    margin: 0;
+    padding: 0;
+    height: 40px;
+  }
+
+  .menu a {
+    display: block;
+    box-sizing: border-box;
+    height: 40px;
+    padding: 0 16px;
+    line-height: 40px;
+    color: #0f172a;
+    font-size: 15px;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .menu a:hover,
+  .menu a:focus-visible {
+    background: #e2e8f0;
+    outline: none;
+  }
+</style>
+</head>
+<body>
+  <button class="menu-button" type="button" aria-controls="main-menu" aria-expanded="false">Menu</button>
+
+  <div class="menu" id="main-menu">
+    <ul>
+      <li><a href="#profile">Profile</a></li>
+      <li><a href="#settings">Settings</a></li>
+      <li><a href="#notifications">Notifications</a></li>
+      <li><a href="#help">Help</a></li>
+      <li><a href="#sign-out">Sign out</a></li>
+    </ul>
+  </div>
+
+  <script>
+    (function () {
+      var button = document.querySelector('button.menu-button');
+      var menu = document.querySelector('div.menu');
+
+      // Each click flips the open state. The CSS transition does the rest,
+      // starting from wherever the panel currently is.
+      button.addEventListener('click', function () {
+        var open = menu.classList.toggle('open');
+        button.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+    })();
+  </script>
+</body>
+</html>

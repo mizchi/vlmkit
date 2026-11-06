@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tiles that appear from the centre</title>
+<style>
+  html, body { margin: 0; padding: 0; }
+  body {
+    width: 1280px;
+    height: 800px;
+    overflow: hidden;
+    background: #ffffff;
+    position: relative;
+  }
+  .grid {
+    position: absolute;
+    left: 40px;
+    top: 40px;
+    display: grid;
+    grid-template-columns: repeat(3, 120px);
+    grid-template-rows: repeat(3, 120px);
+    gap: 16px;
+  }
+  .tile {
+    width: 120px;
+    height: 120px;
+    box-sizing: border-box;
+    opacity: 1;
+    transform: none;
+    animation-name: tile-in;
+    animation-duration: 300ms;
+    animation-timing-function: ease-out;
+    animation-fill-mode: backwards;
+  }
+  /* Delays: centre 0ms, edge-middles 100ms, corners 200ms. */
+  .tile.mid    { animation-delay: 0ms; }
+  .tile.edge   { animation-delay: 100ms; }
+  .tile.corner { animation-delay: 200ms; }
+
+  @keyframes tile-in {
+    from { opacity: 0; transform: scale(0.8); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  .t1 { background: #e63946; }
+  .t2 { background: #f4a261; }
+  .t3 { background: #e9c46a; }
+  .t4 { background: #2a9d8f; }
+  .t5 { background: #264653; }
+  .t6 { background: #6a4c93; }
+  .t7 { background: #1d3557; }
+  .t8 { background: #8ac926; }
+  .t9 { background: #ff595e; }
+</style>
+</head>
+<body>
+<div class="grid">
+  <div class="tile corner t1"></div>
+  <div class="tile edge t2"></div>
+  <div class="tile corner t3"></div>
+  <div class="tile edge t4"></div>
+  <div class="tile mid t5"></div>
+  <div class="tile edge t6"></div>
+  <div class="tile corner t7"></div>
+  <div class="tile edge t8"></div>
+  <div class="tile corner t9"></div>
+</div>
+</body>
+</html>

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Partner logo strip</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #ffffff; color: #1f2937; }
+  body { width: 1280px; height: 800px; overflow: hidden; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+
+  /* The strip: 1200x80, 40px from the left and top, clips everything outside it. */
+  div.strip {
+    position: absolute;
+    left: 40px;
+    top: 40px;
+    width: 1200px;
+    height: 80px;
+    overflow: hidden;
+  }
+
+  /* The track holds 16 logos (two sets of eight), 20px apart. One set is 8 * (140 + 20) = 1280px. */
+  div.track {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    height: 80px;
+    width: max-content;
+    animation: marquee 16s linear infinite; /* 1280px / 16s = 80px per second */
+  }
+
+  span.logo {
+    flex: 0 0 140px;
+    width: 140px;
+    height: 60px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #f9fafb;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #374151;
+  }
+
+  /* Pointer over the strip: the logos stop where they are and resume from there when it leaves. */
+  div.strip:hover div.track {
+    animation-play-state: paused;
+  }
+
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-1280px); }
+  }
+
+  /* Reduced motion: the logos do not move. */
+  @media (prefers-reduced-motion: reduce) {
+    div.track { animation: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="strip">
+    <div class="track">
+      <span class="logo">Acme</span>
+      <span class="logo">Globex</span>
+      <span class="logo">Initech</span>
+      <span class="logo">Umbrella</span>
+      <span class="logo">Hooli</span>
+      <span class="logo">Stark</span>
+      <span class="logo">Wayne</span>
+      <span class="logo">Soylent</span>
+      <span class="logo">Acme</span>
+      <span class="logo">Globex</span>
+      <span class="logo">Initech</span>
+      <span class="logo">Umbrella</span>
+      <span class="logo">Hooli</span>
+      <span class="logo">Stark</span>
+      <span class="logo">Wayne</span>
+      <span class="logo">Soylent</span>
+    </div>
+  </div>
+</body>
+</html>

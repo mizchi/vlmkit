@@ -746,7 +746,11 @@ describe("inspect motion on fixtures/motion-repair (round 1 passed all three bro
       const dead = await run("broken/guard.html", ["--selector", "#hero"]);
       assert.equal(dead.code, 2, dead.out);
       const bar = await run("reference/meter.html", ["--selector", "#fill"]);
-      assert.match(bar.out, /\(its centre: its box grows \d+px from its left edge, which stays put\)/, bar.out);
+      assert.match(
+        bar.out,
+        /\(its centre: its box grows \d+px from its left edge, which stays put at x = [\d.]+\)/,
+        bar.out,
+      );
     },
   );
 

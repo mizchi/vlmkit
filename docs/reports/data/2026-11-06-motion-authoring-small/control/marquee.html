@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Partner logo strip</title>
+<style>
+  :root { color-scheme: light; }
+  html, body { margin: 0; padding: 0; height: 100%; background: #ffffff; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; position: relative; min-height: 800px; }
+
+  /* 1200x80 strip, 40px from the left and the top. Only what is inside it shows. */
+  div.strip {
+    position: absolute;
+    left: 40px;
+    top: 40px;
+    width: 1200px;
+    height: 80px;
+    overflow: hidden;
+    border: 1px solid #e2e5ea;
+    border-radius: 6px;
+    box-sizing: border-box;
+    background: #fafbfc;
+  }
+
+  /* Eight logos plus the same eight again: 16 x 160px (140px box + 20px gap).
+     One set is 8 x 160 = 1280px, so the track moves exactly one set per loop. */
+  div.track {
+    position: absolute;
+    left: 0;
+    top: 10px;
+    height: 60px;
+    display: flex;
+    gap: 20px;
+    width: max-content;
+    animation: strip-scroll 16s linear infinite; /* 1280px / 16s = 80px per second */
+  }
+
+  span.logo {
+    flex: 0 0 140px;
+    width: 140px;
+    height: 60px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+    border: 1px solid #d9dee5;
+    border-radius: 4px;
+    color: #2b3445;
+    font-size: 16px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  /* Pointer over the strip: freeze where they are; they carry on when it leaves. */
+  div.strip:hover div.track {
+    animation-play-state: paused;
+  }
+
+  @keyframes strip-scroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-1280px); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    div.track { animation: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="strip">
+    <div class="track">
+      <span class="logo">Northwind</span>
+      <span class="logo">Lumen Labs</span>
+      <span class="logo">Brightpath</span>
+      <span class="logo">Cobalt &amp; Co</span>
+      <span class="logo">Verdant</span>
+      <span class="logo">Harbor Systems</span>
+      <span class="logo">Pinnacle</span>
+      <span class="logo">Atlas Group</span>
+      <span class="logo">Northwind</span>
+      <span class="logo">Lumen Labs</span>
+      <span class="logo">Brightpath</span>
+      <span class="logo">Cobalt &amp; Co</span>
+      <span class="logo">Verdant</span>
+      <span class="logo">Harbor Systems</span>
+      <span class="logo">Pinnacle</span>
+      <span class="logo">Atlas Group</span>
+    </div>
+  </div>
+</body>
+</html>

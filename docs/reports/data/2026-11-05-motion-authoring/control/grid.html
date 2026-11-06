@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tiles from the centre</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #ffffff; }
+  .grid {
+    position: absolute;
+    left: 40px;
+    top: 40px;
+    display: grid;
+    grid-template-columns: repeat(3, 120px);
+    grid-template-rows: repeat(3, 120px);
+    gap: 16px;
+  }
+  .tile {
+    width: 120px;
+    height: 120px;
+    transform-origin: 50% 50%;
+    animation: tile-in 300ms ease-out backwards;
+  }
+  @keyframes tile-in {
+    from { opacity: 0; transform: scale(0.8); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  /* centre: at once; edges: 100ms; corners: 200ms */
+  .tile:nth-child(5) { animation-delay: 0ms; }
+  .tile:nth-child(2), .tile:nth-child(4), .tile:nth-child(6), .tile:nth-child(8) { animation-delay: 100ms; }
+  .tile:nth-child(1), .tile:nth-child(3), .tile:nth-child(7), .tile:nth-child(9) { animation-delay: 200ms; }
+
+  .tile:nth-child(1) { background: #e63946; }
+  .tile:nth-child(2) { background: #f4a261; }
+  .tile:nth-child(3) { background: #e9c46a; }
+  .tile:nth-child(4) { background: #2a9d8f; }
+  .tile:nth-child(5) { background: #264653; }
+  .tile:nth-child(6) { background: #457b9d; }
+  .tile:nth-child(7) { background: #8e44ad; }
+  .tile:nth-child(8) { background: #6a994e; }
+  .tile:nth-child(9) { background: #bc4749; }
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="tile"></div>
+    <div class="tile"></div>
+    <div class="tile"></div>
+    <div class="tile"></div>
+    <div class="tile"></div>
+    <div class="tile"></div>
+    <div class="tile"></div>
+    <div class="tile"></div>
+    <div class="tile"></div>
+  </div>
+</body>
+</html>

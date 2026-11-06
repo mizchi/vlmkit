@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>Tiles from the centre</title>
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #f4f4f6;
+  }
+  .grid {
+    position: absolute;
+    left: 40px;
+    top: 40px;
+    display: grid;
+    grid-template-columns: repeat(3, 120px);
+    grid-template-rows: repeat(3, 120px);
+    gap: 16px;
+  }
+  div.tile {
+    width: 120px;
+    height: 120px;
+    box-sizing: border-box;
+    border-radius: 0;
+    animation: grow-in 300ms ease-out both;
+  }
+  /* Row by row: corner, edge, corner / edge, centre, edge / corner, edge, corner */
+  div.tile:nth-child(1) { background: #e4572e; animation-delay: 200ms; }
+  div.tile:nth-child(2) { background: #f3a712; animation-delay: 100ms; }
+  div.tile:nth-child(3) { background: #29a19c; animation-delay: 200ms; }
+  div.tile:nth-child(4) { background: #4c6ef5; animation-delay: 100ms; }
+  div.tile:nth-child(5) { background: #9c36b5; animation-delay: 0ms; }
+  div.tile:nth-child(6) { background: #d6336c; animation-delay: 100ms; }
+  div.tile:nth-child(7) { background: #2b8a3e; animation-delay: 200ms; }
+  div.tile:nth-child(8) { background: #1c7ed6; animation-delay: 100ms; }
+  div.tile:nth-child(9) { background: #e8590c; animation-delay: 200ms; }
+
+  @keyframes grow-in {
+    from { opacity: 0; transform: scale(0.8); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    div.tile { animation: none; }
+  }
+</style>
+</head>
+<body>
+  <main class="grid">
+    <div class="tile"></div>
+    <div class="tile"></div>
+    <div class="tile"></div>
+    <div class="tile"></div>
+    <div class="tile"></div>
+    <div class="tile"></div>
+    <div class="tile"></div>
+    <div class="tile"></div>
+    <div class="tile"></div>
+  </main>
+</body>
+</html>

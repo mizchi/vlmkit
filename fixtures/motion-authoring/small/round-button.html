@@ -1,0 +1,14 @@
+<!doctype html><html><head><meta charset="utf-8"><title>round button over a picture</title>
+<style>
+body{margin:0;font:15px system-ui,sans-serif}
+.card{position:absolute;left:0;top:0;width:320px;height:300px}
+.media{position:absolute;left:0;top:0;width:320px;height:160px;background:#94a3b8}
+button.add{position:absolute;left:40px;top:40px;width:44px;height:44px;border:0;border-radius:22px;background:#16a34a;color:#fff;
+  overflow:hidden;white-space:nowrap;padding:0 14px;text-align:left;transition:width 300ms ease-out}
+button.add.added{width:180px}
+</style></head><body>
+<!-- The small-model round's label page, cut down: a round button over the card's picture. Its square
+     box's corners lie over the picture, which is behind it, not over it. -->
+<div class="card"><span class="media"></span><button class="add">+ Added to cart</button></div>
+<script>document.querySelector("button.add").onclick=(e)=>e.currentTarget.classList.add("added");</script>
+</body></html>

@@ -1,0 +1,9 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>App</title><style>
+body{margin:0;font:15px system-ui,sans-serif}
+header{height:96px;background:#111827;color:#fff}
+button.bell{position:absolute;right:32px;top:24px;width:48px;height:48px;border:0;border-radius:24px;background:#1f2937;display:grid;place-items:center;padding:0;cursor:pointer}
+.bell-icon{width:28px;height:28px;display:block;animation:ring 700ms 800ms ease-in-out}
+@keyframes ring{0%{transform:rotate(0)}14%{transform:rotate(14deg)}36%{transform:rotate(-12deg)}58%{transform:rotate(8deg)}80%{transform:rotate(-4deg)}100%{transform:rotate(0)}}
+</style></head><body><header><button class="bell" aria-label="Notifications">
+<svg class="bell-icon" viewBox="0 0 28 28" aria-hidden="true"><path d="M14 3c-4.4 0-7 3.2-7 7.5v5L4.5 20h19L21 15.5v-5C21 6.2 18.4 3 14 3z" fill="#facc15"/><circle cx="14" cy="23" r="2.5" fill="#facc15"/></svg>
+</button></header></body></html>

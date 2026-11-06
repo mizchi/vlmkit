@@ -1,0 +1,18 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Card</title><style>
+body{margin:0;background:#f1f3f6;font:15px/1.4 system-ui,sans-serif;color:#1d2330}
+div.card{position:absolute;left:40px;top:40px;width:360px;height:150px;background:#fff;border-radius:12px;box-shadow:0 1px 3px #0002}
+div.skeleton,div.content{position:absolute;left:24px;top:24px;right:24px}
+div.skeleton{height:96px;overflow:hidden;animation:out 300ms 1500ms both}
+.bar{height:16px;border-radius:8px;background:#e3e6ec;margin-bottom:16px}
+.bar:nth-child(2){width:80%}.bar:nth-child(3){width:55%;margin:0}
+span.shimmer{position:absolute;top:0;left:0;width:80px;height:100%;background:linear-gradient(90deg,#fff0,#fffa,#fff0);
+transform:translateX(-80px);animation:sweep 1200ms linear infinite}
+@keyframes sweep{to{transform:translateX(312px)}}
+div.content{opacity:0;animation:in 300ms 1500ms both}
+div.content h2{margin:0 0 8px;font-size:18px}div.content p{margin:0}
+@keyframes in{from{opacity:0}to{opacity:1}}@keyframes out{from{opacity:1}to{opacity:0}}
+@media (prefers-reduced-motion:reduce){span.shimmer{animation:none}}
+</style></head><body><div class="card">
+<div class="skeleton" aria-hidden="true"><div class="bar"></div><div class="bar"></div><div class="bar"></div><span class="shimmer"></span></div>
+<div class="content"><h2>Revenue this week</h2><p>$12,480, up 8% on last week.</p><p>Best day: Thursday.</p></div>
+</div></body></html>

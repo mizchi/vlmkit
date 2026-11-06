@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add to cart confirmation</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 1280px;
+    height: 800px;
+    overflow: hidden;
+    background: #f3f4f6;
+    font-family: Helvetica, Arial, sans-serif;
+    color: #111827;
+  }
+
+  .card {
+    position: relative;
+    width: 400px;
+    height: 240px;
+    background: #ffffff;
+    border-radius: 0 0 12px 0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  }
+
+  .title {
+    position: absolute;
+    left: 40px;
+    top: 110px;
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 24px;
+    white-space: nowrap;
+  }
+
+  .price {
+    position: absolute;
+    left: 40px;
+    top: 142px;
+    margin: 0;
+    font-size: 15px;
+    line-height: 20px;
+    color: #4b5563;
+    white-space: nowrap;
+  }
+
+  button.add {
+    position: absolute;
+    left: 40px;
+    top: 40px;
+    width: 44px;
+    height: 44px;
+    margin: 0;
+    padding: 0 0 0 14px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    overflow: hidden;
+    border: 0;
+    border-radius: 22px;
+    background: #2563eb;
+    color: #ffffff;
+    font: inherit;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 20px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: width 300ms ease-out;
+  }
+
+  button.add.added {
+    width: 160px;
+  }
+
+  button.add:focus-visible {
+    outline: 3px solid #93c5fd;
+    outline-offset: 2px;
+  }
+
+  button.add .icon {
+    flex: 0 0 16px;
+    width: 16px;
+    height: 16px;
+    display: block;
+  }
+
+  button.add .label {
+    flex: 0 0 auto;
+    margin-left: 8px;
+    opacity: 0;
+    white-space: nowrap;
+    transition: opacity 300ms ease-out;
+  }
+
+  button.add.added .label {
+    opacity: 1;
+  }
+</style>
+</head>
+<body>
+  <div class="card" id="card">
+    <button class="add" type="button" id="add">
+      <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
+        <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/>
+      </svg>
+      <span class="label">Added to cart</span>
+    </button>
+    <p class="title">Trail Runner Jacket</p>
+    <p class="price">$89.00</p>
+  </div>
+
+  <script>
+    (function () {
+      var btn = document.getElementById('add');
+      btn.addEventListener('click', function () {
+        btn.classList.add('added');
+      });
+    })();
+  </script>
+</body>
+</html>

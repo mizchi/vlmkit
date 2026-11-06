@@ -1,0 +1,12 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Partners</title><style>
+body{margin:0;font:600 15px system-ui,sans-serif}
+div.strip{position:absolute;left:40px;top:40px;width:1200px;height:80px;overflow:hidden;background:#f3f4f6}
+div.track{display:flex;gap:20px;padding-top:10px;width:max-content;animation:roll 16000ms linear infinite}
+div.strip:hover div.track{animation-play-state:paused}
+span.logo{flex:none;width:140px;height:60px;display:grid;place-items:center;background:#fff;border-radius:8px}
+@keyframes roll{to{transform:translateX(-1280px)}}
+@media (prefers-reduced-motion:reduce){div.track{animation:none}}
+</style></head><body><div class="strip"><div class="track">
+<span class="logo">Acme</span><span class="logo">Globex</span><span class="logo">Initech</span><span class="logo">Umbrella</span><span class="logo">Hooli</span><span class="logo">Vehement</span><span class="logo">Stark</span><span class="logo">Wayne</span>
+<span class="logo" aria-hidden="true">Acme</span><span class="logo" aria-hidden="true">Globex</span><span class="logo" aria-hidden="true">Initech</span><span class="logo" aria-hidden="true">Umbrella</span><span class="logo" aria-hidden="true">Hooli</span><span class="logo" aria-hidden="true">Vehement</span><span class="logo" aria-hidden="true">Stark</span><span class="logo" aria-hidden="true">Wayne</span>
+</div></div></body></html>

@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A loading card</title>
+<style>
+  :root {
+    --page: #eceff3;
+    --card: #ffffff;
+    --bar: #d9dee6;
+    --shine: rgba(255, 255, 255, 0.7);
+    --ink: #1d2430;
+    --muted: #5b6676;
+  }
+  html, body { margin: 0; }
+  body {
+    background: var(--page);
+    min-height: 100vh;
+    position: relative;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--ink);
+  }
+
+  /* The card: 360px wide, 40px from the top-left of the page. */
+  .card {
+    position: absolute;
+    left: 40px;
+    top: 40px;
+    width: 360px;
+    box-sizing: border-box;
+    padding: 20px;
+    background: var(--card);
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  }
+
+  /* Skeleton and content share one cell, so they occupy the same place. */
+  .stack {
+    display: grid;
+    grid-template-columns: 100%;
+    grid-template-rows: 120px;
+  }
+  .stack > * {
+    grid-area: 1 / 1;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Skeleton: three grey bars and the shimmer clipped to them. */
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 14px;
+    animation: skeleton-out 300ms linear 1500ms both;
+  }
+  .skeleton .bar {
+    display: block;
+    height: 16px;
+    border-radius: 8px;
+    background: var(--bar);
+  }
+  .skeleton .bar:nth-child(1) { width: 60%; }
+  .skeleton .bar:nth-child(2) { width: 100%; }
+  .skeleton .bar:nth-child(3) { width: 75%; }
+
+  /* The highlight: 80px wide, starts wholly left of the bars and ends wholly right of them. */
+  .shimmer {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 80px;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, var(--shine) 50%, rgba(255, 255, 255, 0) 100%);
+    transform: translateX(-100px);
+    animation: sweep 1200ms linear infinite;
+    pointer-events: none;
+  }
+  @keyframes sweep {
+    from { transform: translateX(-100px); }
+    to   { transform: translateX(340px); }
+  }
+
+  /* Content: the same place as the skeleton, hidden until the data arrives at 1500ms. */
+  .content {
+    opacity: 0;
+    animation: content-in 300ms linear 1500ms both;
+  }
+  .content h2 {
+    margin: 0 0 10px;
+    font-size: 20px;
+    line-height: 28px;
+    font-weight: 600;
+  }
+  .content p {
+    margin: 0 0 6px;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--muted);
+  }
+
+  @keyframes skeleton-out {
+    from { opacity: 1; }
+    to   { opacity: 0; }
+  }
+  @keyframes content-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  /* Reduced motion: the highlight stays still (still visible, inside the bars). The content still arrives at 1500ms. */
+  @media (prefers-reduced-motion: reduce) {
+    .shimmer {
+      animation: none;
+      transform: translateX(120px);
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="card" id="card">
+    <div class="stack">
+      <div class="skeleton" aria-hidden="true">
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="shimmer"></span>
+      </div>
+      <div class="content">
+        <h2>Quarterly revenue</h2>
+        <p>Revenue rose 12% on the previous quarter, led by renewals.</p>
+        <p>Figures are provisional until the audit closes next month.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,11 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Product</title><style>
+body{margin:0;font:15px system-ui,sans-serif}
+.card{position:absolute;left:20px;top:20px;width:360px;height:220px;border:1px solid #e5e7eb;border-radius:12px}
+button.add{position:absolute;left:19px;top:19px;height:44px;width:44px;border:0;border-radius:22px;background:#16a34a;color:#fff;font:inherit;
+display:flex;align-items:center;gap:6px;padding:0 13px;overflow:hidden;white-space:nowrap;box-sizing:border-box;transition:width 300ms ease-out}
+button.add .icon{flex:none;width:18px;text-align:center;font-size:20px}
+button.add .text{opacity:0;transition:opacity 300ms ease-out}
+button.add.added .text{opacity:1}
+.card h2{position:absolute;left:20px;top:90px;margin:0}
+</style></head><body><div class="card"><button class="add"><span class="icon">+</span><span class="text">Added to cart</span></button><h2>Linen shirt</h2></div>
+<script>const b=document.querySelector("button.add");b.onclick=()=>{b.classList.add("added");b.style.width=b.scrollWidth+"px";};</script></body></html>
