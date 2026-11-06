@@ -1,0 +1,17 @@
+{
+  "exit": 1,
+  "output": "inspect motion: fixtures/motion-authoring/v2/mutants/gauge-origin.html — 11 frames over 0..1200ms + 1 at rest (<out>/f/frames.json)\n  target \".needle\", begins at 0ms, runs 1200ms: travels 160px upwards (and 29px rightwards) over the frames measured, turns clockwise 120° (80°/s, a turn every 4500ms) (about 160,100 in its own units, outside its box), follows ease-out (it fits 4.2x better than the next-best curve, ease); follows ease-out in its turn exactly (measured: no other curve comes close)\n    frames (time, share of its on-screen part seen [op = opacity, on-screen = share of its box in the viewport, when partial], centre): 0ms 1.00 (180,250), 120ms 1.00 (160,226), 240ms 1.00 (150,200), 360ms 1.00 (148,174), 480ms 1.00 (153,150), 600ms 1.00 (162,130), 720ms 0.85 (175,115), 840ms 0.80 (187,104), 960ms 0.60 (198,98), 1080ms 0.60 (206,94), 1199ms 0.60 (209,93), 1500ms 0.60 (209,93)\n    FAIL origin-mismatch at 0ms: it turns about 160,100 in its own units (the SVG's user space), not 160,170: transform-origin on an SVG element is measured from the viewBox's corner (transform-box: view-box, the default), or from its own box with fill-box\n  1 fail; measured from the page, no model asked (--jev adds Jev's reading and the --forbid statements)\n  look at the frames: vlmkit snapshot strip --manifest <out>/f/frames.json --max-frames 6 --columns 3 --crop 54,0,234,303 --out <out>/f/strip.png\n  the first fail's own frame (0ms, .needle origin-mismatch): <out>/f/0000-t000000.png\n  report: <out>/f/motion-report.json\n",
+  "images": [
+    {
+      "file": "evidence-1.webp",
+      "caption": "The sweep. The hub stays where it is drawn; the needle's base leaves it in the first frame and ends up above the dial.",
+      "width": 734,
+      "height": 664,
+      "kind": "evidence"
+    }
+  ],
+  "thenExit": 0,
+  "thenOutput": "\nStrip\n  Frames: 6 (2 row(s) x 3 column(s))\n  Sheet:  734x664 png\n  <out>/strip.png\n",
+  "command": "vlmkit inspect motion fixtures/motion-authoring/v2/mutants/gauge-origin.html --selector .needle --expect-origin 160,170 --frames {out}/f",
+  "thenCommand": "vlmkit snapshot strip --manifest {out}/f/frames.json --max-frames 6 --columns 3 --crop 54,0,234,303 --out {out}/strip.png"
+}

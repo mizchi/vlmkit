@@ -81,7 +81,7 @@ export const ICONS = Object.freeze([
   {
     id: "history",
     glyph: "a clock face with a circular arrow running around it",
-    usedFor: "README: track changes over time",
+    usedFor: "demo group “Does it move right?”; README: track changes over time",
   },
   {
     id: "image-check",

@@ -1,0 +1,17 @@
+{
+  "exit": 1,
+  "output": "inspect motion: fixtures/motion-authoring/v2/mutants/lift-noz.html — 11 frames over 17..217ms + 1 at rest (<out>/f/frames.json)\n  target \".plan:nth-child(2)\", begins at 17ms, runs 200ms: travels 0px over the frames measured, follows ease-out in its scale exactly (measured: no other curve comes close); follows ease-out in its shadow (it fits 515.6x better than the next-best curve, ease); the scale grows from its centre (its scale goes from 1.00 to 1.08)\n    frames (time, share of its on-screen part seen [op = opacity, on-screen = share of its box in the viewport, when partial], centre): 17ms 1.00 (538,310), 37ms 1.00 (538,310), 57ms 1.00 (538,310), 77ms 1.00 (538,310), 97ms 1.00 (538,310), 117ms 1.00 (538,310), 137ms 1.00 (538,310), 157ms 1.00 (538,310), 177ms 1.00 (538,310), 197ms 1.00 (538,310), 216ms 1.00 (538,310), 517ms 1.00 (538,310)\n    FAIL covered-edge at 137ms: raised (scale 1.06) and covered at its edge at 137ms: 25% of the points along its edge are covered by div.plan, which comes later in the document and paints over it — give it a z-index (with position: relative, or as a grid / flex item) while it is raised\n  1 fail; measured from the page, no model asked (--jev adds Jev's reading and the --forbid statements)\n  look at the frames: vlmkit snapshot strip --manifest <out>/f/frames.json --max-frames 6 --columns 3 --crop 0,2,1225,616 --out <out>/f/strip.png\n  the first fail's own frame (137ms, .plan:nth-child(2) covered-edge): <out>/f/0006-t000137.png\n  report: <out>/f/motion-report.json\n",
+  "images": [
+    {
+      "file": "evidence-1.webp",
+      "caption": "The hovered card growing. From the 156ms frame on, its right edge runs under the Scale card beside it.",
+      "width": 1592,
+      "height": 1058,
+      "kind": "evidence"
+    }
+  ],
+  "thenExit": 0,
+  "thenOutput": "\nStrip\n  Frames: 6 (2 row(s) x 3 column(s))\n  Sheet:  1592x1058 png\n  <out>/strip.png\n",
+  "command": "vlmkit inspect motion fixtures/motion-authoring/v2/mutants/lift-noz.html --hover .plan:nth-child(2) --selector .plan:nth-child(2) --frames {out}/f",
+  "thenCommand": "vlmkit snapshot strip --manifest {out}/f/frames.json --max-frames 6 --columns 3 --crop 380,100,520,500 --out {out}/strip.png"
+}

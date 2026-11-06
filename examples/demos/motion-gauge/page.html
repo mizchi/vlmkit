@@ -1,0 +1,9 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Speed</title><style>
+body{margin:0;background:#0f172a}
+svg.gauge{position:absolute;left:80px;top:80px;width:320px;height:200px}
+.needle{transform-origin:center;animation:sweep 1200ms ease-out forwards}
+@keyframes sweep{from{transform:rotate(0deg)}to{transform:rotate(120deg)}}
+</style></head><body>
+<svg class="gauge" viewBox="0 0 320 200"><path d="M30 170 A130 130 0 0 1 290 170" fill="none" stroke="#334155" stroke-width="14"/>
+<line class="needle" x1="160" y1="170" x2="40" y2="170" stroke="#f43f5e" stroke-width="4" stroke-linecap="round"/><circle cx="160" cy="170" r="8" fill="#e2e8f0"/></svg>
+</body></html>

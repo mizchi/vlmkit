@@ -1,0 +1,17 @@
+{
+  "exit": 1,
+  "output": "inspect motion: fixtures/motion-authoring/v2/mutants/menu-keyframes.html — 11 frames over 175..425ms + 1 at rest (<out>/f/frames.json)\n  sampled: the motion --click .menu-button (the last action) starts; what --click .menu-button started ran (as far as --wait let it) unsampled — --every-action measures each in turn\n  target \".menu\", begins at 175ms, runs 250ms: travels 88px upwards over the frames measured (its centre: its box shrinks 166px from its top edge, which stays put at y = 84), follows ease-out exactly in its path, its opacity and its scale (measured: no other curve comes close); the scale shrinks towards its top edge (its scale goes from 1.00 to 0.00)\n    frames (time, share of its on-screen part seen [op = opacity, on-screen = share of its box in the viewport, when partial], centre): 175ms 1.00 (150,173), 200ms 1.00 op 0.84 (150,158), 225ms 1.00 op 0.69 (150,145), 250ms 1.00 op 0.55 (150,133), 275ms 1.00 op 0.43 (150,122), 300ms 1.00 op 0.32 (150,112), 325ms 1.00 op 0.21 (150,103), 350ms 1.00 op 0.13 (150,95), 375ms 1.00 op 0.06 (150,90), 400ms 0.00 ·, 424ms 0.00 ·, 725ms 0.00 ·\n    FAIL interrupt-jump: .menu jumps the moment --click .menu-button lands at 158ms: 220x133 at opacity 0.75 → 220x177 at 1.00 within a frame, more than it moves in any frame after (28px). Its new motion starts from its own first keyframe, not from where the one it cut into had got to: a @keyframes animation always starts from its `from`, a transition reverses from where it is — move the two states into one transition\n  1 fail; measured from the page, no model asked (--jev adds Jev's reading and the --forbid statements)\n  look at the frames: vlmkit snapshot strip --manifest <out>/f/frames.json --max-frames 6 --columns 3 --crop 0,36,315,273 --out <out>/f/strip.png\n  report: <out>/f/motion-report.json\n",
+  "images": [
+    {
+      "file": "evidence-1.webp",
+      "caption": "The close after the second click, from the frames `inspect motion` shot. At 175ms the menu is fully open again, though it was half open when the click landed.",
+      "width": 977,
+      "height": 604,
+      "kind": "evidence"
+    }
+  ],
+  "thenExit": 0,
+  "thenOutput": "\nStrip\n  Frames: 6 (2 row(s) x 3 column(s))\n  Sheet:  977x604 png\n  <out>/strip.png\n",
+  "command": "vlmkit inspect motion fixtures/motion-authoring/v2/mutants/menu-keyframes.html --click .menu-button --wait 125 --click .menu-button --selector .menu --exits --frames {out}/f",
+  "thenCommand": "vlmkit snapshot strip --manifest {out}/f/frames.json --max-frames 6 --columns 3 --crop 0,36,315,273 --out {out}/strip.png"
+}
