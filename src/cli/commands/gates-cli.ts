@@ -19,7 +19,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { UsageError, handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
-import { hasFlag, readAll, readFlag, readInt } from "@mizchi/vlmkit-core/arg-reader.ts";
+import { hasFlag, readAll, readFlag, readInt, tokenizeCommand } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { VLMKIT_IGNORE_ENTRIES, isGitIgnored, isGitRepo } from "@mizchi/vlmkit-core/run-ledger.ts";
 import {
   GATE_CONFIG_FILENAMES,
@@ -335,6 +335,32 @@ async function validateAgainstRegistry(
   }
 }
 
+/**
+ * `inspect motion` is not a registered gate, so the registry cannot check its flags: each such job's
+ * command is read by the motion CLI's own parser before anything runs. A `{"motion": ...}` entry that
+ * asks for something the command line cannot express (two easing lists of the wrong length, a still
+ * target with no selector) is a config error here, not a "did not run" after the browser work.
+ */
+async function validateMotionJobs(plan: GatePlan, configPath: string): Promise<void> {
+  const jobs = plan.jobs.filter((j) => /^inspect\s+motion(\s|$)/.test(j.baseGate));
+  if (jobs.length === 0) return;
+  const { parseMotionArgs, MotionUsageError } = await import("@mizchi/vlmkit-markup/inspect/motion-cli.ts");
+  const problems: string[] = [];
+  for (const job of jobs) {
+    try {
+      parseMotionArgs([...tokenizeCommand(job.gate).slice(2), job.source]);
+    } catch (e) {
+      if (!(e instanceof MotionUsageError)) throw e;
+      problems.push(`${job.pageId} / ${job.baseGate}: ${e.message}`);
+    }
+  }
+  if (problems.length > 0)
+    throw new UsageError(
+      `${configPath}: ${problems.length} inspect motion run(s) cannot start as configured:\n` +
+        [...new Set(problems)].map((p) => `  - ${p}`).join("\n"),
+    );
+}
+
 const STARTER_GATE = "check integrity";
 
 /** Flags a URL-sourced scaffold needs to run at all. See `scaffoldConfig`. */
@@ -525,6 +551,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     rulesForGate: rulesForGateFactory(registry),
   });
   await validateAgainstRegistry(declared, path, registry);
+  await validateMotionJobs(declared, path);
   // `suppressions` is an inventory of the config, so it must not depend on the
   // filesystem: a broken glob should not hide what has been silenced.
   // Everything relative inside the config — a `source` glob, a `--har` or

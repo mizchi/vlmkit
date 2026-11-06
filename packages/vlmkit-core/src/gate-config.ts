@@ -20,6 +20,7 @@
  */
 
 import { UsageError } from "./cli-error.ts";
+import { motionSpecCommand } from "./motion-spec.ts";
 import type { RuleSettingEntry, RuleSettings } from "./plugin/rules.ts";
 import { parseAnnotatedRuleSettings } from "./plugin/rules.ts";
 
@@ -196,13 +197,21 @@ function parseSuppression(raw: unknown, path: string): GateSuppression {
 }
 
 function parseGateList(raw: unknown, path: string): string[] {
-  if (!Array.isArray(raw)) fail(path, "must be an array of gate command strings");
+  if (!Array.isArray(raw)) fail(path, 'must be an array of gate command strings (or { "motion": {...} } entries)');
   // An empty list is almost certainly a half-finished edit, and it is the worst
   // possible outcome: `defaults: {gates: []}` used to validate and then run
   // nothing for every page that relied on the defaults.
   if (raw.length === 0) fail(path, "is empty — remove the key or list at least one gate");
   return raw.map((g, i) => {
-    if (typeof g !== "string" || !g.trim()) fail(`${path}[${i}]`, "must be a non-empty string");
+    // What a brief asks of the motion, per target: compiled to the `inspect motion` command it
+    // stands for (`motion-spec.ts`), so everything after this — plan, suppressions, `gates list` —
+    // sees one command string, and `gates list` prints what will run.
+    if (typeof g === "object" && g !== null && !Array.isArray(g) && "motion" in g) {
+      if (Object.keys(g).length !== 1) fail(`${path}[${i}]`, 'a { "motion": {...} } entry has no other keys');
+      return motionSpecCommand((g as { motion: unknown }).motion, `${path}[${i}].motion`, fail);
+    }
+    if (typeof g !== "string" || !g.trim())
+      fail(`${path}[${i}]`, 'must be a non-empty string (a gate command), or { "motion": {...} }');
     return (g as string).trim();
   });
 }
