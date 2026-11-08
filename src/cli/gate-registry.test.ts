@@ -34,7 +34,7 @@ describe("composed built-in registry", () => {
     // createGateRegistry throws on a conflict, so reaching this line is the
     // assertion; the count guards against a plugin silently dropping out.
     const r = await registry();
-    assert.equal(r.list().length, 36);
+    assert.equal(r.list().length, 37);
   });
 
   it("keeps each gate id in step with its command path", async () => {
@@ -282,7 +282,9 @@ describe("composed built-in registry", () => {
     // 239 → 240: `counter-rotation-drift` (round 18).
     // 240 → 243: `stress data` (#218): `variant-defect` (integrity's judges on a variant of the
     //       page's data), `empty-collapses` and `broken-image-collapses`.
-    assert.equal(total, 243);
+    // 243 → 248: `check mobile` (#219): `zoom-disabled`, `no-viewport-meta`, `swipe-unsnapped`,
+    //       `keyboard-covers-input`, `safe-area-overlap`.
+    assert.equal(total, 248);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {
@@ -327,6 +329,7 @@ describe("composed built-in registry", () => {
       "check.integrity",
       "check.interactions",
       "check.layout",
+      "check.mobile",
       "check.motion",
       "check.perf",
       "check.responsive",

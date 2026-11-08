@@ -343,6 +343,10 @@ function originOfUrl(url: string): string | null {
 export interface OpenPageOptions {
   viewport?: ViewportSize;
   deviceScaleFactor?: number;
+  /** A phone: the viewport meta is honoured and `pointer: coarse` matches (`check mobile`). */
+  isMobile?: boolean;
+  /** Touch events are on (`check mobile` swipes with them). */
+  hasTouch?: boolean;
   /** `prefers-color-scheme` for the page's context (theme-parity opens both). */
   colorScheme?: "light" | "dark" | "no-preference";
   /** Playwright storage state for pages behind a login. */
@@ -387,6 +391,8 @@ function pageOptions(options: OpenPageOptions) {
       ...(options.viewport ? { viewport: options.viewport } : {}),
       ...(options.deviceScaleFactor !== undefined ? { deviceScaleFactor: options.deviceScaleFactor } : {}),
       ...(options.colorScheme ? { colorScheme: options.colorScheme } : {}),
+      ...(options.isMobile ? { isMobile: true } : {}),
+      ...(options.hasTouch ? { hasTouch: true } : {}),
     },
     options.storageState,
   );

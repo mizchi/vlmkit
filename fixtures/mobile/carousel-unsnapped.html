@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mobile — carousel-unsnapped</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; color: #1f2933; background: #fff; }
+  header {
+    position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; align-items: center;
+    padding-top: calc(12px + env(safe-area-inset-top));
+    padding-bottom: 12px; padding-left: calc(16px + env(safe-area-inset-left)); padding-right: calc(16px + env(safe-area-inset-right));
+    background: #0b3d5c; color: #fff;
+  }
+  header h1 { margin: 0; font-size: 18px; }
+  header a { color: #fff; }
+  main { padding: 16px 16px 120px; }
+  .carousel {
+    display: flex; overflow-x: auto; gap: 0;
+    
+    margin: 0 -16px;
+  }
+  .slide {
+    flex: 0 0 100%; scroll-snap-align: start; height: 180px; padding: 24px;
+    display: flex; align-items: flex-end; color: #fff; font-weight: 600;
+  }
+  .slide:nth-child(1) { background: #1d4ed8; } .slide:nth-child(2) { background: #047857; } .slide:nth-child(3) { background: #b45309; }
+  p { margin: 16px 0; }
+  .composer {
+    position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 8px;
+    padding: 8px 16px calc(8px + env(safe-area-inset-bottom));
+    background: #f1f5f9; border-top: 1px solid #cbd5e1;
+  }
+  .composer input { flex: 1; font-size: 16px; padding: 10px; border: 1px solid #64748b; border-radius: 8px; }
+  .composer button { font-size: 16px; padding: 10px 14px; border: 0; border-radius: 8px; background: #0b3d5c; color: #fff; }
+</style>
+</head>
+<body>
+<header><h1>Harbour notes</h1><a href="#menu">Menu</a></header>
+<main>
+  <div class="carousel" aria-label="Featured">
+    <div class="slide">Morning tide</div>
+    <div class="slide">Fishing fleet</div>
+    <div class="slide">Lighthouse walk</div>
+  </div>
+  <p>The harbour opens at six. Boats leave on the morning tide and come back by noon, when the market fills the quay.</p>
+  <p>Ask at the office for the walking map: the path to the lighthouse is two kilometres along the breakwater.</p>
+  <p>Tide tables for the week are posted by the gate, and the café keeps a copy behind the counter.</p>
+  <p>Last ferry to the island leaves at 18:30 in summer and 17:00 from October.</p>
+</main>
+<form class="composer" onsubmit="return false"><input aria-label="Message" placeholder="Ask the harbour office"><button>Send</button></form>
+<script src="keyboard.js"></script>
+</body>
+</html>

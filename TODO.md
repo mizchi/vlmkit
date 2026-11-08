@@ -874,6 +874,10 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   条件検証→失敗ならロールバック/再計画」の検証付きループ(`vlmkit act`)。
   browser-use/Stagehand との差別化軸は "verified success rate"(見た目 OK
   でなく宣言事後条件の充足)。MVP は自リポジトリ UI に閉じる。
+  2026-11-08: ループ本体を実装(`vlmkit act`, #220)。検証は integrity の新規欠陥・
+  aria-expanded とパネルの不一致・`--expect` 事後条件。planner は `llm` / `--plan` /
+  `--planner-cmd`。残り: LLM キーのある環境でデモサイトの verified success rate を測る
+  (`--runs N`)。
 
 ### 参照なし(創造的)マークアップ評価 — `check integrity` + S14(設計 2026-07-30)
 設計: `docs/design/creative-markup-eval.md`
