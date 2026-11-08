@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Act fixture — store</title>
+<style>
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; color: #1f2933; }
+  main { max-width: 640px; margin: 0 auto; padding: 24px; }
+  button { font: inherit; padding: 8px 14px; border: 1px solid #334155; border-radius: 6px; background: #fff; color: #1f2933; }
+  .banner { margin-top: 12px; padding: 8px; background: #fef3c7; white-space: nowrap; }
+  [hidden] { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Harbour mug</h1>
+  <p>Cart: <span id="count">0</span> item(s)</p>
+  <button id="add">Add to cart</button>
+  <!-- Breaks the layout: a banner wider than the page. A step that clicks it is rolled back. -->
+  <button id="promo">Show promotion</button>
+  <!-- A disclosure that works, and one whose aria-expanded flips while its panel stays hidden. -->
+  <button id="more" aria-expanded="false" aria-controls="details">Details</button>
+  <button id="broken" aria-expanded="false" aria-controls="specs">Specifications</button>
+  <div id="details" hidden><p>Stoneware, 350 ml, dishwasher safe.</p></div>
+  <div id="specs" hidden><p>Height 9 cm.</p></div>
+  <div id="slot"></div>
+</main>
+<script>
+  const count = document.getElementById("count");
+  document.getElementById("add").onclick = () => (count.textContent = String(Number(count.textContent) + 1));
+  document.getElementById("promo").onclick = () => {
+    const b = document.createElement("div");
+    b.className = "banner";
+    b.textContent = "SUMMER-SALE-" + "X".repeat(160);
+    document.getElementById("slot").append(b);
+  };
+  const more = document.getElementById("more");
+  more.onclick = () => {
+    const open = more.getAttribute("aria-expanded") !== "true";
+    more.setAttribute("aria-expanded", String(open));
+    document.getElementById("details").hidden = !open;
+  };
+  const broken = document.getElementById("broken");
+  broken.onclick = () => broken.setAttribute("aria-expanded", String(broken.getAttribute("aria-expanded") !== "true"));
+</script>
+</body>
+</html>

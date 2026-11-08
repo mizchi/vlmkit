@@ -1446,6 +1446,33 @@ adversarial review (54 findings), not to re-learn (`docs/reports/2026-10-13-scan
   capture: a planted glitch and transient come back on their frames. On the stream clock 16.67ms gaps
   are a recording's rate, never "every 60 fps frame".
 
+## A browser agent whose steps are verified (`vlmkit act`)
+
+```bash
+vlmkit act page.html --goal "put two mugs in the cart" --expect 'text:#count=2'        # --planner llm (default): needs an LLM key
+vlmkit act page.html --goal "…" --expect 'visible:#details' --plan steps.json          # a fixed list of actions, no key
+vlmkit act page.html --goal "…" --expect 'url:/thanks/' --planner-cmd "my-agent"        # any program: context JSON in, action JSON out
+vlmkit act page.html --goal "…" --expect … --runs 10                                    # the verified success rate
+```
+
+Issue #220. Plan a step → act → verify → keep it, or roll it back (reload and replay the kept
+steps) and tell the planner why. Verify is deterministic: no `check integrity` fail the page did not
+have before the step (`newFindings`, the same kind+selector-or-gist match `stress data` uses), a
+clicked toggle's panel follows its `aria-expanded`, and the run is `verified` only when every
+`--expect` holds. "done" before that is `claimed` — the failure browser agents report as success.
+Pure half `@mizchi/vlmkit-judge/act.ts` (postcondition syntax, action schema, verdict); browser half
+`src/cli/commands/act-cli.ts` (observation with `eN` control ids, a replay selector per kept step).
+Known answers: `fixtures/act/store.html` (a step that overflows the page, a toggle whose panel never
+shows, a working one), held by `act-cli.test.ts` with keyless planners. Measured building it, not to
+re-learn:
+
+- **`locator.evaluate` takes a function, not a function's source.** A string is evaluated as an
+  expression, so the replay selector came back `undefined` and every toggle check read `null`.
+- **A grouped finding's message changes number** ("6 elements" → "1 element"), so the gist folds the
+  plural as well as the counts.
+- Not measured yet: the verified success rate with a real LLM planner — no key in this sandbox. On
+  `examples/sites/shop` a two-step plan (`#qty-inc`, `#add-to-cart`) is VERIFIED by `text:#cart-count=2`.
+
 ## A phone, not a narrow window (`check mobile`)
 
 ```bash

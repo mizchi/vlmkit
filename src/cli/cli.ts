@@ -139,6 +139,7 @@ const SPECS: Record<string, Spec> = {
   strip: spec("strip-cli", () => import("./commands/strip-cli.ts")),
   storyboard: spec("storyboard-cli", () => import("./commands/storyboard-cli.ts")),
   checkAuto: spec("check-auto", () => import("./commands/auto-cli.ts")),
+  act: spec("act-cli", () => import("./commands/act-cli.ts")),
   scanVideo: spec("scan-video-cli", () => import("./commands/scan-video-cli.ts")),
   recordHar: spec("record-har-cli", () => import("./commands/record-har-cli.ts")),
   diffForAgent: spec("diff-for-agent-cli", () => import("./commands/diff-for-agent-cli.ts")),
@@ -419,6 +420,7 @@ Workflows:
   diff-pr / batch / gates       Run repeatable local and CI gates
   rules                         List gates and the rules each one can tune
   workflow / markup-loop        Drive agent-oriented verification loops
+  act                           A browser agent whose steps are verified (goal + postconditions)
   api / mcp                     Expose vlmkit to other tools
 
 Run \`vlmkit <command> --help\` for subcommands, options, and examples.`);
@@ -704,6 +706,14 @@ Options:
     .command("manifest [...args]", "Author / edit approval.json manifests")
     .allowUnknownOptions()
     .action(async () => delegate(SPECS.manifest, passThrough(argv, ["manifest"])));
+
+  cli
+    .command(
+      "act [...args]",
+      "A browser agent whose steps are verified: plan → act → gates + postconditions, roll back on failure",
+    )
+    .allowUnknownOptions()
+    .action(async () => delegate(SPECS.act, passThrough(argv, ["act"])));
 
   cli
     .command("watch [...args]", "File-watcher inner loop with round-vs-round delta")
