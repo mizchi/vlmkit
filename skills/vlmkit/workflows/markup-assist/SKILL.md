@@ -27,6 +27,7 @@ nothing — failing on a suspect is the default.
 
 | Question | Gate |
 |---|---|
+| Not sure which gates apply? (it reads the page once — text, controls, width queries, a dark theme, animations, scrollers — runs the matching gates in parallel, says why each was chosen, and names the ones that need an input of yours) | `vlmkit check auto page.html` (`--plan` lists them without running) |
 | Is anything broken? (JS errors, empty render, failed resources, text collision/clipping/protrusion, collapsed containers, overflow, invisible text, occlusion, misalignment, unstyled page — 3 viewports) | `vlmkit check integrity page.html` |
 | Is the required copy present, exactly? | `vlmkit check copy page.html --manifest copy.txt` |
 | Does the structure match the brief? (widths, per-row counts, order, per-viewport visibility) | `vlmkit check layout page.html --contract layout.json` |

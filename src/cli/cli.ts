@@ -138,6 +138,7 @@ const SPECS: Record<string, Spec> = {
   flipbook: spec("flipbook-cli", () => import("./commands/flipbook-cli.ts")),
   strip: spec("strip-cli", () => import("./commands/strip-cli.ts")),
   storyboard: spec("storyboard-cli", () => import("./commands/storyboard-cli.ts")),
+  checkAuto: spec("check-auto", () => import("./commands/auto-cli.ts")),
   scanVideo: spec("scan-video-cli", () => import("./commands/scan-video-cli.ts")),
   recordHar: spec("record-har-cli", () => import("./commands/record-har-cli.ts")),
   diffForAgent: spec("diff-for-agent-cli", () => import("./commands/diff-for-agent-cli.ts")),
@@ -187,6 +188,10 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
   },
   check: {
     palette: { spec: SPECS.palette, desc: "Dominant colors of a PNG, or palette diff of two PNGs" },
+    auto: {
+      spec: SPECS.checkAuto,
+      desc: "Load the page once, see what it has, and run the gates that apply (with why), in parallel, one verdict",
+    },
   },
   inspect: {
     interact: { spec: SPECS.interact, desc: "Scripted UI interaction sequence" },
