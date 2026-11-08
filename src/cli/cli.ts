@@ -708,10 +708,7 @@ Options:
     .action(async () => delegate(SPECS.manifest, passThrough(argv, ["manifest"])));
 
   cli
-    .command(
-      "act [...args]",
-      "A browser agent whose steps are verified: plan → act → gates + postconditions, roll back on failure",
-    )
+    .command("act [...args]", "A browser agent whose steps are verified by gates and postconditions")
     .allowUnknownOptions()
     .action(async () => delegate(SPECS.act, passThrough(argv, ["act"])));
 
