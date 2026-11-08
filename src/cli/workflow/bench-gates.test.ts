@@ -96,7 +96,7 @@ describe("which gates the bench can run", () => {
     assert.equal(isBenchable(stub([{ name: "url", kind: "string", description: "Crater URL" }])), false);
   });
 
-  it("selects 25 of the 35 built-ins, and every one of them takes a page", async () => {
+  it("selects 26 of the 36 built-ins, and every one of them takes a page", async () => {
     // The count is a canary: a new gate that takes a page should join the bench
     // by existing, and one that does not must not be dragged in.
     resetGateRegistryCache();
@@ -106,7 +106,8 @@ describe("which gates the bench can run", () => {
     // so the bench shows one fast error row rather than waiting out the timeout.
     // 23 → 24: `check responsive`, which benches at its default 60 cases.
     // 24 → 25: `check flash`, which shoots every 60fps frame of 2-10s of page time.
-    assert.equal(benchable.length, 25, benchable.map(({ gate }) => gate.id).join(", "));
+    // 25 → 26: `stress data`, one fresh load per variant per width.
+    assert.equal(benchable.length, 26, benchable.map(({ gate }) => gate.id).join(", "));
     for (const { gate } of benchable) {
       const positional = (gate.inputs ?? []).find((i) => i.positional === 0);
       assert.equal(positional?.kind, "path-or-url", `${gate.id} positional is not a page`);

@@ -34,7 +34,7 @@ describe("composed built-in registry", () => {
     // createGateRegistry throws on a conflict, so reaching this line is the
     // assertion; the count guards against a plugin silently dropping out.
     const r = await registry();
-    assert.equal(r.list().length, 35);
+    assert.equal(r.list().length, 36);
   });
 
   it("keeps each gate id in step with its command path", async () => {
@@ -280,7 +280,9 @@ describe("composed built-in registry", () => {
     // 234 → 237: `stepped-keyframe`, `inert-size-animation`, `unknown-media-feature` (round 17).
     // 237 → 239: `overridden-animation`, `unitless-duration-var` (round 18).
     // 239 → 240: `counter-rotation-drift` (round 18).
-    assert.equal(total, 240);
+    // 240 → 243: `stress data` (#218): `variant-defect` (integrity's judges on a variant of the
+    //       page's data), `empty-collapses` and `broken-image-collapses`.
+    assert.equal(total, 243);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {
@@ -336,6 +338,7 @@ describe("composed built-in registry", () => {
       "scan.handlers",
       "scan.scroll",
       "scan.style",
+      "stress.data",
       "stress.i18n",
       "stress.media",
       "verify.flow",

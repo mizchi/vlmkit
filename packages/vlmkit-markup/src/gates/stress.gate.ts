@@ -13,6 +13,7 @@
 import { join } from "node:path";
 import { readAll, readFlag, readNumber } from "@mizchi/vlmkit-core/arg-reader.ts";
 import {
+  dataStressRuleOf,
   formatDataStressReport,
   runDataStress,
   type DataStressOptions,
@@ -222,9 +223,10 @@ empty or error state from data is not driven into it.`,
   run: (options) => runDataStress(options),
   findings: (report): Finding[] =>
     report.findings.map((f) => {
-      const own = f.rule === "empty-collapses" || f.rule === "broken-image-collapses";
+      const rule = dataStressRuleOf(f);
+      const own = rule !== "variant-defect";
       return {
-        rule: own ? f.rule : "variant-defect",
+        rule,
         severity: f.severity === "fail" ? ("suspect" as const) : ("warn" as const),
         message: `${f.variant}: ${own ? "" : `[${f.rule}] `}${f.message}`,
         viewport: f.viewport,

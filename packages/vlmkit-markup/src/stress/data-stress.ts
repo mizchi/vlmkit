@@ -30,6 +30,8 @@ import type { Page } from "playwright";
 import type { IntegrityFinding } from "@mizchi/vlmkit-judge/integrity.ts";
 import type { PageLoadOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { ruleTier } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { STYLE_SAMPLING_JS } from "../style/style-sampling.ts";
 
 export interface DataStressOptions extends PageLoadOptions {
@@ -328,7 +330,16 @@ export async function runDataStress(options: DataStressOptions): Promise<DataStr
   });
 }
 
-export function formatDataStressReport(report: DataStressReport): string {
+/** The gate rule a finding is reported under: integrity's own rules all go out as `variant-defect`. */
+export const dataStressRuleOf = (f: DataStressFinding): string =>
+  f.rule === "empty-collapses" || f.rule === "broken-image-collapses" ? f.rule : "variant-defect";
+
+/**
+ * The report as text. Under rule settings a finding takes its rule's tier (a `variant-defect`
+ * keeps integrity's own fail / warn unless the setting names one), and an `off` rule's findings
+ * are not printed.
+ */
+export function formatDataStressReport(report: DataStressReport, rules?: RuleView): string {
   const lines = [
     `${BOLD}${CYAN}vlmkit stress data${RESET}`,
     `${DIM}source: ${report.source}${RESET}`,
@@ -339,8 +350,18 @@ export function formatDataStressReport(report: DataStressReport): string {
     lines.push(`${YELLOW}No repeated items, counts or images found: nothing to stress.${RESET}`);
     return lines.join("\n");
   }
+  const tiered = report.findings.flatMap((f) => {
+    const emitted =
+      f.rule === "empty-collapses" || f.rule === "broken-image-collapses"
+        ? "warn"
+        : f.severity === "fail"
+          ? "suspect"
+          : "warn";
+    const tier = ruleTier(rules, dataStressRuleOf(f), emitted);
+    return tier === "off" ? [] : [{ ...f, severity: tier === "suspect" ? ("fail" as const) : ("warn" as const) }];
+  });
   for (const v of report.variants) {
-    const mine = report.findings.filter((f) => f.variant === v.id);
+    const mine = tiered.filter((f) => f.variant === v.id);
     lines.push(
       `${mine.length === 0 ? `${GREEN}ok${RESET}  ` : mine.some((f) => f.severity === "fail") ? `${RED}FAIL${RESET}` : `${YELLOW}warn${RESET}`} ${v.id}  ${DIM}${v.does}${RESET}`,
     );
@@ -349,10 +370,10 @@ export function formatDataStressReport(report: DataStressReport): string {
         `      ${f.severity === "fail" ? `${RED}x${RESET}` : `${YELLOW}!${RESET}`} [${f.rule}] @${f.viewport}: ${f.message}`,
       );
   }
-  const fails = report.findings.filter((f) => f.severity === "fail").length;
+  const fails = tiered.filter((f) => f.severity === "fail").length;
   lines.push(
     "",
-    `${fails} fail, ${report.findings.length - fails} warn over ${report.variants.length} variant(s); replay one: --variant <id>`,
+    `${fails} fail, ${tiered.length - fails} warn over ${report.variants.length} variant(s); replay one: --variant <id>`,
   );
   return lines.join("\n");
 }
