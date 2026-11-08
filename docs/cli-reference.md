@@ -536,6 +536,7 @@ are measured as a fraction of that width. Findings and `--allow` use scene paths
 vlmkit check auto          <html|url>          # load once, see what the page has, run the gates that apply in parallel (why each; --plan, --json)
 vlmkit check a11y contrast <html|url>          # WCAG AA contrast scan
 vlmkit check a11y touch    <html|url>          # Touch target size (WCAG 2.5.8 AA default, 2.5.5 AAA via --level)
+vlmkit check mobile        <html|url>          # As a touch phone: zoom allowed, carousels snap, keyboard leaves the field visible, safe-area insets
 vlmkit check a11y focus    <html|url>          # Tab order vs visual order
 vlmkit check a11y tree     <a11y.json>         # No DOM: names, reach, pixel contrast, target size from a platform's
                                                # accessibility tree + frame (Flutter, Android, …) — docs/a11y-tree.md
@@ -716,7 +717,7 @@ no-op, and the JSON is always
 ```
 
 so a client gates on `verdict` / `counts` without knowing which gate ran. All
-36 gates are registry-driven; `vlmkit rules` lists them. Commands that produce
+37 gates are registry-driven; `vlmkit rules` lists them. Commands that produce
 artifacts rather than verdicts (`diff`, `build`, `contract`, `snapshot`, …) are
 not gates and keep their own flags.
 

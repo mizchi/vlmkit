@@ -44,6 +44,7 @@ nothing — failing on a suspect is the default.
 | Nothing breaks at any width inside a regime (text starved, overflow, clipping, collisions) — shrunk to the width range, the breakpoint and the declaration | `vlmkit check responsive page.html` |
 | Scroll containers / page overflow-x inventory | `vlmkit scan scroll page.html` |
 | Sticky/fixed/snap actually behave | `vlmkit check scroll page.html` |
+| Works on a phone (zoom, swipe, keyboard, notch) | `vlmkit check mobile page.html` |
 | Animations visibly run, settle, respect reduced-motion | `vlmkit check animation page.html` (`--virtual-time` when motion is script-driven: rAF, GSAP, canvas, a timer carousel) |
 | Nothing flashes more than three times a second (WCAG 2.3.1, Level A, whatever the motion preference) | `vlmkit check flash page.html` — every 60fps frame of page time on the held clock; `motion-flicker` (warn) is moving content, `general-flash` / `red-flash` (suspect) is a strobe; `--strip` writes one still sheet, never an animation |
 | A video or animated GIF the page ships does not flash either (the page sweep pauses a `<video>` and reports it unmeasured) | `vlmkit check flash clip.mp4` (or `.webm`, `.gif`) — decoded with your own ffmpeg / ffprobe (vlmkit ships none), every frame at its own time, a GIF timed and looped as the browser plays it; `--display-width` is how wide it plays |

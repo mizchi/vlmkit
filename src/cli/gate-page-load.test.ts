@@ -142,8 +142,8 @@ describe("page-load options on the gates that navigate", () => {
     // place to notice it needs these flags. (23 → 24 `check grounding`,
     // 24 → 25 `check composition`, 25 → 26 `check color`, 26 → 27 `scan style`,
     // 27 → 28 `scan a11y`, whose source is a page or a uiautomator dump,
-    // 28 → 29 `check responsive`, 29 → 30 `check flash`, 30 → 31 `stress data`.)
-    assert.equal(gates.length, 31, gates.map(command).join(", "));
+    // 28 → 29 `check responsive`, 29 → 30 `check flash`, 30 → 31 `stress data`, 31 → 32 `check mobile`.)
+    assert.equal(gates.length, 32, gates.map(command).join(", "));
 
     const missing: string[] = [];
     for (const gate of gates) {

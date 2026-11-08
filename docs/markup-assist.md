@@ -190,6 +190,7 @@ its relative stylesheets, images and scripts resolve — if your CSS lives in
 | Discover which breakpoints the CSS declares | `vlmkit scan breakpoints page.html` |
 | Scroll inventory: containers, page overflow-x, clipped content | `vlmkit scan scroll page.html` |
 | Sticky sticks / fixed holds / snap lands | `vlmkit check scroll page.html` |
+| On a phone: zoom allowed, carousels land on a slide, the keyboard leaves the field visible, nothing under the notch | `vlmkit check mobile page.html` |
 | Animations visibly animate, settle, respect reduced-motion | `vlmkit check animation page.html` (declared-CSS view: `check motion`) |
 | The page at chosen instants of its motion, as numbered frames (`NNNN-t<ms>.png` + `frames.json`) | `vlmkit check animation page.html --at 0..600/100 --frames out/f`; after an action, a `frames` step in `inspect interact`; one sheet: `vlmkit snapshot strip --manifest out/f/frames.json` |
 | What a frame sequence shows happening: glitches, transients, changes and where they settle, each timed and boxed from the pixels | `vlmkit snapshot storyboard out/f/frames.json` (`SUMMARY.md`, `sheet.png`, `narrate/BRIEF.md` for your own vision; no verdict, exits 0) |

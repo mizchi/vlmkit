@@ -48,6 +48,7 @@ import { storyGate } from "./story.gate.ts";
 import { scrollScanGate } from "./scroll-scan.gate.ts";
 import { styleScanGate } from "./style-scan.gate.ts";
 import { dataStressGate, i18nStressGate, mediaVariantsGate } from "./stress.gate.ts";
+import { mobileGate } from "./mobile.gate.ts";
 import { themeGate } from "./theme.gate.ts";
 import { tokensGate } from "./tokens.gate.ts";
 import { verifyFlowGate, verifyMarkupGate } from "./verify.gate.ts";
@@ -77,6 +78,7 @@ export {
   interactionsGate,
   layoutGate,
   mediaVariantsGate,
+  mobileGate,
   motionGate,
   responsiveGate,
   scrollGate,
@@ -119,6 +121,7 @@ export const markupGatesPlugin = definePlugin({
     i18nStressGate,
     dataStressGate,
     mediaVariantsGate,
+    mobileGate,
     // Decoration and consistency.
     tokensGate,
     designGate,
