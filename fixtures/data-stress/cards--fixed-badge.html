@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Products</title>
+<!-- Mutant: the badge is 20px wide whatever its count, so 9,999,999 is cut off. -->
+<style>
+  body { margin: 0; font: 15px/1.4 system-ui, sans-serif; color: #1f2937; background: #f8fafc; }
+  main { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
+  h1 { font-size: 24px; margin: 0 0 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin: 0; padding: 0; list-style: none; }
+  .grid:empty::before { content: "No products yet"; display: block; padding: 24px; color: #6b7280; border: 1px dashed #cbd5e1; border-radius: 8px; }
+  .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+  .avatar { width: 48px; height: 48px; border-radius: 50%; background: #e5e7eb; }
+  .name { font-weight: 600; overflow-wrap: anywhere; }
+  .seller { color: #6b7280; font-size: 13px; overflow-wrap: anywhere; }
+  .badge { min-width: 20px; padding: 2px 8px; border-radius: 999px; background: #b91c1c; color: #fff; font-size: 12px; text-align: center; white-space: nowrap; }
+.badge { width: 20px; min-width: 0; padding: 2px 0; overflow: hidden; }</style>
+</head>
+<body>
+<main>
+  <h1>Products</h1>
+  <ul class="grid">
+    <li class="card">
+      <img class="avatar" src="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2248%22%20height%3D%2248%22%3E%3Crect%20width%3D%2248%22%20height%3D%2248%22%20rx%3D%2224%22%20fill%3D%22%2393c5fd%22%2F%3E%3C%2Fsvg%3E" alt="Desk lamp">
+      <div><div class="name">Desk lamp</div><div class="seller">by Studio 1</div></div>
+      <span class="badge">2</span>
+    </li>
+    <li class="card">
+      <img class="avatar" src="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2248%22%20height%3D%2248%22%3E%3Crect%20width%3D%2248%22%20height%3D%2248%22%20rx%3D%2224%22%20fill%3D%22%2393c5fd%22%2F%3E%3C%2Fsvg%3E" alt="Notebook">
+      <div><div class="name">Notebook</div><div class="seller">by Studio 2</div></div>
+      <span class="badge">3</span>
+    </li>
+    <li class="card">
+      <img class="avatar" src="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2248%22%20height%3D%2248%22%3E%3Crect%20width%3D%2248%22%20height%3D%2248%22%20rx%3D%2224%22%20fill%3D%22%2393c5fd%22%2F%3E%3C%2Fsvg%3E" alt="Pen set">
+      <div><div class="name">Pen set</div><div class="seller">by Studio 3</div></div>
+      <span class="badge">4</span>
+    </li>
+    <li class="card">
+      <img class="avatar" src="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2248%22%20height%3D%2248%22%3E%3Crect%20width%3D%2248%22%20height%3D%2248%22%20rx%3D%2224%22%20fill%3D%22%2393c5fd%22%2F%3E%3C%2Fsvg%3E" alt="Mug">
+      <div><div class="name">Mug</div><div class="seller">by Studio 4</div></div>
+      <span class="badge">5</span>
+    </li>
+    <li class="card">
+      <img class="avatar" src="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2248%22%20height%3D%2248%22%3E%3Crect%20width%3D%2248%22%20height%3D%2248%22%20rx%3D%2224%22%20fill%3D%22%2393c5fd%22%2F%3E%3C%2Fsvg%3E" alt="Tote bag">
+      <div><div class="name">Tote bag</div><div class="seller">by Studio 5</div></div>
+      <span class="badge">6</span>
+    </li>
+    <li class="card">
+      <img class="avatar" src="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2248%22%20height%3D%2248%22%3E%3Crect%20width%3D%2248%22%20height%3D%2248%22%20rx%3D%2224%22%20fill%3D%22%2393c5fd%22%2F%3E%3C%2Fsvg%3E" alt="Stickers">
+      <div><div class="name">Stickers</div><div class="seller">by Studio 6</div></div>
+      <span class="badge">7</span>
+    </li>
+  </ul>
+</main>
+</body>
+</html>

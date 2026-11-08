@@ -11,7 +11,14 @@
  */
 
 import { join } from "node:path";
-import { readFlag, readNumber } from "@mizchi/vlmkit-core/arg-reader.ts";
+import { readAll, readFlag, readNumber } from "@mizchi/vlmkit-core/arg-reader.ts";
+import {
+  dataStressRuleOf,
+  formatDataStressReport,
+  runDataStress,
+  type DataStressOptions,
+  type DataStressReport,
+} from "../stress/data-stress.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
@@ -126,6 +133,114 @@ needing translations.`,
       overflowing: report.overflowing.length,
       report: report.reportPath,
     },
+  }),
+});
+
+export const dataStressGate = defineGate<DataStressReport, DataStressOptions>({
+  id: "stress.data",
+  command: ["stress", "data"],
+  title: "Data-edge stress",
+  summary:
+    "Empty, one-item and multiplied lists, unbreakable names, huge counts, failing images — judged by check integrity",
+  category: "behavior",
+  usage: `Finds where the page holds data — repeated groups (three or more children of one shape),
+short text slots in their items, counts, images — and loads the page once per variant: each
+group emptied, cut to one item and multiplied (x5, up to 60), the slots set to a long name with
+nowhere to break, the counts set to 9,999,999, the images failing to load. check integrity's
+layout judges read each variant, and what a variant adds over the page as it is is reported with
+the variant's id; --variant <id> replays one. DOM mutation only: an app that renders its own
+empty or error state from data is not driven into it.`,
+  rules: [
+    {
+      id: "variant-defect",
+      title: "A layout defect a data variant brings (text overflow, collision, clipping, page overflow…)",
+      severity: "suspect",
+      docs: "The integrity rule it is, and the variant, are in the message; check integrity's warns stay warns.",
+    },
+    {
+      id: "empty-collapses",
+      title: "Emptied, a list collapses to nothing and nothing says it is empty",
+      severity: "warn",
+      docs: "Static markup only: an empty state a script renders cannot be reached by emptying the DOM.",
+    },
+    {
+      id: "broken-image-collapses",
+      title: "A failing image shrinks its slot to under half its area",
+      severity: "warn",
+    },
+  ],
+  inputs: [
+    {
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page to stress",
+      positional: 0,
+      required: true,
+    },
+    {
+      name: "viewports",
+      placeholder: "w,w",
+      kind: "string",
+      description: "Widths to judge at",
+      defaultDescription: "1280,375",
+    },
+    {
+      name: "variant",
+      placeholder: "id",
+      kind: "string",
+      repeatable: true,
+      description: "Run only this variant (repeat): an id the output prints (empty:ul.grid, long-text, …)",
+    },
+    {
+      name: "storage-state",
+      placeholder: "file",
+      kind: "path",
+      description: "Playwright storage state for pages behind a login",
+    },
+    ...PAGE_LOAD_INPUTS,
+  ],
+  parse: (argv) => {
+    const source = firstPositional(argv, "vlmkit stress data <html-or-url>", [
+      "--viewports",
+      "--variant",
+      "--storage-state",
+    ]);
+    const widths = readFlag(argv, "viewports");
+    const viewports = widths?.split(",").map((w) => Number(w.trim()));
+    if (viewports && viewports.some((w) => !Number.isInteger(w) || w < 200))
+      throw new UsageError(`--viewports takes widths of 200px or more, e.g. 1280,375; got ${widths}`);
+    const only = readAll(argv, "variant");
+    const storageState = readFlag(argv, "storage-state");
+    return {
+      source,
+      ...(viewports ? { viewports } : {}),
+      ...(only.length > 0 ? { only } : {}),
+      ...(storageState ? { storageState } : {}),
+      ...parsePageLoad(argv),
+    };
+  },
+  run: (options) => runDataStress(options),
+  findings: (report): Finding[] =>
+    report.findings.map((f) => {
+      const rule = dataStressRuleOf(f);
+      const own = rule !== "variant-defect";
+      return {
+        rule,
+        severity: f.severity === "fail" ? ("suspect" as const) : ("warn" as const),
+        message: `${f.variant}: ${own ? "" : `[${f.rule}] `}${f.message}`,
+        viewport: f.viewport,
+        ...(f.selector ? { selector: f.selector } : {}),
+        evidence: { variant: f.variant, rule: f.rule, replay: `--variant ${f.variant}` },
+      };
+    }),
+  format: formatDataStressReport,
+  headline: (report) =>
+    `${report.findings.length} finding(s) over ${report.variants.length} variant(s) of ${report.probe.groups.length} group(s)`,
+  ledger: (report, options) => ({
+    tool: "stress-data",
+    source: options.source,
+    headline: { variants: report.variants.length, findings: report.findings.length },
   }),
 });
 

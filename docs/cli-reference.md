@@ -716,7 +716,7 @@ no-op, and the JSON is always
 ```
 
 so a client gates on `verdict` / `counts` without knowing which gate ran. All
-35 gates are registry-driven; `vlmkit rules` lists them. Commands that produce
+36 gates are registry-driven; `vlmkit rules` lists them. Commands that produce
 artifacts rather than verdicts (`diff`, `build`, `contract`, `snapshot`, …) are
 not gates and keep their own flags.
 
@@ -1132,6 +1132,7 @@ vlmkit check responsive <html|url>             # Property-based responsive check
 vlmkit check crater                            # Crater BiDi backend smoke check
 
 # Stress tests.
+vlmkit stress data  <html>                     # Empty / one / many items, long names, 9,999,999, broken images
 vlmkit stress i18n  <html>                     # Text-node inflation overflow detection
 vlmkit stress media <html>                     # forced-colors, reduced-motion, print, RTL, 200% zoom
 ```

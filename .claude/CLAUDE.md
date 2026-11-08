@@ -1446,6 +1446,38 @@ adversarial review (54 findings), not to re-learn (`docs/reports/2026-10-13-scan
   capture: a planted glitch and transient come back on their frames. On the stream clock 16.67ms gaps
   are a recording's rate, never "every 60 fps frame".
 
+## Data the page was not built with (`stress data`)
+
+```bash
+vlmkit stress data page.html                         # every list-like group emptied / cut to one / x5, long names, 9,999,999, broken images; 1280 and 375
+vlmkit stress data page.html --variant long-text     # replay one variant (every finding prints its --variant)
+```
+
+Issue #218. A probe finds repeated groups (3+ visible siblings of one shape, at least 60% of the
+children; navigation, header and footer left out; the 4 largest), the short text leaves in their
+items, the counts (`12`, `(3)`) and the images, and plans the variants from what it found
+(`planVariants`, pure). Each variant is applied to a fresh load and judged with `check
+integrity`'s judges (`judgeIntegrityInstant`) at each width; what the page already had at rest is
+not reported again. Two rules of its own: `empty-collapses` (an emptied group with no height and no
+`::before` / `::after` to say it is empty) and `broken-image-collapses` (an image that fails to load
+and loses half its area). Code: `packages/vlmkit-markup/src/stress/data-stress.ts`; gate
+`stress.data` in `stress.gate.ts`. Known answers: `fixtures/data-stress/` (`build.mjs`: an intact
+product list, and one mutant each for a long unbreakable name, a fixed-width badge, an avatar with
+no size of its own and a list with no empty state), held by `data-stress.test.ts`. Measured building
+it, not to re-learn:
+
+- **A page's own finding comes back under another selector.** Integrity groups findings ("6
+  elements: …"), and with one item left the group's selector is that item's, so a contrast defect
+  the page had at rest read as new in `one:`. The baseline is matched by kind and selector AND by
+  the message with counts, quoted text and nth paths taken out.
+- **A broken image's alt text is clipped by design**, so in `broken-images` a finding on an `img`
+  is not reported; its collapse is `broken-image-collapses`.
+- **Footer and nav groups are noise**: a column of footer links emptied is not a list the data
+  fills. They are skipped.
+- On the six demo sites every one fails `long-text` somewhere (text-collision, page-overflow-x,
+  container-protrusion) and 4-7 groups per site have no empty state; the intact fixture passes all
+  six variants at both widths.
+
 ## Responsive layout as a property-based test (`check responsive`)
 
 ```bash
@@ -1918,7 +1950,7 @@ This repository is a pnpm workspace.
 | `packages/vlmkit-judge/` | **Pure judges** (`judgeComposition`, `judgeColorRoles`, `judgeDesignPolicy`, the 15 `check integrity` judges, both `--allow` parsers, `UsageError`): snapshot in, findings out. Zero deps, no DOM / Playwright / `node:*` — `purity.test.ts` enforces it, `scene-graph.test.ts` judges a non-DOM game menu. The bottom layer (`judge ← core ← capture ← markup`); markup re-exports every moved symbol from its old path. `scene.ts` is the **scene contract** — the image-mode `--elements` JSON as `SceneElement`, plus `sceneFromTree` (engine-style local coordinates) and adapters to integrity, composition, colour and design — each reachable as `--elements` on its gate (`check color` reads `role: field | link | button`; `check design` groups by any `role`; `check composition` reads boxes, `heading`, font, and background / border / radius as a group's painted edge; `check copy` sorts drawn strings with the page's invisible-reason classes from `opacity` / `color` / `background`, the judgement itself in `copy.ts`); `integrity-image.ts` is only its file-reading half. `a11y-tree.ts` is the second contract, for what a platform *announces* rather than paints — `vlmkit-a11y/1`, judged by `check a11y tree` with contrast read from the frame's pixels. `color.ts` is the page's colour arithmetic as pure functions, and `vlmkit-markup/src/contrast-parity.test.ts` holds the two to each other (functions over a grid, and the real `COLLECT_TEXT_CONTRAST` vs the scene adapter on one page). Rule: the collector resolves colours, the judge composites and measures. Both DOM contrast collectors follow it: `COLLECT_TEXT_CONTRAST` ships `TextContrastSample`s (colour, background layers, opacity, font) to `textContrastCandidates`, and `COLLECT_COLOR_ROLES` ships `ControlSample` / `LinkSample` to `controlBoundary` / `linkCue`; each move was proven by byte-identical `--json` on 15-16 pages. `pbt.ts` is the property-based search (seeded generator, greedy shrink, failing-interval bisection, ddmin) and `responsive.ts` the viewport space it searches for `check responsive` — both pure, both usable for any property with an async oracle. `frames.ts` is the `vlmkit-frames/1` contract and its time grammar, and `storyboard.ts` segments such a sequence into states and events over any `FramePixels` (`snapshot storyboard`); `flash.ts` and `flash-motion.ts` are WCAG 2.3.1's arithmetic over one (`check flash`). Plan for the rest of the split: `docs/design/package-decomposition.md`. |
 | `packages/vlmkit-core/` | Image / CSS / DOM / a11y diff engine + shared types and CLI helpers. No Playwright or AI deps required to import core types. |
 | `packages/vlmkit-core/src/plugin/` | **Gate plugin runtime**: the contract (`defineGate` / `definePlugin`), rule tables and settings, the registry, and the core runner that owns `--help` / `--json` / `--advisory` / the run ledger / the exit code. Core never imports a gate — definitions are handed to it. |
-| `packages/vlmkit-markup/src/gates/` | Gate definitions (`*.gate.ts`) + the main built-in plugin (`index.ts`) — 33 of the 35 gates. Wraps existing measurement code; adding a gate is `defineGate` + one line in `index.ts`. |
+| `packages/vlmkit-markup/src/gates/` | Gate definitions (`*.gate.ts`) + the main built-in plugin (`index.ts`) — 34 of the 36 gates. Wraps existing measurement code; adding a gate is `defineGate` + one line in `index.ts`. |
 | `packages/vlmkit-capture/src/gates/`, `src/gates/` | The other two built-in plugins: `check crater` (capture) and `check perf` (app-side). Composed by `src/cli/gate-registry.ts` alongside any `vlmkit.config.json` `"plugins"`. |
 | `packages/vlmkit-capture/` | Playwright / Crater capture infrastructure, viewport discovery, prescanner. |
 | `packages/vlmkit-ai/` | VLM / LLM clients, reasoning pipeline, NLP helpers. |
@@ -1999,7 +2031,7 @@ case at 0.23.0.
 | `docs/reports/2026-08-06-gate-rule-cost-bench.md` | Measured gate/rule execution cost: where a ruleset's time goes, why per-rule cost is attributed rather than isolated, why suppression saves nothing |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
 | `docs/design/package-decomposition.md` | **Splitting vlmkit by layer** (collector / pure judge / driver / loop / diagrams): what was measured, phase 1 (`vlmkit-judge`) and the proposed phases 2-5 |
-| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 35 gates + 233 rules, behavior changes, what is deliberately not a gate |
+| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 36 gates + 243 rules, behavior changes, what is deliberately not a gate |
 | `docs/design/moonbit-boundary.md` | **TS ↔ MoonBit boundary**: what the positional FFI costs (61 commands, 233 args, 2 duplicated dispatch tables), the JSON boundary that replaces it for new logic, how to add a command, and which pure logic belongs in MoonBit versus which deliberately does not |
 | `docs/crater-css-status.md` | Crater CSS rendering verification status |
 | `docs/reset-css-comparison.md` | Reset CSS domain knowledge |
