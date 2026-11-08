@@ -31,7 +31,7 @@ nothing — failing on a suspect is the default.
 | Is anything broken? (JS errors, empty render, failed resources, text collision/clipping/protrusion, collapsed containers, overflow, invisible text, occlusion, misalignment, unstyled page — 3 viewports) | `vlmkit check integrity page.html` |
 | Is the required copy present, exactly? | `vlmkit check copy page.html --manifest copy.txt` |
 | Does the structure match the brief? (widths, per-row counts, order, per-viewport visibility) | `vlmkit check layout page.html --contract layout.json` |
-| Tokens / theme / a11y / long-text survival | `check tokens` · `check theme` · `check a11y contrast\|touch\|focus` · `stress i18n` |
+| Tokens / theme / a11y / long-text survival | `check tokens` · `check theme` · `check a11y contrast\|touch\|focus` · `stress i18n` · `stress data` (empty / one / many items, long names, big numbers, broken images) |
 | Is the page consistent with itself? (no tokens file needed — component styles reused, spacing on its own scale) | `vlmkit check design page.html` |
 | Does the layout read as organized? A heading drifted from the content it labels, two SIBLINGS whose edges sit a few px apart, `h2`/`h3` rendering at one size | `vlmkit check composition page.html` (complements `check design`: style reuse cannot see a margin change) |
 | What is each colour for, and does colour alone carry a meaning? A text field with no visible boundary, a link in prose with no underline | `vlmkit check color page.html` (complements `check a11y contrast`, which measures text against its background and passes both) |

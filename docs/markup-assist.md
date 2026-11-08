@@ -165,6 +165,7 @@ its relative stylesheets, images and scripts resolve — if your CSS lives in
 | Light/dark theme parity | `vlmkit check theme page.html` |
 | WCAG contrast / touch targets / focus order | `vlmkit check a11y contrast\|touch\|focus page.html` |
 | Layout survives 30% longer strings (i18n) | `vlmkit stress i18n page.html` |
+| Layout survives real data: empty / one / many items, long names, 9,999,999, broken images | `vlmkit stress data page.html` |
 | A generated/sourced image asset fits its slot (aspect, cut-out background, silhouette contrast, palette harmony) — before swapping it in | `vlmkit check asset sprite.png --slot 220x300 --expect-transparent --against-bg "#241b3a" --page-palette page.png` |
 
 ### Match a target design
