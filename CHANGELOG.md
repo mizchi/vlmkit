@@ -3,6 +3,70 @@
 All notable changes to this project will be documented in this file.
 Dates are YYYY-MM-DD.
 
+## 0.26.0 — 2026-11-08
+
+Added:
+
+- `vlmkit act <page> --goal "…" --expect <postcondition>` runs a browser agent that verifies each
+  step.
+  - Each step is planned, done, then checked. A step that brings in a `check integrity` defect,
+    fails to run, or clicks a toggle whose `aria-expanded` and panel disagree is rolled back, and
+    the planner is told why.
+  - The run is VERIFIED only when every `--expect` holds. Postcondition forms: `url:`, `visible:`,
+    `hidden:`, `text:`, `count:`, `value:`.
+  - A planner that says done before that is reported as CLAIMED, NOT VERIFIED.
+  - Planners: `--planner llm` (needs an LLM key), `--plan steps.json`, or `--planner-cmd "<cmd>"`
+    (context as JSON on stdin, one action as JSON on stdout).
+  - `--runs N` prints the verified success rate. Exit 0 only when every run is verified.
+- `check mobile` opens the page as a touch phone (390x844, `isMobile`, `hasTouch`). It has five
+  rules:
+  - `zoom-disabled`: `user-scalable=no` or `maximum-scale` < 2 (WCAG 1.4.4);
+  - `no-viewport-meta` (warn): the page has no viewport meta;
+  - `swipe-unsnapped`: a carousel swiped with real touch events comes to rest between slides;
+  - `keyboard-covers-input`: a focused field stays under a software keyboard covering 40% of the
+    screen (it follows `interactive-widget`);
+  - `safe-area-overlap`: with `viewport-fit=cover`, text or a control sits under the notch or
+    home-indicator insets.
+
+  `--device`, `--keyboard` and `--insets` change the phone.
+- `stress data` loads the page once per data variant and judges each with `check integrity`'s
+  layout judges, at 1280 and 375. Only what a variant adds over the page as it is is reported.
+  - Variants: every repeated group emptied, cut to one item and multiplied by 5; unbreakable long
+    names; counts set to 9,999,999; images failing to load.
+  - Its own rules: `empty-collapses` (an emptied list shows nothing and says nothing) and
+    `broken-image-collapses` (a failed image shrinks its slot).
+  - `--variant <id>` replays one variant.
+- `check auto <page>` probes the page once, chooses the gates that apply with a reason for each, and
+  runs them in parallel with one verdict. The style gates judge a `scan style` snapshot from the
+  same run. `--plan` prints the choice without running it.
+- `inspect motion --track x,y,w,h` follows a target by its pixels, with no element to read: a
+  canvas, a script-drawn scene or a video. It measures position only, and the output says so.
+- `inspect motion --baseline <file>` holds a passing run's motion to an approved one: start,
+  duration, runs, travel, direction, easing, origin, pivot, turn and rest place, each with its own
+  tolerance. `--update-baseline` writes the file, only from a passing run.
+- `{ "motion": { … } }` entries in `vlmkit.gates.json` declare a brief's expectations per target.
+  They are compiled to the `inspect motion` command line, so the plan and suppressions see one
+  command.
+- `--color-scheme light|dark` on the gates that read paint: `check integrity`, `check a11y
+  contrast`, `check color`, `check design`, `check composition` and `scan style` (which records it
+  for `--from`).
+- `OpenPageOptions` takes `isMobile` and `hasTouch`.
+
+Changed:
+
+- 37 gates and 248 rules, up from 35 and 240: `stress data` adds 3 rules and `check mobile` adds 5.
+- `inspect motion`:
+  - `--expect-easing any` is accepted as one target's entry in a per-target list;
+  - a click caught by an invisible element on top is `action-blocked` (fail), naming the cover,
+    instead of a usage error;
+  - a fade a target inherits from its parent no longer counts as its easing.
+- `gates run` recognises a failing `inspect motion` job as run, not "DID NOT RUN".
+
+Docs:
+
+- Four CSS animation demos checked with `inspect motion`.
+- CLAUDE.md, the CLI reference and markup-assist routing cover each new command.
+
 ## 0.25.2 — 2026-11-06
 
 Added:
