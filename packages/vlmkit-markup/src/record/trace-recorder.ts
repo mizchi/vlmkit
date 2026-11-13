@@ -280,6 +280,9 @@ const LISTEN_SCRIPT = `(() => {
   document.addEventListener("focusin", (e) => { if (rec() && isText(e.target)) arm(e.target); }, true);
   document.addEventListener("focusout", (e) => { if (rec() && field && e.target === field.el) flush(); }, true);
   // Node is told a field holds an edit not yet sent, so a window closed mid-edit is counted as lost.
+  // beforeinput comes before the value changes: a field cleared by the page after Enter is armed
+  // with its cleared value, so a one-character edit is still an edit.
+  document.addEventListener("beforeinput", (e) => { if (rec() && isText(e.target)) arm(e.target); }, true);
   document.addEventListener("input", (e) => {
     if (!rec() || !isText(e.target)) return;
     arm(e.target);

@@ -191,4 +191,26 @@ describe("record a session from the page's events and replay it with @playwright
     });
     assert.equal(lost, 1);
   });
+
+  it("a field the page clears on Enter, then typed in again, records the new edit", { timeout: 60_000 }, async () => {
+    const { withBrowser } = await import("@mizchi/vlmkit-core/browser-launch.ts");
+    const trace = await withBrowser(async (browser) => {
+      const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+      await page.goto(fixture("app.html"));
+      const rec = new TraceRecorder(page, { recordedBy: "test" });
+      await rec.start();
+      await rec.listen();
+      await page.getByPlaceholder("New item").click();
+      await page.keyboard.type("Teapot");
+      await page.keyboard.press("Enter"); // the page adds the item and clears the field, focus stays
+      await page.waitForTimeout(120);
+      await rec.idle();
+      await page.keyboard.type("b");
+      const t = await rec.stop();
+      await page.close();
+      return t;
+    });
+    const fills = trace.steps.flatMap((s) => (s.action.action === "fill" ? [s.action.value] : []));
+    assert.deepEqual(fills, ["Teapot", "b"], JSON.stringify(trace.steps.map((s) => s.action)));
+  });
 });
