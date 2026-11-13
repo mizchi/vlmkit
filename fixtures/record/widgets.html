@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Record fixture — widgets</title>
+<style>body { font: 16px system-ui; margin: 24px; } [contenteditable] { border: 1px solid #888; min-height: 2em; padding: 4px; }</style>
+</head>
+<body><main>
+<h1>Widgets</h1>
+<details id="more"><summary>More</summary><p id="more-text">Hand-thrown in small batches.</p></details>
+<p><label for="toppings">Toppings</label>
+<select id="toppings" multiple size="3"><option value="a">Almond</option><option value="b">Basil</option><option value="c">Cocoa</option></select></p>
+<p id="picked">none</p>
+<div id="notes" role="textbox" aria-label="Notes" contenteditable="true"></div>
+<p><button id="first">First</button> <button id="second">Second</button></p>
+<p><label for="last">Last word</label> <input id="last"></p>
+<a href="widgets-next.html">Next page</a>
+</main>
+<script>
+document.getElementById("toppings").addEventListener("change", (e) => {
+  document.getElementById("picked").textContent = [...e.target.selectedOptions].map((o) => o.textContent).join(", ") || "none";
+});
+</script>
+</body></html>

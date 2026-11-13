@@ -22,6 +22,7 @@ import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { hasFlag, readAll, readFlag, readInt } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { SessionTrace } from "@mizchi/vlmkit-judge/session-trace.ts";
 import {
   actVerdict,
   checkAction,
@@ -79,6 +80,8 @@ export interface ActOptions {
   viewport?: { width: number; height: number };
   /** Leave the integrity judges out of verify (postconditions only). */
   noGates?: boolean;
+  /** Record the kept steps as a session trace (`vlmkit-trace/1`) for `vlmkit export playwright`. */
+  trace?: boolean;
 }
 
 export interface ActReport {
@@ -89,6 +92,8 @@ export interface ActReport {
   steps: ActStepRecord[];
   postconditions: { expect: string; holds: boolean; saw: string }[];
   rolledBack: number;
+  /** With `trace`: the kept steps and what each changed. */
+  trace?: SessionTrace;
 }
 
 const OBSERVE = `(() => {
@@ -259,6 +264,22 @@ async function toggleProblems(page: Page, t: { selector: string; was: string | n
   return problems;
 }
 
+/** What the recorder needs to describe an act step before it runs. */
+function traceStep(page: Page, a: ActAction) {
+  const target = "target" in a && a.target ? page.locator(resolveTarget(a.target)).first() : undefined;
+  switch (a.action) {
+    case "goto":
+      return { type: "goto" as const, url: new URL(a.url, page.url()).href };
+    case "press":
+      return { type: "press" as const, key: a.key, ...(target ? { locator: target } : {}) };
+    case "fill":
+    case "select":
+      return { type: a.action, value: a.value, ...(target ? { locator: target } : {}) };
+    default:
+      return { type: "click" as const, ...(target ? { locator: target } : {}) };
+  }
+}
+
 export async function runAct(options: ActOptions, browser: Browser): Promise<ActReport> {
   const { openSource } = await import("@mizchi/vlmkit-core/page-open.ts");
   const viewport = options.viewport ?? { width: 1280, height: 800 };
@@ -278,6 +299,12 @@ export async function runAct(options: ActOptions, browser: Browser): Promise<Act
   let gaveUp = false;
   let replyError: string | undefined;
   let rolledBack = 0;
+  const recorder = options.trace
+    ? new (await import("@mizchi/vlmkit-markup/record/trace-recorder.ts")).TraceRecorder(page, {
+        recordedBy: "vlmkit act",
+      })
+    : null;
+  await recorder?.start();
   let post = await readPostconditions(page, options.expectations);
   for (let n = 1; n <= maxSteps && !post.every((p) => p.holds); n++) {
     const observation = (await page.evaluate(OBSERVE)) as Observation;
@@ -315,8 +342,14 @@ export async function runAct(options: ActOptions, browser: Browser): Promise<Act
     const before = options.noGates ? [] : await gateFindings(page, viewport.width);
     const problems: string[] = [];
     let replay: ActAction | undefined;
+    const tracedBefore = recorder?.stepCount ?? 0;
     try {
-      const done = await perform(page, action);
+      let done!: Awaited<ReturnType<typeof perform>>;
+      const run = async () => {
+        done = await perform(page, action);
+      };
+      if (recorder) await recorder.step(run, traceStep(page, action));
+      else await run();
       replay = done.replay;
       await settle(page);
       if (done.toggle) problems.push(...(await toggleProblems(page, done.toggle)));
@@ -334,9 +367,15 @@ export async function runAct(options: ActOptions, browser: Browser): Promise<Act
       rolledBack++;
       await page.close();
       page = await open(kept);
+      if (recorder) {
+        // Only this action's step: one that failed before it was recorded added none.
+        if (recorder.stepCount > tracedBefore) recorder.discardLast();
+        await recorder.rebind(page);
+      }
     }
     post = await readPostconditions(page, options.expectations);
   }
+  const trace = recorder ? await recorder.stop() : undefined;
   await page.close();
   return {
     source: options.source,
@@ -350,6 +389,7 @@ export async function runAct(options: ActOptions, browser: Browser): Promise<Act
     steps,
     postconditions: post,
     rolledBack,
+    ...(trace ? { trace } : {}),
   };
 }
 
@@ -469,6 +509,7 @@ Options:
   --runs <n>              repeat the run; prints the verified success rate
   --viewport WxH          default 1280x800
   --no-gates              postconditions only (no integrity judges in verify)
+  --trace <file>          record the kept steps as a session trace (vlmkit export playwright <file>)
   --out <dir>             write act-report.json
   --json`;
 
@@ -487,6 +528,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     "--runs",
     "--viewport",
     "--out",
+    "--trace",
   ]);
   const positional = argv.filter((a, i) => !a.startsWith("--") && !(i > 0 && valueFlags.has(argv[i - 1]!)));
   if (positional.length !== 1) throw new UsageError(`act takes one page or URL, got ${positional.length}`);
@@ -551,6 +593,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
             ...(maxSteps ? { maxSteps } : {}),
             ...(viewport ? { viewport } : {}),
             ...(hasFlag(argv, "no-gates") ? { noGates: true } : {}),
+            ...(readFlag(argv, "trace") ? { trace: true } : {}),
           },
           browser,
         ),
@@ -564,6 +607,16 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     claimed: reports.filter((r) => r.outcome === "claimed").length,
     rate: verified / reports.length,
   };
+  const tracePath = readFlag(argv, "trace");
+  if (tracePath) {
+    const { writeTrace } = await import("./record-cli.ts");
+    // One trace per run; with --runs, the run's number before the extension.
+    for (const [i, r] of reports.entries()) {
+      if (!r.trace) continue;
+      const path = reports.length > 1 ? tracePath.replace(/(\.json)?$/, `-${i + 1}$1`) : tracePath;
+      await writeTrace(r.trace, resolve(path), undefined, hasFlag(argv, "json") ? console.error : console.log);
+    }
+  }
   const outDir = readFlag(argv, "out");
   if (outDir) {
     await mkdir(resolve(outDir), { recursive: true });

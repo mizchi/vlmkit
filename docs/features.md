@@ -86,6 +86,14 @@ The paint-reading gates take `--color-scheme dark`.
 | `vlmkit check equivalence <attempt> --region …` | Whether the regions left over are visually equivalent: a measured delta, and with `--vlm` a model's reading checked against it **[opt key]** |
 | `vlmkit heal selector` · `heal markup` | Replacements for a selector that no longer matches; an LLM's CSS fix from a kickback, kept only if the gates pass **[key]** |
 
+## Turn a session into a Playwright test
+
+| Command | What it answers |
+|---|---|
+| `vlmkit record <page>` | Opens a browser and records what you do: each click, typed field, select, checkbox and key, with what the step changed (URL, ARIA state, text that appeared or changed, an element shown or gone, focus). Writes a `vlmkit-trace/1` file. Needs a display |
+| `vlmkit act <page> --goal … --expect … --trace t.json` | The same trace from an agent's run, with only the steps it kept |
+| `vlmkit export playwright <trace> --out x.spec.ts` | An `@playwright/test` spec: each action with its best locator (test id, role and name, label, placeholder, text, a CSS path last) and each observed change as an `expect`. Same trace, same spec. `--verify` runs it twice with Playwright's own runner |
+
 ## Compare and track changes (VRT)
 
 | Command | What it answers |

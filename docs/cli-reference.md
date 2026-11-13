@@ -22,7 +22,7 @@ for options.
 | `vlmkit snapshot` | `[<url>...]`, `approve`, `fix-prompt`, `stability`, `flipbook`, `strip`, `storyboard`, `record-har`, `report` |
 | `vlmkit migration` | `compare`, `blind`, `subagent` |
 | `vlmkit workflow` | `init`, `capture`, `verify`, `approve`, `graph`, `affected`, `introspect`, `spec-verify`, `expect` |
-| Standalone | `vlmkit batch`, `vlmkit gates`, `vlmkit rules`, `vlmkit mcp`, `vlmkit watch`, `vlmkit manifest`, `vlmkit diff-pr`, `vlmkit baseline`, `vlmkit markup-loop`, `vlmkit act`, `vlmkit api`, `vlmkit bench`, `vlmkit report`, `vlmkit skill` |
+| Standalone | `vlmkit record`, `vlmkit export playwright`, `vlmkit batch`, `vlmkit gates`, `vlmkit rules`, `vlmkit mcp`, `vlmkit watch`, `vlmkit manifest`, `vlmkit diff-pr`, `vlmkit baseline`, `vlmkit markup-loop`, `vlmkit act`, `vlmkit api`, `vlmkit bench`, `vlmkit report`, `vlmkit skill` |
 
 ## Features
 
@@ -223,6 +223,21 @@ vlmkit diff matrix --viewport desktop:1280:base.png:cur.png [...]   # region x v
 vlmkit diff browsers <html|url>                # chromium / firefox / webkit parity
 vlmkit diff runs <dir...>                      # Aggregate multiple VRT runs into one table
 ```
+
+### Record a session, export a Playwright test
+
+```bash
+vlmkit record <html|url> --out trace.json      # a window: click through, close it to finish (needs a display)
+vlmkit act <html|url> --goal "…" --expect … --trace trace.json   # the same trace from an agent's kept steps
+vlmkit export playwright trace.json --out tests/recorded.spec.ts --verify   # write the spec, run it twice
+vlmkit export playwright trace.json --base-url http://localhost:3000        # URLs as paths, for use.baseURL
+```
+
+A trace (`vlmkit-trace/1`) is each step's action and what the step was observed to change: the
+URL, ARIA state, text that appeared or changed, an element shown or gone, focus. A value that
+changes while nothing happens (a clock) is never an outcome. Every locator was resolved by
+Playwright to that one element when it was recorded, best first: test id, role and name, label,
+placeholder, text, a CSS path last.
 
 ### Snapshot (URL → baseline + diff)
 

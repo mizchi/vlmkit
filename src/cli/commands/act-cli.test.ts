@@ -96,3 +96,30 @@ describe("vlmkit act on fixtures/act/store.html", () => {
     assert.match(told, /no JSON object/);
   });
 });
+
+describe("vlmkit act --trace", () => {
+  it("records only the kept steps, and the trace replays as an @playwright/test spec", T, async () => {
+    const { compileTrace } = await import("@mizchi/vlmkit-judge/session-trace.ts");
+    const { runSpec } = await import("@mizchi/vlmkit-markup/record/run-spec.ts");
+    const r = await run({
+      goal: "show the details and put two mugs in the cart",
+      expectations: [parseExpectation("text:#count=2"), parseExpectation("visible:#details")],
+      trace: true,
+      planner: scriptPlanner([
+        { action: "click", target: "#promo" },
+        { action: "click", target: "#more" },
+        { action: "click", target: "#add" },
+        { action: "click", target: "#add" },
+      ]),
+    });
+    assert.equal(r.outcome, "verified");
+    assert.ok(r.trace);
+    assert.equal(r.trace.steps.length, 3, "the rolled-back promo click is not in the trace");
+    assert.equal(r.trace.source.recordedBy, "vlmkit act");
+    const spec = compileTrace(r.trace);
+    assert.match(spec, /getByRole\("button", \{ name: "Details", exact: true \}\)\.click\(\)/);
+    assert.match(spec, /toHaveAttribute\("aria-expanded", "true"\)/);
+    const replay = runSpec(spec);
+    assert.ok(replay.passed, replay.output);
+  });
+});
