@@ -1,9 +1,9 @@
 # vlmkit CLI reference
 
-The complete command reference. For "which command do I want" start
-with the use-case map in the [README](../README.md#when-to-use-what)
-or `vlmkit --help`; for task recipes and done-condition sets see
-[`markup-assist.md`](./markup-assist.md).
+The complete command reference. For "which command do I want", start
+with [`features.md`](./features.md) (every command, one line each) or the
+use-case map in the [README](../README.md#when-to-use-what); for task recipes
+and done-condition sets see [`markup-assist.md`](./markup-assist.md).
 
 The CLI is organized into verb groups. Run `vlmkit <group> --help`
 for options.
@@ -11,52 +11,36 @@ for options.
 | Group | Subcommands |
 |---|---|
 | `vlmkit diff` | `html`, `png`, `matrix`, `elements`, `component`, `browsers`, `agent`, `runs` |
-| `vlmkit check` | `integrity`, `copy`, `layout`, `interactions`, `equivalence`, `asset`, `breakpoints`, `scroll`, `animation`, `motion`, `a11y {contrast,touch,focus}`, `palette`, `tokens`, `design`, `theme`, `perf`, `drift {component,pages}`, `crater` |
-| `vlmkit scan` | `component`, `breakpoints`, `scroll`, `mock`, `handlers` |
-| `vlmkit build` | `component`, `page` |
+| `vlmkit check` | `integrity`, `auto`, `copy`, `layout`, `interactions`, `equivalence`, `asset`, `breakpoints`, `responsive`, `scroll`, `mobile`, `animation`, `motion`, `flash`, `story`, `grounding`, `a11y {contrast,touch,focus,tree}`, `palette`, `tokens`, `design`, `composition`, `color`, `theme`, `perf`, `drift {component,pages}`, `crater` |
+| `vlmkit scan` | `component`, `breakpoints`, `scroll`, `style`, `mock`, `handlers`, `a11y`, `video` |
+| `vlmkit build` | `component`, `page`, `gallery` |
 | `vlmkit verify` | `markup`, `flow` |
 | `vlmkit contract` | `introspect`, `validate`, `scaffold` |
 | `vlmkit heal` | `selector`, `markup` |
-| `vlmkit inspect` | `interact`, `explore`, `smoke` |
-| `vlmkit stress` | `i18n`, `media` |
-| `vlmkit snapshot` | `[<url>...]`, `approve`, `fix-prompt`, `stability`, `flipbook`, `strip`, `record-har`, `report` |
+| `vlmkit inspect` | `interact`, `explore`, `smoke`, `motion`, `locate`, `claims` |
+| `vlmkit stress` | `i18n`, `data`, `media` |
+| `vlmkit snapshot` | `[<url>...]`, `approve`, `fix-prompt`, `stability`, `flipbook`, `strip`, `storyboard`, `record-har`, `report` |
 | `vlmkit migration` | `compare`, `blind`, `subagent` |
 | `vlmkit workflow` | `init`, `capture`, `verify`, `approve`, `graph`, `affected`, `introspect`, `spec-verify`, `expect` |
 | Standalone | `vlmkit batch`, `vlmkit gates`, `vlmkit rules`, `vlmkit mcp`, `vlmkit watch`, `vlmkit manifest`, `vlmkit diff-pr`, `vlmkit baseline`, `vlmkit markup-loop`, `vlmkit act`, `vlmkit api`, `vlmkit bench`, `vlmkit report`, `vlmkit skill` |
 
 ## Features
 
-- **Pixel diff** — pixelmatch v7 + heatmap generation; per-region
-  measured colors, translation estimates (`shift {dx, dy}`), and
-  deterministic DOM selector candidates (`--elements-html`). This
-  deterministic signal layer is the agent-facing core — see the
-  controlled A/B evaluation in
-  `docs/reports/2026-06-06-ab-external-synthesis.md`.
-- **Computed style diff** — `getComputedStyle` capture including hover/focus states
-- **A11y tree diff** — accessibility snapshot comparison
-- **CSS challenge bench** — automated CSS deletion/recovery with detection rate tracking (96.7%)
-- **2-stage AI pipeline** — VLM (image → structured diff) + LLM (diff → CSS fix)
-- **Migration VRT** — compare HTML before/after across responsive viewports
-- **Snapshot** — URL-based multi-viewport capture with baseline diff
-- **Mask** — selector-based masking for dynamic content (animations, counters). Each
-  `--mask` selector is validated in the page and injected on its own, so a malformed one
-  cannot take the others with it, and the run warns about any that were invalid CSS or
-  matched no element anywhere
-- **Crater integration** — lightweight prescanner via BiDi (1.66x speedup,
-  0% false positive) plus a layout-only JS/WASM backend.
-- **Markup-assistance toolkit** (10+ commands): build from screenshot, theme-parity,
-  i18n stress, a11y contrast / touch / focus-order, media-variant adaptations,
-  cross-browser parity, design-token conformance, interaction sequences.
-- **Self-healing Playwright tests** (`@mizchi/vlmkit-heal`) — a cost-optimized
-  loop that runs a test, observes the failure, and patches the test (or updates
-  a VRT baseline), escalating cheap → strong models under a shared budget cap.
-  See [`packages/vlmkit-heal`](packages/vlmkit-heal/README.md) /
-  [日本語ガイド](packages/vlmkit-heal/README.ja.md).
-- **Playwright planning/generation contracts** (`@mizchi/vlmkit-plan`,
-  `@mizchi/vlmkit-generate`) — runtime-neutral prompt/API layers for turning a
-  user story + seed test + UI observations into `specs/<topic>.md`, then into a
-  Playwright spec source file.
+What each command answers, grouped by question, is [`features.md`](./features.md). Underneath
+them are a few engines worth knowing by name:
 
+- **Pixel diff**: pixelmatch with a heatmap, measured colours and translation estimates per region
+  (`shift {dx, dy}`), and DOM selector candidates (`--elements-html`). This deterministic layer is
+  the agent-facing core (`docs/reports/2026-06-06-ab-external-synthesis.md`).
+- **The held clock**: `requestAnimationFrame`, timers and every animation held at page time 0 and
+  advanced one 60fps frame at a time, so motion is measured instead of raced.
+- **Computed style and a11y tree diffs**, and a **mask** per selector for dynamic content (each
+  `--mask` validated on its own, with a warning for one that is invalid or matches nothing).
+- **Crater**: a lightweight prescanner through BiDi, plus a layout-only JS/WASM backend.
+- **Libraries beside the CLI**: `@mizchi/vlmkit-heal` (self-healing Playwright tests, cheap to
+  strong models under one budget; [README](../packages/vlmkit-heal/README.md)),
+  `@mizchi/vlmkit-plan` and `@mizchi/vlmkit-generate` (a user story into a test plan, then into a
+  Playwright spec), and `@mizchi/vlmkit-judge` (the pure judges, usable without a browser).
 
 ## Quick Start
 
@@ -126,11 +110,16 @@ vlmkit manifest add --selector .hero__body --max-px 2 --reason "AA artifact" --e
 vlmkit manifest add --a11y-contrast --selector "button" --reason "decorative" --expires 2026-08-15
 vlmkit manifest add --from-run .vlmkit/runs/diff-pr/  # auto-acknowledge sub-pixel deltas
 vlmkit manifest list
+vlmkit manifest check                                     # warn on expired / soon-to-expire rules (exit 1 on expired)
+vlmkit manifest rm 2                                      # remove a rule by index or selector
 
 # CI gate — declare routes in vlmkit.config.json, pin baselines, gate per PR
 vlmkit baseline pin                                       # on main
 vlmkit baseline verify                                    # in PR
 vlmkit baseline post --pr owner/repo#123                  # send summary.md as PR comment
+vlmkit baseline update hero                               # archive to _history/<ts>/ and re-pin (reversible)
+vlmkit baseline list                                      # every pinned baseline
+vlmkit baseline rm hero                                   # remove a route's baselines
 
 # No URL to open? Start from PNGs — native renderers, or a broken headless capture.
 vlmkit baseline pin    --from-dir captures/                # no browser launched
@@ -229,6 +218,8 @@ vlmkit diff png <baseline.png> <current.png>   # Direct PNG pixel diff + heatmap
   #                      uncertain below 0.6 confidence. --kind-limit <N> (12),
   #                      --kind-model <id> (jev-1.14.0)
 vlmkit diff elements [options]                 # Element-level diff with shift isolation
+vlmkit diff component before.html after.html --selectors "header,main"   # the same, per component selector
+vlmkit diff matrix --viewport desktop:1280:base.png:cur.png [...]   # region x viewport presence, with media-query hints
 vlmkit diff browsers <html|url>                # chromium / firefox / webkit parity
 vlmkit diff runs <dir...>                      # Aggregate multiple VRT runs into one table
 ```
@@ -541,6 +532,10 @@ vlmkit check a11y focus    <html|url>          # Tab order vs visual order
 vlmkit check a11y tree     <a11y.json>         # No DOM: names, reach, pixel contrast, target size from a platform's
                                                # accessibility tree + frame (Flutter, Android, …) — docs/a11y-tree.md
 vlmkit check palette       <target.png> [current.png]  # Dominant colors, or palette diff (missing/extra hex)
+vlmkit check layout        <html|url> --contract c.json   # a brief's widths, items per row and stacking order per viewport
+vlmkit check scroll        <html|url>          # fixed holds, engaged sticky sticks, mandatory snap lands on a child edge
+vlmkit check asset         <png> --slot …      # a generated image vetted for its slot (aspect, transparency, contrast, palette)
+vlmkit check equivalence   <attempt> --region …   # residual regions: measured delta, --vlm reading checked against it
 vlmkit check tokens        <html|url>          # radius/spacing/z-index/shadow scale conformance (declared scale)
 vlmkit check design        <html|url>          # coherence of the scale the page itself implies (no config; --elements for a scene)
 vlmkit check composition   <html|url>          # 近接/整列/対比: label grouping, page rails, declared type hierarchy (--elements for a scene)
@@ -1033,6 +1028,8 @@ vlmkit scan component <screenshot.png>         # Crop to standalone PNGs
   # --min-area <px>      min filled px per component (default 200)
   # --preset game-ui     = --min-area 24 --top-n 24, for small high-contrast frames
 vlmkit scan breakpoints <html-file>            # Discover responsive breakpoints
+vlmkit scan mock <mock.png>                    # Normalise a @2x / @3x export to CSS px for the loops below
+vlmkit scan handlers <html|url>                # Every wired listener, and controls only a pointer can reach
 vlmkit scan a11y <url|dump.xml> [--out a11y.json] # A platform's accessibility tree + frame as vlmkit-a11y/1:
                                                # Flutter web (semantics switched on, --click to reach a
                                                # screen) or an Android uiautomator dump (--density dpi)
@@ -1043,6 +1040,12 @@ vlmkit scan scroll <html|url>                  # Annotation-free scroll inventor
                                                # (axis / overflow px / bbox), unintended page overflow-x
                                                # with offenders, overflow:hidden cut-off suspects, nested
                                                # scrolling; --json emits UI Contract expectedScrollports
+
+# Done verdicts, and repair.
+vlmkit verify markup <attempt.html> --target t.png   # composition + gates + pixel diff -> DONE / NOT DONE + kickback
+vlmkit verify flow   <html|url> --flow flow.json     # each scripted action followed by a deterministic postcondition
+vlmkit heal markup   <attempt.html> --target t.png   # [key] an LLM's CSS overrides from the kickback, kept only if the gates pass
+vlmkit heal selector <html|url> <broken-selector>    # replacements for a selector that no longer matches
 
 # UI Contract IR: extract from existing markup, validate, or compile to a scaffold.
 vlmkit contract introspect <html|url> --out ui.contract.json

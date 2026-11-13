@@ -143,18 +143,20 @@ live in [mizchi/explainer](https://github.com/mizchi/explainer).
 
 ## When to use what
 
-`vlmkit --help` prints this same map. Everything is key-free unless
-marked `[key]`.
+Everything is key-free unless marked `[key]`. Every command, one line each:
+[`docs/features.md`](./docs/features.md).
 
 | You want to… | Reach for |
 |---|---|
-| <img src="docs/assets/icons/page-check.webp" width="20" height="20" alt="" /> Check the page you just wrote/edited, no reference | `check integrity` (broken-page scan, 3 viewports) · `check copy --manifest` (copy present, visibly, verbatim) · `check layout --contract` · `scan scroll` / `scan handlers` |
-| <img src="docs/assets/icons/responsive.webp" width="20" height="20" alt="" /> Verify behavior, not pixels | `check breakpoints --sweep` · `check responsive` (every width, shrunk to breakpoint + declaration) · `check interactions` · `check scroll` / `check animation` · `verify flow --flow` |
+| <img src="docs/assets/icons/page-check.webp" width="20" height="20" alt="" /> Check the page you just wrote/edited, no reference | `check auto` (picks the gates that apply and runs them) · `check integrity` (broken-page scan, 3 viewports) · `check copy --manifest` (copy present, visibly, verbatim) · `check layout --contract` · `scan scroll` / `scan handlers` |
+| <img src="docs/assets/icons/responsive.webp" width="20" height="20" alt="" /> Verify behavior, not pixels | `check breakpoints --sweep` · `check responsive` (every width, shrunk to breakpoint + declaration) · `check interactions` · `check scroll` · `check mobile` (touch phone: zoom, swipe, keyboard, notch) · `stress i18n\|data\|media` · `verify flow --flow` · `act` (a goal run as verified steps) |
+| <img src="docs/assets/icons/gallery.webp" width="20" height="20" alt="" /> Check that it moves right | `check animation` (held clock) · `inspect motion` (jumps, easing, origin, timing against a brief; `--track` for canvas) · `check flash` (WCAG 2.3.1) · `snapshot storyboard` |
+| <img src="docs/assets/icons/contrast.webp" width="20" height="20" alt="" /> Check an app with no DOM (Flutter web, Android, macOS) | `scan a11y` → `check a11y tree` |
 | <img src="docs/assets/icons/pointer.webp" width="20" height="20" alt="" /> Drive the page from a screenshot (computer use) | `check grounding` — action map in screenshot px, which element a click at each point actually reaches, `--mark` for a numbered overlay |
 | <img src="docs/assets/icons/target.webp" width="20" height="20" alt="" /> Match a target design | `verify markup --target` (done verdict + fix list) · `build page` / `build component` · `scan mock` (normalize @2x exports) |
 | <img src="docs/assets/icons/history.webp" width="20" height="20" alt="" /> Track changes over time (VRT) | `snapshot` (baseline → per-viewport diff → `snapshot approve`) · `watch` · `diff-pr` · `baseline` |
 | <img src="docs/assets/icons/compare.webp" width="20" height="20" alt="" /> Compare two versions | `diff html\|png\|elements` · `migration compare` · `check equivalence --region` |
-| <img src="docs/assets/icons/layout-grid.webp" width="20" height="20" alt="" /> Audit design quality | `check tokens\|theme\|palette` · `check design` (is the page consistent with itself — one button style or six) · `check a11y contrast\|touch\|focus` · `check perf` · `check drift` · `stress i18n\|media` |
+| <img src="docs/assets/icons/layout-grid.webp" width="20" height="20" alt="" /> Audit design quality | `check tokens\|theme\|palette` · `check design` (is the page consistent with itself — one button style or six) · `check composition` · `check color` · `check a11y contrast\|touch\|focus` · `check perf` · `check drift` |
 | <img src="docs/assets/icons/image-check.webp" width="20" height="20" alt="" /> Vet an image asset before it enters a slot | `check asset --slot --expect-transparent --against-bg --page-palette` |
 | <img src="docs/assets/icons/wrench.webp" width="20" height="20" alt="" /> Repair | `heal selector` (dead selector) · `heal markup` `[key]` (LLM auto-fix from a kickback) |
 | <img src="docs/assets/icons/stack.webp" width="20" height="20" alt="" /> Run gates over a whole site | `batch --gate "check integrity" "routes/**/*.html"` (parallel, `--shard i/n`, per-job timing) · `gates run` (same, from one reviewed config) |
@@ -267,10 +269,14 @@ and a test fails when this block drifts from them.
 | Doc | Contents |
 |---|---|
 | [`docs/introduce.md`](./docs/introduce.md) | What is vlmkit? — narrative introduction assuming zero context |
+| [`docs/features.md`](./docs/features.md) | Every command, one line each, grouped by the question it answers (held to the CLI by a test) |
 | [`docs/markup-assist.md`](./docs/markup-assist.md) | Task-routing guide: which gate for which job, done-condition recipes, anti-gaming rules |
 | [`docs/cli-reference.md`](./docs/cli-reference.md) | Complete command reference: all groups, examples, workflow/API/HTTP, architecture, project structure |
 | [`docs/configuration.md`](./docs/configuration.md) | Install, MCP/skill setup, environment variables, snapshot/CI config, agent skills catalog |
+| [`docs/a11y-tree.md`](./docs/a11y-tree.md) | The `vlmkit-a11y/1` contract for apps with no DOM, and how to write a collector |
+| [`docs/authoring-gates.md`](./docs/authoring-gates.md) | Adding a gate of your own through a plugin |
 | [`packages/vlmkit-mcp/README.md`](./packages/vlmkit-mcp/README.md) | MCP tool table |
+| [`docs/README.md`](./docs/README.md) | Index of every document, with which are current reference and which are design history |
 | [`docs/knowledge.md`](./docs/knowledge.md) · [`docs/reports/`](./docs/reports/) | Accumulated evaluation findings and dated experiment reports |
 | [`CHANGELOG.md`](./CHANGELOG.md) | Release notes, including the 0.4.x → current command mapping |
 

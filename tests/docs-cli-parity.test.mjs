@@ -55,6 +55,7 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const REFERENCE_DOCS = [
   "README.md",
   "docs/cli-reference.md",
+  "docs/features.md",
   "docs/configuration.md",
   "docs/markup-assist.md",
   ".claude/skills/README.md",

@@ -2088,6 +2088,8 @@ case at 0.23.0.
 
 | File | Contents |
 |---------|------|
+| `docs/features.md` | **Every command, one line each**, grouped by the question it answers; `tests/features-doc.test.mjs` fails when a gate, a dispatcher leaf or a top-level verb is missing, or the gate / rule counts drift |
+| `docs/README.md` | Index of every document under `docs/`: reference, design (landed) and history; the same test fails when a doc is not listed |
 | `docs/a11y-tree.md` | **Accessibility with no DOM**: the `vlmkit-a11y/1` contract (role / name / rect / states / actions + frame), `scan a11y`'s Flutter web and Android collectors, `check a11y tree`'s four rules, and how a collector for another platform writes the file |
 | `docs/markup-assist.md` | Context-free guide to the deterministic markup gates (CLI / MCP / skill install, task routing, done-condition recipes) |
 | `docs/cli-reference.md` | Complete command reference moved out of README (groups, examples, workflow/API/HTTP, architecture, project structure) |

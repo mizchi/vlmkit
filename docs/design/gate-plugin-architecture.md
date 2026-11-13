@@ -398,7 +398,7 @@ else, and making them its first consumer is the only way to keep that honest.
 | `scan handlers` | 24 | markup |
 | `check grounding` | 7 | markup |
 | `check motion` | 3 | markup |
-| `check animation` | 18 | markup |
+| `check animation` | 30 | markup |
 | `check flash` | 6 | markup |
 | `stress data` | 3 | markup |
 | `stress i18n` | 3 | markup |
