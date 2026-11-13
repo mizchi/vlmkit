@@ -1,5 +1,9 @@
 # vlmkit — Architecture
 
+> Historical record (2026-05). File paths, entry points and the package list here predate the
+> current layout: `src/cli/cli.ts` is the entry, and there are eleven packages. For what exists now,
+> read [`features.md`](./features.md) and the README's workspace map.
+
 ## CLI Command System
 
 Entry point: `src/cli/vrt.ts`
