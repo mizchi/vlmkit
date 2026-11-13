@@ -148,9 +148,9 @@ export const RECORDER_SCRIPT = `(() => {
       if (t) out.text = t.slice(0, 200);
     }
     for (const s of STATES) if (el.hasAttribute(s)) out.states[s] = el.getAttribute(s);
-    if (tag === "details") out.states["aria-expanded"] = el.open ? "true" : "false";
+    if (tag === "details" || tag === "dialog") out.states.open = el.open ? "true" : "false";
     if (tag === "input" && (el.type === "checkbox" || el.type === "radio")) out.checked = el.checked;
-    else if (["input", "select", "textarea"].includes(tag)) out.value = el.value;
+    else if (["input", "textarea"].includes(tag) || (tag === "select" && !el.multiple)) out.value = el.value;
     const testId = el.getAttribute("data-testid");
     if (testId) out.testId = testId;
     const label = labelOf(el);
@@ -224,7 +224,12 @@ const LISTEN_SCRIPT = `(() => {
   if (window.__vlmkitListening) return;
   window.__vlmkitListening = true;
   const rec = () => window.__vlmkitRec;
-  const call = (ev) => { try { window.__vlmkitRecord(ev); } catch {} };
+  let lastCall = Promise.resolve();
+  const call = (ev) => { try { lastCall = Promise.resolve(window.__vlmkitRecord(ev)).catch(() => {}); } catch {} };
+  // Event ids are this document's: a page navigated to starts counting again.
+  const doc = Math.random().toString(36).slice(2, 10);
+  const valueOf = (el) => (el.isContentEditable ? el.innerText : el.value);
+  const selected = (el) => (el.multiple ? [...el.selectedOptions].map((o) => o.value) : el.value);
   const isText = (el) => !!el && (el.tagName === "TEXTAREA" || el.isContentEditable || (el.tagName === "INPUT" && !["checkbox", "radio", "button", "submit", "reset", "range", "color", "file"].includes((el.type || "text").toLowerCase())));
   let lastSnap = null;
   const snap = () => (lastSnap = rec().observe());
@@ -255,7 +260,7 @@ const LISTEN_SCRIPT = `(() => {
   const begin = (ev, before) => {
     close(before);
     lastEvent = Date.now();
-    open = ++id;
+    open = doc + ":" + ++id;
     call({ ...ev, id: open, before, volatile: [...volatile] });
     quiet = setTimeout(() => close(), 400);
     cap = setTimeout(() => close(), 2000);
@@ -265,16 +270,18 @@ const LISTEN_SCRIPT = `(() => {
     if (!field) return;
     const f = field;
     field = null;
-    if (f.el.value === f.sent) return;
-    begin({ type: "fill", target: rec().describe(f.el), value: f.el.value }, f.before);
+    if (valueOf(f.el) === f.sent) return;
+    begin({ type: "fill", target: rec().describe(f.el), value: valueOf(f.el) }, f.before);
   };
-  const arm = (el) => { if (!field || field.el !== el) { flush(); field = { el, before: snap(), sent: el.value }; } };
+  const arm = (el) => { if (!field || field.el !== el) { flush(); field = { el, before: snap(), sent: valueOf(el) }; } };
+  // Stopping: the field being typed in is a step, and the step still open is closed.
+  window.__vlmkitFinish = async () => { flush(); close(); await lastCall; };
   document.addEventListener("focusin", (e) => { if (rec() && isText(e.target)) arm(e.target); }, true);
   document.addEventListener("focusout", (e) => { if (rec() && field && e.target === field.el) flush(); }, true);
   document.addEventListener("input", (e) => { if (rec() && isText(e.target)) arm(e.target); }, true);
   // A select's change fires after its value changed: the page before it had the value it had on focus.
   const selectWas = new WeakMap();
-  document.addEventListener("focusin", (e) => { if (rec() && e.target.tagName === "SELECT") selectWas.set(e.target, e.target.value); }, true);
+  document.addEventListener("focusin", (e) => { if (rec() && e.target.tagName === "SELECT") selectWas.set(e.target, selected(e.target)); }, true);
   window.addEventListener("click", (e) => {
     if (!e.isTrusted || !rec()) return;
     const el = e.target.closest ? e.target.closest(rec().INTERACTIVE) || e.target : e.target;
@@ -300,22 +307,24 @@ const LISTEN_SCRIPT = `(() => {
     const prev = selectWas.has(el) ? selectWas.get(el) : lastSnap && (lastSnap.elements.find((o) => o.key === key) || {}).value;
     const before = snap();
     if (prev !== undefined) for (const o of before.elements) if (o.key === key) o.value = prev;
-    selectWas.set(el, el.value);
-    begin({ type: "select", target: rec().describe(el), value: el.value }, before);
+    selectWas.set(el, selected(el));
+    begin({ type: "select", target: rec().describe(el), value: selected(el) }, before);
   }, true);
   window.addEventListener("keydown", (e) => {
     if (!e.isTrusted || !rec()) return;
     const el = document.activeElement;
     const text = isText(el);
     const keys = ["Escape", "Tab", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End"];
+    // Held modifiers are part of the key: Shift+Tab goes back.
+    const mods = (e.ctrlKey ? "Control+" : "") + (e.altKey ? "Alt+" : "") + (e.metaKey ? "Meta+" : "") + (e.shiftKey ? "Shift+" : "");
     if (e.key === "Enter" && text) {
       flush();
-      begin({ type: "press", key: "Enter", target: rec().describe(el) }, snap());
+      begin({ type: "press", key: mods + "Enter", target: rec().describe(el) }, snap());
       // The page's own handler may clear the field after this listener; typing again re-arms it.
     } else if (keys.includes(e.key) && !(text && e.key.startsWith("Arrow"))) {
       flush();
       const target = el && el !== document.body && el !== document.documentElement ? rec().describe(el) : undefined;
-      begin({ type: "press", key: e.key, ...(target ? { target } : {}) }, snap());
+      begin({ type: "press", key: mods + e.key, ...(target ? { target } : {}) }, snap());
     }
   }, true);
 })()`;
@@ -416,7 +425,7 @@ export interface RecorderOptions {
 
 interface HumanEvent extends Partial<Omit<RawStep, "type">> {
   type: RawStep["type"] | "after";
-  id: number;
+  id: string;
   before?: RecordedObservation;
   after?: RecordedObservation;
   volatile?: string[];
@@ -425,7 +434,7 @@ interface HumanEvent extends Partial<Omit<RawStep, "type">> {
 export interface RawStep {
   type: "click" | "fill" | "select" | "check" | "uncheck" | "press" | "goto";
   target?: RecordedElement;
-  value?: string;
+  value?: string | string[];
   key?: string;
   url?: string;
 }
@@ -503,7 +512,8 @@ export class TraceRecorder {
     const target = raw.target ? await verify(this.page, raw.target, mode) : null;
     if (raw.type === "press") return { action: "press", key: raw.key!, ...(target ? { target } : {}) };
     if (!target) return null;
-    if (raw.type === "fill" || raw.type === "select") return { action: raw.type, target, value: raw.value ?? "" };
+    if (raw.type === "select") return { action: "select", target, value: raw.value ?? "" };
+    if (raw.type === "fill") return { action: "fill", target, value: String(raw.value ?? "") };
     return { action: raw.type, target };
   }
 
@@ -530,7 +540,10 @@ export class TraceRecorder {
     volatile: Set<string> = new Set(),
   ): Promise<TraceStep> {
     const changes = diffObservations(before, after, again, targetKey).filter(
-      (c) => !("element" in c) || !volatile.has(c.element.key),
+      (c) =>
+        (!("element" in c) || !volatile.has(c.element.key)) &&
+        // Typing moves focus nowhere: a fill is read when the next action begins, whose mousedown has moved it.
+        !(action.action === "fill" && c.kind === "focused"),
     );
     const expect: TraceExpectation[] = [];
     for (const c of changes) {
@@ -572,12 +585,17 @@ export class TraceRecorder {
   async listen(): Promise<void> {
     await this.page.exposeBinding("__vlmkitRecord", (_src, ev: HumanEvent) => {
       if (ev.type === "after") {
-        this.afters.get(ev.id)?.(ev);
-        this.afterSeen.set(ev.id, ev);
+        const waiting = this.afters.get(ev.id);
+        if (waiting) waiting(ev);
+        else this.afterSeen.set(ev.id, ev);
         return;
       }
       this.lastEventAt = Date.now();
-      this.queue = this.queue.then(() => this.human(ev)).catch(() => {});
+      this.queue = this.queue
+        .then(() => this.human(ev))
+        .catch(() => {
+          this.lost++;
+        });
     });
     await this.page.addInitScript(LISTEN_SCRIPT);
     await this.page.evaluate(LISTEN_SCRIPT);
@@ -596,25 +614,37 @@ export class TraceRecorder {
 
   private lastEventAt = 0;
   private navigations = 0;
-  private afters = new Map<number, (ev: HumanEvent) => void>();
-  private afterSeen = new Map<number, HumanEvent>();
+  private afters = new Map<string, (ev: HumanEvent) => void>();
+  private afterSeen = new Map<string, HumanEvent>();
+  private lost = 0;
+
+  /** Events the page reported that could not be recorded (the window closed before they were read). */
+  get lostSteps(): number {
+    return this.lost;
+  }
 
   /** The page's "after" for an event, or none when the page navigated away before it settled. */
-  private waitAfter(id: number, navigationsAtStart: number): Promise<HumanEvent | null> {
+  private waitAfter(id: string, navigationsAtStart: number): Promise<HumanEvent | null> {
     const seen = this.afterSeen.get(id);
-    if (seen) return Promise.resolve(seen);
+    if (seen) {
+      this.afterSeen.delete(id);
+      return Promise.resolve(seen);
+    }
     return new Promise((resolve) => {
       const timer = setInterval(() => {
         if (this.navigations !== navigationsAtStart || Date.now() > deadline) {
           clearInterval(timer);
           this.afters.delete(id);
-          resolve(this.afterSeen.get(id) ?? null);
+          const late = this.afterSeen.get(id) ?? null;
+          this.afterSeen.delete(id);
+          resolve(late);
         }
       }, 50);
       const deadline = Date.now() + 3000;
       this.afters.set(id, (ev) => {
         clearInterval(timer);
         this.afters.delete(id);
+        this.afterSeen.delete(id);
         resolve(ev);
       });
     });
@@ -649,6 +679,9 @@ export class TraceRecorder {
 
   /** Wait for every reported event to be recorded, and return the trace. */
   async stop(): Promise<SessionTrace> {
+    await this.page
+      .evaluate(() => (window as unknown as { __vlmkitFinish?: () => Promise<void> }).__vlmkitFinish?.())
+      .catch(() => {});
     await this.queue;
     const viewport = this.page.viewportSize() ?? { width: 1280, height: 800 };
     return {

@@ -54,6 +54,8 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       `${GREEN}spec${RESET} ${resolve(out)}  ${DIM}${trace.steps.length} step(s), ${trace.steps.reduce((n, s) => n + s.expect.length, 0)} expect(s)${RESET}`,
     );
   } else if (!hasFlag(rest, "verify")) process.stdout.write(spec);
+  // With --verify and no --out, stdout is the spec once every run passed; the runs are told on stderr.
+  const say = out ? console.log : console.error;
 
   if (hasFlag(rest, "verify")) {
     if (baseUrl)
@@ -65,11 +67,12 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     for (let i = 1; i <= times; i++) {
       const run = runSpec(spec);
       if (!run.passed) {
-        console.log(`${RED}run ${i} of ${times} failed${RESET}\n${run.output.trim()}`);
+        say(`${RED}run ${i} of ${times} failed${RESET}\n${run.output.trim()}`);
         return 1;
       }
-      console.log(`${GREEN}run ${i} of ${times} passed${RESET}`);
+      say(`${GREEN}run ${i} of ${times} passed${RESET}`);
     }
+    if (!out) process.stdout.write(spec);
   }
   return 0;
 }

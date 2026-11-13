@@ -70,6 +70,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   }
   let trace: SessionTrace;
   let dropped = 0;
+  let lost = 0;
   try {
     const context = await browser.newContext({
       viewport,
@@ -104,10 +105,15 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     });
     trace = await rec.stop().catch(async () => rec.stop());
     dropped = rec.droppedExpectations;
+    lost = rec.lostSteps;
   } finally {
     await browser.close().catch(() => {});
   }
   await writeTrace(trace, out, specOut);
+  if (lost > 0)
+    console.log(
+      `${YELLOW}!${RESET} ${lost} action(s) left out: the window closed before they could be read. Wait a moment after the last action before closing it`,
+    );
   if (dropped > 0)
     console.log(
       `${YELLOW}!${RESET} ${dropped} observed change(s) left out: no locator resolved to their element alone`,

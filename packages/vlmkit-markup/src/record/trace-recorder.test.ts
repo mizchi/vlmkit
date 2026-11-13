@@ -4,7 +4,7 @@
  * page it was recorded on, and fails on a mutant whose button adds two items instead of one.
  */
 import assert from "node:assert/strict";
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, it } from "vite-plus/test";
@@ -64,6 +64,7 @@ describe("record a session from the page's events and replay it with @playwright
     { timeout: 240_000 },
     async () => {
       const trace = await recordSession();
+      mkdirSync(join(repo, "test-results"), { recursive: true });
       writeFileSync(join(repo, "test-results/record-e2e.trace.json"), JSON.stringify(trace, null, 2)); // to read when it fails
       const actions = trace.steps.map((s) => s.action.action);
       assert.deepEqual(
@@ -101,6 +102,76 @@ describe("record a session from the page's events and replay it with @playwright
       const broken = runSpec(spec.replaceAll("fixtures/record/app.html", "fixtures/record/app--broken.html"));
       assert.equal(broken.passed, false, "the mutant adds two to the cart and must fail");
       assert.match(broken.output, /cart-count|toHaveText/);
+    },
+  );
+
+  it(
+    "native open state, a multiple select, contenteditable, a held modifier, a field still focused at stop, and ids across a navigation",
+    { timeout: 240_000 },
+    async () => {
+      const { withBrowser } = await import("@mizchi/vlmkit-core/browser-launch.ts");
+      const trace = await withBrowser(async (browser) => {
+        const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+        await page.goto(fixture("widgets.html"));
+        const rec = new TraceRecorder(page, { recordedBy: "test" });
+        await rec.start();
+        await rec.listen();
+        const done = async () => {
+          await page.waitForTimeout(120);
+          await rec.idle();
+        };
+        await page.getByText("More", { exact: true }).click();
+        await done();
+        await page.locator("#toppings").selectOption(["a", "c"]);
+        await done();
+        await page.locator("#notes").click();
+        await page.keyboard.type("Glaze twice");
+        await page.locator("#second").click();
+        await done();
+        await page.keyboard.press("Shift+Tab");
+        await done();
+        await page.getByRole("link", { name: "Next page" }).click();
+        await page.waitForURL(/widgets-next\.html/);
+        await done();
+        await page.getByRole("button", { name: "Go" }).click();
+        await done();
+        await page.waitForTimeout(1600); // a navigation within 1.5s of an event is taken as that event's
+        const back = page.waitForURL(/widgets\.html/);
+        await page.goBack();
+        await back;
+        await page.waitForTimeout(1600);
+        await page.locator("#last").click();
+        await page.keyboard.type("fin");
+        const t = await rec.stop(); // the field is still focused
+        await page.close();
+        return t;
+      });
+      mkdirSync(join(repo, "test-results"), { recursive: true });
+      writeFileSync(join(repo, "test-results/record-widgets.trace.json"), JSON.stringify(trace, null, 2));
+      const steps = trace.steps.map((s) => s.action);
+      const find = (pred: (a: (typeof steps)[number]) => boolean, what: string) => {
+        const i = steps.findIndex(pred);
+        assert.ok(i >= 0, `${what}: ${JSON.stringify(steps, null, 1)}`);
+        return trace.steps[i]!;
+      };
+      const opened = find((a) => a.action === "click" && a.target.describe.includes("More"), "details click");
+      assert.ok(
+        opened.expect.some((e) => e.kind === "state" && e.attr === "open" && e.value === "true"),
+        `details opened: ${JSON.stringify(opened.expect)}`,
+      );
+      find((a) => a.action === "select" && JSON.stringify(a.value) === '["a","c"]', "both selected values");
+      find((a) => a.action === "fill" && a.value === "Glaze twice", "contenteditable typed");
+      find((a) => a.action === "press" && a.key === "Shift+Tab", "the held modifier");
+      const go = find((a) => a.action === "click" && a.target.describe.includes("Go"), "a click after a navigation");
+      assert.ok(
+        go.expect.some((e) => e.kind === "text" && e.value === "went"),
+        `the click on the next page is its own step: ${JSON.stringify(go.expect)}`,
+      );
+      find((a) => a.action === "fill" && a.value === "fin", "the field still focused at stop");
+
+      const spec = compileTrace(trace, { title: "widgets session" });
+      const run = runSpec(spec);
+      assert.ok(run.passed, `${spec}\n${run.output}`);
     },
   );
 });

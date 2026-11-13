@@ -132,9 +132,9 @@ describe("compileTrace: a trace as an @playwright/test spec", () => {
     assert.match(src, /test\.use\(\{ viewport: \{ width: 1280, height: 800 \}, reducedMotion: "reduce" \}\);/);
     assert.match(src, /await page\.goto\("http:\/\/localhost:3000\/shop"\);/);
     assert.match(src, /page\.getByRole\("button", \{ name: "Add to cart", exact: true \}\)\.click\(\);/);
-    assert.match(src, /expect\(page\.getByTestId\("cart-count"\)\)\.toHaveText\("1"\);/);
+    assert.match(src, /expect\(page\.getByTestId\("cart-count"\)\)\.toHaveText\("1", \{ useInnerText: true \}\);/);
     assert.match(src, /page\.getByLabel\("Coupon", \{ exact: true \}\)\.fill\("SAVE\\"10"\);/);
-    assert.match(src, /toHaveURL\(\/\\\/shop\\\?coupon=1\$\/\);/);
+    assert.ok(src.includes("toHaveURL(/^[a-z][a-z0-9+.-]*:\\/\\/[^\\/]*\\/shop\\?coupon=1$/);"), src);
     assert.equal(compileTrace(trace, { title: "add to cart" }), src, "deterministic");
   });
 
@@ -202,5 +202,27 @@ describe("diffObservations says each outcome once", () => {
       diffObservations(after, next).map((c) => c.kind),
       ["url", "visible"],
     );
+  });
+
+  it("a URL is matched whole, a native open state by its attribute, a multiple select by every value", () => {
+    const one = (expect: SessionTrace["steps"][number]["expect"], action?: SessionTrace["steps"][number]["action"]) =>
+      compileTrace({ ...trace, steps: [{ action: action ?? trace.steps[0]!.action, expect }] });
+    const url = (path: string) => {
+      const src = one([{ kind: "url", path }]);
+      const m = src.match(/toHaveURL\((\/.*\/)\);/)!;
+      return new Function(`return ${m[1]}`)() as RegExp;
+    };
+    assert.ok(url("/checkout").test("http://localhost:3000/checkout"));
+    assert.ok(!url("/checkout").test("http://localhost:3000/wrong/checkout"), "a longer path is not the same path");
+    assert.ok(url("details.html").test("file:///repo/fixtures/details.html"));
+    assert.ok(
+      !url("details.html").test("file:///repo/fixtures/old-details.html"),
+      "a file name is matched from a slash",
+    );
+    const target = { locators: [{ by: "css" as const, value: "#more" }], describe: "details" };
+    assert.match(one([{ kind: "state", target, attr: "open", value: "true" }]), /toHaveAttribute\("open"\);/);
+    assert.match(one([{ kind: "state", target, attr: "open", value: "false" }]), /not\.toHaveAttribute\("open"\);/);
+    const sel = { locators: [{ by: "label" as const, value: "Toppings" }], describe: "listbox" };
+    assert.match(one([], { action: "select", target: sel, value: ["a", "c"] }), /selectOption\(\["a","c"\]\);/);
   });
 });

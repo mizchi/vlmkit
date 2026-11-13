@@ -35,12 +35,20 @@ export type TraceAction =
   | { action: "goto"; url: string }
   | { action: "click"; target: TraceTarget }
   | { action: "fill"; target: TraceTarget; value: string }
-  | { action: "select"; target: TraceTarget; value: string }
+  | { action: "select"; target: TraceTarget; value: string | string[] }
   | { action: "check" | "uncheck"; target: TraceTarget }
   | { action: "press"; key: string; target?: TraceTarget };
 
 /** The ARIA states a step can be held to. */
-export const TRACE_STATES = ["aria-expanded", "aria-pressed", "aria-selected", "aria-checked", "aria-current"] as const;
+/** ARIA states, and `open`: a native `<details>` or `<dialog>` open or shut ("true" / "false"), held to its `open` attribute. */
+export const TRACE_STATES = [
+  "aria-expanded",
+  "aria-pressed",
+  "aria-selected",
+  "aria-checked",
+  "aria-current",
+  "open",
+] as const;
 export type TraceState = (typeof TRACE_STATES)[number];
 
 export type TraceExpectation =
@@ -298,7 +306,7 @@ function actionSource(a: TraceAction, opts: CompileOptions): string {
     case "fill":
       return `await ${locatorSource(a.target)}.fill(${q(a.value)});`;
     case "select":
-      return `await ${locatorSource(a.target)}.selectOption(${q(a.value)});`;
+      return `await ${locatorSource(a.target)}.selectOption(${JSON.stringify(a.value)});`;
     case "check":
       return `await ${locatorSource(a.target)}.check();`;
     case "uncheck":
@@ -313,8 +321,15 @@ function actionSource(a: TraceAction, opts: CompileOptions): string {
 function expectSource(e: TraceExpectation): string {
   switch (e.kind) {
     case "url":
-      return `await expect(page).toHaveURL(/${escapeRegExp(e.path)}$/);`;
+      // The whole path: from the origin for a URL path, from a slash for a file name (urlPath).
+      return e.path.startsWith("/")
+        ? `await expect(page).toHaveURL(/^[a-z][a-z0-9+.-]*:\\/\\/[^\\/]*${escapeRegExp(e.path)}$/);`
+        : `await expect(page).toHaveURL(/\\/${escapeRegExp(e.path)}$/);`;
     case "state":
+      if (e.attr === "open")
+        return e.value === "true"
+          ? `await expect(${locatorSource(e.target)}).toHaveAttribute("open");`
+          : `await expect(${locatorSource(e.target)}).not.toHaveAttribute("open");`;
       return `await expect(${locatorSource(e.target)}).toHaveAttribute(${q(e.attr)}, ${q(e.value)});`;
     case "checked":
       return e.value
@@ -323,7 +338,8 @@ function expectSource(e: TraceExpectation): string {
     case "value":
       return `await expect(${locatorSource(e.target)}).toHaveValue(${q(e.value)});`;
     case "text":
-      return `await expect(${locatorSource(e.target)}).toHaveText(${q(e.value)});`;
+      // innerText, as it was recorded: a block inside the element is a line break, not nothing.
+      return `await expect(${locatorSource(e.target)}).toHaveText(${q(e.value)}, { useInnerText: true });`;
     case "visible":
       return `await expect(${locatorSource(e.target)}).toBeVisible();`;
     case "hidden":
@@ -342,7 +358,7 @@ export const describeAction = (a: TraceAction): string => {
     case "fill":
       return `fill ${a.target.describe} with ${q(a.value)}`;
     case "select":
-      return `select ${q(a.value)} in ${a.target.describe}`;
+      return `select ${JSON.stringify(a.value)} in ${a.target.describe}`;
     case "check":
     case "uncheck":
       return `${a.action} ${a.target.describe}`;
