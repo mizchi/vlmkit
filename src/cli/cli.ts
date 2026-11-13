@@ -140,6 +140,8 @@ const SPECS: Record<string, Spec> = {
   storyboard: spec("storyboard-cli", () => import("./commands/storyboard-cli.ts")),
   checkAuto: spec("check-auto", () => import("./commands/auto-cli.ts")),
   act: spec("act-cli", () => import("./commands/act-cli.ts")),
+  record: spec("record-cli", () => import("./commands/record-cli.ts")),
+  exportSpec: spec("export-cli", () => import("./commands/export-cli.ts")),
   scanVideo: spec("scan-video-cli", () => import("./commands/scan-video-cli.ts")),
   recordHar: spec("record-har-cli", () => import("./commands/record-har-cli.ts")),
   diffForAgent: spec("diff-for-agent-cli", () => import("./commands/diff-for-agent-cli.ts")),
@@ -421,6 +423,7 @@ Workflows:
   rules                         List gates and the rules each one can tune
   workflow / markup-loop        Drive agent-oriented verification loops
   act                           A browser agent whose steps are verified (goal + postconditions)
+  record / export playwright    Record a session in a browser; turn it into an @playwright/test spec
   api / mcp                     Expose vlmkit to other tools
 
 Run \`vlmkit <command> --help\` for subcommands, options, and examples.`);
@@ -706,6 +709,16 @@ Options:
     .command("manifest [...args]", "Author / edit approval.json manifests")
     .allowUnknownOptions()
     .action(async () => delegate(SPECS.manifest, passThrough(argv, ["manifest"])));
+
+  cli
+    .command("record [...args]", "Record what you do in a browser as a session trace (vlmkit-trace/1)")
+    .allowUnknownOptions()
+    .action(async () => delegate(SPECS.record, passThrough(argv, ["record"])));
+
+  cli
+    .command("export [...args]", "export playwright <trace>: a session trace as an @playwright/test spec")
+    .allowUnknownOptions()
+    .action(async () => delegate(SPECS.exportSpec, passThrough(argv, ["export"])));
 
   cli
     .command("act [...args]", "A browser agent whose steps are verified by gates and postconditions")

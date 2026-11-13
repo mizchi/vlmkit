@@ -1446,6 +1446,38 @@ adversarial review (54 findings), not to re-learn (`docs/reports/2026-10-13-scan
   capture: a planted glitch and transient come back on their frames. On the stream clock 16.67ms gaps
   are a recording's rate, never "every 60 fps frame".
 
+## A session as a Playwright test (`vlmkit record`, `export playwright`)
+
+```bash
+vlmkit record page.html --out trace.json                      # a person clicks through a headed browser
+vlmkit act page.html --goal "…" --expect … --trace trace.json   # an agent's kept steps, the same trace
+vlmkit export playwright trace.json --out tests/x.spec.ts --verify   # spec, then run twice with @playwright/test
+```
+
+One trace for every session (`vlmkit-trace/1`, `@mizchi/vlmkit-judge/session-trace.ts`, pure:
+`diffObservations`, `compileTrace`), one recorder (`packages/vlmkit-markup/src/record/trace-recorder.ts`,
+`TraceRecorder`: `step()` for a driver, `listen()` for a person), one runner
+(`record/run-spec.ts`: a temp dir linking `@playwright/test`, its CLI by path). Each step's
+expectations are what it was observed to change; the compiler asks no model. Known answers:
+`fixtures/record/app.html` (toggle, counter, form, list, dialog, navigation, a ticking clock) and
+`app--broken.html` (adds two), held by `trace-recorder.test.ts`: recorded from the page's own
+events, the spec passes twice and fails on the mutant. Measured building it, not to re-learn:
+
+- **Read the page inside the event's own capture listener.** Read from Node after the event, a
+  quick next action's effects landed in the previous step (the email fill took the plan's new
+  value). Each step's "before" is read in the page as the event fires, its "after" when the page
+  is quiet for 400ms or when the next event begins, whichever is first.
+- **A checkbox is already toggled when its click is dispatched, and a select's change fires after
+  its value changed**: their "before" is patched to the old state, or the step's own outcome
+  vanishes.
+- **A value that changes while nothing happens is volatile** (a clock): the page reports keys that
+  change between idle reads, and two reads in Node catch the rest.
+- **One outcome, said once**: a dialog shown, not each line in it; a count, not the sentence
+  around it; no "hidden" for the old page after a navigation. An element held to its text is not
+  found by that text.
+- **A label's name leaves out the control inside it** (a select's options made "Plan Free Pro").
+- `record` needs a display; in this sandbox it refuses and points at `act --trace`.
+
 ## A browser agent whose steps are verified (`vlmkit act`)
 
 ```bash

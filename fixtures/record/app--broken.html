@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Record fixture — shop</title>
+<style>
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; color: #1f2933; }
+  header, main { max-width: 720px; margin: 0 auto; padding: 16px; }
+  header { display: flex; justify-content: space-between; align-items: center; }
+  button, input, select { font: inherit; padding: 6px 10px; }
+  [hidden] { display: none !important; }
+  .dialog { position: fixed; inset: 30% 25% auto; padding: 16px; background: #fff; border: 1px solid #334155; }
+</style>
+</head>
+<body>
+<header>
+  <strong>Harbour shop</strong>
+  <span>Updated <span id="clock">0</span></span>
+  <button id="menu" aria-expanded="false" aria-controls="nav">Menu</button>
+</header>
+<nav id="nav" hidden><a href="details.html">Details</a></nav>
+<main>
+  <h1>Harbour mug</h1>
+  <p>Cart: <span data-testid="cart-count">0</span></p>
+  <button id="add">Add to cart</button>
+
+  <h2>Newsletter</h2>
+  <form id="form">
+    <label>Email <input id="email" type="email"></label>
+    <label>Plan <select id="plan"><option value="free">Free</option><option value="pro">Pro</option></select></label>
+    <label><input id="sub" type="checkbox"> Weekly digest</label>
+    <button type="submit">Sign up</button>
+  </form>
+  <p id="thanks" role="status"></p>
+
+  <h2>List</h2>
+  <input id="item" placeholder="New item">
+  <ul id="list"><li>Kettle</li></ul>
+  <button id="clear">Clear list</button>
+  <div class="dialog" role="dialog" aria-label="Clear the list?" id="confirm" hidden>
+    <p>Remove every item?</p>
+    <button id="yes">Remove</button>
+  </div>
+</main>
+<script>
+  const $ = (s) => document.querySelector(s);
+  let tick = 0;
+  setInterval(() => ($("#clock").textContent = String(++tick)), 100);
+  $("#menu").onclick = () => {
+    const open = $("#menu").getAttribute("aria-expanded") !== "true";
+    $("#menu").setAttribute("aria-expanded", String(open));
+    $("#nav").hidden = !open;
+  };
+  const count = document.querySelector("[data-testid=cart-count]");
+  $("#add").onclick = () => (count.textContent = String(Number(count.textContent) + 2));
+  $("#form").onsubmit = (e) => {
+    e.preventDefault();
+    $("#thanks").textContent = `Thanks, ${$("#email").value} (${$("#plan").value}${$("#sub").checked ? ", weekly" : ""})`;
+    location.hash = "signed-up";
+  };
+  $("#item").onkeydown = (e) => {
+    if (e.key !== "Enter" || !$("#item").value) return;
+    const li = document.createElement("li");
+    li.textContent = $("#item").value;
+    $("#list").append(li);
+    $("#item").value = "";
+  };
+  $("#clear").onclick = () => { $("#confirm").hidden = false; $("#yes").focus(); };
+  $("#yes").onclick = () => { $("#list").replaceChildren(); $("#confirm").hidden = true; };
+</script>
+</body>
+</html>
