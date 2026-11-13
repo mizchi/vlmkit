@@ -174,4 +174,22 @@ describe("record a session from the page's events and replay it with @playwright
       assert.ok(run.passed, `${spec}\n${run.output}`);
     },
   );
+
+  it("a window closed while a field holds an edit counts that edit as lost", { timeout: 60_000 }, async () => {
+    const { withBrowser } = await import("@mizchi/vlmkit-core/browser-launch.ts");
+    const lost = await withBrowser(async (browser) => {
+      const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+      await page.goto(fixture("widgets.html"));
+      const rec = new TraceRecorder(page, { recordedBy: "test" });
+      await rec.start();
+      await rec.listen();
+      await page.locator("#last").click();
+      await page.keyboard.type("gone");
+      await page.waitForTimeout(100);
+      await page.close();
+      await rec.stop();
+      return rec.lostSteps;
+    });
+    assert.equal(lost, 1);
+  });
 });

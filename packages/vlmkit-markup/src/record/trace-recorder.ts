@@ -270,6 +270,7 @@ const LISTEN_SCRIPT = `(() => {
     if (!field) return;
     const f = field;
     field = null;
+    if (f.told) call({ type: "typed", id: doc });
     if (valueOf(f.el) === f.sent) return;
     begin({ type: "fill", target: rec().describe(f.el), value: valueOf(f.el) }, f.before);
   };
@@ -278,7 +279,12 @@ const LISTEN_SCRIPT = `(() => {
   window.__vlmkitFinish = async () => { flush(); close(); await lastCall; };
   document.addEventListener("focusin", (e) => { if (rec() && isText(e.target)) arm(e.target); }, true);
   document.addEventListener("focusout", (e) => { if (rec() && field && e.target === field.el) flush(); }, true);
-  document.addEventListener("input", (e) => { if (rec() && isText(e.target)) arm(e.target); }, true);
+  // Node is told a field holds an edit not yet sent, so a window closed mid-edit is counted as lost.
+  document.addEventListener("input", (e) => {
+    if (!rec() || !isText(e.target)) return;
+    arm(e.target);
+    if (!field.told) { field.told = true; call({ type: "typing", id: doc }); }
+  }, true);
   // A select's change fires after its value changed: the page before it had the value it had on focus.
   const selectWas = new WeakMap();
   document.addEventListener("focusin", (e) => { if (rec() && e.target.tagName === "SELECT") selectWas.set(e.target, selected(e.target)); }, true);
@@ -424,7 +430,7 @@ export interface RecorderOptions {
 }
 
 interface HumanEvent extends Partial<Omit<RawStep, "type">> {
-  type: RawStep["type"] | "after";
+  type: RawStep["type"] | "after" | "typing" | "typed";
   id: string;
   before?: RecordedObservation;
   after?: RecordedObservation;
@@ -584,6 +590,10 @@ export class TraceRecorder {
    */
   async listen(): Promise<void> {
     await this.page.exposeBinding("__vlmkitRecord", (_src, ev: HumanEvent) => {
+      if (ev.type === "typing" || ev.type === "typed") {
+        this.typing = ev.type === "typing";
+        return;
+      }
       if (ev.type === "after") {
         const waiting = this.afters.get(ev.id);
         if (waiting) waiting(ev);
@@ -602,6 +612,7 @@ export class TraceRecorder {
     this.page.on("framenavigated", (frame) => {
       if (frame !== this.page.mainFrame()) return;
       this.navigations++;
+      this.typing = false; // a new document holds no edit yet
       if (Date.now() - this.lastEventAt < 1500) return; // a click or a submit started it
       const url = frame.url();
       this.queue = this.queue
@@ -617,6 +628,7 @@ export class TraceRecorder {
   private afters = new Map<string, (ev: HumanEvent) => void>();
   private afterSeen = new Map<string, HumanEvent>();
   private lost = 0;
+  private typing = false;
 
   /** Events the page reported that could not be recorded (the window closed before they were read). */
   get lostSteps(): number {
@@ -679,9 +691,12 @@ export class TraceRecorder {
 
   /** Wait for every reported event to be recorded, and return the trace. */
   async stop(): Promise<SessionTrace> {
-    await this.page
+    const finished = await this.page
       .evaluate(() => (window as unknown as { __vlmkitFinish?: () => Promise<void> }).__vlmkitFinish?.())
-      .catch(() => {});
+      .then(() => true)
+      .catch(() => false);
+    // The window closed while a field held an edit: that fill never reached here.
+    if (!finished && this.typing) this.lost++;
     await this.queue;
     const viewport = this.page.viewportSize() ?? { width: 1280, height: 800 };
     return {
