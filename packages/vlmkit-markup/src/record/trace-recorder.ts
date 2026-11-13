@@ -463,6 +463,11 @@ export class TraceRecorder {
     await this.start();
   }
 
+  /** How many steps are recorded: a driver compares it across an action to know whether one was added. */
+  get stepCount(): number {
+    return this.steps.length;
+  }
+
   /** Forget the last step (the driver rolled it back). */
   discardLast(): void {
     this.steps.pop();

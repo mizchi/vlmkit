@@ -342,6 +342,7 @@ export async function runAct(options: ActOptions, browser: Browser): Promise<Act
     const before = options.noGates ? [] : await gateFindings(page, viewport.width);
     const problems: string[] = [];
     let replay: ActAction | undefined;
+    const tracedBefore = recorder?.stepCount ?? 0;
     try {
       let done!: Awaited<ReturnType<typeof perform>>;
       const run = async () => {
@@ -367,7 +368,8 @@ export async function runAct(options: ActOptions, browser: Browser): Promise<Act
       await page.close();
       page = await open(kept);
       if (recorder) {
-        recorder.discardLast();
+        // Only this action's step: one that failed before it was recorded added none.
+        if (recorder.stepCount > tracedBefore) recorder.discardLast();
         await recorder.rebind(page);
       }
     }
@@ -612,7 +614,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     for (const [i, r] of reports.entries()) {
       if (!r.trace) continue;
       const path = reports.length > 1 ? tracePath.replace(/(\.json)?$/, `-${i + 1}$1`) : tracePath;
-      await writeTrace(r.trace, resolve(path));
+      await writeTrace(r.trace, resolve(path), undefined, hasFlag(argv, "json") ? console.error : console.log);
     }
   }
   const outDir = readFlag(argv, "out");

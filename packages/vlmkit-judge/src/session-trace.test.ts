@@ -161,6 +161,22 @@ describe("compileTrace: a trace as an @playwright/test spec", () => {
     );
     assert.equal(parseSessionTrace(JSON.stringify(trace), "t.json").steps.length, 2);
   });
+
+  it("no trace value runs as code: a viewport must be numbers, and a line break cannot end a comment", () => {
+    const viewport = { width: "1}); process.exit(1); ({a:1" as never, height: 800 };
+    assert.throws(
+      () => parseSessionTrace(JSON.stringify({ ...trace, start: { ...trace.start, viewport } }), "t.json"),
+      /viewport needs whole-number width and height/,
+    );
+    const hostile: SessionTrace = {
+      ...trace,
+      source: { recordedBy: "x\nprocess.exit(1)", url: "http://a/\u2028process.exit(2)" },
+      steps: [{ action: { action: "press", key: "Enter\r\nprocess.exit(3)" }, expect: [] }],
+    };
+    const src = compileTrace(hostile, { tracePath: "t.json\nprocess.exit(4)" });
+    for (const line of src.split(/\r\n|[\n\r\u2028\u2029]/))
+      if (line.includes("process.exit")) assert.match(line.trim(), /^\/\/|^await page\.keyboard\.press\(/, line);
+  });
 });
 
 describe("diffObservations says each outcome once", () => {

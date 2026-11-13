@@ -68,54 +68,71 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       );
     throw e;
   }
-  const context = await browser.newContext({
-    viewport,
-    ...(scheme ? { colorScheme: scheme as "light" | "dark" } : {}),
-    ...(reduced ? { reducedMotion: "reduce" as const } : {}),
-    ...(storageState ? { storageState } : {}),
-  });
-  const page = await context.newPage();
-  await page.goto(sourceToUrl(positional[0]!), { waitUntil: "load" });
-  const rec = new TraceRecorder(page, {
-    recordedBy: "vlmkit record",
-    ...(scheme ? { colorScheme: scheme as "light" | "dark" } : {}),
-    ...(reduced ? { reducedMotion: "reduce" as const } : {}),
-  });
-  await rec.start();
-  await rec.listen();
-  console.log(`${BOLD}${CYAN}vlmkit record${RESET}  ${DIM}${page.url()}${RESET}`);
-  console.log(
-    `${DIM}recording — ${forMs ? `stopping in ${forMs}ms` : "close the window or press Ctrl-C to finish"}${RESET}`,
-  );
-
-  await new Promise<void>((done) => {
-    page.on("close", () => done());
-    process.once("SIGINT", () => done());
-    if (forMs) setTimeout(done, forMs);
-  });
-  const trace = await rec.stop().catch(async () => rec.stop());
-  await browser.close().catch(() => {});
-  await writeTrace(trace, out, specOut);
-  if (rec.droppedExpectations > 0)
+  let trace: SessionTrace;
+  let dropped = 0;
+  try {
+    const context = await browser.newContext({
+      viewport,
+      ...(scheme ? { colorScheme: scheme as "light" | "dark" } : {}),
+      ...(reduced ? { reducedMotion: "reduce" as const } : {}),
+      ...(storageState ? { storageState } : {}),
+    });
+    const page = await context.newPage();
+    await page.goto(sourceToUrl(positional[0]!), { waitUntil: "load" });
+    const rec = new TraceRecorder(page, {
+      recordedBy: "vlmkit record",
+      ...(scheme ? { colorScheme: scheme as "light" | "dark" } : {}),
+      ...(reduced ? { reducedMotion: "reduce" as const } : {}),
+    });
+    await rec.start();
+    await rec.listen();
+    console.log(`${BOLD}${CYAN}vlmkit record${RESET}  ${DIM}${page.url()}${RESET}`);
     console.log(
-      `${YELLOW}!${RESET} ${rec.droppedExpectations} observed change(s) left out: no locator resolved to their element alone`,
+      `${DIM}recording — ${forMs ? `stopping in ${forMs}ms` : "close the window or press Ctrl-C to finish"}${RESET}`,
+    );
+
+    await new Promise<void>((resolveDone) => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const done = () => {
+        if (timer) clearTimeout(timer);
+        process.off("SIGINT", done);
+        resolveDone();
+      };
+      page.on("close", done);
+      process.once("SIGINT", done);
+      if (forMs) timer = setTimeout(done, forMs);
+    });
+    trace = await rec.stop().catch(async () => rec.stop());
+    dropped = rec.droppedExpectations;
+  } finally {
+    await browser.close().catch(() => {});
+  }
+  await writeTrace(trace, out, specOut);
+  if (dropped > 0)
+    console.log(
+      `${YELLOW}!${RESET} ${dropped} observed change(s) left out: no locator resolved to their element alone`,
     );
   return 0;
 }
 
-export async function writeTrace(trace: SessionTrace, out: string, specOut?: string): Promise<void> {
+export async function writeTrace(
+  trace: SessionTrace,
+  out: string,
+  specOut?: string,
+  log: (line: string) => void = console.log,
+): Promise<void> {
   await mkdir(dirname(out), { recursive: true });
   await writeFile(out, JSON.stringify(trace, null, 2) + "\n");
-  console.log(`\n${trace.steps.length} step(s):`);
+  log(`\n${trace.steps.length} step(s):`);
   for (const [i, s] of trace.steps.entries())
-    console.log(`  ${String(i + 1).padStart(2)}. ${describeAction(s.action)}  ${DIM}${s.expect.length} expect${RESET}`);
-  console.log(`\n${GREEN}trace${RESET} ${out}`);
+    log(`  ${String(i + 1).padStart(2)}. ${describeAction(s.action)}  ${DIM}${s.expect.length} expect${RESET}`);
+  log(`\n${GREEN}trace${RESET} ${out}`);
   if (specOut) {
     const path = resolve(specOut);
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, compileTrace(trace, { tracePath: out }));
-    console.log(`${GREEN}spec${RESET}  ${path}`);
-  } else console.log(`${DIM}next: vlmkit export playwright ${out} --out tests/recorded.spec.ts${RESET}`);
+    log(`${GREEN}spec${RESET}  ${path}`);
+  } else log(`${DIM}next: vlmkit export playwright ${out} --out tests/recorded.spec.ts${RESET}`);
 }
 
 if (isCliEntry(import.meta.url, "record-cli")) {
