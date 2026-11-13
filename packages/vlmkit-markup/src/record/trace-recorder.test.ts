@@ -185,8 +185,7 @@ describe("record a session from the page's events and replay it with @playwright
       await rec.listen();
       await page.locator("#last").click();
       await page.keyboard.type("gone");
-      await page.waitForTimeout(100);
-      await page.close();
+      await page.close(); // at once: the page sent "typing" on the first input, before type() returned
       await rec.stop();
       return rec.lostSteps;
     });
