@@ -13,6 +13,9 @@ output/
 design-runs/game-assets-20260520/outputs/
 design-runs/game-assets-20260520/external/
 design-runs/game-assets-20260520/_build/
+# luna demo sites: MoonBit build output and generated interfaces (app.js is the committed artifact)
+examples/sites/*/src/_build/
+examples/sites/*/src/**/pkg.generated.mbti
 vrt-report.json
 playwright-report/
 .playwright-mcp/
