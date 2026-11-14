@@ -12,8 +12,10 @@ Added:
   - Each step records the click, fill, select, checkbox or key (with held modifiers such as
     `Shift+Tab`), and what that step changed: URL, ARIA state, a `<details>` or `<dialog>`
     opened, text that appeared or changed, an element shown or gone, and where focus went.
-  - The page is read inside each event's own listener, so a quick next action never lends its
-    effects to the step before it. Values that change on their own, such as a clock, are left out.
+  - The page is read inside each event's own listener, so a quick next click or key does not lend
+    its effects to the step before it. Focusing a text field starts no step of its own, so a field
+    focused right after a click can show up as that click's focus change. Values that change on
+    their own, such as a clock, are left out.
   - Multiple selects, contenteditable fields and a field still being typed in at the end are all
     recorded. Actions lost because the window closed before they were read are counted and
     reported.
@@ -26,8 +28,10 @@ Added:
   model: the same trace gives the same spec.
   - Each action uses the best locator that resolves to its element alone: test id, role and
     name, label, placeholder, text, then a CSS path.
-  - Each observed change becomes an `expect`. A URL is matched whole and text by `innerText`, as
-    it was recorded.
+  - Observed changes become `expect`s: at most six per step, and only those a locator resolves to
+    alone (`record` counts the ones dropped for want of one). Review the spec for what it covers. A URL is
+    matched by its whole path, query and hash, on any origin; text is matched by `innerText`, as it
+    was recorded.
   - `--verify [n]` runs the spec n times (2 by default) with Playwright's own runner. It exits 1
     unless every run passes, and with no `--out` it prints the spec only after the runs pass.
   - `--out`, `--title` and `--base-url` (URLs under that origin are written as paths).
