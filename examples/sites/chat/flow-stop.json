@@ -1,0 +1,24 @@
+{
+  "viewport": { "width": 1280, "height": 800 },
+  "steps": [
+    { "label": "Send a prompt", "do": { "action": "fill", "selector": "#prompt", "value": "How should I plan the evening?" },
+      "expect": [ { "assert": "visible", "selector": "#send" } ] },
+    { "do": { "action": "click", "selector": "#send" },
+      "expect": [ { "assert": "text", "selector": "#stop", "contains": "Stop generating" } ] },
+    { "label": "Stop mid-stream: partial reply kept with the note Stopped", "do": { "action": "click", "selector": "#stop" },
+      "expect": [
+        { "assert": "text", "selector": ".msg-assistant:last-of-type .stopped-note", "contains": "Stopped" },
+        { "assert": "count", "selector": ".caret", "equals": 0 },
+        { "assert": "visible", "selector": "#send" },
+        { "assert": "visible", "selector": ".msg-assistant:last-of-type .msg-actions" }
+      ] },
+    { "label": "Regenerate re-streams the same reply", "do": { "action": "click", "selector": ".msg-assistant:last-of-type [aria-label='Regenerate']" },
+      "expect": [ { "assert": "text", "selector": "#stop", "contains": "Stop generating" }, { "assert": "count", "selector": ".stopped-note", "equals": 0 } ] },
+    { "do": { "action": "wait", "ms": 3500 },
+      "expect": [ { "assert": "text", "selector": ".msg-assistant:last-of-type .md", "contains": "tick items off as they are done" } ] },
+    { "label": "New chat shows the greeting and four suggestions", "do": { "action": "click", "selector": ".sidebar .new-chat" },
+      "expect": [ { "assert": "text", "selector": "#greet", "contains": "What can I help with?" }, { "assert": "count", "selector": ".suggestion", "equals": 4 } ] },
+    { "label": "A suggestion fills the composer and sends it", "do": { "action": "click", "selector": ".suggestion" },
+      "expect": [ { "assert": "count", "selector": ".msg-user", "equals": 1 }, { "assert": "text", "selector": ".msg-user .bubble", "contains": "Plan a star party" }, { "assert": "text", "selector": ".row.is-current", "contains": "Plan a star party" } ] }
+  ]
+}

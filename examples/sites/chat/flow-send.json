@@ -1,0 +1,29 @@
+{
+  "viewport": { "width": 1280, "height": 800 },
+  "steps": [
+    { "label": "Send is disabled while the box is empty", "do": { "action": "focus", "selector": "#prompt" },
+      "expect": [ { "assert": "attr", "selector": "#send", "name": "disabled", "equals": "" } ] },
+    { "label": "Whitespace alone keeps Send disabled", "do": { "action": "fill", "selector": "#prompt", "value": "   " },
+      "expect": [ { "assert": "attr", "selector": "#send", "name": "disabled", "equals": "" } ] },
+    { "label": "Shift+Enter inserts a newline instead of sending", "do": { "action": "fill", "selector": "#prompt", "value": "Give me a checklist" },
+      "expect": [ { "assert": "visible", "selector": "#send" } ] },
+    { "do": { "action": "press", "key": "Shift+Enter", "selector": "#prompt" },
+      "expect": [ { "assert": "count", "selector": ".msg-user", "equals": 2 }, { "assert": "visible", "selector": "#send" } ] },
+    { "label": "Enter sends: the user bubble appears and the reply streams with Stop generating", "do": { "action": "press", "key": "Enter", "selector": "#prompt" },
+      "expect": [
+        { "assert": "count", "selector": ".msg-user", "equals": 3 },
+        { "assert": "text", "selector": "#stop", "contains": "Stop generating" },
+        { "assert": "visible", "selector": ".msg-assistant:last-of-type .caret" },
+        { "assert": "attr", "selector": ".messages", "name": "aria-busy", "equals": "true" }
+      ] },
+    { "label": "The reply settles: caret gone, actions shown, Send back", "do": { "action": "wait", "ms": 3500 },
+      "expect": [
+        { "assert": "hidden", "selector": "#stop" },
+        { "assert": "count", "selector": ".caret", "equals": 0 },
+        { "assert": "text", "selector": ".msg-assistant:last-of-type .md", "contains": "tick items off as they are done" },
+        { "assert": "visible", "selector": ".msg-assistant:last-of-type .msg-actions" }
+      ] },
+    { "label": "Good response toggles its pressed state", "do": { "action": "click", "selector": ".msg-assistant:last-of-type [aria-label='Good response']" },
+      "expect": [ { "assert": "attr", "selector": ".msg-assistant:last-of-type [aria-label='Good response']", "name": "aria-pressed", "equals": "true" } ] }
+  ]
+}

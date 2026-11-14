@@ -1,0 +1,344 @@
+# Parley — AI assistant chat — judgment log
+
+How this interactive app — conversational AI chat UI was judged, in order. Rendered from `judgment.sqlite` by `examples/sites/judge.mjs`; `judge.mjs <site> render` writes the page, with the screens the log keeps, to `judgment/`.
+
+**4** rounds · **84** gate runs (23 failing) · **70** screens in 64 shots (14 kept) · **64** looks · defects: **11** by eye, **6** by a gate · 4 gate false positive(s)
+
+Brief: [`../briefs/chat.md`](../briefs/chat.md)
+
+## Defects
+
+| | found by | what | fix | checked by |
+|---|---|---|---|---|
+| D1 | eye (L1 on S1) | `.search svg, .brand-logo` Every SVG drawn through luna lost its class: the search icon is in flow above the field instead of inside it, and the Parley logo is black with no inner lines (.logo-bubble/.logo-lines fills never apply). Probe: the rendered <svg> has no class attribute at all. | SVG classes are now set as attributes from ref_ (svg_class helper in main.mbt), because luna's className path does nothing on SVG elements. | L4 |
+| D2 | gate (G16) | `#sidebar @767px` check breakpoints: the whole sidebar reads visible at 766px right after a resize from desktop — the drawer's close transition (visibility delayed 0.22s) also runs when the viewport crosses the 767px breakpoint, so the sidebar slides away on resize instead of only when the user closes the drawer. | The drawer transition is behind a .drawer-anim class that set_drawer() adds when the reader opens or closes it and the resize listener removes, so crossing 767px snaps instead of animating. | G20 |
+| D3 | gate (G11) | `h1.conv-title, .md-h` check composition no-type-contrast: the largest text is 18px against 16px body and no heading is heavier; the reply headings (h3) are barely bigger than body text, so a long reply has no visible structure. | Reply headings (.md-h, h3) are 21px/700 instead of 18px/650, so a long reply's sections stand out (1.31x body). | G21 |
+| D4 | gate (G2) | `#share-btn` check copy misses 'Copy link': the Share button opens a dialog but does not say so (no aria-haspopup=dialog / aria-expanded), so neither assistive tech nor the gate's disclosure sweep knows a dialog is behind it. | Share has aria-haspopup=dialog and aria-expanded following the dialog. | G22 |
+| D5 | eye (L6 on S6) | `.msg-assistant:last-child .msg-actions` After Stop generating the action row renders below the visible area, hidden under the sticky composer; the view only follows the stream on ticks, not when stopping adds the Stopped note and the actions. | stop_stream() calls follow() after the Stopped note and the actions render, so a reader at the end stays at the end. | L7 |
+| D6 | eye (L8 on S8) | `#model-menu .mm-desc` Parley Deep's description wraps and strands 'problems' on its own line in the 320px menu. | Deep's description is now 'Slower, for harder problems', which fits on one line like the others. | L11 |
+| D7 | eye (L10 on S10) | `#share-link` The share link field opens selected and scrolled to its end, cutting off the start of the URL. | The link field no longer selects itself on focus; the dialog focuses Copy link, the field is 13px with an ellipsis, and the dialog is 480px so the URL reads from its start. | L12 |
+| D8 | eye (L19 on S19) | `.edit-box .edit-area` The edit textarea draws a square focus ring and resize grip inside the rounded edit box, two borders at once. | The edit textarea has no outline or resize grip of its own; the edit box takes the teal border and soft ring on :focus-within, like the composer. | L25 |
+| D9 | eye (L19 on S19) | `.dock` With the thread scrolled to the middle, a strip of thread text shows below the small print: the sticky dock inside the scroller leaves a paint seam at the bottom of the scrollport. | The composer dock is no longer sticky inside the scroller: it is a flex sibling under it, with a ::before fade over the thread's last 20px, so nothing can paint below it. | L25 |
+| D10 | eye (L20 on S20) | `.row .rename` While renaming, the row's ⋯ button sits on top of the rename field's right end and covers the text. | The row's ⋯ button is not rendered while that row is being renamed, and the field keeps a 4px right margin. | L26 |
+| D11 | gate (G23) | `.msg-assistant:last-of-type .caret` verify flow: after a reply finishes streaming, its blinking caret stays in the last block (.caret count 1, not 0). The caret was decided when the block rendered, and the block is not re-rendered when streaming ends. | The caret is a luna show() bound to the message's own streaming signal (caret_node(live)), so it goes when the reply settles or stops, without re-rendering the block. | G25 |
+| D12 | gate (G28) | `#sidebar (drawer) focus trap` verify flow: in the open drawer, Shift+Tab from the first control does not wrap; focus stays on the close button. The trap wraps to the last matching control, which is the collapsed rail's New chat button, display:none on a phone, so focus() does nothing. | focusables() keeps only controls with a layout box (getClientRects().length > 0), so the trap wraps to the last visible row's ⋯. | G36 |
+| D13 | gate (G34) | `#share-dialog, drawer` verify flow: focus did not move when a dialog or the drawer opened or closed until a later task (Share left focus on the Share button when read right after the click; Escape on the drawer left it on the close button). Every focus move went through setTimeout(0). | later_focus() focuses at once (luna renders a show() synchronously) and only retries after the task when the target is not there yet; the drawer's open/close focus calls are synchronous. | G36 |
+| D14 | eye (L27 on S27) | `nav.history .no-match` With no history at all the sidebar says 'No chats match “”.' — the search miss message with empty quotes — instead of saying there are no chats yet. | When there are no conversations the line reads 'No chats yet. Start one with New chat.'; the match message is only for a search that finds nothing. | L29 |
+| D15 | eye (L29 on S29) | `nav.history .no-match` 'No chats yet. Start one with New chat.' wraps and strands 'chat.' on its own line in the 260px sidebar. | The line is just 'No chats yet.' — the New chat button sits right above it. | L30 |
+| D16 | eye (L34 on S34) | `@768px: .msg-assistant, .sidebar` At 768px the full 260px sidebar plus the 48px avatar gutter leave the reply ~410px: table cells wrap into three lines, the header title is cut and the code block clips early. | Below 1024px the sidebar is 232px, the thread and dock gutters 20px, and the reply drops its avatar column (the avatar sits above the reply as on phones), giving the reply ~496px at 768. | L48 |
+| D17 | eye (L51 on S51) | `@375px: .md-table` On a phone the comparison table squeezes four columns into 343px: cells wrap to 3-4 lines and the last column is cut by a few pixels, so it looks broken instead of scrollable. | Under 768px the table is max-content wide with unwrapped cells, so it keeps its columns and scrolls sideways inside its focusable .table-wrap, as the code blocks do. | L52 |
+
+## Rounds
+
+### R1 · first draft (builder)
+
+- **S1** index.html · 1280×800 · full page, 1 screen(s) (screens not kept)
+  - 👁 **L1**: Desktop 1280x800, one screen (the app is a fixed-height shell, the conversation scrolls inside). Left: a 260px grey sidebar with the "Parley" wordmark, a collapse icon, a bordered "New chat" button, then a search field — but the magnifier icon sits on its own line ABOVE the field, at x≈22 y≈124, instead of inside the field's left padding, which leaves the field looking empty-padded. History groups Today / Previous 7 days / Older read cleanly, 12 titles, the current one ("Planning a lunar observati…") on a darker pill with its ⋯ button showing; long titles ellipsize. The Parley logo next to the wordmark is solid BLACK, not the teal accent the stylesheet asks for, and its two inner lines are invisible — it reads as a generic black speech bubble. Header: "Parley Swift ⌄" at left, the conversation title centred in muted grey, a pill "Share" at right. The thread opened scrolled to its end, as a chat app should: the tail of the comparison table is cut by the header at the top (expected, it is scrolled), then prose, a `stations.py` inline code chip, a python code block on a tinted panel with a "python" label and "Copy" button, monospace text at a readable size, and the closing sentence. The five response actions (copy, regenerate, good, bad, read aloud) sit below in muted grey. The composer is a rounded box with "Message Parley" placeholder, a round + button and a disabled grey send arrow; the small print is centred under it. Nothing overlaps; the bottom of the reply clears the composer.
+    - ✗ **D1** defect `.search svg, .brand-logo`: Every SVG drawn through luna lost its class: the search icon is in flow above the field instead of inside it, and the Parley logo is black with no inner lines (.logo-bubble/.logo-lines fills never apply). Probe: the rendered <svg> has no class attribute at all.
+- **S2** index.html · 375×812 · full page, 1 screen(s)
+  - 👁 **L2**: Mobile 375x812. The sidebar is gone (drawer closed) and the header holds a hamburger, "Parley Swift ⌄" and the "Share" pill; the conversation title is hidden at this width, as intended. The thread takes the full width with 16px gutters and is scrolled to the end: prose wraps comfortably at 16px/1.6, the `stations.py` chip sits inline, and the python code block keeps its long lines and scrolls sideways inside the panel (lines are clipped at the right edge of the panel — that is the pre's own horizontal scroller, not page overflow). The action row and the composer (placeholder, +, disabled send) sit at the bottom with the small print centred under it on one line. No horizontal page scroll visible, nothing overlapping. The avatar column is dropped at this width so text uses the whole width. Nothing here looks broken; the code block's clipped lines are the one thing a first-time visitor may read as cut off, but the scroller is the standard pattern.
+- **N1** decision: Gate set. Base (PROTOCOL): check integrity, check copy --manifest copy.txt, check design, check composition, check color, check a11y contrast (light, ?theme=dark and --color-scheme dark), check a11y focus, check a11y touch, scan scroll, scan handlers, check interactions. Added for this brief's behaviour: check scroll (the conversation scroller and the sticky composer dock), check animation + check motion (the blinking streaming caret and the drawer slide must honour reduced motion), verify flow (send a message, see the reply stream in, stop one mid-stream: flows written as JSON in the site dir), stress data (long messages, empty history), check breakpoints --sweep (the sidebar becomes a drawer at 768px). check copy on index.html alone cannot see "Stop generating" (only while a reply streams) or "What can I help with?" (only in the New chat state); the page has ?chat=new for the second, and the first is shown by verify flow and shots.
+- **G1** `vlmkit check integrity index.html` → exit 0 — verdict: NO DEFECTS, 2 WARN (0 fail, 2 warn, 20 exempted)
+- **G2** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 4 · placeholders 0 · manifestLines 10 · statesExplored 16 · revealedOnly 0
+  - ✗ **D4** defect `#share-btn`: check copy misses 'Copy link': the Share button opens a dialog but does not say so (no aria-haspopup=dialog / aria-expanded), so neither assistive tech nor the gate's disclosure sweep knows a dialog is behind it.
+- **G3** `vlmkit check a11y contrast index.html` → exit 0 — inspected 78 · failures 0
+- **G4** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 78 · failures 0
+- **G5** `vlmkit check a11y focus index.html` → exit 0 — steps 47 · findings 3
+- **G6** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 36 · failures 0 · wcagExempt 0
+- **G7** `vlmkit scan scroll index.html` → exit 0 — containers 2 · overflowX 0 · issues 5
+- **G8** `vlmkit scan handlers index.html` → exit 0 — registrations 55 · elements 50 · suspects 0
+- **G9** `vlmkit check interactions index.html` → exit 0 — elements 30 · suspects 0 · warns 0
+- **G10** `vlmkit check design index.html` → exit 0 — verdict: DRIFT (2 finding(s))
+- **G11** `vlmkit check composition index.html` → exit 0 — verdict: UNBALANCED (2 finding(s))
+  - ✗ **D3** defect `h1.conv-title, .md-h`: check composition no-type-contrast: the largest text is 18px against 16px body and no heading is heavier; the reply headings (h3) are barely bigger than body text, so a long reply has no visible structure.
+- **G12** `vlmkit check color index.html` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s))
+- **G13** `vlmkit check scroll index.html` → exit 0 — pageScrolled 0 · stickyFixed 1 · engagedSticky 0 · snaps 0 · issues 0
+- **G14** `vlmkit check animation index.html` → exit 0 — animations 0 · settleMs 0 · issues 0
+- **G15** `vlmkit check motion index.html` → exit 0 — activeAnimations 0 · running 0 · issues 0
+- **G16** `vlmkit check breakpoints index.html --sweep` → exit 1 — breakpoints 2 · issues 118 · sweepRanges 0
+  - ✗ **D2** defect `#sidebar @767px`: check breakpoints: the whole sidebar reads visible at 766px right after a resize from desktop — the drawer's close transition (visibility delayed 0.22s) also runs when the viewport crosses the 767px breakpoint, so the sidebar slides away on resize instead of only when the user closes the drawer.
+- **G17** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 2 · issues 0 · sweepRanges 0
+- **G18** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (1 finding(s))
+- **G19** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 3 · placeholders 0 · manifestLines 10 · statesExplored 17 · revealedOnly 1
+- **S3** index.html · 1280×800 · full page, 1 screen(s)
+  - 👁 **L3**: Desktop after the SVG class fix. The magnifier now sits inside the search field's left padding, vertically centred, and the field reads as a search box. The Parley logo beside the wordmark is the teal accent with its two white lines, and the history list moved up 28px now that the icon no longer takes its own line (Today starts at y≈187). The ⋯ on the current row is visible; others hide it until hover/focus. Everything else as in S1: thread scrolled to its end, code panel with "python" label and Copy, five muted response actions, composer with placeholder, + and disabled send, small print centred. The response-action icons sit 6px left of the text column (the row has a -6px margin so the icon glyphs, not their 32px hit boxes, line up with the text) — they visually align with the paragraph's first letter, which is what I wanted.
+- **F1** fix for D1: SVG classes are now set as attributes from ref_ (svg_class helper in main.mbt), because luna's className path does nothing on SVG elements.
+- **F2** fix for D2: The drawer transition is behind a .drawer-anim class that set_drawer() adds when the reader opens or closes it and the resize listener removes, so crossing 767px snaps instead of animating.
+- **F3** fix for D3: Reply headings (.md-h, h3) are 21px/700 instead of 18px/650, so a long reply's sections stand out (1.31x body).
+- **F4** fix for D4: Share has aria-haspopup=dialog and aria-expanded following the dialog.
+- **G20** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 2 · issues 0 · sweepRanges 0
+- **G21** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (1 finding(s))
+- **G22** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 3 · placeholders 0 · manifestLines 10 · statesExplored 17 · revealedOnly 1
+- **S4** index.html · 1280×800 · element .sb-top — sidebar top after svg fix (screens not kept)
+  - 👁 **L4**: Close-up of the sidebar's top row after F1: the Parley logo is a teal speech bubble with two white lines, beside the bold "Parley" wordmark; the collapse icon (a panel outline) sits at the right in muted grey. The SVG classes now apply — the logo is no longer the solid black bubble of S1, and the icon has its .icon sizing.
+- **V1** D1 verified by L4
+- **V2** D2 verified by G20
+- **V3** D3 verified by G21
+- **V4** D4 verified by G22: Copy link now counts as revealed-only: the sweep opened the Share dialog.
+
+### R2 · interactions and states (builder)
+
+- **S5** index.html · 1280×800 · fill #prompt "Can you give me a checklist for the night?" · press Enter · wait 500 — reply mid-stream (screens not kept)
+  - 👁 **L5**: Reply mid-stream, desktop. The new user bubble "Can you give me a checklist for the night?" is right-aligned on the grey pill with its edit pencil under its right edge; the earlier reply's Regenerate icon is dimmed (disabled while another reply streams). Below, the Parley avatar and the streaming reply: an intro line, a numbered list of five items with bold lead-ins, then a partial sentence "Keep the list somewhere everyone helping" ending in a solid dark block caret, inline at the end of the text where a cursor would be. No action row yet under the streaming reply, as intended. The composer has the teal focus ring (the textarea kept focus after Enter), it is empty again, and the send arrow is replaced by a dark pill "■ Stop generating" at its right. The view followed the stream: the newest line sits just above the composer. Nothing overlaps.
+- **S6** index.html · 1280×800 · fill #prompt "Can you give me a checklist for the night?" · press Enter · wait 700 · click #stop — stopped reply (screens not kept)
+  - 👁 **L6**: Stopped reply, desktop. After Stop generating, the reply ends mid-sentence at "5. Check the forecast on the morning, and post a", and a muted "■ Stopped" note sits under it. The composer is back to its idle state (placeholder, +, disabled send). BUT the reply's action row (copy, regenerate, good, bad, read aloud), which appears once the reply stops, is not on screen: the scroller did not follow, so the row is hidden under the sticky composer and the reader has to scroll to reach Regenerate — the obvious next action after stopping.
+    - ✗ **D5** defect `.msg-assistant:last-child .msg-actions`: After Stop generating the action row renders below the visible area, hidden under the sticky composer; the view only follows the stream on ticks, not when stopping adds the Stopped note and the actions.
+- **F5** fix for D5: stop_stream() calls follow() after the Stopped note and the actions render, so a reader at the end stays at the end.
+- **S7** index.html · 1280×800 · fill #prompt "Can you give me a checklist for the night?" · press Enter · wait 700 · click #stop — stopped reply (screens not kept)
+  - 👁 **L7**: Stopped reply after F5. The reply ends at "5. Check the forecast on the morning, and post a", the muted "■ Stopped" note follows, and now the action row (copy, regenerate, good, bad, read aloud) sits right under it, clear of the composer, so Regenerate is one click away. The view is at the end; the composer is idle with the disabled send arrow. Spacing between Stopped and the actions (≈16px) matches the gap above the note.
+- **S8** index.html · 1280×800 · click #model-btn — model-picker (screens not kept)
+  - 👁 **L8**: Model picker open (desktop). A white panel with soft shadow drops from "Parley Swift ⌄" (whose button now has a hover-grey fill). Three rows: "Parley Swift / Fast answers for everyday questions" with a teal check at right and a grey highlight (it has focus — the menu put focus on the checked item), "Parley Deep / Slower, thinks through harder problems", "Parley Mini / Lightweight, for short drafts and edits". Defect: the Deep description wraps, leaving "problems" alone on a second line, so that row is taller than the others and the list looks uneven. The panel overlaps the start of the reply text behind it, which is expected for a menu.
+    - ✗ **D6** defect `#model-menu .mm-desc`: Parley Deep's description wraps and strands 'problems' on its own line in the 320px menu.
+- **S9** index.html · 1280×800 · click #more-5 — row-menu (screens not kept)
+  - 👁 **L9**: History row menu open for the current chat. The ⋯ button stays visible with a darker pill, and a small menu (184px) opens just under it, aligned to its right edge: Rename (pencil, focused grey highlight), Archive (box icon), Delete in red with a red trash icon. The menu floats over the rows below ("Sourdough…", "Rewrite…", "Previous 7 days") with a shadow, is not clipped by the sidebar's scroller (it is position: fixed), and text is crisp. Looks right.
+- **S10** index.html · 1280×800 · click #share-btn — share-dialog (screens not kept)
+  - 👁 **L10**: Share dialog (desktop). A white 460px dialog centred on the page: "Share this chat" with a close ×, two lines of explanation, then a readonly link field and a teal "Copy link" pill. Two problems. (1) The link field opened with its text selected and scrolled to its END, so it reads "y.example/share/lunar-night-4f7c2a": the start of the URL, the part that says what it is, is cut off. (2) The page behind is NOT dimmed in this picture: sidebar and thread are at full brightness, so the dialog barely separates from the page and the modal reads like a tooltip. A probe of my own (Playwright, same click) shows .backdrop at 1280x800 with rgba(17,19,23,.45), and a screenshot of that probe IS dimmed — so I re-shoot after the field fix before deciding whether this is the page or the shot.
+    - ✗ **D7** defect `#share-link`: The share link field opens selected and scrolled to its end, cutting off the start of the URL.
+- **V5** D5 verified by L7
+- **F6** fix for D6: Deep's description is now 'Slower, for harder problems', which fits on one line like the others.
+- **F7** fix for D7: The link field no longer selects itself on focus; the dialog focuses Copy link, the field is 13px with an ellipsis, and the dialog is 480px so the URL reads from its start.
+- **S11** index.html · 1280×800 · click #model-btn (screens not kept)
+  - 👁 **L11**: Model picker after F6. The three rows are now even: "Parley Swift / Fast answers for everyday questions" (teal check, focused grey row), "Parley Deep / Slower, for harder problems", "Parley Mini / Lightweight, for short drafts and edits", each one name line plus one description line, same height, the panel 180px tall with 6px padding. The menu sits 6px under the button and the picker button keeps its grey pressed fill while open.
+- **S12** index.html · 1280×800 · click #share-btn (screens not kept)
+  - 👁 **L12**: Share dialog after F7. The page behind is dimmed by the scrim; the dialog is 480px, "Share this chat" with ×, the explanation now wraps after "Messages", and the link field reads from its start, "https://parley.example/share/lunar-n…" with an ellipsis, unselected. Focus went to the teal "Copy link" pill (no visible ring in this shot because focus came from script, not keyboard — :focus-visible). Field and button share a 40px height and baseline. Reads as a clear, small modal.
+- **N2** superseded about L10: L10's second point was wrong. Reading S10's pixels back (a canvas decode of S10-1.webp) gives the thread background at (700,150) as rgb(147,149,151), not white: the 0.45 scrim was painted, the same as in my own probe's PNG (148,149,150). I misjudged the brightness of the thumbnail. Only the link-field point (D7) stands.
+- **V6** D6 verified by L11
+- **V7** D7 verified by L12
+- **S13** index.html?chat=new · 1280×800 (screens not kept)
+  - 👁 **L13**: Empty "New chat" state, desktop (?chat=new). The header says "New chat" in the centre and has no Share button (nothing to share yet). The thread area shows the teal logo, then "What can I help with?" at 30px/650 — the clear focal point — and a 2x2 grid of four suggestion cards (bold title + muted detail: "Plan a star party / a checklist for 20 guests", "Write a script / that rotates groups between stations", "Compare the models / Swift, Deep and Mini side by side", "Explain the terminator / and why craters look sharper there"), all the same height with 12px gutters, centred in the 760px column. The group sits slightly above the visual middle because the composer takes the bottom. No history row is highlighted, correctly. Calm and balanced.
+- **S14** index.html?chat=new · 375×812 (screens not kept)
+  - 👁 **L14**: Empty state on a phone (375). Hamburger + "Parley Swift ⌄" in the header; the logo, "What can I help with?" on one line at 26px, and the four suggestion cards in one column (the 520px query), each full width with a 16px gutter, titles and details on one line each. Composer and small print at the bottom on one line. Nothing cramped or overflowing.
+- **S15** index.html · 375×812 · click #open-drawer (screens not kept)
+  - 👁 **L15**: Mobile drawer open. The sidebar slides in as a 300px panel over a dimmed page (the scrim covers the conversation, whose text shows through darkened at the right). Inside: logo + "Parley" and a close (panel) icon, New chat, search, the three groups with all 12 titles — longer titles now have room ("Planning a lunar observation nig…") — and every row's ⋯ is visible since a touch screen has no hover. The current row is highlighted. The profile footer sits at the bottom. The close control reuses the panel icon rather than an ×; it is labelled "Close sidebar", and the scrim and Escape close it too, so I leave it.
+- **S16** index.html?theme=dark · 1280×800 (screens not kept)
+  - 👁 **L16**: Dark theme (?theme=dark), desktop. Near-black page (#17181b), a slightly lighter sidebar, light grey text. The current history row is a lighter grey pill; muted group labels and the conversation title read clearly. The code panel is a slightly lighter tint with a visible hairline border, "python" and "Copy" legible; the inline `stations.py` chip has a darker fill and border. The composer box is a lighter panel with a visible border; the send button is a dim disabled circle. The logo keeps its (lighter) teal with dark lines. No element kept a light-theme white background; contrast looks comfortable everywhere.
+- **S17** index.html · 1280×800 · scroll-to .msg-assistant .md-h (screens not kept)
+  - 👁 **L17**: Scrolled up to the first reply (scroll-to the first heading). The thread shows the first user bubble (three lines, right-aligned, with the pencil under it), then the reply: a paragraph with bold "waxing gibbous", the 21px heading "A plan for the evening" (now clearly a section title), the numbered list with bold lead-ins, and "What to bring" starting. The round "Scroll to bottom" button (↓ in a white circle with a border and shadow) has appeared, centred above the composer, overlapping the dock's fade, not the composer. Exactly the brief's behaviour.
+- **S18** index.html · 1280×800 · click #collapse (screens not kept)
+  - 👁 **L18**: Sidebar collapsed on desktop. The sidebar becomes a 60px rail with two icon buttons — expand (panel icon) and new chat (pencil) — at the top, and the conversation column re-centres in the wider space; the header starts at x≈86. The rail has no brand mark, which is how the big apps do it, and its two icons are clearly buttons on hover. Nothing reflows badly; the code block and composer just shift left.
+- **S19** index.html · 1280×800 · scroll-to #edit-3 · click #edit-3 (screens not kept)
+  - 👁 **L19**: Editing the second user message. The bubble became a rounded box the width of the column's right part, holding a textarea with the message text, then Cancel (outlined) and Send (teal) at the right — the brief's edit form. Two things look off. (1) The textarea draws its own rectangular focus ring and resize grip INSIDE the rounded box, so the box has two borders, one square and one round. (2) At the very bottom of the screen, under the small print, a strip of the thread's text shows through (y≈795-800): the sticky composer dock does not cover the last few pixels of the scrollport when the thread is scrolled to the middle. A probe says the dock's box reaches 800 and is topmost there, yet the capture shows the text — a sticky-in-scroller paint seam I should design out rather than argue with. The Scroll to bottom button appears as it should.
+    - ✗ **D8** defect `.edit-box .edit-area`: The edit textarea draws a square focus ring and resize grip inside the rounded edit box, two borders at once.
+    - ✗ **D9** defect `.dock`: With the thread scrolled to the middle, a strip of thread text shows below the small print: the sticky dock inside the scroller leaves a paint seam at the bottom of the scrollport.
+- **S20** index.html · 1280×800 · click #more-14 · click #row-menu [role=menuitem]:nth-child(1) (screens not kept)
+  - 👁 **L20**: Rename from the row menu: the "Explain CSS container queries" row turned into a text field with the title selected and the teal border. But the row's ⋯ button stays on top of the field's right end — the selected text runs under the three dots ("queries" collides with "…"), so the field's end is hidden and the dots look like part of the text. The rows below are intact.
+    - ✗ **D10** defect `.row .rename`: While renaming, the row's ⋯ button sits on top of the rename field's right end and covers the text.
+- **S21** index.html · 1280×800 · click #more-14 · click #row-menu .danger (screens not kept)
+  - 👁 **L21**: Delete confirmation for "Explain CSS container queries": the page dims, a 480px alertdialog says "Delete chat?" with the explanation "This deletes “Explain CSS container queries” and its messages. You can’t undo this." (title in bold), and Cancel (outlined) + Delete (red, white text) at the right. Cancel has focus (script focus, no ring shown). Clear and safe: the destructive button is red but not the default focus.
+- **S22** index.html · 1280×800 · click #attach-btn (screens not kept)
+  - 👁 **L22**: Attach (+) menu open: a small panel rises above the composer from the + button with "Upload file" (upload icon, highlighted with focus) and "Take screenshot" (corners icon). The composer shows the teal focus ring because focus is inside it. The menu clears the composer's top edge and does not clip. Good.
+- **S23** index.html · 1280×800 · fill #search "zzz" (screens not kept)
+  - 👁 **L23**: Search with "zzz": every group disappears and a muted line says No chats match “zzz”. with curly quotes; the field has the teal focus border and the browser's native clear (×) button, drawn in Chromium's blue — the one off-palette colour on the page, but it is the platform's own control and Escape clears the field too, so I leave it.
+- **S24** index.html · 1280×800 · fill #prompt "line one
+line two
+line three
+line four
+line five
+line six
+line seven
+line eight
+line nine
+line ten" (screens not kept)
+  - 👁 **L24**: Composer with ten lines typed. The textarea grew to its cap (~8.5 lines, 216px) and then scrolls: "line two" is half cut at the top edge, line ten is visible at the bottom, and the + and the now-enabled teal send button stay pinned under the text. The composer grew upward over the thread, which slides under it. This is the brief's "grows to about 8 lines, then scrolls".
+- **F8** fix for D8: The edit textarea has no outline or resize grip of its own; the edit box takes the teal border and soft ring on :focus-within, like the composer.
+- **F9** fix for D9: The composer dock is no longer sticky inside the scroller: it is a flex sibling under it, with a ::before fade over the thread's last 20px, so nothing can paint below it.
+- **F10** fix for D10: The row's ⋯ button is not rendered while that row is being renamed, and the field keeps a 4px right margin.
+- **S25** index.html · 1280×800 · scroll-to #edit-3 · click #edit-3 (screens not kept)
+  - 👁 **L25**: Edit form after F8/F9, scrolled to the middle of the thread. The edit box is one rounded shape with a teal border and soft ring (focus-within), no square ring and no resize grip inside it; the text, Cancel and Send read cleanly. The bottom of the screen is now clean: the composer sits in an opaque dock under the scroller, the small print is the last thing on screen, and the thread fades out 20px above the composer instead of showing a strip below it. The Scroll to bottom button floats over the fade, centred.
+- **S26** index.html · 1280×800 · click #more-14 · click #row-menu [role=menuitem]:nth-child(1) (screens not kept)
+  - 👁 **L26**: Rename after F10: the field spans the row with the whole title "Explain CSS container queries" selected and visible to its last letter, no ⋯ on top of it; the teal border marks it. The next row (hovered by the pointer) still shows its own ⋯, which is right.
+- **V8** D8 verified by L25
+- **V9** D9 verified by L25
+- **V10** D10 verified by L26
+- **G23** `vlmkit verify flow index.html --flow flow-send.json` → exit 1 — verdict: FAILED (5/7 steps)
+  - ✗ **D11** defect `.msg-assistant:last-of-type .caret`: verify flow: after a reply finishes streaming, its blinking caret stays in the last block (.caret count 1, not 0). The caret was decided when the block rendered, and the block is not re-rendered when streaming ends.
+- **G24** `vlmkit verify flow index.html --flow flow-stop.json` → exit 0 — verdict: DONE (7/7 steps)
+- **F11** fix for D11: The caret is a luna show() bound to the message's own streaming signal (caret_node(live)), so it goes when the reply settles or stops, without re-rendering the block.
+- **G25** `vlmkit verify flow index.html --flow flow-send.json` → exit 0 — verdict: DONE (7/7 steps)
+- **G26** `vlmkit verify flow index.html --flow flow-stop.json` → exit 0 — verdict: DONE (7/7 steps)
+- **V11** D11 verified by G25
+- **G27** `vlmkit verify flow index.html --flow flow-traps.json` → exit 1 — verdict: FAILED (1/9 steps)
+- **N3** superseded about G27: G27 failed on my flow, not on the page: Shift+Tab from New chat correctly lands on the drawer's close button, which comes before it. The flow now steps through it (G28).
+- **G28** `vlmkit verify flow index.html --flow flow-traps.json` → exit 1 — verdict: FAILED (2/10 steps)
+  - ✗ **D12** defect `#sidebar (drawer) focus trap`: verify flow: in the open drawer, Shift+Tab from the first control does not wrap; focus stays on the close button. The trap wraps to the last matching control, which is the collapsed rail's New chat button, display:none on a phone, so focus() does nothing.
+- **F12** fix for D12: focusables() keeps only controls with a layout box (getClientRects().length > 0), so the trap wraps to the last visible row's ⋯.
+- **G29** `vlmkit verify flow index.html --flow flow-traps.json` → exit 1 — verdict: FAILED (0/10 steps)
+- **G30** `vlmkit verify flow index.html --flow flow-traps.json` → exit 1 — verdict: FAILED (2/10 steps)
+- **N4** accepted about G29: G29/G30 are runs between fixes. G29's step 1 lost a race: the drawer moved focus in a setTimeout(0), and the flow read focus before it ran (it had passed in G27/G28). Opening now focuses New chat in the same task. G30's 'got #more-38' was my flow's mistake: 38 is the id of the last row (Birthday party playlist); 35 is not the last one.
+- **G31** `vlmkit verify flow index.html --flow flow-traps.json` → exit 1 — verdict: FAILED (4/10 steps)
+- **G32** `vlmkit verify flow index.html --flow flow-traps.json` → exit 1 — verdict: FAILED (4/10 steps)
+- **G33** `vlmkit verify flow index.html --flow flow-traps.json` → exit 1 — verdict: FAILED (6/11 steps)
+- **G34** `vlmkit verify flow index.html --flow flow-traps.json` → exit 1 — verdict: FAILED (6/11 steps)
+  - ✗ **D13** defect `#share-dialog, drawer`: verify flow: focus did not move when a dialog or the drawer opened or closed until a later task (Share left focus on the Share button when read right after the click; Escape on the drawer left it on the close button). Every focus move went through setTimeout(0).
+- **G35** `vlmkit verify flow index.html --flow flow-traps.json` → exit 0 — verdict: DONE (11/11 steps)
+- **F13** fix for D13: later_focus() focuses at once (luna renders a show() synchronously) and only retries after the task when the target is not there yet; the drawer's open/close focus calls are synchronous.
+- **G36** `vlmkit verify flow index.html --flow flow-traps.json` → exit 0 — verdict: DONE (11/11 steps)
+- **V12** D12 verified by G36: Shift+Tab from the first drawer control wraps to the last row's ⋯ (#more-38).
+- **V13** D13 verified by G36: Every focus step of the trap flow passes, read right after each action.
+- **G37** `vlmkit stress data index.html` → exit 1 — variants 13 · findings 17
+- **S27** index.html?history=empty · 1280×800 · element .sidebar (screens not kept)
+  - 👁 **L27**: Sidebar with an empty history (?history=empty, the brief's "empty history" stress case, which stress data cannot reach because it skips navigation groups). Logo, New chat and search as usual, then where the groups would be a single muted line: No chats match “”. — the search's no-result message with an empty pair of quotes, which reads like a bug: nothing was searched, there are simply no chats yet. The rest of the column is empty down to the profile footer.
+    - ✗ **D14** defect `nav.history .no-match`: With no history at all the sidebar says 'No chats match “”.' — the search miss message with empty quotes — instead of saying there are no chats yet.
+- **F14** fix for D14: When there are no conversations the line reads 'No chats yet. Start one with New chat.'; the match message is only for a search that finds nothing.
+- **S28** index.html?history=empty · 1280×800 · element .sidebar (screens not kept)
+  - 👁 **L28**: Same picture as S27: still "No chats match “”." My edit for F14 had not applied when this was shot (the source had been reformatted by moon fmt and my replacement did not match; the build ran on the old text). So S28 shows the defect unchanged; the edit is now applied and rebuilt, and S29 is the real check.
+- **S29** index.html?history=empty · 1280×800 · element .sidebar (screens not kept)
+  - 👁 **L29**: Empty history after F14 really applied: the line now says "No chats yet. Start one with New chat." in muted text — the right message — but at 260px it wraps and leaves "chat." alone on a second line, an orphan right under a sentence that already points at the New chat button directly above it.
+    - ✗ **D15** defect `nav.history .no-match`: 'No chats yet. Start one with New chat.' wraps and strands 'chat.' on its own line in the 260px sidebar.
+- **V14** D14 verified by L29: the message is right; its wrapping is D15
+- **F15** fix for D15: The line is just 'No chats yet.' — the New chat button sits right above it.
+- **S30** index.html?history=empty · 1280×800 · element .sb-full (screens not kept)
+  - 👁 **L30**: Empty history after F15: one short muted line, "No chats yet.", on one line under the search field, with the New chat button right above it as the obvious next step. The rest of the sidebar is empty down to the profile footer, as it should be.
+- **V15** D15 verified by L30
+- **N5** accepted about G37: stress data, three kinds of finding, none fixed: (1) occluded-text by div.dock in the 'many' variants: the composer dock is opaque and its 20px ::before fade overlaps the bottom of the conversation scroller, so whichever line is passing under the composer at that scroll position is covered. That is the chat pattern itself (content scrolls under a fixed composer; S25 shows the fade); at the end of the thread nothing is covered (S7, S3). The base page reports none. (2) long-text: the variant puts a 62-character unbreakable name into button.code-copy, whose label is only ever "Copy" or "Copied", so the protrusion cannot happen. (3) empty-collapses for .messages, .md, ol.md-list and tbody: none of these can be empty in the app. A conversation with no messages is the New chat state, which renders the greeting instead (S13); a reply with no text yet shows the caret (S5). The empty case the brief names, empty history, is not a group stress data reaches (it skips navigation); I added ?history=empty and fixed what it showed (D14, D15).
+- **N6** accepted about G22: check copy on index.html misses three lines, all visible in other states: "Message Parley" is the composer's placeholder (visible in every screenshot, S3; the gate reads rendered text, not placeholders), "Stop generating" is the Stop button while a reply streams (S5; asserted visible by verify flow), and "What can I help with?" is the New chat greeting (S13, ?chat=new; asserted by verify flow). Not moved into the static page: the brief places them in those states.
+
+### R3 · final check (builder)
+
+- **G38** `vlmkit check integrity index.html` → exit 0 — verdict: NO DEFECTS, 2 WARN (0 fail, 2 warn, 21 exempted)
+- **G39** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 3 · placeholders 0 · manifestLines 10 · statesExplored 17 · revealedOnly 1
+- **G40** `vlmkit check copy 'index.html?chat=new' --manifest copy.txt` → exit 1 — missing 3 · placeholders 0 · manifestLines 10 · statesExplored 16 · revealedOnly 0
+- **G41** `vlmkit check design index.html` → exit 0 — verdict: DRIFT (2 finding(s))
+- **G42** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (1 finding(s))
+- **G43** `vlmkit check color index.html` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s))
+- **G44** `vlmkit check a11y contrast index.html` → exit 0 — inspected 78 · failures 0
+- **G45** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 78 · failures 0
+- **G46** `vlmkit check a11y contrast index.html --color-scheme dark` → exit 0 — inspected 78 · failures 0
+- **G47** `vlmkit check a11y contrast 'index.html?chat=new'` → exit 0 — inspected 33 · failures 0
+- **G48** `vlmkit check a11y focus index.html` → exit 1 — steps 47 · findings 4
+- **G49** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 36 · failures 0 · wcagExempt 0
+- **G50** `vlmkit scan scroll index.html` → exit 0 — containers 2 · overflowX 0 · issues 5
+- **G51** `vlmkit scan handlers index.html` → exit 0 — registrations 55 · elements 50 · suspects 0
+- **G52** `vlmkit check scroll index.html` → exit 0 — pageScrolled 0 · stickyFixed 0 · engagedSticky 0 · snaps 0 · issues 0
+- **G53** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 2 · issues 0 · sweepRanges 0
+- **G54** `vlmkit check animation index.html` → exit 0 — animations 0 · settleMs 0 · issues 0
+- **G55** `vlmkit check motion index.html` → exit 0 — activeAnimations 0 · running 0 · issues 0
+- **S31** index.html · 1280×720 · focus .msg-assistant:last-of-type [aria-label='Read aloud'] · press Tab — tab from the last action into the composer (screens not kept)
+  - 👁 **L31**: Keyboard check for check a11y focus's "reverse" finding: focus was put on the last reply's Read aloud button and Tab was pressed. The thread is scrolled so that the last reply's action row sits just above the composer (y≈563), and focus is now in the composer — its teal ring is on, directly BELOW the row it came from. On screen the move is downward, the natural end of the reading order: thread, then the box you type in. The gate's "moved up by 1227px" compares the button's position inside the scrolled content (y=1832 unscrolled) with the composer's fixed place (y=606).
+- **G56** `vlmkit check interactions index.html --max-elements 60` → exit 0 — elements 46 · suspects 0 · warns 3
+- **G57** `vlmkit verify flow index.html --flow flow-send.json` → exit 0 — verdict: DONE (7/7 steps)
+- **G58** `vlmkit verify flow index.html --flow flow-stop.json` → exit 0 — verdict: DONE (7/7 steps)
+- **G59** `vlmkit verify flow index.html --flow flow-traps.json` → exit 0 — verdict: DONE (11/11 steps)
+- **G60** `vlmkit stress data index.html` → exit 1 — variants 13 · findings 17
+- **G61** `vlmkit inspect motion 'index.html?chat=new' --selector .caret --click .suggestion` → exit 1
+- **N7** tool about G61: inspect motion "index.html?chat=new" --selector ".caret" --click ".suggestion" crashed with a stack trace instead of a usage message:   Error: without Jev every target needs the page's measurement: .caret       at checkMotionFrames (file://dist/motion-check-C9CYuKXg.mjs:51:27)       at runMotionOptions (file://dist/motion-cli-kuNzkIJW.mjs:2727:18) My guess is that .caret does not exist until the click starts a reply, and the measurement is set up before the click; the message does not say which. The streaming caret is covered instead by verify flow (caret visible while streaming, count 0 once settled or stopped: G57, G58) and by a reduced-motion shot.
+- **S32** index.html?chat=new · 1280×800 · reduced motion · click .suggestion — reduced motion: reply appears whole (screens not kept)
+  - 👁 **L32**: Reduced motion: from the New chat state, a suggestion card was clicked with prefers-reduced-motion: reduce. The reply is there whole at once — intro, five numbered items, the closing sentence — with its action row and no caret; Send is back. The new conversation "Plan a star party for 20 gu…" sits at the top of Today and is marked current, and the header title shows the prompt ellipsized ("Plan a star party for 20 guests and give…"). The suggestion filled and sent in one click, as the brief asks.
+- **N8** accepted about G38: nested-scroll (warn): the code block's <pre> and the table wrapper scroll sideways inside the vertical conversation scroller at 768/375px. A long code line or a four-column table has to scroll on a phone; wrapping code would change its meaning. Both are focusable (tabindex=0) so they scroll from the keyboard. Seen in S2.
+- **N9** accepted about G39: Same three lines as N6: the placeholder 'Message Parley' (every screenshot), 'Stop generating' (only while streaming: S5, verify flow G57/G58) and 'What can I help with?' (New chat state; G40 on ?chat=new finds it, and misses 'Copy link' there because a new chat has no Share).
+- **N10** accepted about G40: ?chat=new: the greeting is found; 'Copy link' is missing because an empty chat has nothing to share (the Share button is not shown, S13); the other two as in N6.
+- **N11** accepted about G41: component-drift on buttons: the 12x dominant style is the icon-only action button; the 7 one-offs are each a different control on purpose — New chat (bordered row button), the model picker, Share (pill), the composer's send circle, Stop generating (dark pill), code Copy, the suggestion card. They are one per role, not drift of one component: the brief wants one message component per role and the message actions are all the one style.
+- **N12** false-positive about G43: control-boundary-invisible on textarea#prompt: the textarea is borderless on purpose because its boundary is the composer form around it, a 1px #7c828c border (3.6:1 on white) with a 26px radius, which turns teal with a ring on focus (S3, S22, S31). The gate measures the textarea element alone.
+- **N13** false-positive about G48: check a11y focus 'reverse' (moved up by 1227px) compares the last reply action's position inside the scrolled thread (y=1832 unscrolled) with the composer's fixed place below the scroller (y=606). On screen the step is downward: S31 shows focus going from the last action row to the composer directly below it. The three skip-row warns are focus passing over message text, which has no controls (accepted).
+- **N14** accepted about G50: clipped-content (warn) on history titles: long titles are ellipsized by design in the 260px sidebar (text-overflow: ellipsis, integrity exempts them); the full title is in the drawer at phone width (S15) and in the header when the chat is open.
+- **N15** accepted about G51: scan handlers only warns that it presses nothing (unprobed-handler-types); the handlers are exercised by check interactions (G56) and the three verify flows (G57-G59). No pointer-only controls.
+- **N16** accepted about G60: Same three findings as N5 (G37): text passing under the opaque composer dock while scrolled, a 62-character label forced into the code Copy button, and groups that are never empty in the app. Nothing new.
+- **N17** decision about G52: check scroll now reports no sticky element: since D9 the composer is a flex sibling under the conversation scroller, not sticky inside it, so it is stuck to the bottom by layout and check scroll has nothing to drive. The scroller itself is in scan scroll (G50) and the Scroll to bottom button in S17/S36.
+- **S33** index.html · 1280×800 · full page, 1 screen(s)
+  - 👁 **L33**: Final desktop 1280x800 (the shell is one screen; the conversation scrolls inside it). Sidebar: teal logo + "Parley", collapse icon, New chat, search with its icon inside, Today / Previous 7 days / Older with 12 titles, the current one highlighted with its ⋯, profile at the bottom. Header: model picker, centred title, Share pill. Thread at its end: the table's last row, two paragraphs with the `stations.py` chip, the python block with label and Copy, the closing line and the response actions, then the composer (now an opaque dock with a soft fade above it) and the small print. Spacing is even, nothing collides, the hierarchy reads conversation first.
+- **S34** index.html · 768×1024 · full page, 1 screen(s)
+  - 👁 **L34**: Tablet 768x1024. The full 260px sidebar stays (the drawer starts below 768), which leaves the thread only ~410px of text width beside the avatar column. It shows: the comparison table's cells wrap into three lines each ("Sharp, / wide / views", "Kids, / quick / looks"), the header title is cut to "Planning a lunar observation ni…", and the code block's first line is clipped at "Wh". The page is not broken, but it is cramped at a common width — the avatar gutter and the full sidebar together squeeze the reply.
+    - ✗ **D16** defect `@768px: .msg-assistant, .sidebar`: At 768px the full 260px sidebar plus the 48px avatar gutter leave the reply ~410px: table cells wrap into three lines, the header title is cut and the code block clips early.
+- **S35** index.html · 375×812 · full page, 1 screen(s)
+  - 👁 **L35**: Phone 375x812 final. Hamburger, model picker and Share pill in the header; the thread at full width with 16px gutters, the avatar column dropped, prose wrapping comfortably, the code block scrolling sideways inside its panel, the action row, and the composer with the small print on one line at the bottom. No horizontal page scroll.
+- **S36** index.html · 1280×800 · scroll-to .msg-assistant .md-h — scroll to bottom button (screens not kept)
+  - 👁 **L36**: Scrolled up (state: Scroll to bottom). The first user bubble and the start of the first reply with the 21px headings "A plan for the evening" and "What to bring". The round ↓ button floats centred just above the composer, over the fade; it sits on top of the first bullet's words ("the[…]ght vision") while it is there, which is how a floating button behaves over moving content — the reader scrolls or clicks it, and it goes.
+- **S37** index.html · 1280×800 · fill #prompt "Can you give me a checklist for the night?" · press Enter · wait 400 — mid-stream (screens not kept)
+  - 👁 **L37**: Mid-stream (state). New user bubble right-aligned; the reply streaming under the avatar, at item 5 of the list with the dark block caret at the end of "…by noon."; the earlier reply's Regenerate dimmed; the composer shows the dark "■ Stop generating" pill in place of send, and the view follows the stream.
+- **S38** index.html · 1280×800 · fill #prompt "Can you give me a checklist for the night?" · press Enter · wait 600 · click #stop — stopped (screens not kept)
+  - 👁 **L38**: Stopped (state). The reply ends at "5. Check the forecast" (the bold lead-in had just closed), then the muted "■ Stopped" note and the full action row right under it, above the composer; no caret anywhere; send is back (disabled, empty box).
+- **S39** index.html · 1280×800 · click #model-btn (screens not kept)
+  - 👁 **L39**: Model picker open (state). Three rows of name + one-line description, all one line each, the current "Parley Swift" checked in teal and focused; the panel's shadow separates it from the reply it covers.
+- **S40** index.html · 1280×800 · click #more-5 (screens not kept)
+  - 👁 **L40**: History row menu open (state) for the current chat: Rename (focused), Archive, Delete in red, in a small floating menu aligned to the ⋯ button's right edge, over the rows below, not clipped.
+- **S41** index.html · 1280×800 · click #share-btn (screens not kept)
+  - 👁 **L41**: Share dialog (state). Dimmed page, 480px dialog: "Share this chat", ×, two lines of explanation, the link field reading from "https://parley.example/share/lunar-n…", and the teal "Copy link" pill with focus.
+- **S42** index.html?chat=new · 1280×800 (screens not kept)
+  - 👁 **L42**: New chat (state). Header "New chat", no Share; logo, "What can I help with?" and the 2x2 suggestion cards centred in the column; no history row current; the composer waits below.
+- **S43** index.html · 375×812 · click #open-drawer (screens not kept)
+  - 👁 **L43**: Mobile drawer open (state). The 300px sidebar over a dimmed conversation; logo, close icon, New chat (focus moved here when the drawer opened), search, the three groups with fuller titles and every row's ⋯, profile at the bottom.
+- **S44** index.html?theme=dark · 1280×800 (screens not kept)
+  - 👁 **L44**: Dark theme desktop (state). Near-black page and slightly lighter sidebar, light text, the current row a lighter pill, code panel and inline chip tinted with hairline borders, the composer a lighter panel with a visible border; nothing is left light.
+- **S45** index.html?theme=dark · 375×812 (screens not kept)
+  - 👁 **L45**: Dark theme on a phone: the same thread at full width on near-black, code panel tinted, the composer panel's border visible, the small print legible in muted grey.
+- **S46** index.html · 375×812 · dark · click #model-btn (screens not kept)
+  - 👁 **L46**: Dark theme on a phone with the model picker open: the menu panel (#222428) with its border sits under the header button, which keeps its pressed fill; the light-teal check marks Parley Swift, descriptions in muted grey fit on one line each within the 320px (viewport-capped) panel.
+- **F16** fix for D16: Below 1024px the sidebar is 232px, the thread and dock gutters 20px, and the reply drops its avatar column (the avatar sits above the reply as on phones), giving the reply ~496px at 768.
+
+### R4 · final check (after the tablet fix) (builder)
+
+- **S47** index.html · 1280×800 · full page, 1 screen(s) (screens not kept)
+  - 👁 **L47**: Final desktop 1280 after F16: unchanged from S33 at this width (the new rules start below 1024): sidebar, header, the thread at its end with table tail, prose, the python block, the closing line, actions and composer. Consistent spacing, nothing overlapping.
+- **S48** index.html · 768×1024 · full page, 1 screen(s)
+  - 👁 **L48**: Tablet 768 after F16. The sidebar is 232px (titles ellipsize a little earlier, still readable), and the reply now uses the whole column: no avatar gutter at this width. The comparison table's cells wrap at most to two lines ("Crater detail at / 150x", "Sharp, wide / views"), the header title shows in full ("Planning a lunar observation night", left-aligned beside the model picker), the python block's longest line fits to "Whole disc"]", and the prose has a comfortable measure. The cramping of S34 is gone.
+- **S49** index.html · 375×812 · full page, 1 screen(s) (screens not kept)
+  - 👁 **L49**: Final phone 375: as S35 — header with hamburger, model picker and Share; full-width thread with 16px gutters; code panel scrolling inside itself; actions; composer and the one-line small print. No overflow, nothing clipped except the code lines inside their scroller.
+- **V16** D16 verified by L48
+- **S50** index.html · 1280×800 · full page, 3 screen(s) — the whole conversation
+  - 👁 **L50**: The whole conversation at desktop, walked through the #scroller in 3 screens. Screen 1: the first user bubble (three lines, right-aligned, pencil under it), the Parley avatar and the first reply — paragraph with bold "waxing gibbous", the 21px heading "A plan for the evening", the four-item numbered list with bold lead-ins, "What to bring" starting; the Scroll to bottom ↓ floats above the composer because the walk is not at the end. Screen 2: the bulleted list with bold crater names, the closing paragraph, the first reply's action row, the second user bubble, the second reply's intro and the comparison table (header row with a stronger rule, three rows). Screen 3: the table's last row, two paragraphs, the python block, the closing line and the actions, at the end — no ↓ button. Rhythm is even: 30px between messages, 14px between paragraphs, headings with more space above than below.
+- **S51** index.html · 375×812 · full page, 5 screen(s) — the whole conversation, phone
+  - 👁 **L51**: The whole conversation on a phone, 5 screens through the scroller. Bubbles take 86% width and wrap well; the avatar sits above each reply; headings and lists read fine. One real problem on screen 3/4: the four-column comparison table is squeezed into 343px — cells wrap to three and four lines ("Crater / detail / at / 150x", "70 mm / travel / scope"), and the last column is cut ("Copernicu", "Whole disc" clipped) because the table is just wider than its scroller. It reads as broken rather than as a table you can swipe. The code block scrolls sideways as intended. The ↓ button floats over the text while the walk is mid-thread, as designed.
+    - ✗ **D17** defect `@375px: .md-table`: On a phone the comparison table squeezes four columns into 343px: cells wrap to 3-4 lines and the last column is cut by a few pixels, so it looks broken instead of scrollable.
+- **F17** fix for D17: Under 768px the table is max-content wide with unwrapped cells, so it keeps its columns and scrolls sideways inside its focusable .table-wrap, as the code blocks do.
+- **S52** index.html · 375×812 · scroll-to .md-table — phone table (screens not kept)
+  - 👁 **L52**: Phone table after F17: the comparison table keeps its four columns on single lines — "8\" Dobsonian | 203 mm | Crater deta…", "102 mm refractor | 102 mm | Sharp, wide…", "70 mm travel scope | 70 mm | Kids, quick…" — and runs off the right edge of the column exactly like the code block below does, which reads as "swipe sideways" rather than as broken cells. Rows are 40px with hairline rules; the header keeps its stronger rule.
+- **V17** D17 verified by L52
+- **G62** `vlmkit check integrity index.html` → exit 0 — verdict: NO DEFECTS, 2 WARN (0 fail, 2 warn, 22 exempted)
+- **G63** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 3 · placeholders 0 · manifestLines 10 · statesExplored 17 · revealedOnly 1
+- **G64** `vlmkit check copy 'index.html?chat=new' --manifest copy.txt` → exit 1 — missing 3 · placeholders 0 · manifestLines 10 · statesExplored 16 · revealedOnly 0
+- **G65** `vlmkit check design index.html` → exit 0 — verdict: DRIFT (2 finding(s))
+- **G66** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (1 finding(s))
+- **G67** `vlmkit check color index.html` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s))
+- **G68** `vlmkit check a11y contrast index.html` → exit 0 — inspected 78 · failures 0
+- **G69** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 78 · failures 0
+- **G70** `vlmkit check a11y contrast index.html --color-scheme dark` → exit 0 — inspected 78 · failures 0
+- **G71** `vlmkit check a11y contrast 'index.html?chat=new'` → exit 0 — inspected 33 · failures 0
+- **G72** `vlmkit check a11y focus index.html` → exit 1 — steps 47 · findings 4
+- **G73** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 36 · failures 0 · wcagExempt 0
+- **G74** `vlmkit scan scroll index.html` → exit 0 — containers 2 · overflowX 0 · issues 5
+- **G75** `vlmkit scan handlers index.html` → exit 0 — registrations 55 · elements 50 · suspects 0
+- **G76** `vlmkit check scroll index.html` → exit 0 — pageScrolled 0 · stickyFixed 0 · engagedSticky 0 · snaps 0 · issues 0
+- **G77** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 3 · issues 0 · sweepRanges 0
+- **G78** `vlmkit check animation index.html` → exit 0 — animations 0 · settleMs 0 · issues 0
+- **G79** `vlmkit check motion index.html` → exit 0 — activeAnimations 0 · running 0 · issues 0
+- **G80** `vlmkit verify flow index.html --flow flow-send.json` → exit 0 — verdict: DONE (7/7 steps)
+- **G81** `vlmkit verify flow index.html --flow flow-stop.json` → exit 0 — verdict: DONE (7/7 steps)
+- **G82** `vlmkit verify flow index.html --flow flow-traps.json` → exit 0 — verdict: DONE (11/11 steps)
+- **G83** `vlmkit check interactions index.html --max-elements 60` → exit 0 — elements 46 · suspects 0 · warns 3
+- **G84** `vlmkit stress data index.html` → exit 1 — variants 13 · findings 15
+- **N18** accepted about G62: Same two nested-scroll warns as N8: the code <pre> and, at 375px, the table wrapper scroll sideways inside the conversation scroller — at phone width the table now does so on purpose (D17), both are keyboard-focusable.
+- **N19** accepted about G63: As N6/N9: placeholder 'Message Parley' (S47), 'Stop generating' only while streaming (S54 below, verify flow G80/G81), 'What can I help with?' only in New chat (G64 finds it).
+- **N20** accepted about G64: As N10: on ?chat=new the greeting is found; there is no Share in an empty chat, so no 'Copy link'.
+- **N21** accepted about G65: As N11: one style per button role; the icon-only action button is the 12x shared style.
+- **N22** false-positive about G67: As N12: textarea#prompt's boundary is the composer form's 1px #7c828c border around it (3.6:1), teal on focus.
+- **N23** false-positive about G72: As N13: the 'reverse' step is the last reply action to the composer, which on screen is directly below it (S31); the gate compares an unscrolled in-scroller y=1832 with the composer's fixed y=606. The three skip-row warns pass over message text, which holds no controls.
+- **N24** accepted about G74: As N14: the clipped-content warns are the ellipsized history titles.
+- **N25** accepted about G75: As N15: scan handlers says it presses nothing; check interactions (G83) and the flows (G80-G82) press everything.
+- **N26** accepted about G84: As N5/N16: text passing under the opaque composer while the injected 'many' variants are scrolled mid-thread; a 62-character label forced into the code Copy button; never-empty groups. Nothing new since the tablet and phone-table fixes.
+- **S53** index.html · 1280×800 · scroll-to .msg-assistant .md-h — scroll to bottom (screens not kept)
+  - 👁 **L53**: Scroll to bottom (state), final build. Scrolled to the first reply's heading: the first user bubble, the reply with "A plan for the evening" and the numbered list, "What to bring" starting; the round ↓ button floats centred over the fade above the composer (it covers a few letters of the first bullet while it is shown, as a floating control does).
+- **S54** index.html · 1280×800 · fill #prompt "Can you give me a checklist for the night?" · press Enter · wait 400 — mid-stream (screens not kept)
+  - 👁 **L54**: Reply mid-stream (state), final build. The new bubble, the streaming list at item 5 with the block caret after "by noon.", the previous reply's Regenerate dimmed, and "■ Stop generating" in the composer, which has the teal focus ring. The view follows the stream.
+- **S55** index.html · 1280×800 · fill #prompt "Can you give me a checklist for the night?" · press Enter · wait 600 · click #stop — stopped (screens not kept)
+  - 👁 **L55**: Stopped reply (state), final build. Partial list ending at the bold "Check the forecast", "■ Stopped" under it, the action row under that and above the composer, no caret, send back.
+- **S56** index.html · 1280×800 · click #model-btn (screens not kept)
+  - 👁 **L56**: Model picker open (state), final build. Swift checked and focused, Deep and Mini below, each a name and a one-line description; even rows.
+- **S57** index.html · 1280×800 · click #more-5 (screens not kept)
+  - 👁 **L57**: History row menu open (state), final build: Rename (focused), Archive, Delete in red, floating under the current row's ⋯, aligned to its right edge.
+- **S58** index.html · 1280×800 · click #share-btn (screens not kept)
+  - 👁 **L58**: Share dialog (state), final build: dimmed page, "Share this chat", ×, the two-line note, the link reading from its start with an ellipsis, and "Copy link" focused.
+- **S59** index.html?chat=new · 1280×800 (screens not kept)
+  - 👁 **L59**: New chat empty state (state), desktop, final build: "New chat" in the header without Share; logo, "What can I help with?" and the four suggestion cards in a 2x2 grid; no current row.
+- **S60** index.html?chat=new · 375×812 (screens not kept)
+  - 👁 **L60**: New chat on a phone, final build: one column of four suggestion cards under the greeting, composer and small print at the bottom; nothing cramped.
+- **S61** index.html · 375×812 · click #open-drawer (screens not kept)
+  - 👁 **L61**: Mobile drawer open (state), final build: 300px panel over the dimmed conversation with New chat, search, all three groups, every row's ⋯, profile footer.
+- **S62** index.html?theme=dark · 1280×800 (screens not kept)
+  - 👁 **L62**: Dark theme desktop (state), final build: as S44 — near-black surfaces, light text, lighter current row, tinted code panel with hairline border, composer panel with a visible border; the logo's teal lightens for the dark ground.
+- **S63** index.html?theme=dark · 768×1024 (screens not kept)
+  - 👁 **L63**: Dark theme at tablet width, final build: the 232px sidebar, the reply without an avatar gutter, the table's cells at most two lines, the full title in the header, the code block and composer in their dark tints. Same layout as the light tablet (S48).
+- **S64** index.html · 768×1024 · fill #prompt "Give me a checklist" · press Enter · wait 300 — tablet mid-stream (screens not kept)
+  - 👁 **L64**: Mid-stream at tablet width: the new "Give me a checklist" bubble, the avatar above the streaming reply, the list wrapping cleanly in the wider column with the caret after "post a", the earlier Regenerate dimmed, and "■ Stop generating" in the composer. Nothing squeezed.
+- **N27** decision: No hand-written script: index.html loads only app.js. Everything luna does not wrap (setTimeout, focus, the clipboard, matchMedia, location.search, getBoundingClientRect, the inert property) goes through mizchi/js_core's Any from MoonBit (src/main/js.mbt), so no inline <script> was needed.
+- **N28** accepted about G61: The inspect motion crash (N7, a tool finding) is not a page defect: the caret it was asked to follow exists only after the click. The caret's contract is held by verify flow instead — visible while streaming, gone once the reply settles or stops (G80, G81) — and by the reduced-motion shot S32 (no caret, reply whole). check motion (G79) confirms a prefers-reduced-motion rule, which turns the blink off.
+- **done**: Parley, an assistant chat window written in MoonBit with mizchi/luna: a history sidebar (12 seeded chats in three groups, search, per-row Rename / Archive / Delete with a confirmation dialog, collapse to a rail, an off-canvas drawer with a focus trap on phones), a model picker with three models, a Share dialog, and a conversation with a Markdown subset (headings, lists, a table, a fenced code block with Copy) whose canned replies stream three words every 50ms with a caret, Stop generating, Regenerate, feedback toggles and message editing. Light and dark themes, ?animate=0 / reduced motion, ?chat=new, ?history=empty. 17 defects closed: 11 found by looking, 6 by gates (breakpoints, composition, copy, and three by verify flow — a caret left behind after streaming, a focus trap wrapping to a hidden control, focus moving a task late). Gate findings left open are noted: placeholder/state copy, one button style per role, the composer form as the textarea's boundary, a focus-order 'reverse' that is downward on screen, and stress data's composer occlusion of mid-scroll text.

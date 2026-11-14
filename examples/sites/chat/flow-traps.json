@@ -1,0 +1,27 @@
+{
+  "viewport": { "width": 375, "height": 812 },
+  "steps": [
+    { "label": "The menu button opens the drawer and focus moves into it", "do": { "action": "click", "selector": "#open-drawer" },
+      "expect": [ { "assert": "attr", "selector": "#open-drawer", "name": "aria-expanded", "equals": "true" }, { "assert": "focused", "selector": ".sidebar .new-chat" } ] },
+    { "label": "Shift+Tab goes back to the close button at the drawer's top", "do": { "action": "press", "key": "Shift+Tab" },
+      "expect": [ { "assert": "focused", "selector": "#collapse" } ] },
+    { "label": "Shift+Tab from the first control wraps to the last one inside the drawer", "do": { "action": "press", "key": "Shift+Tab" },
+      "expect": [ { "assert": "focused", "selector": "#more-38" } ] },
+    { "label": "Tab from the last control wraps back to the first", "do": { "action": "press", "key": "Tab" },
+      "expect": [ { "assert": "focused", "selector": "#collapse" } ] },
+    { "label": "Escape closes the drawer and returns focus to the menu button", "do": { "action": "press", "key": "Escape" },
+      "expect": [ { "assert": "attr", "selector": "#open-drawer", "name": "aria-expanded", "equals": "false" }, { "assert": "focused", "selector": "#open-drawer" } ] },
+    { "label": "Once its 220ms slide ends the drawer is hidden", "do": { "action": "wait", "ms": 400 },
+      "expect": [ { "assert": "hidden", "selector": ".sidebar .new-chat" } ] },
+    { "label": "Share opens a modal dialog with focus on Copy link", "do": { "action": "click", "selector": "#share-btn" },
+      "expect": [ { "assert": "visible", "selector": "#share-dialog" }, { "assert": "focused", "selector": "#copy-link" } ] },
+    { "label": "Tab stays inside the dialog", "do": { "action": "press", "key": "Tab" },
+      "expect": [ { "assert": "focused", "selector": "#share-dialog .icon-btn" } ] },
+    { "do": { "action": "press", "key": "Shift+Tab" },
+      "expect": [ { "assert": "focused", "selector": "#copy-link" } ] },
+    { "label": "Copy link says Copied", "do": { "action": "click", "selector": "#copy-link" },
+      "expect": [ { "assert": "text", "selector": "#copy-link", "contains": "Copied" } ] },
+    { "label": "Escape closes the dialog and focus returns to Share", "do": { "action": "press", "key": "Escape" },
+      "expect": [ { "assert": "count", "selector": "#share-dialog", "equals": 0 }, { "assert": "focused", "selector": "#share-btn" } ] }
+  ]
+}
