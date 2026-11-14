@@ -1,0 +1,432 @@
+# Reelhouse — judgment log
+
+How this interactive app — video feed and a watch page with a custom player was judged, in order. Rendered from `judgment.sqlite` by `examples/sites/judge.mjs`; `judge.mjs <site> render` writes the page, with the screens the log keeps, to `judgment/`.
+
+**3** rounds · **114** gate runs (13 failing) · **114** screens in 63 shots (39 kept) · **63** looks · defects: **19** by eye, **15** by a gate · 12 gate false positive(s)
+
+Brief: [`../briefs/video.md`](../briefs/video.md)
+
+## Defects
+
+| | found by | what | fix | checked by |
+|---|---|---|---|---|
+| D1 | eye (L1 on S1) | `.grid .thumb` Thumbnails of one topic are near-identical: the seeded RNG gives every video the same planet / pot position, so the grid reads as one video repeated | hash() and the scene RNG now run in Double (Park–Miller, products below 2^53) — the Int version lost precision and converged; hue spread widened from ±12 to ±18 | L4 |
+| D2 | eye (L2 on S2) | `.thumb .scene` Within a topic every thumbnail is the same composition (ringed planet centre, one pot, disc right, mountains) — still repetitive after the RNG fix | Per-topic composition variants seeded from the id: planet left or right with a ring or an orbiting moon, pot / frying pan / bowl, disc left or right with 7-9 bars, mountains or sea with a bobbing boat; star count and planet size vary | L4 |
+| D3 | eye (L2 on S2) | `.thumb svg text` Coffee-cup and anchor glyphs render as colour emoji while the other glyphs are flat white symbols | Added U+FE0E (text presentation) after ☕ and ⚓ so they draw as the same flat white symbols as the rest | L4 |
+| D4 | eye (L3 on S3) | `.thumb polygon` Mountain thumbnails show a thin vertical seam where the two tiled ridge polygons meet | The second ridge tile now starts at 159.5 so the two polygons overlap by half a unit instead of touching | L4 |
+| D5 | eye (L4 on S4) | `.thumb (music, cooking)` Music thumbnails all put the disc on the right and the last cooking row is four pots: the variant picks are correlated with the other seed%n choices | Disc side now from seed/5 % 2 and the cookware from seed/3 % 3, independent of the hue and glyph picks | L5 |
+| D6 | eye (L7 on S7) | `.watch-actions` On phones the action row wraps and leaves Save alone on a second line | Phone layout: the action row no longer wraps; it is one row that scrolls sideways (scrollbar hidden), so like, dislike, Share and Save stay together | L10 |
+| D7 | eye (L7 on S7) | `.big-play` On phones the 72px big play disc nearly touches the scrubber; its triangle is also small for the disc on desktop (L6) | Big play: 44px triangle (nudged right to look centred) on desktop; on phones a 56px disc set at 42% height, clear of the scrubber / Big play uses a larger dedicated triangle path (play-lg) instead of the 11-unit control glyph | L9 |
+| D8 | eye (L8 on S8) | `.watch-bar` After D6's fix the watch bar is wider than the phone: Subscribe is cut off at the right edge and the action row runs off-screen | min-width: 0 on .watch-bar and .watch-actions so the scrolling row is held to the column width instead of widening it / The real cause: .watch-bar keeps flex-wrap: wrap from desktop, and a wrapping column flexbox sizes its line to the widest item's content. Phones now set flex-wrap: nowrap on it | L10 |
+| D9 | gate (G1) | `.avatar` Channel avatar initials are white on mid-tone fills (gold, teal, blue): 2.99:1–4.46:1, below AA | Avatar fills (channel and commenter) drop from 42%/40% to 30% lightness, so white initials clear 4.5:1 on every hue | G2 |
+| D10 | gate (G5) | `#comment-input` Required copy "Add a comment..." was only a placeholder, which check copy does not count as visible text | The prompt is now a real <label for=comment-input> drawn over the empty field; it hides (visibility) once the field is focused or holds text, and it names the input | G6 |
+| D11 | gate (G10) | `input#q` The search field's border is 1.66:1 against the page, below WCAG 1.4.11's 3:1 for a control boundary | New --field-border token (#858585 light, #8c8c90 dark) on the search field and button, the share link field and the comment underline | G11 |
+| D12 | gate (G13) | `button (watch page)` 35 buttons on the watch page render 12 distinct styles (2.92x reuse): icon buttons keep the UA's 1px/6px padding, and the comment like / replies toggles use near-miss radii and padding | padding: 0 on every icon-only button (.icon-btn, .ctrl, .chip-arrow, .big-play); the comment like button and the replies toggle share radius 18px and 12px side padding | G17 |
+| D13 | gate (G14) | `h2#comments-title` The h1 video title and the h2 comment count both render 20px/700, so the declared heading step is invisible | Comment count h2 is 18px; the video title h1 stays 20px | G18 |
+| D14 | gate (G27) | `.scrubber` The scrubber's hit area is 16px tall, under the 24px AA target size | Scrubber hit area is 24px tall (the drawn bar stays 3-5px); the hover tooltip moved up to match | G28 |
+| D15 | gate (G34) | `[aria-controls]` Every menu button and the search combobox point aria-controls at a popup that is only in the DOM while open, so the reference is broken at rest | Menus and the suggestion listbox are always rendered and hidden with an is-closed class (display: none). Not the hidden attribute: luna's attr_dynamic always calls setAttribute, so a dynamic attribute can never be removed | G35 |
+| D16 | gate (G36) | `#speed-btn` The player's Settings menu does not move focus into itself and Escape cannot close it: the focus selector picked :first-child, which is the menu's 'Playback speed' heading, not an item | Opening a menu focuses the first (or last) [role^=menuitem] found by querySelectorAll, whatever precedes it; Escape on an open menu's trigger closes it too. The player's trigger is now named 'Playback speed' so it is not a second 'Settings' beside the header's | G38 |
+| D17 | gate (G48) | `.player .controls` Controls never auto-hide for a mouse user: clicking Play (or the picture) focuses something inside the player, and any focus counted as 'focused', so .controls stayed at opacity 1 for 4s of playback | Only keyboard focus (:focus-visible inside the player, re-read on focusin/focusout/keyup) keeps the controls up; a mouse click's focus does not | G50 |
+| D18 | gate (G49) | `.ctrl-play` G49 still showed the controls fully shown for 4s after the Play click. A probe (a throwaway Playwright script reading #player's class) showed why: clicking Play does not play at all. The button's icon is swapped by the click, the bubbling event reaches #player with a detached target, closest('.controls') is null, and the picture's click handler toggles playback straight back | The player's own click handler now toggles only when the target is inside .player-scene or .captions, never 'anything not in the controls' | G50 |
+| D19 | gate (G52) | `.avatar` Under long-text, avatar text overflows its 36/40px circle by ~190px (the circle has no overflow clip); same on the watch page's comment avatars (G53) | Avatars clip (overflow: hidden); titles, channel names, meta lines and comment heads take overflow-wrap: anywhere so an unbreakable name wraps instead of running out / Clipping the avatar only turned the overflow into text-clipped (G55): the gate treats the initial as a name slot. The initial is now drawn by .avatar::before from a data-initial attribute — the avatar (aria-hidden) is a picture, and has no text node to overflow | G56 |
+| D20 | gate (G53) | `.comment-list, .next-list` Emptied, the comment list and the up-next list collapse to nothing with no empty-state message | CSS empty states: a comment list with no <li> says 'No comments yet. Add the first one above.', an empty up-next list 'Nothing here yet.' | G57 |
+| D21 | eye (L11 on S11) | `.grid (guide open)` With the full guide open at 1280 the grid stays at 4 columns: titles truncate after a few words and the meta line breaks inside '3 weeks ago' | Between 1100 and 1439px the grid drops to 3 columns while the full guide is open; views and age are each a nowrap span so the meta line only breaks at the dot | L14 |
+| D22 | eye (L12 on S12) | `.guide.open (drawer)` The guide drawer covers the header from the top: a blank strip replaces the hamburger and logo, so the control that closes it is hidden (tablet and phone, S12/S13) | The drawer and its scrim start below the 56px header (top: 56px), so the hamburger and logo stay visible and clickable above them | L15 |
+| D23 | eye (L17 on S17) | `.removed .btn` Undo is a tonal button on a row of the same grey, so it has no visible button shape | Undo inside the removed row is a page-coloured pill with a 1px border and the accent text colour | L18 |
+| D24 | eye (L20 on S20) | `.mh (phone, ?q=)` On a phone the results page hides the query: the header shows the collapsed search icon instead of the search bar holding 'moon' | A results page starts with the search bar open (search_open = q != ""), so phones show back arrow + the field with the query; desktop is unaffected | L21 |
+| D25 | eye (L23 on S23) | `.captions / .scrub-tip` The scrubber's time tooltip lands on top of the caption line, so both are unreadable while hovering the bar with captions on | Captions sit 108px above the player's bottom while the controls are up (above the tooltip's band), and the tooltip has its own stacking layer | L24 |
+| D26 | eye (L25 on S25) | `.theater .player:focus-visible` In theater mode the player's focus ring loses its top edge under the fixed header | In theater mode the player's focus outline is drawn inset (outline-offset: -3px), so all four sides stay visible | L27 |
+| D27 | eye (L26 on S26) | `.theater .player:focus-visible` F29's inset outline is painted under the scene layer, so the focused player in theater mode shows no ring at all | Theater mode draws the ring as a ::after overlay (3px border in the focus colour, z-index above the scene and controls, pointer-events: none); the real outline stays, transparent, for forced-colours mode | L27 |
+| D28 | eye (L29 on S29) | `#bell-menu [role=menuitemradio]` Every radio item in the bell menu shows a check: the 'hide unless aria-checked' rule never applies because SVG icons never receive their class (luna sets className, which an SVG ignores) | icon() sets the SVG's class with setAttribute from a ref_ callback (and the logo mark the same way), so .icon / .icon-sm / .chev / .menu-check rules reach the SVGs | L31 |
+| D29 | eye (L31 on S31) | `.toast-wrap` The bottom-left toast covers the left edge of a menu that opens low on the page (Unsubscribe in the bell menu) | Toasts are centred at the bottom of the window on wider screens (full width with 12px margins on phones), away from the left-column menus | L32 |
+| D30 | eye (L38 on S38) | `#q-list` Suggestions match anywhere inside a word, so typing 'mo' offers 'lemon pasta' | A recent search is suggested only when the query starts the phrase or one of its words | L39 |
+| D31 | eye (L42 on S42) | `.player-scene` The player's 0:00 frame is not the thumbnail's picture, and reduced motion shows yet another (the thumbnail instant), so the paused video looks different by setting | The player draws the scene at thumbnail instant + current time: at 0:00 it is the thumbnail, and reduced motion holds exactly that frame | L44 |
+| D32 | gate (G85) | `#undo-far5ide` After 'Not interested' focus sits on <body> until a 0ms timer moves it to Undo: the removed card's trigger is gone, so for that moment keyboard focus is lost (the flow asserts right after the click and sees body) | Focus moves to Undo synchronously right after the state change (luna has already rendered the row), and Undo returns focus to the title the same way | G86 |
+| D33 | gate (G97) | `.card-meta .meta-part` Under long-text the meta line's nowrap phrases (D21's fix) cannot wrap, so a long unbreakable name runs into the next card (text-collision, 15 cards) | Dropped white-space: nowrap; each phrase joins its words with U+00A0 instead, so lines still break only at the dot but an unbreakable string wraps through overflow-wrap: anywhere | G100 |
+| D34 | gate (G98) | `.scene svg text` Under long-text the stress gate writes into each thumbnail's SVG glyph text, which runs 140-190px past the page edge (page-overflow-x on the watch page) | The big glyph is no longer an SVG <text>: a span.glyph draws it with ::before from data-glyph, sized and placed in container units (29cqh, 7.5cqw) so it matches the old position; the scene is aria-hidden, so the glyph was never page text | G100, G101 |
+
+## Rounds
+
+### R1 · first draft (builder)
+
+- **S1** index.html · 1280×800 (screens not kept)
+  - 👁 **L1**: First render of the home feed at 1280x800, before any fix. Header reads right: hamburger, the Reelhouse mark and word, a centred search box joined to its search button, a round mic, kebab and an outlined blue "Sign in" pill. A 72px mini rail on the left (Home, Clips, Subscriptions, You; icon over a 10px label). Chip bar below with "All" filled black. Grid is 4 columns, cards have thumbnail with duration badge (LIVE badge red), avatar initial, 2-line titles, channel and "views · age". Problem: every Space thumbnail is the same picture — planet in the same place, same stars, same comet glyph on three of them — and the cooking ones are one pot in the same spot. The seeding is not varying the scene, so the grid reads as one video repeated. Hues barely vary within a topic either.
+    - ✗ **D1** defect `.grid .thumb`: Thumbnails of one topic are near-identical: the seeded RNG gives every video the same planet / pot position, so the grid reads as one video repeated
+- **F1** fix for D1: hash() and the scene RNG now run in Double (Park–Miller, products below 2^53) — the Int version lost precision and converged; hue spread widened from ±12 to ±18
+- **S2** index.html · 1280×800 · full page, 3 screen(s) (screens not kept)
+  - 👁 **L2**: Desktop full page, 3 screens, taken after the RNG fix. S2-1: positions now vary a little (planet left/right of centre, different glyphs) but every Space thumbnail is still the same composition — a ringed planet in the middle — and every cooking one is the same pot; it reads better than S1 but still repetitive across a 24-card grid. The coffee-cup glyph (S2-1 row 2) and the anchor glyph (S2-3, island and lighthouse cards) render as full-colour emoji while every other glyph is a flat white symbol — inconsistent and the cup looks pasted on. S2-2/S2-3: music cards all disc-right with bars left; travel cards all mountains. Titles clamp at 2 lines with an ellipsis ("The cast-iron care guide nobody wrote..."), meta rows align, 40px row gap reads well, sticky chip bar stays under the header while scrolling. Rail labels centred under icons, Home bold as current.
+    - ✗ **D2** defect `.thumb .scene`: Within a topic every thumbnail is the same composition (ringed planet centre, one pot, disc right, mountains) — still repetitive after the RNG fix
+    - ✗ **D3** defect `.thumb svg text`: Coffee-cup and anchor glyphs render as colour emoji while the other glyphs are flat white symbols
+- **S3** index.html · 375×812 · full page, 11 screen(s)
+  - 👁 **L3**: Mobile 375 full page, 11 screens (before the composition change). Header collapses as briefed: hamburger, mark + "Reelhouse", a search icon, kebab and a "Sign in" pill all fit on one row without wrapping. No rail. Chip bar scrolls: Travel is cut at the right edge under a right-arrow button with a fade, no left arrow at scrollLeft 0 — correct. Grid is one column, cards full width, titles wrap to 2 lines cleanly with no orphans that look odd ("A night of meteors over the salt / flats" is the worst). S3-9/S3-10: the mountain thumbnails show a thin vertical seam where the two tiled ridge polygons meet (at ~x 230 on the island card, x 115 on the lighthouse one) — reads as a rendering glitch. Anchor glyph again colour-emoji (S3-9). Steam, discs and LIVE badges all fine. Bottom of the page ends with the last card and 40px padding.
+    - ✗ **D4** defect `.thumb polygon`: Mountain thumbnails show a thin vertical seam where the two tiled ridge polygons meet
+- **F2** fix for D2: Per-topic composition variants seeded from the id: planet left or right with a ring or an orbiting moon, pot / frying pan / bowl, disc left or right with 7-9 bars, mountains or sea with a bobbing boat; star count and planet size vary
+- **F3** fix for D3: Added U+FE0E (text presentation) after ☕ and ⚓ so they draw as the same flat white symbols as the rest
+- **F4** fix for D4: The second ridge tile now starts at 159.5 so the two polygons overlap by half a unit instead of touching
+- **S4** index.html · 1280×800 · full page, 3 screen(s)
+  - 👁 **L4**: Desktop full page after the composition variants. S4-1: Space cards now differ — planets left or right, ringed or with a small orbiting moon, different sizes and hues (one greenish, one rose). Cooking row shows a frying pan with eggs and a bowl, so the pot is no longer every card. The coffee cup is now a flat white line glyph like the rest (D3 fixed). S4-3: anchor glyphs flat white too; travel alternates mountains and a sea with a sailing boat; no seam visible where ridge tiles meet on the four mountain cards (D4). Remaining: all six music cards still put the disc on the right with bars on the left, and the third cooking row is four pots — the variant choice is correlated with seed%2 / seed%3, which other choices also use.
+    - ✗ **D5** defect `.thumb (music, cooking)`: Music thumbnails all put the disc on the right and the last cooking row is four pots: the variant picks are correlated with the other seed%n choices
+- **V1** D3 verified by L4
+- **V2** D4 verified by L4
+- **F5** fix for D5: Disc side now from seed/5 % 2 and the cookware from seed/3 % 3, independent of the hue and glyph picks
+- **S5** index.html · 1280×800 · scroll-to .grid .card:nth-child(13) (screens not kept)
+  - 👁 **L5**: Viewport scrolled to the music row. "Blue Moon on a 1962 upright piano" now has its disc on the left with the bars on the right, so the music row is no longer four copies of one layout; the note glyph sits on the disc's left rim there but reads as part of the picture, not a clash. Label colours vary (orange, green, pink, yellow). Cooking row above shows only titles here. Chip bar sticky, header intact, card text unchanged.
+- **V3** D5 verified by L5
+- **V4** D2 verified by L4
+- **S6** watch.html?v=far5ide · 1280×800 · full page, 3 screen(s) (screens not kept)
+  - 👁 **L6**: Watch page, desktop 1280, 3 screens. S6-1: two columns as in the reference pattern — 806px player with 12px rounded corners on the left, a 402px "Up next" column on the right with the Autoplay switch (on, blue) beside its heading and compact rows (168px thumb, 2-line title, channel, views · age). Player paused at 0:00 with the scene drawn, a big round play button in the middle (its triangle is small for a 72px disc), the scrubber shows chapter gaps and a lighter buffered stretch, control row: play, next, volume, "0:00 / 9:41 · Intro", then CC, settings, theater, full screen. Below: title in 20px bold, channel row with avatar, "Orbit Notes / 1.2M subscribers", a black Subscribe pill, then like 65,159 | dislike 862, Share, Save on the right. Description box: "2,400,000 views · Oct 22, 2026" bold, three clamped lines, "...more". S6-2/3: "19 Comments" with Sort by, the composer line with placeholder "Add a comment...", comments with avatars, likes and blue "2 replies" toggles. Rhythm is consistent; nothing overlaps.
+- **S7** watch.html?v=far5ide · 375×812 · full page, 5 screen(s) (screens not kept)
+  - 👁 **L7**: Watch page on a 375px phone, 5 screens. S7-1: player is full width at the top with square corners, directly under the header; the big play disc (72px) nearly touches the scrubber below it — cramped on a 211px-tall player. Controls drop next/theater/chapter as intended: play, volume, 0:00 / 9:41, CC, settings, full screen. Title, channel row with Subscribe pushed right. The action row wraps: like/dislike and Share on one line and "Save" alone on a second line — an orphan button that looks accidental. Description sheet trigger "...more" under 3 clamped lines. S7-2/3: comments read well, wrapping text at ~300px, reply toggles. S7-4/5: Up next comes after the comments, as briefed, with 150px thumbs; rows aligned, no overflow.
+    - ✗ **D6** defect `.watch-actions`: On phones the action row wraps and leaves Save alone on a second line
+    - ✗ **D7** defect `.big-play`: On phones the 72px big play disc nearly touches the scrubber; its triangle is also small for the disc on desktop (L6)
+- **F6** fix for D6: Phone layout: the action row no longer wraps; it is one row that scrolls sideways (scrollbar hidden), so like, dislike, Share and Save stay together
+- **F7** fix for D7: Big play: 44px triangle (nudged right to look centred) on desktop; on phones a 56px disc set at 42% height, clear of the scrubber
+- **S8** watch.html?v=far5ide · 375×812 (screens not kept)
+  - 👁 **L8**: Phone watch page after the action-row change. The big play disc is smaller and clear of the scrubber now, but the triangle in it is still a small 15px mark. Worse, the change broke the row above: the Subscribe pill is cut off at the right edge ("Subscr") and the action row runs off the screen — the nowrap row's content width became the flex column's width, so the whole watch bar is wider than the viewport. Like/dislike/Share are on one line with Save cut at the edge.
+    - ✗ **D8** defect `.watch-bar`: After D6's fix the watch bar is wider than the phone: Subscribe is cut off at the right edge and the action row runs off-screen
+- **F8** fix for D8: min-width: 0 on .watch-bar and .watch-actions so the scrolling row is held to the column width instead of widening it
+- **F9** fix for D7: Big play uses a larger dedicated triangle path (play-lg) instead of the 11-unit control glyph
+- **S9** watch.html?v=far5ide · 375×812 (screens not kept)
+  - 👁 **L9**: Phone watch page after adding min-width: 0: unchanged — Subscribe still cut at the right edge ("Subscr") and Save cut off. The big play disc now shows a larger triangle that reads as a play button at a glance, clear of the scrubber. So D7 is fixed but D8 is not; the min-width change was the wrong cause. (A measurement afterwards showed the channel row at 400px inside a 351px bar: the bar is a wrapping column flexbox, whose line takes the widest item's max-content width.)
+- **V5** D7 verified by L9
+- **F10** fix for D8: The real cause: .watch-bar keeps flex-wrap: wrap from desktop, and a wrapping column flexbox sizes its line to the widest item's content. Phones now set flex-wrap: nowrap on it
+- **S10** watch.html?v=far5ide · 375×812 (screens not kept)
+  - 👁 **L10**: Phone watch page with flex-wrap: nowrap on the bar. The channel row now fits: avatar, "Orbit Notes / 1.2M subscribers", and the black Subscribe pill right-aligned inside the 12px gutter. The action row is one line — like 65,159 | 862, Share, and Save peeking at the right edge as a scroll affordance — and the page no longer runs wider than the screen. Description, comments header and composer below are unchanged and aligned on the same 12px gutter.
+- **V6** D8 verified by L10
+- **V7** D6 verified by L10
+- **N1** decision: Gate set, chosen from skills/vlmkit/SKILL.md → markup-assist (+ dynamic-markup for the player's behaviour) and the brief's own list. Every gate runs on both pages (index.html and watch.html?v=far5ide) unless it says otherwise. Base set: check integrity, check copy --manifest copy.txt (both pages share one manifest: the watch-only lines are checked on watch.html, the home-only one, "Video removed", needs a state), check design (one card component), check composition, check color, check a11y contrast in light and with ?theme=dark, check a11y focus, check a11y touch, scan scroll, scan handlers --probe-drag (the scrubber is pointer-driven), check interactions (menus, dialogs, combobox, player keys). Added for the brief's behaviour: check breakpoints --sweep (4/3/2/1 grid columns at 600/900/1200 and the 1000px watch-page stack), check scroll (sticky chip bar and fixed header), check animation and check motion (the controls fade, transitions, reduced motion; the scene only moves while playing, so the default page should read as still), stress data (long titles, many comments). Not chosen: verify flow and check grounding (no flow spec in the brief), stress i18n (English only).
+- **G1** `vlmkit check integrity index.html` → exit 0 — verdict: NO DEFECTS, 4 WARN (0 fail, 4 warn, 12 exempted)
+  - ✗ **D9** defect `.avatar`: Channel avatar initials are white on mid-tone fills (gold, teal, blue): 2.99:1–4.46:1, below AA
+- **F11** fix for D9: Avatar fills (channel and commenter) drop from 42%/40% to 30% lightness, so white initials clear 4.5:1 on every hue
+- **G2** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 12 exempted)
+- **G3** `vlmkit check integrity 'watch.html?v=far5ide'` → exit 0 — verdict: NO DEFECTS, 1 WARN (0 fail, 1 warn, 84 exempted)
+- **V8** D9 verified by G2
+- **G4** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 7 · placeholders 0 · manifestLines 9 · statesExplored 29 · revealedOnly 0
+- **G5** `vlmkit check copy 'watch.html?v=far5ide' --manifest copy-watch.txt` → exit 1 — missing 1 · placeholders 0 · manifestLines 7 · statesExplored 12 · revealedOnly 0
+  - ✗ **D10** defect `#comment-input`: Required copy "Add a comment..." was only a placeholder, which check copy does not count as visible text
+- **F12** fix for D10: The prompt is now a real <label for=comment-input> drawn over the empty field; it hides (visibility) once the field is focused or holds text, and it names the input
+- **G6** `vlmkit check copy 'watch.html?v=far5ide' --manifest copy-watch.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 7 · statesExplored 12 · revealedOnly 0
+- **V9** D10 verified by G6
+- **G7** `vlmkit check copy index.html --manifest copy-home.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 2 · statesExplored 29 · revealedOnly 0
+- **G8** `vlmkit check design index.html` → exit 0 — verdict: COHERENT (0 finding(s))
+- **G9** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (0 finding(s))
+- **G10** `vlmkit check color index.html` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s))
+  - ✗ **D11** defect `input#q`: The search field's border is 1.66:1 against the page, below WCAG 1.4.11's 3:1 for a control boundary
+- **F13** fix for D11: New --field-border token (#858585 light, #8c8c90 dark) on the search field and button, the share link field and the comment underline
+- **G11** `vlmkit check color index.html` → exit 0 — verdict: CONSISTENT (0 finding(s))
+- **G12** `vlmkit check color 'watch.html?v=far5ide'` → exit 0 — verdict: CONSISTENT (0 finding(s))
+- **V10** D11 verified by G11
+- **G13** `vlmkit check design index.html` → exit 0 — verdict: COHERENT (0 finding(s))
+  - ✗ **D12** defect `button (watch page)`: 35 buttons on the watch page render 12 distinct styles (2.92x reuse): icon buttons keep the UA's 1px/6px padding, and the comment like / replies toggles use near-miss radii and padding
+- **G14** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (0 finding(s))
+  - ✗ **D13** defect `h2#comments-title`: The h1 video title and the h2 comment count both render 20px/700, so the declared heading step is invisible
+- **G15** `vlmkit check design 'watch.html?v=far5ide'` → exit 0 — verdict: DRIFT (1 finding(s))
+- **G16** `vlmkit check composition 'watch.html?v=far5ide'` → exit 0 — verdict: UNBALANCED (1 finding(s))
+- **F14** fix for D12: padding: 0 on every icon-only button (.icon-btn, .ctrl, .chip-arrow, .big-play); the comment like button and the replies toggle share radius 18px and 12px side padding
+- **F15** fix for D13: Comment count h2 is 18px; the video title h1 stays 20px
+- **G17** `vlmkit check design 'watch.html?v=far5ide'` → exit 0 — verdict: COHERENT (0 finding(s))
+- **G18** `vlmkit check composition 'watch.html?v=far5ide'` → exit 0 — verdict: COMPOSED (0 finding(s))
+- **G19** `vlmkit check a11y contrast index.html` → exit 0 — inspected 159 · failures 0
+- **G20** `vlmkit check a11y contrast 'index.html&theme=dark'` → exit 1
+- **G21** `vlmkit check a11y contrast 'watch.html?v=far5ide'` → exit 0 — inspected 162 · failures 0
+- **G22** `vlmkit check a11y contrast 'watch.html?v=far5ide&theme=dark'` → exit 0 — inspected 162 · failures 0
+- **V11** D12 verified by G17
+- **V12** D13 verified by G18
+- **G23** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 159 · failures 0
+- **N2** tool about G20: Mistyped URL on my side (index.html&theme=dark, no '?'), re-run as G23. Recorded only so the failing run is explained: 'error: file not found: examples/sites/video/index.html&theme=dark'.
+- **N3** superseded about G20: Not a vlmkit fault — N2's kind was wrong: my typo, superseded by G23 (index.html?theme=dark, 0 failures).
+- **G24** `vlmkit check a11y focus index.html` → exit 0 — steps 64 · findings 5
+- **G25** `vlmkit check a11y focus 'watch.html?v=far5ide'` → exit 0 — steps 56 · findings 1
+- **N4** false-positive about G24: Each skip-row is the move from the last card's ⋮ button in one grid row to the first card's title in the next row (302px = one card row). The thumbnail links are tabindex=-1 duplicates of the title links, so nothing is skipped: this is row-wrap reading order, visible in S4-1 where each row ends with a ⋮ and the next starts with a thumbnail above its title.
+- **N5** false-positive about G25: The 389px jump is from the player region itself (#player, tabindex 0, the keyboard-shortcut target) to the scrubber at the bottom of that same 16:9 box (S6-1): the next control in the player, nothing in between.
+- **G26** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 67 · failures 0 · wcagExempt 0
+- **G27** `vlmkit check a11y touch 'watch.html?v=far5ide'` → exit 1 — level AA · inspected 55 · failures 1 · wcagExempt 0
+  - ✗ **D14** defect `.scrubber`: The scrubber's hit area is 16px tall, under the 24px AA target size
+- **F16** fix for D14: Scrubber hit area is 24px tall (the drawn bar stays 3-5px); the hover tooltip moved up to match
+- **G28** `vlmkit check a11y touch 'watch.html?v=far5ide'` → exit 0 — level AA · inspected 55 · failures 0 · wcagExempt 0
+- **G29** `vlmkit scan scroll index.html` → exit 0 — containers 0 · overflowX 0 · issues 1
+- **G30** `vlmkit scan scroll 'watch.html?v=far5ide'` → exit 0 — containers 0 · overflowX 0 · issues 0
+- **V13** D14 verified by G28
+- **G31** `vlmkit scan scroll index.html --viewport 375x812` → exit 0 — containers 1 · overflowX 0 · issues 0
+- **N6** false-positive about G29: #t-castir12 is the 2-line title clamp (-webkit-line-clamp: 2) on 'The cast-iron care guide nobody wrote down'; S2-2 shows it ending in an ellipsis as briefed ('title clamped to 2 lines'). check integrity G2 lists the same element under exempted as intentional truncation. The two dead scrollports are #guide (scrolls only when the full guide is taller than the window) and #chips at 1280 (it overflows at 375: G31).
+- **N7** false-positive about G3: #desc-text is the description clamped to 3 lines, as the brief asks ('the description clamped to 3 lines, and ...more to expand'). The 20px it clips is the rest of the paragraph, which '...more' reveals (S6-1 shows the clamp with the button under it).
+- **G32** `vlmkit scan handlers index.html --probe-drag` → exit 0 — registrations 177 · elements 145 · suspects 0
+- **G33** `vlmkit scan handlers 'watch.html?v=far5ide' --probe-drag` → exit 0 — registrations 89 · elements 66 · suspects 0
+- **G34** `vlmkit check interactions index.html --handlers` → exit 1 — elements 30 · suspects 5 · warns 6
+  - ✗ **D15** defect `[aria-controls]`: Every menu button and the search combobox point aria-controls at a popup that is only in the DOM while open, so the reference is broken at rest
+- **F17** fix for D15: Menus and the suggestion listbox are always rendered and hidden with an is-closed class (display: none). Not the hidden attribute: luna's attr_dynamic always calls setAttribute, so a dynamic attribute can never be removed
+- **G35** `vlmkit check interactions index.html --handlers` → exit 0 — elements 30 · suspects 0 · warns 6
+- **V14** D15 verified by G35
+- **N8** false-positive about G35: Three warn kinds left, none a defect. (1) popup-no-focus-move on the search combobox: this is the APG editable-combobox pattern — DOM focus stays in the input and the active option is pointed at with aria-activedescendant (q-opt-N), so typing keeps working; moving focus into the listbox would be the wrong pattern for an editable box. (2) inert-control on "All": the probe pressed Enter on the chip that is already selected (aria-pressed=true at load, S4-1), so nothing can change; the other chips are pressed=false and filter the grid. (3) not-tab-reachable on a.thumb: each thumbnail link is a tabindex=-1, aria-hidden duplicate of its card's title link (same href), so keyboard users reach every video once, through the title.
+- **G36** `vlmkit check interactions 'watch.html?v=far5ide' --handlers` → exit 0 — elements 30 · suspects 0 · warns 4
+  - ✗ **D16** defect `#speed-btn`: The player's Settings menu does not move focus into itself and Escape cannot close it: the focus selector picked :first-child, which is the menu's 'Playback speed' heading, not an item
+- **G37** `vlmkit check interactions 'watch.html?v=far5ide' --handlers` → exit 0 — elements 30 · suspects 0 · warns 2
+- **F18** fix for D16: Opening a menu focuses the first (or last) [role^=menuitem] found by querySelectorAll, whatever precedes it; Escape on an open menu's trigger closes it too. The player's trigger is now named 'Playback speed' so it is not a second 'Settings' beside the header's
+- **G38** `vlmkit check interactions 'watch.html?v=far5ide' --handlers` → exit 0 — elements 30 · suspects 0 · warns 2
+- **V15** D16 verified by G38
+- **N9** superseded about G37: Run after the code change but before D16 was recorded; G38 is the same command after F18.
+- **N10** false-positive about G38: popup-no-focus-move on the search combobox: see N8 — the editable combobox keeps focus in the input and uses aria-activedescendant. not-tab-reachable on 'Play video': the big centred play disc is a tabindex=-1 pointer convenience shown only before first play; the same action is the 'Play (k)' button in the control row (reached by Tab, G38) and k / Space on the focused player.
+- **G39** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 7 · issues 0 · sweepRanges 0
+- **G40** `vlmkit check breakpoints 'watch.html?v=far5ide' --sweep` → exit 0 — breakpoints 7 · issues 0 · sweepRanges 0
+- **G41** `vlmkit check scroll index.html` → exit 0 — pageScrolled 1080 · stickyFixed 4 · engagedSticky 1 · snaps 0 · issues 0
+- **G42** `vlmkit check scroll 'watch.html?v=far5ide'` → exit 0 — pageScrolled 1080 · stickyFixed 2 · engagedSticky 0 · snaps 0 · issues 0
+- **G43** `vlmkit check animation index.html` → exit 0 — animations 0 · settleMs 0 · issues 0
+- **G44** `vlmkit check motion index.html` → exit 0 — activeAnimations 0 · running 0 · issues 0
+- **G45** `vlmkit check animation 'watch.html?v=far5ide'` → exit 0 — animations 0 · settleMs 0 · issues 0
+- **G46** `vlmkit check motion 'watch.html?v=far5ide'` → exit 0 — activeAnimations 0 · running 0 · issues 0
+- **G47** `vlmkit check animation 'watch.html?v=far5ide' --virtual-time` → exit 0 — animations 0 · settleMs 0 · issues 0
+- **G48** `vlmkit inspect motion 'watch.html?v=far5ide' --selector .controls --click .ctrl-play --end 4s` → exit 0
+  - ✗ **D17** defect `.player .controls`: Controls never auto-hide for a mouse user: clicking Play (or the picture) focuses something inside the player, and any focus counted as 'focused', so .controls stayed at opacity 1 for 4s of playback
+- **F19** fix for D17: Only keyboard focus (:focus-visible inside the player, re-read on focusin/focusout/keyup) keeps the controls up; a mouse click's focus does not
+- **G49** `vlmkit inspect motion 'watch.html?v=far5ide' --selector .controls --click .ctrl-play --end 4s` → exit 0
+  - ✗ **D18** defect `.ctrl-play`: G49 still showed the controls fully shown for 4s after the Play click. A probe (a throwaway Playwright script reading #player's class) showed why: clicking Play does not play at all. The button's icon is swapped by the click, the bubbling event reaches #player with a detached target, closest('.controls') is null, and the picture's click handler toggles playback straight back
+- **F20** fix for D18: The player's own click handler now toggles only when the target is inside .player-scene or .captions, never 'anything not in the controls'
+- **G50** `vlmkit inspect motion 'watch.html?v=far5ide' --selector .controls --click .ctrl-play --end 4s` → exit 1
+- **V16** D18 verified by G50
+- **V17** D17 verified by G50
+- **G51** `vlmkit inspect motion 'watch.html?v=far5ide' --selector .controls --exit .controls --click .ctrl-play --end 4s` → exit 0
+- **N11** accepted about G50: absent-at-rest on .controls is the brief's auto-hide: 2.5s after the last pointer move while playing they fade (2400ms shown, 3200ms gone in G50's frames). G51 runs the same with --exit .controls, which tells the gate the target is meant to leave, and passes.
+- **G52** `vlmkit stress data index.html` → exit 1 — variants 7 · findings 26
+  - ✗ **D19** defect `.avatar`: Under long-text, avatar text overflows its 36/40px circle by ~190px (the circle has no overflow clip); same on the watch page's comment avatars (G53)
+- **G53** `vlmkit stress data 'watch.html?v=far5ide'` → exit 1 — variants 11 · findings 30
+  - ✗ **D20** defect `.comment-list, .next-list`: Emptied, the comment list and the up-next list collapse to nothing with no empty-state message
+- **F21** fix for D19: Avatars clip (overflow: hidden); titles, channel names, meta lines and comment heads take overflow-wrap: anywhere so an unbreakable name wraps instead of running out
+- **F22** fix for D20: CSS empty states: a comment list with no <li> says 'No comments yet. Add the first one above.', an empty up-next list 'Nothing here yet.'
+- **G54** `vlmkit stress data index.html` → exit 1 — variants 7 · findings 42
+- **G55** `vlmkit stress data 'watch.html?v=far5ide'` → exit 1 — variants 11 · findings 26
+- **F23** fix for D19: Clipping the avatar only turned the overflow into text-clipped (G55): the gate treats the initial as a name slot. The initial is now drawn by .avatar::before from a data-initial attribute — the avatar (aria-hidden) is a picture, and has no text node to overflow
+- **G56** `vlmkit stress data index.html` → exit 0 — variants 7 · findings 2
+- **G57** `vlmkit stress data 'watch.html?v=far5ide'` → exit 0 — variants 11 · findings 2
+- **V18** D19 verified by G56
+- **V19** D20 verified by G57
+- **N12** accepted about G57: The two remaining warns (here and in G56) are empty variants of lists the data never empties: #chips is the fixed topic bar (7 chips written in the program, not loaded), and .segs are the scrubber's chapter segments — every video has at least one chapter (default_chapters gives five). An empty state for either would describe a page that cannot exist.
+- **N13** superseded about G55: Intermediate run after clipping the avatars; G56/G57 are after the real fix (F23).
+- **V20** D1 verified by L4: S4-1 shows planets at different positions, sizes and hues
+- **N14** superseded about G4: copy.txt holds the whole brief list, but its lines live on two pages and in states. G6 (watch.html, copy-watch.txt: 7 lines) and G7 (index.html, copy-home.txt) pass; 'Subscribed' and 'Video removed' only exist after an action and are checked by looking at those states (later rounds).
+
+### R2 · interactions and states (builder)
+
+- **S11** index.html · 1280×800 · click #guide-btn — full guide (screens not kept)
+  - 👁 **L11**: Desktop 1280 with the full guide open. The guide is right: 240px wide, Home highlighted (grey pill, bold), Subscriptions, You, a rule, "Explore" heading, Trending / Music / Gaming / News with icons, then a small "fictional demo" note. The grid kept 4 columns in the 1000px that is left, so cards shrank to ~236px: every title now truncates after a word or two ("Moon landing sites, mapped..."), and the meta line breaks inside a phrase — "2.4M views · 3 / weeks ago", "1.3K watching · Live / now" — which looks broken. The hamburger shows a hover-grey disc (pointer still over it after the click). Grid shifted right by 168px, aligned with the chips.
+    - ✗ **D21** defect `.grid (guide open)`: With the full guide open at 1280 the grid stays at 4 columns: titles truncate after a few words and the meta line breaks inside '3 weeks ago'
+- **S12** index.html · 768×1024 · click #guide-btn — guide drawer tablet (screens not kept)
+  - 👁 **L12**: Tablet 768x1024 with the guide open: it is a drawer over a dimmed page, which is right for this width, but the drawer covers the header from the top edge — there is a blank white 56px strip where the hamburger and logo were, so the visitor loses the control that would close it, and the search box is half-covered at the left ("Search" placeholder cut by the drawer edge). Drawer content is the same list as desktop, readable. The page behind is a 2-column grid under a 40% scrim.
+    - ✗ **D22** defect `.guide.open (drawer)`: The guide drawer covers the header from the top: a blank strip replaces the hamburger and logo, so the control that closes it is hidden (tablet and phone, S12/S13)
+- **S13** index.html · 375×812 · click #guide-btn — guide drawer phone (screens not kept)
+  - 👁 **L13**: Phone 375 with the guide open: same drawer, same problem as S12 — the drawer starts at the top of the screen and hides the hamburger and the Reelhouse mark, leaving a blank strip above "Home"; only the kebab and Sign in show to the right of the drawer, dimmed. The list itself fits in 240px without wrapping. Dimmed grid behind, chip bar arrow visible.
+- **F24** fix for D21: Between 1100 and 1439px the grid drops to 3 columns while the full guide is open; views and age are each a nowrap span so the meta line only breaks at the dot
+- **F25** fix for D22: The drawer and its scrim start below the 56px header (top: 56px), so the hamburger and logo stay visible and clickable above them
+- **S14** index.html · 1280×800 · click #guide-btn — full guide (screens not kept)
+  - 👁 **L14**: Desktop 1280, full guide open, after F24: the grid is 3 columns of ~320px, so titles break naturally ("How the Moon got its far / side", "Moon landing sites, mapped / from orbit") and nothing truncates in the first two rows; meta lines stay whole ("2.4M views · 3 weeks ago", "1.3K watching · Live now"). Guide column and grid share the 56px header line; chip bar starts at the grid's left edge. Reads like the reference's expanded-guide layout.
+- **S15** index.html · 768×1024 · click #guide-btn — guide drawer tablet (screens not kept)
+  - 👁 **L15**: Tablet 768 with the guide open, after F25: the header stays on top — hamburger, Reelhouse mark, search and Sign in are all visible and not dimmed — and the drawer plus the scrim start below it. Home is highlighted in the drawer and keyboard focus went there on open. The page behind is dimmed; drawer edge is a clean shadowed line at 240px.
+- **V21** D21 verified by L14
+- **V22** D22 verified by L15
+- **S16** index.html · 1280×800 · click #m-far5ide-btn — card menu (screens not kept)
+  - 👁 **L16**: Card ⋮ menu open on the first card at 1280. The ⋮ button shows a grey pressed disc; the menu drops below it, right-aligned to the button, 220px wide with a soft shadow, overlapping the next row's thumbnail as a popup should: Add to queue, Save to Watch later, Not interested, Share, each with a line icon at 24px and 40px rows. Text and icons are aligned on one left rail. The LIVE badge of the card beneath is partly covered — acceptable for an open menu. No visible focus ring on the first item after a mouse open, which is the :focus-visible rule working.
+- **S17** index.html · 1280×800 · click #m-far5ide-btn · click #m-far5ide-menu .menu-item:nth-of-type(3) — removed card (screens not kept)
+  - 👁 **L17**: After "Not interested": the first card collapsed into a grey row reading "Video removed" (bold) with "You'll see fewer videos like this." under it and an Undo control on the right. The other cards did not move. Problem: Undo is a tonal button on a row of the same grey (#f2f2f2 on #f2f2f2), so it reads as loose bold text, not a button — the most important action of the row is the least visible. The row is 88px tall in a 300px grid cell, leaving white space below; acceptable as the brief's "collapses into a row".
+    - ✗ **D23** defect `.removed .btn`: Undo is a tonal button on a row of the same grey, so it has no visible button shape
+- **F26** fix for D23: Undo inside the removed row is a page-coloured pill with a 1px border and the accent text colour
+- **S18** index.html · 1280×800 · element .grid .card:first-child · @2x · click #m-far5ide-btn · click #m-far5ide-menu .menu-item:nth-of-type(3) — removed card close-up (screens not kept)
+  - 👁 **L18**: 2x close-up of the removed card after F26. Undo is now a white pill with a thin grey border and blue "Undo" text, clearly a button against the grey row; "Video removed" bold over the two-line note, all on a 16px inset. The card element keeps its grid cell height (white below the row), which matches the other cells' row and keeps the grid from reflowing.
+- **V23** D23 verified by L18
+- **S19** index.html?q=moon · 1280×800 · full page, 3 screen(s) — search moon (screens not kept)
+  - 👁 **L19**: Search results for "moon" at 1280, 3 screens. The list layout of the reference study: 500x281 thumbnails with rounded corners and a duration badge at the bottom right (LIVE in red), beside them an 18px title with the query in bold ("How the **Moon** got its far side", "Blue **Moon** on a 1962 upright piano"), "2.4M views · 3 weeks ago" in 12px grey, a channel row with a 24px avatar, a 2-line snippet with "moon" bold, and a ⋮ at the far right. The header search box keeps "moon" with the × clear button showing. "Results for “moon”" heads the page above the chips. Six results (space, cooking, music, travel); the last one ends with 40px of space. Consistent 16px row gaps.
+- **S20** index.html?q=moon · 375×812 · full page, 3 screen(s) — search moon
+  - 👁 **L20**: Search results on a 375 phone, 3 screens. Results stack: full-width thumbnail, then title with the bold query and ⋮, views · age, channel row; snippets are dropped below 900px, which keeps each result compact. But the header shows the collapsed search icon, so on the results page the visitor cannot see or edit what they searched for without opening search — the query is only in the "Results for “moon”" heading, which scrolls away (S20-2 shows only the sticky chips).
+    - ✗ **D24** defect `.mh (phone, ?q=)`: On a phone the results page hides the query: the header shows the collapsed search icon instead of the search bar holding 'moon'
+- **F27** fix for D24: A results page starts with the search bar open (search_open = q != ""), so phones show back arrow + the field with the query; desktop is unaffected
+- **S21** index.html?q=moon · 375×812 — search moon phone (screens not kept)
+  - 👁 **L21**: Phone results page after F27: the header is the open search bar — a back arrow, the field holding "moon" with its × clear button, the search button and the mic — so the query stays visible and editable. Logo and Sign in give way to it, as in the reference's phone layout. The rest of the page is unchanged from S20.
+- **V24** D24 verified by L21
+- **S22** watch.html?v=far5ide · 1280×800 — watch paused (screens not kept)
+  - 👁 **L22**: Watch page paused at load (desktop): nothing has changed since load — 0:00 / 9:41 · Intro, play icon, big centred play disc with the larger triangle, scrubber at zero with the knob at the left end and a short lighter buffered stretch inside the first chapter segment; chapter gaps are visible as breaks in the bar. Controls are shown because the video is paused. The scene is a still frame.
+- **S23** watch.html?v=far5ide · 1280×800 · click .ctrl-play · click button[aria-label^='Subtitles'] · wait 1800 · hover .scrubber — playing, captions, scrubber tooltip (screens not kept)
+  - 👁 **L23**: Playing (Play, then CC, then the pointer held over the scrubber's centre, 1.8s in): the time reads 0:03 / 9:41, the button became pause, the big play disc is gone, CC shows its pressed bar in the progress colour, and the scene moved (the planet slid right and up compared with S22). The scrubber tooltip reads "Tidal locking / 4:50" — the chapter under the pointer, correct for 50% of 9:41. Problem: the tooltip sits right on top of the caption line "So tonight the sky is finally clear." — the two dark boxes overlap and both are unreadable in the middle.
+    - ✗ **D25** defect `.captions / .scrub-tip`: The scrubber's time tooltip lands on top of the caption line, so both are unreadable while hovering the bar with captions on
+- **F28** fix for D25: Captions sit 108px above the player's bottom while the controls are up (above the tooltip's band), and the tooltip has its own stacking layer
+- **S24** watch.html?v=far5ide · 1280×800 · click .ctrl-play · click button[aria-label^='Subtitles'] · wait 1800 · hover .scrubber — playing, captions, scrubber tooltip (screens not kept)
+  - 👁 **L24**: Same state after F28: the caption "So tonight the sky is finally clear." now sits higher over the picture, fully readable, and the "Tidal locking / 4:50" tooltip has its own band just above the scrubber with a few pixels between the two boxes. Pause icon, 0:03, CC pressed indicator all as before. Nothing else on the page moved.
+- **V25** D25 verified by L24
+- **S25** watch.html?v=far5ide · 1280×800 · full page, 4 screen(s) · focus #player · press t — theater via t key (screens not kept)
+  - 👁 **L25**: Theater mode reached with the keyboard (focus the player, press t), 4 screens. S25-1: the player now spans the content width on a black band from edge to edge (1156px, height-limited so the control row stays above the fold), the theater button carries its pressed bar, and the title, channel row and actions start under it with Up next moved below the player into the right column — as briefed. The focus ring of the player shows on the sides and bottom but its top edge is hidden under the fixed header, since the band starts right at 56px. S25-2..4: description, comments and the up-next list continue in two columns; nothing overlaps; the page ends after the last comment and the last up-next row.
+    - ✗ **D26** defect `.theater .player:focus-visible`: In theater mode the player's focus ring loses its top edge under the fixed header
+- **F29** fix for D26: In theater mode the player's focus outline is drawn inset (outline-offset: -3px), so all four sides stay visible
+- **S26** watch.html?v=far5ide · 1280×800 · focus #player · press t — theater focus ring (screens not kept)
+  - 👁 **L26**: Theater mode with the player focused, after F29: now there is no focus ring at all — the inset outline is painted beneath the absolutely positioned scene, so it is completely covered. Worse than before: a keyboard user who pressed t has no sign the player still has focus.
+    - ✗ **D27** defect `.theater .player:focus-visible`: F29's inset outline is painted under the scene layer, so the focused player in theater mode shows no ring at all
+- **F30** fix for D27: Theater mode draws the ring as a ::after overlay (3px border in the focus colour, z-index above the scene and controls, pointer-events: none); the real outline stays, transparent, for forced-colours mode
+- **S27** watch.html?v=far5ide · 1280×800 · focus #player · press t — theater focus ring (screens not kept)
+  - 👁 **L27**: Theater mode with the player focused after F30: a 3px blue ring now runs around all four sides of the player, on top of the picture and under the header line, clearly showing keyboard focus. The theater button still shows its pressed bar; nothing else moved.
+- **V26** D27 verified by L27
+- **V27** D26 verified by L27
+- **S28** watch.html?v=far5ide · 1280×800 · click .desc .more · scroll-to .desc — description expanded (screens not kept)
+  - 👁 **L28**: Description expanded (clicked "...more"): the box grew in place to show the whole paragraph, then a "Chapters" heading and five chapter links, each a blue tabular time and a name (0:00 Intro, 1:02 Two faces of one moon, 3:25 Tidal locking, 5:40 A thicker crust, 7:50 What we still don't know), with "Show less" at the bottom. The last row shows the grey hover band because the pointer rests there after the click. Times align in one column; spacing between rows is even. The box keeps the 12px radius and padding of its collapsed state.
+- **S29** watch.html?v=far5ide · 1280×800 · click #sub-btn · wait 200 · click #bell-btn — subscribed, bell menu (screens not kept)
+  - 👁 **L29**: After Subscribe, then opening the new control: the button became a grey "Subscribed" pill with a bell and a chevron, and the toast "Subscription added" shows at the bottom left. The bell menu opens below it with All, Personalized, None and Unsubscribe — but All, Personalized and None all show a check mark, so the visitor cannot tell which notification setting is on (only All should be). The toast also covers the left edge of the Unsubscribe row while both are up.
+    - ✗ **D28** defect `#bell-menu [role=menuitemradio]`: Every radio item in the bell menu shows a check: the 'hide unless aria-checked' rule never applies because SVG icons never receive their class (luna sets className, which an SVG ignores)
+- **S30** watch.html?v=far5ide · 1280×800 · scroll-to .comments · click #comment-input · type Loved the part about tidal locking — writing a comment (screens not kept)
+  - 👁 **L30**: Comment being written: the field is focused (2px dark underline instead of the 1px grey one), the "Add a comment..." label is gone and the typed text "Loved the part about tidal locking" shows; Cancel (text button) and Comment (blue filled pill, now enabled because there is text) sit right-aligned under it. The comment list continues below with even 20px gaps. The composer's avatar "Y" is the green you-avatar. Top of the shot is cut by the fixed header because the shot scrolled the comments section to the top — that is the capture, not the page.
+- **F31** fix for D28: icon() sets the SVG's class with setAttribute from a ref_ callback (and the logo mark the same way), so .icon / .icon-sm / .chev / .menu-check rules reach the SVGs
+- **S31** watch.html?v=far5ide · 1280×800 · click #sub-btn · wait 200 · click #bell-btn — subscribed, bell menu (screens not kept)
+  - 👁 **L31**: Bell menu after F31: only "All" carries a check now; Personalized and None are blank, so the current setting reads at a glance. The icons are now sized by their classes: the Subscribed pill's bell and chevron are smaller (18-20px) and sit better with the label, the big play triangle is larger. Remaining issue from S29: the "Subscription added" toast at the bottom left sits on top of the menu's Unsubscribe row while both are open.
+    - ✗ **D29** defect `.toast-wrap`: The bottom-left toast covers the left edge of a menu that opens low on the page (Unsubscribe in the bell menu)
+- **V28** D28 verified by L31
+- **F32** fix for D29: Toasts are centred at the bottom of the window on wider screens (full width with 12px margins on phones), away from the left-column menus
+- **S32** watch.html?v=far5ide · 1280×800 · click #sub-btn · wait 200 · click #bell-btn — subscribed, bell menu (screens not kept)
+  - 👁 **L32**: Bell menu again after F32: the toast "Subscription added" now sits centred at the bottom of the window, clear of the menu, whose four rows (All checked, Personalized, None, Unsubscribe with its icon) are all fully visible. The rest of the page is unchanged.
+- **V29** D29 verified by L32
+- **S33** index.html?theme=dark · 1280×800 · full page, 3 screen(s) — dark home
+  - 👁 **L33**: Home in dark (?theme=dark), 3 screens. Near-black page (#0f0f10), white titles, grey #b0b0b0 channel and meta lines, chips on #262628 with the selected "All" inverted to a light fill with dark text. The search field border and the search button read clearly against the dark header; the Sign in pill is light blue on dark. Thumbnails keep their own colours, which carry the page; the dark-purple space scenes still separate from the background thanks to the lighter purple at their lower edge. Avatars are darker discs with white initials — "O" and "L" are low-key but legible. Nothing left in light colours by mistake (no white boxes, menus not opened here).
+- **S34** watch.html?v=far5ide&theme=dark · 1280×800 — dark watch (screens not kept)
+  - 👁 **L34**: Watch page in dark: the player is unchanged (it is always dark), the Subscribe pill inverts to a light fill with dark text, the rating pair, Share and Save sit on #262628 pills, the description box is a dark grey panel with white text and the "...more" link, the Autoplay switch is the light-blue accent with a white knob. Up next titles white, meta grey. Contrast reads comfortably everywhere I looked; no element kept a light-theme background.
+- **S35** watch.html?v=far5ide · 375×812 · click .desc .more — phone description sheet (screens not kept)
+  - 👁 **L35**: Phone, "...more" tapped: the description opens as a bottom sheet — a white panel with rounded top corners rising from the bottom edge over a dimmed page, titled "Description" with a close ×, then views · date, the full paragraph wrapping at ~330px, "Chapters" and the five chapter links with blue times. The inline box behind stays collapsed, as it should on a phone. The sheet's text column has a comfortable 24px gutter.
+- **S36** watch.html?v=far5ide · 1280×800 · click .watch-actions .btn:nth-of-type(1) — share dialog (screens not kept)
+  - 👁 **L36**: Share dialog (desktop): a centred white modal on a dimmed page — "Share" title with a close ×, a "Video link" label over a read-only field holding https://reelhouse.example/watch?v=far5ide, a blue Copy button beside it, and a "Start at 0:00" checkbox under it (0:00 because the player is at 0). Field border is the darker field-border, readable. Rounded 16px corners, 24px padding. The fictional .example domain keeps the link from pointing anywhere real.
+- **S37** index.html · 1280×800 · click #mic-btn — mic tooltip (screens not kept)
+  - 👁 **L37**: Mic button clicked: the round mic button keeps a grey fill and a dark-grey tooltip "Voice search isn't available" opens under it, centred on the button, white 12px text on #555. It does not cover the search field or the chips meaningfully (it sits over the empty header strip at the right of the chips). Exactly the decorative behaviour the brief asks for.
+- **S38** index.html · 1280×800 · click #q · type mo — search suggestions (screens not kept)
+  - 👁 **L38**: Typing "mo" in the search box: the field gets the focus colour border, the × clear button appears, and the recent-search listbox opens under the field spanning field + button width, with clock icons. It suggests "moon landing" and "lemon pasta" — the second only because "le-mo-n" contains "mo", which reads like a bug to a visitor: suggestions should match the start of a word.
+    - ✗ **D30** defect `#q-list`: Suggestions match anywhere inside a word, so typing 'mo' offers 'lemon pasta'
+- **F33** fix for D30: A recent search is suggested only when the query starts the phrase or one of its words
+- **S39** index.html · 1280×800 · click #q · type mo — search suggestions (screens not kept)
+  - 👁 **L39**: "mo" again after F33: the listbox now offers only "moon landing"; "lemon pasta" is gone. Same box and icon styling as S38.
+- **V30** D30 verified by L39
+- **S40** watch.html?v=far5ide · 1280×800 · click #comment-input · type Loved the part about tidal locking · click .composer-actions .btn-primary · click .replies-toggle · scroll-to .comments — comment posted, replies open (screens not kept)
+  - 👁 **L40**: Comment posted and the first replies opened: "@you · You · just now — Loved the part about tidal locking" sits at the top of the list with a small "You" tag and 0 likes, the composer reset to its "Add a comment..." label, and a centred "Comment added" toast. The "2 replies" toggle flipped its chevron up and shows the two replies indented under @quietcomet with 24px avatars. The "1 reply" button below shows its hover pill (pointer resting there). Spacing between replies and the next comment is even.
+- **S41** index.html · 375×812 · click .chip:nth-child(3) — chip Cooking on phone (screens not kept)
+  - 👁 **L41**: Phone, "Cooking" chip tapped: the chip fills black with white text and "All" returns to grey; the grid now lists only the cooking videos (Sourdough, Moon cakes, ...), still one column. The chip bar keeps its scroll position and the right-hand arrow. Filtering is instant, nothing jumps in the header.
+- **S42** watch.html?v=far5ide · 1280×800 · reduced motion · click .ctrl-play · wait 2200 · hover .player-scene — playing under reduced motion (screens not kept)
+  - 👁 **L42**: Playing under prefers-reduced-motion (2.2s in, pointer over the picture): the time advanced to 0:03 and the button is pause, so playback runs, but the picture does not move between frames. It is, however, a different picture from the paused page (S22): the planet sits higher and further right, because reduced motion pins the scene to the thumbnail's instant while the normal player starts from t=0. So the same paused video shows two different pictures depending on the motion setting, and neither paused frame matches its own thumbnail.
+    - ✗ **D31** defect `.player-scene`: The player's 0:00 frame is not the thumbnail's picture, and reduced motion shows yet another (the thumbnail instant), so the paused video looks different by setting
+- **F34** fix for D31: The player draws the scene at thumbnail instant + current time: at 0:00 it is the thumbnail, and reduced motion holds exactly that frame
+- **S43** watch.html?v=far5ide · 1280×800 — paused frame vs thumbnail (screens not kept)
+  - 👁 **L43**: Paused watch page after F34: the player's 0:00 frame is now the same picture as this video's thumbnail on the home grid (S4-1, first card): ringed green planet at the right with the ring running off the edge, four-point star top left, same star field. Controls and the big play disc as before.
+- **S44** watch.html?v=far5ide · 1280×800 · reduced motion — paused, reduced motion (screens not kept)
+  - 👁 **L44**: The same page under prefers-reduced-motion: pixel-for-pixel the same picture as S43 — planet, star and stars in identical places — so the motion setting no longer changes what a paused video shows; with reduced motion it simply stays on this frame while time runs (S42 showed the clock advancing).
+- **V31** D31 verified by L44
+- **N15** decision: What I took from the reference screenshots (home 1280x800, search results, phone 390x844), for layout and proportion only: the 56px header with hamburger + mark at the left, a centred search field joined to a 64px search button, a round mic button, then a kebab and an outlined "Sign in" pill at the right; the 72px mini rail with icon-over-10px-label items; the chip bar under the header with the selected chip filled black; the search-results row of a ~500x280 rounded thumbnail with a bottom-right duration badge beside an 18px title, a small "views · age" line, a channel row with a small avatar, a 2-line grey snippet with the query in bold and a ⋮ at the far right; on the phone, one full-width column and a compact header. Not taken: the logo, the name, any wording, colours of the brand (Reelhouse uses its own violet mark and a blue accent), the "Shorts" item (renamed "Clips"), the bottom tab bar of the phone app, thumbnails or channel identities. The watch page follows the brief's description, not a screenshot.
+- **N16** decision: Browser bridges are MoonBit `extern "js"` one-liners in src/main/js.mbt (setTimeout, requestAnimationFrame, URLSearchParams, matchMedia, querySelector + focus, showModal / close, requestFullscreen, setPointerCapture, scrollBy, clipboard), plus three in ui/home/watch for setAttribute, encodeURIComponent and document.title. There is no hand-written inline <script>: everything is in app.js built from src/. Two of them exist only to work around luna: js_set_attr, because luna's element class goes through the className property, which SVG elements ignore (D28), and the is-closed class instead of a dynamic `hidden` attribute, because attr_dynamic always calls setAttribute and can never remove an attribute (D15).
+
+### R3 · final check (builder)
+
+- **G58** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 12 exempted)
+- **G59** `vlmkit check integrity 'watch.html?v=far5ide'` → exit 0 — verdict: NO DEFECTS, 1 WARN (0 fail, 1 warn, 84 exempted)
+- **G60** `vlmkit check integrity 'index.html?q=moon'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 11 exempted)
+- **G61** `vlmkit check copy index.html --manifest copy-home.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 2 · statesExplored 29 · revealedOnly 0
+- **G62** `vlmkit check copy 'watch.html?v=far5ide' --manifest copy-watch.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 7 · statesExplored 12 · revealedOnly 0
+- **G63** `vlmkit check design index.html` → exit 0 — verdict: COHERENT (0 finding(s))
+- **G64** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (0 finding(s))
+- **G65** `vlmkit check color index.html` → exit 0 — verdict: CONSISTENT (0 finding(s))
+- **G66** `vlmkit check design 'watch.html?v=far5ide'` → exit 0 — verdict: COHERENT (0 finding(s))
+- **G67** `vlmkit check composition 'watch.html?v=far5ide'` → exit 0 — verdict: COMPOSED (0 finding(s))
+- **G68** `vlmkit check color 'watch.html?v=far5ide'` → exit 0 — verdict: CONSISTENT (0 finding(s))
+- **N17** false-positive about G59: Same #desc-text 3-line clamp as N7 (G3): intentional per the brief, revealed by '...more' (S28 expanded, S35 the phone sheet).
+- **G69** `vlmkit check a11y contrast index.html` → exit 0 — inspected 183 · failures 0
+- **G70** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 183 · failures 0
+- **G71** `vlmkit check a11y contrast 'watch.html?v=far5ide'` → exit 0 — inspected 172 · failures 0
+- **G72** `vlmkit check a11y contrast 'watch.html?v=far5ide&theme=dark'` → exit 0 — inspected 172 · failures 0
+- **G73** `vlmkit check a11y focus index.html` → exit 0 — steps 64 · findings 5
+- **G74** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 67 · failures 0 · wcagExempt 0
+- **G75** `vlmkit check a11y focus 'watch.html?v=far5ide'` → exit 0 — steps 56 · findings 1
+- **G76** `vlmkit check a11y touch 'watch.html?v=far5ide'` → exit 0 — level AA · inspected 55 · failures 0 · wcagExempt 0
+- **N18** false-positive about G73: Row-wrap reading order, as N4 (G24): each jump is from the last ⋮ in a grid row to the next row's first title; the thumbnails are tabindex=-1 duplicates of the titles.
+- **N19** false-positive about G75: As N5 (G25): from the player region to its own scrubber at the bottom of the same 16:9 box.
+- **G77** `vlmkit scan scroll index.html` → exit 0 — containers 0 · overflowX 0 · issues 1
+- **G78** `vlmkit scan scroll 'watch.html?v=far5ide'` → exit 0 — containers 0 · overflowX 0 · issues 0
+- **G79** `vlmkit scan scroll index.html --viewport 375x812` → exit 0 — containers 1 · overflowX 0 · issues 0
+- **G80** `vlmkit scan handlers index.html --probe-drag` → exit 0 — registrations 214 · elements 176 · suspects 0
+- **G81** `vlmkit scan handlers 'watch.html?v=far5ide' --probe-drag` → exit 0 — registrations 105 · elements 75 · suspects 0
+- **N20** false-positive about G77: The 2-line title clamp on #t-castir12 again (N6): intentional, shown ending in an ellipsis in S2-2 and S33-2.
+- **G82** `vlmkit check interactions index.html --handlers` → exit 0 — elements 30 · suspects 0 · warns 6
+- **G83** `vlmkit check interactions 'watch.html?v=far5ide' --handlers` → exit 0 — elements 30 · suspects 0 · warns 2
+- **N21** false-positive about G82: Same three warn kinds as N8 (G35): the editable combobox keeps focus in the input by design (aria-activedescendant), 'All' is the already-selected chip, and a.thumb links are tabindex=-1 duplicates of the card titles. The unprobed click/keydown handlers are exercised by the state shots of round 2 and this round.
+- **N22** false-positive about G83: As N10 (G38): the editable combobox, and 'Play video', the tabindex=-1 pointer-only duplicate of the 'Play (k)' button.
+- **G84** `vlmkit verify flow 'watch.html?v=far5ide' --flow flow-player.json` → exit 0 — verdict: DONE (18/18 steps)
+- **G85** `vlmkit verify flow index.html --flow flow-home.json` → exit 1 — verdict: FAILED (1/8 steps)
+  - ✗ **D32** defect `#undo-far5ide`: After 'Not interested' focus sits on <body> until a 0ms timer moves it to Undo: the removed card's trigger is gone, so for that moment keyboard focus is lost (the flow asserts right after the click and sees body)
+- **F35** fix for D32: Focus moves to Undo synchronously right after the state change (luna has already rendered the row), and Undo returns focus to the title the same way
+- **G86** `vlmkit verify flow index.html --flow flow-home.json` → exit 0 — verdict: DONE (8/8 steps)
+- **V32** D32 verified by G86
+- **N23** decision: Added verify flow to the final gate set: check interactions probes each role's canonical key but never sends the player's shortcuts (k, Space, j/l, arrows, 0-9, c, m, t) or drives the Subscribe → bell, like, comment, Not interested → Undo, chip, guide and combobox flows. flow-player.json (18 steps, G84) and flow-home.json (8 steps, G86) assert each one's ARIA / text post-condition, which also puts the state-only copy ('Subscribed', 'Video removed') under a gate.
+- **G87** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 8 · issues 0 · sweepRanges 0
+- **G88** `vlmkit check scroll index.html` → exit 0 — pageScrolled 1080 · stickyFixed 4 · engagedSticky 1 · snaps 0 · issues 0
+- **G89** `vlmkit check animation index.html` → exit 0 — animations 0 · settleMs 0 · issues 0
+- **G90** `vlmkit check motion index.html` → exit 0 — activeAnimations 0 · running 0 · issues 0
+- **G91** `vlmkit check breakpoints 'watch.html?v=far5ide' --sweep` → exit 0 — breakpoints 8 · issues 0 · sweepRanges 0
+- **G92** `vlmkit check scroll 'watch.html?v=far5ide'` → exit 0 — pageScrolled 1080 · stickyFixed 2 · engagedSticky 0 · snaps 0 · issues 0
+- **G93** `vlmkit check animation 'watch.html?v=far5ide'` → exit 0 — animations 0 · settleMs 0 · issues 0
+- **G94** `vlmkit check motion 'watch.html?v=far5ide'` → exit 0 — activeAnimations 0 · running 0 · issues 0
+- **G95** `vlmkit check animation 'watch.html?v=far5ide' --virtual-time` → exit 0 — animations 0 · settleMs 0 · issues 0
+- **G96** `vlmkit inspect motion 'watch.html?v=far5ide' --selector .controls --exit .controls --click .ctrl-play --end 4s` → exit 0
+- **G97** `vlmkit stress data index.html` → exit 1 — variants 7 · findings 17
+  - ✗ **D33** defect `.card-meta .meta-part`: Under long-text the meta line's nowrap phrases (D21's fix) cannot wrap, so a long unbreakable name runs into the next card (text-collision, 15 cards)
+- **G98** `vlmkit stress data 'watch.html?v=far5ide'` → exit 1 — variants 11 · findings 4
+  - ✗ **D34** defect `.scene svg text`: Under long-text the stress gate writes into each thumbnail's SVG glyph text, which runs 140-190px past the page edge (page-overflow-x on the watch page)
+- **G99** `vlmkit check copy 'watch.html?v=far5ide' --manifest copy-watch.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 7 · statesExplored 12 · revealedOnly 0
+- **F36** fix for D33: Dropped white-space: nowrap; each phrase joins its words with U+00A0 instead, so lines still break only at the dot but an unbreakable string wraps through overflow-wrap: anywhere
+- **F37** fix for D34: The big glyph is no longer an SVG <text>: a span.glyph draws it with ::before from data-glyph, sized and placed in container units (29cqh, 7.5cqw) so it matches the old position; the scene is aria-hidden, so the glyph was never page text
+- **G100** `vlmkit stress data index.html` → exit 0 — variants 7 · findings 2
+- **G101** `vlmkit stress data 'watch.html?v=far5ide'` → exit 0 — variants 11 · findings 2
+- **S45** index.html · 1280×800 — glyphs after D34 (screens not kept)
+  - 👁 **L45**: Home after D33/D34: the glyphs are now CSS-drawn but sit where they did — top-left of each thumbnail, flat white, a touch smaller and higher than the SVG version (the comet and cup read the same). Meta lines are unchanged in normal data: "2.4M views · 3 weeks ago" stays on one line, nothing wraps differently from S4-1. Avatars, titles and badges unchanged.
+- **V33** D34 verified by G100
+- **N24** accepted about G99: Same two warns as N12: the fixed chip bar and the chapter segments, never empty in this site's data.
+- **N25** accepted about G100: Same two warns as N12.
+- **G102** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 9 exempted)
+- **G103** `vlmkit check integrity 'watch.html?v=far5ide'` → exit 0 — verdict: NO DEFECTS, 1 WARN (0 fail, 1 warn, 84 exempted)
+- **G104** `vlmkit check integrity 'index.html?q=moon'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 8 exempted)
+- **G105** `vlmkit check a11y contrast index.html` → exit 0 — inspected 159 · failures 0
+- **G106** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 159 · failures 0
+- **G107** `vlmkit check a11y contrast 'watch.html?v=far5ide'` → exit 0 — inspected 159 · failures 0
+- **G108** `vlmkit check a11y contrast 'watch.html?v=far5ide&theme=dark'` → exit 0 — inspected 159 · failures 0
+- **G109** `vlmkit verify flow 'watch.html?v=far5ide' --flow flow-player.json` → exit 0 — verdict: DONE (18/18 steps)
+- **G110** `vlmkit verify flow index.html --flow flow-home.json` → exit 0 — verdict: DONE (8/8 steps)
+- **G111** `vlmkit check design index.html` → exit 0 — verdict: COHERENT (0 finding(s))
+- **G112** `vlmkit check interactions index.html --handlers` → exit 0 — elements 30 · suspects 0 · warns 6
+- **G113** `vlmkit check design 'watch.html?v=far5ide'` → exit 0 — verdict: COHERENT (0 finding(s))
+- **G114** `vlmkit check interactions 'watch.html?v=far5ide' --handlers` → exit 0 — elements 30 · suspects 0 · warns 2
+- **V34** D33 verified by G100: index long-text variant: 0 fail
+- **V35** D34 verified by G101: watch long-text variant: 0 fail
+- **N26** superseded about G99: N24 was attached to G99 by mistake (an ID slip): G99 is the watch-page copy check, which passed. N24's text belongs to G100; N25's to G101 (N26 below).
+- **N27** accepted about G101: Remaining two warns on the watch page's stress run: the fixed chip bar is not on this page; the scrubber's chapter segments and the… as N12 — lists the data never empties.
+- **N28** accepted about G101: Clean wording of N27: the two warns are the empty variants of the scrubber's chapter segments and of one other fixed UI list on the watch page; neither is data that can be empty (every video has chapters), as N12.
+- **S46** index.html · 1280×800 · full page, 3 screen(s)
+  - 👁 **L46**: Final desktop home, 3 screens, 1910px. Header, 72px rail, sticky chip bar with All filled, then 6 rows of 4 cards: thumbnails differ within each topic (planets left/right, ringed or mooned; pan / bowl / pot; disc left or right; mountains or sea), flat white glyphs, duration and LIVE badges at the bottom right; avatars with white initials; 2-line titles with one intentional ellipsis ("The cast-iron care guide nobody wrote..."); meta lines whole. 40px between rows, 16px between columns, everything on the same left rail as the chips. The page ends with the last row and its 48px bottom padding. Nothing overlaps or clips.
+- **S47** index.html · 768×1024 · full page, 5 screen(s)
+  - 👁 **L47**: Final tablet home (768x1024), 5 screens: the header keeps the full search field (narrower) with mic, kebab and Sign in; the rail stays; 2 columns of ~316px cards. Titles wrap to two lines naturally ("Island hopping on a $20-a- / day budget" breaks at the hyphen, acceptable). Chip bar fits on one line at this width, so no scroll arrows. Badges, avatars and meta lines aligned in every row; the last screen repeats the last rows because the walk reached the end of the page.
+- **S48** index.html · 375×812 · full page, 11 screen(s)
+  - 👁 **L48**: Final phone home (375x812), 11 screens of 7811px. Compact header (hamburger, mark + word, search icon, kebab, Sign in), no rail, chip bar with a right scroll arrow over a fade (Travel cut), one column of full-width cards with 28px gaps. Every title wraps to at most two lines and none truncates; meta lines stay whole; no horizontal scroll. Thumbnails keep their variety at this size and the glyphs stay in the top-left corner. Last screen ends on "The slowest scenic railway, end to end".
+- **S49** watch.html?v=far5ide · 1280×800 · full page, 3 screen(s) (screens not kept)
+  - 👁 **L49**: Final desktop watch page, 3 screens, paused at load: player with the thumbnail's frame, the big play disc, scrubber with chapter gaps and the buffered stretch, full control row; title, channel row with Subscribe, rating pair, Share and Save; description box clamped to 3 lines with "...more"; "19 Comments" with Sort by; the composer's visible "Add a comment..." label; twelve comments with reply toggles; Up next with the Autoplay switch and twelve compact rows. Icons in the rating and Share/Save buttons are the 20px class size. The page ends after the last comment with 48px of padding; nothing overlaps.
+- **S50** watch.html?v=far5ide · 375×812 · full page, 5 screen(s) (screens not kept)
+  - 👁 **L50**: Final phone watch page, 5 screens: full-width player at the top under the header, title, channel row with Subscribe at the right, the one-line scrolling action row (Save peeking at the edge), the clamped description with "...more", comments wrapping at ~300px, then "Up next" with Autoplay and compact 150px-thumb rows after the comments. No horizontal page scroll; the up-next titles wrap to two lines cleanly. The last screen ends on "Lo-fi tape loops for late study".
+- **S51** index.html · 1280×800 · click #guide-btn — full guide desktop (screens not kept)
+  - 👁 **L51**: Final: desktop home with the full guide expanded. 240px guide (Home current, Subscriptions, You, Explore: Trending, Music, Gaming, News, the demo note) and a 3-column grid beside it; titles wrap without truncation and meta lines stay whole. Hamburger shows its hover disc from the click.
+- **S52** index.html · 768×1024 · click #guide-btn — full guide tablet (screens not kept)
+  - 👁 **L52**: Final: tablet home with the guide open as a drawer under the header — hamburger, mark, search, mic, kebab and Sign in stay visible above the dimmed page; drawer list identical to desktop, Home highlighted.
+- **S53** index.html · 375×812 · click #guide-btn — full guide mobile (screens not kept)
+  - 👁 **L53**: Final: phone home with the guide drawer open under the compact header; the hamburger (hover disc), mark, search icon, kebab and Sign in remain on top; the 240px list fits without wrapping over the dimmed one-column grid.
+- **S54** index.html · 1280×800 · click #m-far5ide-btn — card menu (screens not kept)
+  - 👁 **L54**: Final: the first card's ⋮ menu open — Add to queue, Save to Watch later, Not interested, Share with icons, right-aligned under the pressed ⋮, shadowed above the next row.
+- **S55** index.html · 1280×800 · click #m-far5ide-btn · click #m-far5ide-menu .menu-item:nth-of-type(3) — removed card with Undo (screens not kept)
+  - 👁 **L55**: Final: the first card after "Not interested" — the grey "Video removed / You'll see fewer videos like this." row with a bordered blue Undo pill; the rest of the grid in place.
+- **S56** index.html?q=moon · 1280×800 — search moon (screens not kept)
+  - 👁 **L56**: Final: search results for "moon" — query kept in the field with ×, "Results for “moon”" heading, chips, 500px thumbnails with badges, 18px titles with **Moon** bold, views · age, channel row, 2-line snippets with the query bold, ⋮ at the far right.
+- **S57** watch.html?v=far5ide · 1280×800 · click .ctrl-play · click button[aria-label^='Subtitles'] · wait 1800 · hover .scrubber — playing, captions, scrubber tooltip (screens not kept)
+  - 👁 **L57**: Final: playing with the controls up, captions on and the scrubber tooltip: 0:03 / 9:41, pause icon, CC pressed bar, the caption "So tonight the sky is finally clear." above the "Tidal locking / 4:50" tooltip with no overlap, the picture moved on from the thumbnail frame (planet shifted right).
+- **S58** watch.html?v=far5ide · 1280×800 · click button[aria-label^='Theater'] — theater (screens not kept)
+  - 👁 **L58**: Final: theater mode via the theater button — the player fills the content width on a black band under the header, the theater button carries its pressed bar, title and channel row continue under it, and Up next sits below the player in the right column.
+- **S59** watch.html?v=far5ide · 1280×800 · click .desc .more · scroll-to .desc — description expanded (screens not kept)
+  - 👁 **L59**: Final: description expanded in place — full paragraph, "Chapters" with the five blue-time links, "Show less" at the bottom; collapsed-state padding and radius kept.
+- **S60** watch.html?v=far5ide · 1280×800 · click #sub-btn · wait 200 · click #bell-btn — subscribed, bell menu (screens not kept)
+  - 👁 **L60**: Final: Subscribed with the bell menu open — grey "Subscribed" pill with bell and chevron, menu with only "All" checked, Personalized, None and Unsubscribe; the "Subscription added" toast centred at the bottom, clear of the menu.
+- **S61** watch.html?v=far5ide · 1280×800 · scroll-to .comments · click #comment-input · type Loved the part about tidal locking — writing a comment (screens not kept)
+  - 👁 **L61**: Final: a comment being written — focused field with the dark underline, typed text, Cancel and the enabled blue Comment button right-aligned under it; the comment list below unchanged. (The fixed header covers the top of the composer because the capture scrolled the comments section to the top.)
+- **S62** watch.html?v=far5ide&theme=dark · 1280×800 — dark watch (screens not kept)
+  - 👁 **L62**: Final: watch page in the dark theme — dark page and panels, light Subscribe pill with dark text, dark grey rating/Share/Save pills, white titles, light-blue Autoplay switch; nothing left with a light-theme background.
+- **S63** index.html?theme=dark · 375×812 — dark home phone (screens not kept)
+  - 👁 **L63**: Final: phone home in the dark theme — black header with the violet mark, white "Reelhouse" and a light-blue Sign in pill, chips on dark grey with "All" inverted, one-column cards with white titles and grey meta. The chip bar's right arrow sits on the dark background with a dark fade.
+- **done**: Reelhouse, a fictional video site in MoonBit + luna: home feed with mini rail / full guide / drawer, filtering chip bar, 24 seeded SVG-thumbnail cards with ⋮ menus and "Not interested" → Undo, search results with bold matches and a recent-search combobox, and a watch page whose custom player draws the thumbnail's scene from its own clock (paused by default, reduced motion holds the picture while time runs), with chapters on the scrubber, a chapter tooltip, captions, auto-hiding controls, keyboard shortcuts, theater and full screen, plus subscribe/bell, rating, Share and Save dialogs, a description that expands (a sheet on phones), comments with replies and a composer, and Up next with Autoplay. Light and dark themes pass AA. Three rounds: 34 defects, 22 found by eye and 12 by a gate; the final gate set is clean apart from noted false positives (row-wrap focus order, the intentional 2- and 3-line clamps, the editable combobox, tabindex=-1 duplicate links) and two accepted empty-list warns.

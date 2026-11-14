@@ -1,0 +1,13 @@
+{
+  "viewport": { "width": 1280, "height": 800 },
+  "steps": [
+    { "label": "open a card menu", "do": { "action": "click", "selector": "#m-far5ide-btn" }, "expect": [{ "assert": "visible", "selector": "#m-far5ide-menu" }] },
+    { "label": "Not interested", "do": { "action": "click", "selector": "#m-far5ide-menu .menu-item:nth-of-type(3)" }, "expect": [{ "assert": "text", "selector": "article[data-id='far5ide']", "contains": "Video removed" }, { "assert": "focused", "selector": "#undo-far5ide" }] },
+    { "label": "Undo", "do": { "action": "click", "selector": "#undo-far5ide" }, "expect": [{ "assert": "visible", "selector": "#t-far5ide" }] },
+    { "label": "chip Music filters", "do": { "action": "click", "selector": ".chip:nth-child(4)" }, "expect": [{ "assert": "attr", "selector": ".chip:nth-child(4)", "name": "aria-pressed", "equals": "true" }, { "assert": "count", "selector": ".grid > article", "equals": 6 }] },
+    { "label": "full guide", "do": { "action": "click", "selector": "#guide-btn" }, "expect": [{ "assert": "visible", "selector": "#guide .full" }, { "assert": "attr", "selector": "#guide-btn", "name": "aria-expanded", "equals": "true" }] },
+    { "label": "typing shows clear and suggestions", "do": { "action": "type", "selector": "#q", "text": "moo" }, "expect": [{ "assert": "visible", "selector": ".search-clear" }, { "assert": "visible", "selector": "#q-list" }, { "assert": "attr", "selector": "#q", "name": "aria-expanded", "equals": "true" }] },
+    { "label": "ArrowDown picks the first suggestion", "do": { "action": "press", "key": "ArrowDown", "selector": "#q" }, "expect": [{ "assert": "attr", "selector": "#q", "name": "aria-activedescendant", "equals": "q-opt-0" }] },
+    { "label": "Escape closes the list", "do": { "action": "press", "key": "Escape", "selector": "#q" }, "expect": [{ "assert": "hidden", "selector": "#q-list" }] }
+  ]
+}

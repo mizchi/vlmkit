@@ -1,0 +1,23 @@
+{
+  "viewport": { "width": 1280, "height": 800 },
+  "steps": [
+    { "label": "focus the player", "do": { "action": "focus", "selector": "#player" }, "expect": [{ "assert": "focused", "selector": "#player" }] },
+    { "label": "k plays", "do": { "action": "press", "key": "k" }, "expect": [{ "assert": "attr", "selector": ".ctrl-play", "name": "aria-label", "equals": "Pause (k)" }] },
+    { "label": "Space pauses", "do": { "action": "press", "key": " " }, "expect": [{ "assert": "attr", "selector": ".ctrl-play", "name": "aria-label", "equals": "Play (k)" }] },
+    { "label": "5 jumps to 50%", "do": { "action": "press", "key": "5" }, "expect": [{ "assert": "attr", "selector": ".scrubber", "name": "aria-valuenow", "equals": "290" }] },
+    { "label": "l seeks +10s", "do": { "action": "press", "key": "l" }, "expect": [{ "assert": "attr", "selector": ".scrubber", "name": "aria-valuenow", "equals": "300" }] },
+    { "label": "j seeks -10s", "do": { "action": "press", "key": "j" }, "expect": [{ "assert": "attr", "selector": ".scrubber", "name": "aria-valuenow", "equals": "290" }] },
+    { "label": "ArrowRight seeks +5s", "do": { "action": "press", "key": "ArrowRight" }, "expect": [{ "assert": "attr", "selector": ".scrubber", "name": "aria-valuenow", "equals": "295" }] },
+    { "label": "ArrowLeft seeks -5s", "do": { "action": "press", "key": "ArrowLeft" }, "expect": [{ "assert": "attr", "selector": ".scrubber", "name": "aria-valuenow", "equals": "290" }] },
+    { "label": "c turns captions on", "do": { "action": "press", "key": "c" }, "expect": [{ "assert": "visible", "selector": ".captions" }, { "assert": "attr", "selector": "button[aria-label^='Subtitles']", "name": "aria-pressed", "equals": "true" }] },
+    { "label": "m mutes", "do": { "action": "press", "key": "m" }, "expect": [{ "assert": "count", "selector": "button[aria-label='Unmute (m)']", "equals": 1 }] },
+    { "label": "t is theater", "do": { "action": "press", "key": "t" }, "expect": [{ "assert": "visible", "selector": ".watch.theater" }] },
+    { "label": "0 jumps to the start", "do": { "action": "press", "key": "0" }, "expect": [{ "assert": "attr", "selector": ".scrubber", "name": "aria-valuenow", "equals": "0" }, { "assert": "text", "selector": ".time", "contains": "0:00 / 9:41" }] },
+    { "label": "Subscribe", "do": { "action": "click", "selector": "#sub-btn" }, "expect": [{ "assert": "text", "selector": "#bell-btn", "contains": "Subscribed" }] },
+    { "label": "bell menu opens", "do": { "action": "click", "selector": "#bell-btn" }, "expect": [{ "assert": "visible", "selector": "#bell-menu" }, { "assert": "attr", "selector": "#bell-btn", "name": "aria-expanded", "equals": "true" }] },
+    { "label": "choose None", "do": { "action": "click", "selector": "#bell-menu .menu-item:nth-of-type(3)" }, "expect": [{ "assert": "attr", "selector": "#bell-menu .menu-item:nth-of-type(3)", "name": "aria-checked", "equals": "true" }, { "assert": "hidden", "selector": "#bell-menu" }] },
+    { "label": "like", "do": { "action": "click", "selector": ".segmented .seg-btn:first-child" }, "expect": [{ "assert": "attr", "selector": ".segmented .seg-btn:first-child", "name": "aria-pressed", "equals": "true" }, { "assert": "text", "selector": ".segmented .seg-btn:first-child", "contains": "65,160" }] },
+    { "label": "write a comment", "do": { "action": "fill", "selector": "#comment-input", "value": "Great chapters" }, "expect": [{ "assert": "visible", "selector": ".composer-actions" }] },
+    { "label": "post it", "do": { "action": "click", "selector": ".composer-actions .btn-primary" }, "expect": [{ "assert": "text", "selector": ".comment-list > li:first-child", "contains": "Great chapters" }, { "assert": "text", "selector": "#comments-title", "contains": "20 Comments" }] }
+  ]
+}
