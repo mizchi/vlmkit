@@ -1,0 +1,386 @@
+{
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "steps": [
+    {
+      "label": "Coffee chip opens its results and filters the pins",
+      "do": {
+        "action": "click",
+        "selector": ".chip[data-cat='1']"
+      },
+      "expect": [
+        {
+          "assert": "attr",
+          "selector": ".chip[data-cat='1']",
+          "name": "aria-pressed",
+          "equals": "true"
+        },
+        {
+          "assert": "text",
+          "selector": "#results-h",
+          "contains": "Results"
+        },
+        {
+          "assert": "count",
+          "selector": ".rows .row",
+          "equals": 8
+        },
+        {
+          "assert": "hidden",
+          "selector": "#pin-0"
+        }
+      ]
+    },
+    {
+      "label": "Hovering a row highlights its pin",
+      "do": {
+        "action": "hover",
+        "selector": "#row-9"
+      },
+      "expect": [
+        {
+          "assert": "attr",
+          "selector": "#pin-9",
+          "name": "class",
+          "equals": "pin hot"
+        }
+      ]
+    },
+    {
+      "label": "Ticking 'Update results when map moves' keeps only what is in view",
+      "do": {
+        "action": "click",
+        "selector": "#follow"
+      },
+      "expect": [
+        {
+          "assert": "text",
+          "selector": ".results-sub",
+          "contains": "in this area"
+        }
+      ]
+    },
+    {
+      "label": "Clicking a row selects the place",
+      "do": {
+        "action": "click",
+        "selector": "#row-9"
+      },
+      "expect": [
+        {
+          "assert": "text",
+          "selector": "#place-h",
+          "contains": "Lumen Roasters"
+        },
+        {
+          "assert": "attr",
+          "selector": "#pin-9",
+          "name": "aria-pressed",
+          "equals": "true"
+        }
+      ]
+    },
+    {
+      "label": "Save is a toggle",
+      "do": {
+        "action": "click",
+        "selector": ".actions .act:nth-child(2)"
+      },
+      "expect": [
+        {
+          "assert": "attr",
+          "selector": ".actions .act:nth-child(2)",
+          "name": "aria-pressed",
+          "equals": "true"
+        },
+        {
+          "assert": "text",
+          "selector": ".toast",
+          "contains": "Saved Lumen Roasters"
+        }
+      ]
+    },
+    {
+      "label": "Reviews tab by keyboard",
+      "do": {
+        "action": "press",
+        "key": "ArrowRight",
+        "selector": "#pt-tab-0"
+      },
+      "expect": [
+        {
+          "assert": "attr",
+          "selector": "#pt-tab-1",
+          "name": "aria-selected",
+          "equals": "true"
+        },
+        {
+          "assert": "focused",
+          "selector": "#pt-tab-1"
+        },
+        {
+          "assert": "count",
+          "selector": ".review",
+          "equals": 5
+        }
+      ]
+    },
+    {
+      "label": "Back returns to the results",
+      "do": {
+        "action": "click",
+        "selector": ".back-btn"
+      },
+      "expect": [
+        {
+          "assert": "visible",
+          "selector": "#results-h"
+        }
+      ]
+    },
+    {
+      "label": "Saved lists the saved place",
+      "do": {
+        "action": "click",
+        "selector": ".rail-btn:nth-of-type(1)"
+      },
+      "expect": [
+        {
+          "assert": "count",
+          "selector": ".rows .row",
+          "equals": 1
+        }
+      ]
+    },
+    {
+      "label": "Directions from the rail; a pair with no street route is a dashed 'Approximate' line",
+      "do": {
+        "action": "click",
+        "selector": ".rail-btn:nth-of-type(2)"
+      },
+      "expect": [
+        {
+          "assert": "visible",
+          "selector": "#dir-from"
+        }
+      ]
+    },
+    {
+      "label": "Type a start and pick it with Enter",
+      "do": {
+        "action": "fill",
+        "selector": "#dir-from",
+        "value": "Museum of"
+      },
+      "expect": [
+        {
+          "assert": "visible",
+          "selector": "#dir-from-list"
+        }
+      ]
+    },
+    {
+      "label": "Enter picks the first suggestion",
+      "do": {
+        "action": "press",
+        "key": "Enter",
+        "selector": "#dir-from"
+      },
+      "expect": [
+        {
+          "assert": "attr",
+          "selector": "#dir-from",
+          "name": "aria-expanded",
+          "equals": "false"
+        }
+      ]
+    },
+    {
+      "label": "Type a destination",
+      "do": {
+        "action": "fill",
+        "selector": "#dir-to",
+        "value": "Gull"
+      },
+      "expect": [
+        {
+          "assert": "visible",
+          "selector": "#dir-to-list"
+        }
+      ]
+    },
+    {
+      "label": "Enter picks it; the route is approximate",
+      "do": {
+        "action": "press",
+        "key": "Enter",
+        "selector": "#dir-to"
+      },
+      "expect": [
+        {
+          "assert": "text",
+          "selector": ".badge",
+          "contains": "Approximate"
+        },
+        {
+          "assert": "count",
+          "selector": ".steps li",
+          "equals": 3
+        }
+      ]
+    },
+    {
+      "label": "Walk mode",
+      "do": {
+        "action": "click",
+        "selector": "#mode-tab-2"
+      },
+      "expect": [
+        {
+          "assert": "attr",
+          "selector": "#mode-tab-2",
+          "name": "aria-selected",
+          "equals": "true"
+        }
+      ]
+    },
+    {
+      "label": "Swap start and destination",
+      "do": {
+        "action": "click",
+        "selector": ".swap-btn"
+      },
+      "expect": [
+        {
+          "assert": "text",
+          "selector": ".steps li:first-child",
+          "contains": "Gull & Grind"
+        }
+      ]
+    },
+    {
+      "label": "Search: typing suggests, Enter on the active option runs it",
+      "do": {
+        "action": "fill",
+        "selector": "#q",
+        "value": "cof"
+      },
+      "expect": [
+        {
+          "assert": "attr",
+          "selector": "#q",
+          "name": "aria-expanded",
+          "equals": "true"
+        },
+        {
+          "assert": "text",
+          "selector": "#sugg-1",
+          "contains": "Coffee near"
+        }
+      ]
+    },
+    {
+      "label": "ArrowDown then Enter picks 'Coffee'",
+      "do": {
+        "action": "press",
+        "key": "ArrowDown",
+        "selector": "#q"
+      },
+      "expect": [
+        {
+          "assert": "attr",
+          "selector": "#q",
+          "name": "aria-activedescendant",
+          "equals": "sugg-0"
+        }
+      ]
+    },
+    {
+      "label": "Enter",
+      "do": {
+        "action": "press",
+        "key": "Enter",
+        "selector": "#q"
+      },
+      "expect": [
+        {
+          "assert": "text",
+          "selector": ".results-sub",
+          "contains": "Coffee"
+        }
+      ]
+    },
+    {
+      "label": "Clear the box",
+      "do": {
+        "action": "click",
+        "selector": ".clear-btn"
+      },
+      "expect": [
+        {
+          "assert": "attr",
+          "selector": ".chip[data-cat='1']",
+          "name": "aria-pressed",
+          "equals": "false"
+        }
+      ]
+    },
+    {
+      "label": "Home resets the view (zoom 2): no street name is shown",
+      "do": {
+        "action": "press",
+        "key": "Home",
+        "selector": "#map"
+      },
+      "expect": [
+        {
+          "assert": "visible",
+          "selector": "#map"
+        }
+      ]
+    },
+    {
+      "label": "after the ease, zoom 2 has no street names",
+      "do": {
+        "action": "wait",
+        "ms": 400
+      },
+      "expect": [
+        {
+          "assert": "count",
+          "selector": "text[data-k='street-label'][display='inline']",
+          "equals": 0
+        }
+      ]
+    },
+    {
+      "label": "Map keyboard: + zooms one level, and street names appear from level 3",
+      "do": {
+        "action": "press",
+        "key": "+",
+        "selector": "#map"
+      },
+      "expect": [
+        {
+          "assert": "visible",
+          "selector": "#map"
+        }
+      ]
+    },
+    {
+      "label": "after the 200ms ease, at zoom 3 street names are shown",
+      "do": {
+        "action": "wait",
+        "ms": 400
+      },
+      "expect": [
+        {
+          "assert": "visible",
+          "selector": "text[data-k='street-label'][display='inline']"
+        }
+      ]
+    }
+  ]
+}
