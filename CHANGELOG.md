@@ -29,9 +29,9 @@ Added:
   - Each action uses the best locator that resolves to its element alone: test id, role and
     name, label, placeholder, text, then a CSS path.
   - Observed changes become `expect`s: at most six per step, and only those a locator resolves to
-    alone (`record` counts the ones dropped for want of one). Review the spec for what it covers. A URL is
-    matched by its whole path, query and hash, on any origin; text is matched by `innerText`, as it
-    was recorded.
+    alone (`record` counts the ones dropped for want of one). Review the spec for what it covers.
+  - A URL is matched by its whole path, query and hash, on any origin; a `file:` URL by its file
+    name, query and hash only. Text is matched by `innerText`, as it was recorded.
   - `--verify [n]` runs the spec n times (2 by default) with Playwright's own runner. It exits 1
     unless every run passes, and with no `--out` it prints the spec only after the runs pass.
   - `--out`, `--title` and `--base-url` (URLs under that origin are written as paths).
