@@ -1,0 +1,313 @@
+{
+ "viewport": {
+  "width": 1280,
+  "height": 800
+ },
+ "steps": [
+  {
+   "label": "'/' opens the palette",
+   "do": {
+    "action": "press",
+    "selector": "body",
+    "key": "/"
+   },
+   "expect": [
+    {
+     "assert": "visible",
+     "selector": "#palette"
+    },
+    {
+     "assert": "focused",
+     "selector": "#palette-input"
+    }
+   ]
+  },
+  {
+   "label": "type a query",
+   "do": {
+    "action": "type",
+    "selector": "#palette-input",
+    "text": "graph"
+   },
+   "expect": [
+    {
+     "assert": "text",
+     "selector": "#pal-opt-0",
+     "contains": "src/core/graph.ts"
+    },
+    {
+     "assert": "attr",
+     "selector": "#pal-opt-0",
+     "name": "aria-selected",
+     "equals": "true"
+    }
+   ]
+  },
+  {
+   "label": "arrow down moves the active option",
+   "do": {
+    "action": "press",
+    "selector": "#palette-input",
+    "key": "ArrowDown"
+   },
+   "expect": [
+    {
+     "assert": "attr",
+     "selector": "#pal-opt-1",
+     "name": "aria-selected",
+     "equals": "true"
+    },
+    {
+     "assert": "attr",
+     "selector": "#palette-input",
+     "name": "aria-activedescendant",
+     "equals": "pal-opt-1"
+    }
+   ]
+  },
+  {
+   "label": "arrow up and Enter opens the file",
+   "do": {
+    "action": "press",
+    "selector": "#palette-input",
+    "key": "ArrowUp"
+   },
+   "expect": [
+    {
+     "assert": "attr",
+     "selector": "#pal-opt-0",
+     "name": "aria-selected",
+     "equals": "true"
+    }
+   ]
+  },
+  {
+   "label": "Enter (action)",
+   "do": {
+    "action": "press",
+    "selector": "#palette-input",
+    "key": "Enter"
+   },
+   "expect": []
+  },
+  {
+   "label": "\u2026after the hashchange render",
+   "do": {
+    "action": "wait",
+    "ms": 250
+   },
+   "expect": [
+    {
+     "assert": "hidden",
+     "selector": "#palette"
+    },
+    {
+     "assert": "text",
+     "selector": ".crumb-current",
+     "contains": "graph.ts"
+    }
+   ]
+  },
+  {
+   "label": "to the issues (action)",
+   "do": {
+    "action": "click",
+    "selector": "a.repo-tab[href='#/issues']"
+   },
+   "expect": []
+  },
+  {
+   "label": "\u2026after the hashchange render",
+   "do": {
+    "action": "wait",
+    "ms": 250
+   },
+   "expect": [
+    {
+     "assert": "text",
+     "selector": ".state-btn.is-on",
+     "contains": "23"
+    },
+    {
+     "assert": "count",
+     "selector": ".issue-row",
+     "equals": 23
+    }
+   ]
+  },
+  {
+   "label": "'/' typed in a field does not open it",
+   "do": {
+    "action": "press",
+    "selector": "#issue-search",
+    "key": "/"
+   },
+   "expect": [
+    {
+     "assert": "hidden",
+     "selector": "#palette"
+    }
+   ]
+  },
+  {
+   "label": "closed toggle",
+   "do": {
+    "action": "click",
+    "selector": ".state-btn:not(.is-on)"
+   },
+   "expect": [
+    {
+     "assert": "count",
+     "selector": ".issue-row",
+     "equals": 41
+    },
+    {
+     "assert": "text",
+     "selector": ".state-btn.is-on",
+     "contains": "Closed"
+    }
+   ]
+  },
+  {
+   "label": "open toggle again",
+   "do": {
+    "action": "click",
+    "selector": ".state-btn:not(.is-on)"
+   },
+   "expect": [
+    {
+     "assert": "count",
+     "selector": ".issue-row",
+     "equals": 23
+    }
+   ]
+  },
+  {
+   "label": "New issue (action)",
+   "do": {
+    "action": "click",
+    "selector": ".issues-head a.btn-primary"
+   },
+   "expect": []
+  },
+  {
+   "label": "\u2026after the hashchange render",
+   "do": {
+    "action": "wait",
+    "ms": 250
+   },
+   "expect": [
+    {
+     "assert": "visible",
+     "selector": "#new-title"
+    }
+   ]
+  },
+  {
+   "label": "empty title is refused (action)",
+   "do": {
+    "action": "click",
+    "selector": ".form-foot button[type=submit]"
+   },
+   "expect": []
+  },
+  {
+   "label": "\u2026after the hashchange render",
+   "do": {
+    "action": "wait",
+    "ms": 250
+   },
+   "expect": [
+    {
+     "assert": "text",
+     "selector": "#new-title-err",
+     "contains": "A title is required"
+    },
+    {
+     "assert": "focused",
+     "selector": "#new-title"
+    }
+   ]
+  },
+  {
+   "label": "title",
+   "do": {
+    "action": "fill",
+    "selector": "#new-title",
+    "value": "Feed plugin drops the last item"
+   },
+   "expect": [
+    {
+     "assert": "attr",
+     "selector": "#new-title",
+     "name": "aria-invalid",
+     "equals": "false"
+    }
+   ]
+  },
+  {
+   "label": "body",
+   "do": {
+    "action": "fill",
+    "selector": "#new-body",
+    "value": "Seen with **3.4.0**."
+   },
+   "expect": [
+    {
+     "assert": "visible",
+     "selector": "#new-body"
+    }
+   ]
+  },
+  {
+   "label": "preview",
+   "do": {
+    "action": "click",
+    "selector": "#nt-tab-preview"
+   },
+   "expect": [
+    {
+     "assert": "text",
+     "selector": ".preview strong",
+     "contains": "3.4.0"
+    },
+    {
+     "assert": "hidden",
+     "selector": "#new-body"
+    }
+   ]
+  },
+  {
+   "label": "submit (action)",
+   "do": {
+    "action": "click",
+    "selector": ".form-foot button[type=submit]"
+   },
+   "expect": []
+  },
+  {
+   "label": "\u2026after the hashchange render",
+   "do": {
+    "action": "wait",
+    "ms": 250
+   },
+   "expect": [
+    {
+     "assert": "text",
+     "selector": ".issue-row:first-child .issue-meta",
+     "contains": "#124"
+    },
+    {
+     "assert": "text",
+     "selector": "a.repo-tab[href='#/issues'] .counter",
+     "contains": "24"
+    },
+    {
+     "assert": "count",
+     "selector": ".issue-row",
+     "equals": 24
+    }
+   ]
+  }
+ ]
+}

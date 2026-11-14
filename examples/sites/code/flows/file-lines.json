@@ -1,0 +1,190 @@
+{
+ "viewport": {
+  "width": 1280,
+  "height": 800
+ },
+ "steps": [
+  {
+   "label": "open the src folder (action)",
+   "do": {
+    "action": "click",
+    "selector": "#file-table a.ft-link[href='#/tree/src']"
+   },
+   "expect": []
+  },
+  {
+   "label": "\u2026after the hashchange render",
+   "do": {
+    "action": "wait",
+    "ms": 250
+   },
+   "expect": [
+    {
+     "assert": "visible",
+     "selector": "#file-table .ft-up"
+    },
+    {
+     "assert": "text",
+     "selector": ".crumbs .crumb-current",
+     "contains": "src"
+    }
+   ]
+  },
+  {
+   "label": "descend into core (action)",
+   "do": {
+    "action": "click",
+    "selector": "#file-table a.ft-link[href='#/tree/src/core']"
+   },
+   "expect": []
+  },
+  {
+   "label": "\u2026after the hashchange render",
+   "do": {
+    "action": "wait",
+    "ms": 250
+   },
+   "expect": [
+    {
+     "assert": "visible",
+     "selector": "#file-table a.ft-link[href='#/blob/src/core/build.ts']"
+    },
+    {
+     "assert": "text",
+     "selector": ".crumbs .crumb-current",
+     "contains": "core"
+    }
+   ]
+  },
+  {
+   "label": "open build.ts (action)",
+   "do": {
+    "action": "click",
+    "selector": "#file-table a.ft-link[href='#/blob/src/core/build.ts']"
+   },
+   "expect": []
+  },
+  {
+   "label": "\u2026after the hashchange render",
+   "do": {
+    "action": "wait",
+    "ms": 250
+   },
+   "expect": [
+    {
+     "assert": "visible",
+     "selector": "#L16"
+    },
+    {
+     "assert": "text",
+     "selector": ".file-info",
+     "contains": "48 lines"
+    }
+   ]
+  },
+  {
+   "label": "highlight line 16",
+   "do": {
+    "action": "click",
+    "selector": "#L16"
+   },
+   "expect": [
+    {
+     "assert": "attr",
+     "selector": "tr:has(#L16)",
+     "name": "class",
+     "equals": "line is-sel"
+    },
+    {
+     "assert": "attr",
+     "selector": "tr:has(#L17)",
+     "name": "class",
+     "equals": "line"
+    }
+   ]
+  },
+  {
+   "label": "shift-activate line 20 to extend the range",
+   "do": {
+    "action": "press",
+    "selector": "#L20",
+    "key": "Shift+Enter"
+   },
+   "expect": [
+    {
+     "assert": "attr",
+     "selector": "tr:has(#L18)",
+     "name": "class",
+     "equals": "line is-sel"
+    },
+    {
+     "assert": "attr",
+     "selector": "tr:has(#L20)",
+     "name": "class",
+     "equals": "line is-sel"
+    },
+    {
+     "assert": "attr",
+     "selector": "tr:has(#L21)",
+     "name": "class",
+     "equals": "line"
+    }
+   ]
+  },
+  {
+   "label": "jump to a symbol (action)",
+   "do": {
+    "action": "click",
+    "selector": ".sym-link[href$='#L46']"
+   },
+   "expect": []
+  },
+  {
+   "label": "\u2026after the hashchange render",
+   "do": {
+    "action": "wait",
+    "ms": 250
+   },
+   "expect": [
+    {
+     "assert": "attr",
+     "selector": "tr:has(#L46)",
+     "name": "class",
+     "equals": "line is-sel"
+    },
+    {
+     "assert": "attr",
+     "selector": "tr:has(#L16)",
+     "name": "class",
+     "equals": "line"
+    }
+   ]
+  },
+  {
+   "label": "back to the repository by the breadcrumb (action)",
+   "do": {
+    "action": "click",
+    "selector": ".blob-crumbs a.crumb-root"
+   },
+   "expect": []
+  },
+  {
+   "label": "\u2026after the hashchange render",
+   "do": {
+    "action": "wait",
+    "ms": 250
+   },
+   "expect": [
+    {
+     "assert": "visible",
+     "selector": "#readme-title"
+    },
+    {
+     "assert": "count",
+     "selector": "#file-table tbody tr",
+     "equals": 12
+    }
+   ]
+  }
+ ]
+}
