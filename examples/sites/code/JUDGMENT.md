@@ -1,6 +1,6 @@
 # Forgeyard — tidewater/lantern — judgment log
 
-How this interactive app — a repository home, file view and issue list was judged, in order. Rendered from `judgment.sqlite` by `examples/sites/judge.mjs`; `judge.mjs <site> render` writes the page, with the screens the log keeps, to `judgment/`.
+How this interactive app — a repository home, file view and issue list was judged, in order. Rendered from `judgment.sqlite` by `examples/sites/judge.mjs`; the published page, with the screens the log keeps and every gate output, is <https://mizchi.github.io/vlmkit/sites/code/judgment/>.
 
 **3** rounds · **106** gate runs (15 failing) · **83** screens in 47 shots (21 kept) · **47** looks · defects: **14** by eye, **12** by a gate · 5 gate false positive(s)
 
@@ -44,9 +44,9 @@ Brief: [`../briefs/code.md`](../briefs/code.md)
 - **N1** decision: Reference study. I read the five reference screenshots of the big code-hosting site (repository home at 1280x800, its Code menu open, the README scrolled, the issue list, the 390x844 phone home) for layout and proportions only. What I took: a near-black global header about 64px tall with a mark, five nav menus, a bordered search field with a "/" key hint, Sign in and a white Sign up; a light grey repo header with owner / name and icon tabs whose current tab has an orange 2px underline and grey pill counters; a title row with the repo icon, name and a bordered "Public" pill, and small bordered Watch / Fork / Star buttons with counters on the right; a ~900px main column (branch button, branch/tag counts, a ~270px "Go to file" field and a green Code button) over a bordered file table whose grey header row carries the latest commit, with 40px rows of icon, name, commit message and right-aligned age; a ~270px right column (About text, link, light-blue topic chips, a list of icon links); the Code menu as a ~400px popover anchored right under the button with a segmented HTTPS / CLI control, a read-only URL with a copy icon, a helper sentence and a divided action list; the issue list as a bordered box whose grey head row holds Open / Closed toggles and filter menus, with rows of a state icon, a bold title and a small meta line; on the phone, a hamburger / mark / icon header, scrolling tabs and the About panel above the file table. Not taken: the logo, the product name, any wording, the octicon drawings (my icons are drawn on a 16px grid in icons.mbt), the left sidebar of the issue list, and the exact colours (my palette is my own, close in role: near-black header, grey subtle surfaces, a blue link, a green primary).
 - **N2** decision: Gate set, chosen from skills/vlmkit/SKILL.md -> markup-assist (the default for a reference-free page build) plus the dynamic gates the brief's behaviour needs. Every round: check integrity, check copy --manifest copy.txt, check interactions (menus, popovers, tabs, the palette, the "/" shortcut). Final round, all of PROTOCOL.md's set: check integrity, check copy, check design (buttons and counters consistent), check composition (the file-table rail and heading hierarchy), check color, check a11y contrast in both themes (?theme=dark, and on #/issues for the label chips, which are only on that view), check a11y focus, check a11y touch, scan scroll, scan handlers, check interactions. Added for the brief: check breakpoints --sweep (the About panel move and the commit-message column drop at 767/768, the header at 1011/1012), check scroll (the tab strip and the code scroller are horizontal scrollers), verify flow (open a file, highlight lines, go back), stress data (long file names, many issues). Not chosen: check animation / check motion (nothing animates; there are no transitions), check flash (nothing flashes), check story (no gallery). Because the views are chosen by the hash, view-specific gates run on index.html#/issues and index.html#/blob/... as well as the home.
 - **N3** decision: Implementation. The page is MoonBit + mizchi/luna as LUNA.md asks: index.html holds only the static landmarks (header#site-header, main#app, the footer) and loads app.js; everything inside the header and main is rendered by luna from src/main/*.mbt, and all data (the 35-entry tree, 7 seeded file texts plus short texts for the rest, 64 issues, 13 refs, blame chunks from a generator seeded by the path) is MoonBit. I build every element with luna's create_element(tag, attrs, children) plus tiny helpers rather than the named-argument DSL, because several tags I need (table, tr, td, dialog, kbd, mark, caption, thead) have no DSL function. The browser calls luna has no API for (location.hash, history.replaceState for #L12, a document keydown listener for "/", dialog showModal/close, clipboard.writeText, focus, scrollIntoView, a data: URL for Download) are extern "js" one-liners in src/main/h.mbt, compiled into app.js; there is no hand-written inline script. Popovers are always in the DOM and hidden by a class, so their copy (Clone, Download ZIP) is reachable to check copy's disclosure sweep.
-- **G1** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 24 exempted)
-- **G2** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 1 · placeholders 0 · manifestLines 13 · statesExplored 15 · revealedOnly 2
-- **S1** index.html · 1280×800 · full page, 3 screen(s)
+- **G1** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 24 exempted) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G1))
+- **G2** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 1 · placeholders 0 · manifestLines 13 · statesExplored 15 · revealedOnly 2 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G2))
+- **S1** index.html · 1280×800 · full page, 3 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/code/judgment/#S1))
   - 👁 **L1**: Desktop 1280, three screens. S1-1: the near-black header reads first: orange Forgeyard mark and wordmark, Platform / Developers / Teams / Resources menus with carets, Pricing, a bordered "Search or jump to…" field with a "/" key, Sign in and a white Sign up. Grey repo header: "tidewater / lantern", tabs Code (orange underline) Issues 23, Pull requests 4, Actions, Security, Insights. Title row: repo icon, "lantern", Public pill; Watch 38 ▾, Fork 312, Star 4,218 on the right. Main column about 880px, About column about 296px — proportions match the study. Problems: (1) every folder icon is black, not the blue I styled, and (2) the "Go to file" magnifier sits OUTSIDE the field, to the left of its border at x≈505, so the field reads as an icon followed by an empty box with a label inset. Both look like the SVG class is being ignored. The file table itself is clean: grey latest-commit row (MO avatar, mira-okafor, message with #418 link, 8c41d2e · 2 hours ago, 1,284 Commits), 40px rows, messages truncate with an ellipsis, ages right-aligned. S1-2: README.md box with an Outline icon button, h1 Lantern, four two-tone badges, paragraph, Install with a code block and a copy button, Configuration with a bordered table; the right column ends after Contributors (14 initial avatars) and Languages (bar + legend), leaving a long empty column beside the README, which is the pattern. S1-3: Roadmap task list (two checked, greyed because disabled), Contributing with the "New issue" link, License, footer with Terms … Contact. Nothing overlaps; spacing rhythm is even.
     - ✗ **D1** defect `svg.ic (all icons), .goto`: SVG icons ignore their class: folder icons are black instead of blue and the Go to file magnifier sits outside the field's left border
 - **S2** index.html · 375×812 · full page, 5 screen(s) (screens not kept)
@@ -55,9 +55,9 @@ Brief: [`../briefs/code.md`](../briefs/code.md)
     - ✗ **D3** defect `#file-table th / .ft-cmsg`: On a phone file names truncate (CHANGELOG....) although the row has room: a hidden middle column still takes width
     - ✗ **D4** defect `.md-code pre`: On a phone the README code line runs under its copy button, with a stray character to the right of the button
     - ✗ **D5** defect `.md-table`: On a phone the README table squeezes 'What it does' into a narrow column wrapping 3-5 lines while Key and Default sit half empty
-- **S3** index.html · 375×812 · full page, 5 screen(s)
+- **S3** index.html · 375×812 · full page, 5 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/code/judgment/#S3))
   - 👁 **L3**: Phone 375 after the first fixes, five screens. S3-1: the title row now fits on one line — Watch and Fork show icon + count (their words are kept for screen readers), Star 4,218 keeps its word. Folder icons are blue and the Go to file magnifier sits inside the field, so the SVG class fix took. About is above the toolbar and table. S3-2: CHANGELOG.... is STILL truncated with a wide gap before "2 weeks ago" — the name column is still only half the row. S3-3: the code block now ends at the copy button (the line scrolls inside its own box, nothing runs under the button). The Configuration table no longer squeezes, but it now overflows its box: "Folder the pages ar" is cut at the right edge — it scrolls, but at 375 it reads as clipped. S3-4/5: Releases, Contributors, Languages and the footer are fine.
-- **G3** `vlmkit check interactions index.html` → exit 0 — elements 30 · suspects 0 · warns 0
+- **G3** `vlmkit check interactions index.html` → exit 0 — elements 30 · suspects 0 · warns 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G3))
 - **S4** index.html · 1280×800 · click #btn-code — Code menu open (screens not kept)
   - 👁 **L4**: Desktop, Code menu open. A 400px popover hangs right-aligned under the green Code button, over the commit-message column: "Clone" header with a terminal icon, a segmented HTTPS (selected, white) / CLI control, a read-only mono field showing https://forgeyard.example/tidewater/lantern… cut at the field edge with a copy icon button beside it, "Clone using the web URL." in small muted text, a divider and "Download ZIP" with a download icon. Shadow and 12px radius separate it from the table. The button shows expanded (the popover is attached by 6px). Matches the study's proportions; nothing behind it bleeds through.
 - **S5** index.html · 1280×800 · click #btn-branch · fill #branch-filter "re" — branch filtered (screens not kept)
@@ -106,7 +106,7 @@ Brief: [`../briefs/code.md`](../briefs/code.md)
 
 ### R2 · fix pass: re-shoot the first draft's defects, run the wider gate set (builder)
 
-- **S17** index.html · 375×812 · full page, 5 screen(s)
+- **S17** index.html · 375×812 · full page, 5 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/code/judgment/#S17))
   - 👁 **L17**: Phone 375 light, five screens, re-shot after F1-F5. S17-1: folder icons blue, the magnifier inside "Go to file", Watch / Fork / Star on one row (F1, F2 hold). S17-2: names are whole (CHANGELOG.md, package.json, .editorconfig) — F3 holds — but the age column now runs into the box's right edge: "3 months ago" ends at x≈354, against the border at 358, and the right padding is gone; the 104px cell is narrower than its nowrap text, so the text overflows the cell and the box clips it. S17-3: the code block ends at its copy button (F4 holds) and the Configuration table fits the box with "What it does" wrapping to two or three lines (F5 holds). S17-4/5: task list, Contributing, License, Releases, Contributors, Languages, footer — no change, fine.
     - ✗ **D11** defect `.ft-age (phone)`: On a phone the age text overflows its 104px cell and touches the file table's right border
 - **V1** D1 verified by L17
@@ -133,18 +133,18 @@ Brief: [`../briefs/code.md`](../briefs/code.md)
 - **V9** D9 verified by L20
 - **V10** D10 verified by L21
 - **V11** D11 verified by L22
-- **G4** `vlmkit check interactions index.html --max-elements 120` → exit 0 — elements 92 · suspects 0 · warns 8
+- **G4** `vlmkit check interactions index.html --max-elements 120` → exit 0 — elements 92 · suspects 0 · warns 8 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G4))
   - ✗ **D12** defect `.md-tasks input`: README task list renders disabled checkboxes: four controls nobody can reach or operate
-- **G5** `vlmkit check a11y contrast index.html` → exit 0 — inspected 217 · failures 0
-- **G6** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 217 · failures 0
-- **G7** `vlmkit check a11y contrast 'index.html#/issues'` → exit 0 — inspected 189 · failures 0
-- **G8** `vlmkit check a11y contrast 'index.html?theme=dark#/issues'` → exit 0 — inspected 189 · failures 0
-- **G9** `vlmkit check a11y focus index.html` → exit 0 — steps 64 · findings 2
-- **G10** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 89 · failures 0 · wcagExempt 34
-- **G11** `vlmkit check design index.html` → exit 0 — verdict: DRIFT (2 finding(s))
+- **G5** `vlmkit check a11y contrast index.html` → exit 0 — inspected 217 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G5))
+- **G6** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 217 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G6))
+- **G7** `vlmkit check a11y contrast 'index.html#/issues'` → exit 0 — inspected 189 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G7))
+- **G8** `vlmkit check a11y contrast 'index.html?theme=dark#/issues'` → exit 0 — inspected 189 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G8))
+- **G9** `vlmkit check a11y focus index.html` → exit 0 — steps 64 · findings 2 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G9))
+- **G10** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 89 · failures 0 · wcagExempt 34 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G10))
+- **G11** `vlmkit check design index.html` → exit 0 — verdict: DRIFT (2 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G11))
   - ✗ **D15** defect `div.lang-bar`: The languages bar uses a 6px radius where every other img-role element (badges) uses 4px
-- **G12** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (0 finding(s))
-- **G13** `vlmkit check color index.html` → exit 0 — verdict: COLOR-DEPENDENT (2 finding(s))
+- **G12** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G12))
+- **G13** `vlmkit check color index.html` → exit 0 — verdict: COLOR-DEPENDENT (2 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G13))
   - ✗ **D13** defect `input#goto, .input`: Go to file (and every .input) draws its border at 1.43:1 against the page: WCAG 1.4.11 wants 3:1 for a control's boundary
   - ✗ **D14** defect `a.pr-ref`: PR number links inside the muted commit messages are told apart by colour alone (1.18:1 against the message text)
 - **N5** accepted about G11: The button drift is four deliberate families, not one style applied inconsistently: transparent 16px nav disclosure buttons on the black header, the header's field-shaped search button, the bordered 32px toolbar/form buttons (.btn, .btn-icon, .btn-primary), and the small 28px/12px counter buttons of the title row (Watch, Fork, Star) that the reference study shows smaller than the toolbar's. Merging them would make the header's menus look like toolbar buttons or the title row's counters as large as the Code button. I fixed the one drift that was not a family (the language bar's radius, D15).
@@ -153,18 +153,18 @@ Brief: [`../briefs/code.md`](../briefs/code.md)
 - **F13** fix for D13: Fields and the editor box use a new --border-input token: #818b98 on light (about 3.5:1 on white) and #767e89 on dark (about 4.5:1 on #0d1117).
 - **F14** fix for D14: PR links in commit messages (.pr-ref, and links in the message column) are underlined, so colour is not the only cue.
 - **F15** fix for D15: Language bar radius 4px, the badges' radius.
-- **G14** `vlmkit check color index.html` → exit 0 — verdict: CONSISTENT (0 finding(s))
-- **G15** `vlmkit check color 'index.html?theme=dark'` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s))
+- **G14** `vlmkit check color index.html` → exit 0 — verdict: CONSISTENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G14))
+- **G15** `vlmkit check color 'index.html?theme=dark'` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G15))
   - ✗ **D16** defect `article.markdown p a`: Dark theme: the README's prose link ('New issue') differs from the prose by colour alone at 2.62:1
-- **G16** `vlmkit check design index.html` → exit 0 — verdict: DRIFT (1 finding(s))
-- **G17** `vlmkit check interactions index.html --max-elements 120` → exit 0 — elements 88 · suspects 0 · warns 0
+- **G16** `vlmkit check design index.html` → exit 0 — verdict: DRIFT (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G16))
+- **G17** `vlmkit check interactions index.html --max-elements 120` → exit 0 — elements 88 · suspects 0 · warns 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G17))
   - ✗ **D17** defect `a.meta-user`: Issue list: the author link in each row's meta line is the same grey as the sentence, with nothing marking it as a link
 - **F16** fix for D16: Links inside Markdown (README, issue bodies, the preview) are underlined in both themes.
-- **G18** `vlmkit check color 'index.html?theme=dark'` → exit 0 — verdict: CONSISTENT (0 finding(s))
-- **G19** `vlmkit check color 'index.html#/issues'` → exit 0 — verdict: COLOR-DEPENDENT (3 finding(s))
+- **G18** `vlmkit check color 'index.html?theme=dark'` → exit 0 — verdict: CONSISTENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G18))
+- **G19** `vlmkit check color 'index.html#/issues'` → exit 0 — verdict: COLOR-DEPENDENT (3 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G19))
 - **F17** fix for D17: Author links in the issue meta line get an underline in the field-border grey (they turn blue on hover), as the study's list marks them.
-- **G20** `vlmkit check color 'index.html#/issues'` → exit 0 — verdict: CONSISTENT (0 finding(s))
-- **G21** `vlmkit check color 'index.html?theme=dark#/issues'` → exit 0 — verdict: CONSISTENT (0 finding(s))
+- **G20** `vlmkit check color 'index.html#/issues'` → exit 0 — verdict: CONSISTENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G20))
+- **G21** `vlmkit check color 'index.html?theme=dark#/issues'` → exit 0 — verdict: CONSISTENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G21))
 - **N7** decision about D17: Provenance correction: D17 was found by G19 (check color on index.html#/issues, 3 link-no-cue findings on a.meta-user). I typed --from G17 by mistake; G17 is the interactions re-run. The log has no command to amend a defect's source, so the correction is this note.
 - **V12** D12 verified by G17: check interactions --max-elements 120: no inert-control / not-tab-reachable warns left
 - **V13** D13 verified by G14: check color: CONSISTENT, no control-boundary-invisible
@@ -172,40 +172,40 @@ Brief: [`../briefs/code.md`](../briefs/code.md)
 - **V15** D15 verified by G16: check design: img 9 instances, 3 styles, reuse 3x, ok
 - **V16** D16 verified by G18: check color ?theme=dark: CONSISTENT
 - **V17** D17 verified by G20: check color #/issues: CONSISTENT (and G21 dark: CONSISTENT)
-- **G22** `vlmkit scan scroll index.html` → exit 0 — containers 0 · overflowX 0 · issues 0
-- **G23** `vlmkit scan handlers index.html` → exit 0 — registrations 76 · elements 59 · suspects 0
-- **G24** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 5 · issues 2 · sweepRanges 1
+- **G22** `vlmkit scan scroll index.html` → exit 0 — containers 0 · overflowX 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G22))
+- **G23** `vlmkit scan handlers index.html` → exit 0 — registrations 76 · elements 59 · suspects 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G23))
+- **G24** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 5 · issues 2 · sweepRanges 1 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G24))
   - ✗ **D18** defect `.gh-inner (1012-1045px)`: The desktop header overflows the viewport by up to 50px between 1012 and 1045px (nav, search, Sign in and Sign up do not fit)
 - **F18** fix for D18: From 1180px down the header tightens: 10px gaps, 7px side padding on the nav buttons and a 180px search field, which leaves room down to the 1012px switch.
-- **G25** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 6 · issues 0 · sweepRanges 0
+- **G25** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 6 · issues 0 · sweepRanges 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G25))
 - **V18** D18 verified by G25: sweep 320-1280 clean, all boundaries clean
-- **G26** `vlmkit check breakpoints 'index.html#/blob/src/core/build.ts' --sweep` → exit 0 — breakpoints 6 · issues 0 · sweepRanges 0
-- **G27** `vlmkit check breakpoints 'index.html#/issues' --sweep` → exit 0 — breakpoints 6 · issues 0 · sweepRanges 0
-- **G28** `vlmkit check scroll 'index.html#/blob/src/core/build.ts'` → exit 0 — pageScrolled 791 · stickyFixed 1 · engagedSticky 1 · snaps 0 · issues 0
-- **G29** `vlmkit scan scroll index.html --viewport 375x812` → exit 0 — containers 2 · overflowX 0 · issues 0
-- **G30** `vlmkit verify flow index.html --flow flows/file-lines.json` → exit 1 — verdict: FAILED (0/7 steps)
-- **G31** `vlmkit verify flow index.html --flow flows/file-lines.json` → exit 1 — verdict: FAILED (2/7 steps)
-- **G32** `vlmkit verify flow index.html --flow flows/file-lines.json` → exit 0 — verdict: DONE (12/12 steps)
+- **G26** `vlmkit check breakpoints 'index.html#/blob/src/core/build.ts' --sweep` → exit 0 — breakpoints 6 · issues 0 · sweepRanges 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G26))
+- **G27** `vlmkit check breakpoints 'index.html#/issues' --sweep` → exit 0 — breakpoints 6 · issues 0 · sweepRanges 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G27))
+- **G28** `vlmkit check scroll 'index.html#/blob/src/core/build.ts'` → exit 0 — pageScrolled 791 · stickyFixed 1 · engagedSticky 1 · snaps 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G28))
+- **G29** `vlmkit scan scroll index.html --viewport 375x812` → exit 0 — containers 2 · overflowX 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G29))
+- **G30** `vlmkit verify flow index.html --flow flows/file-lines.json` → exit 1 — verdict: FAILED (0/7 steps) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G30))
+- **G31** `vlmkit verify flow index.html --flow flows/file-lines.json` → exit 1 — verdict: FAILED (2/7 steps) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G31))
+- **G32** `vlmkit verify flow index.html --flow flows/file-lines.json` → exit 0 — verdict: DONE (12/12 steps) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G32))
 - **N8** tool about G31: verify flow evaluates each step's assertions once, right after the action, with no retry: on a hash-routed page that renders on `hashchange` (a task after the click), G30 read `.crumbs .crumb-current text~"src" (got: )` and G31 read `#L16 visible (got: hidden/absent)` / `.file-info text~"48 lines" (got: )` although the DOM had them a moment later (the same steps pass with a 250ms wait step in between, G32). Playwright's own expect() retries; a "visible"/"text" assertion that waited up to a timeout, or a documented "wait" field per step, would avoid wrapping every navigation in an extra step. Worked around with explicit {action:"wait", ms:250} steps in flows/*.json.
-- **G33** `vlmkit verify flow index.html --flow flows/palette-issue.json` → exit 1 — verdict: FAILED (6/20 steps)
-- **G34** `vlmkit verify flow index.html --flow flows/palette-issue.json` → exit 0 — verdict: DONE (20/20 steps)
-- **G35** `vlmkit stress data index.html` → exit 1 — variants 14 · findings 36
+- **G33** `vlmkit verify flow index.html --flow flows/palette-issue.json` → exit 1 — verdict: FAILED (6/20 steps) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G33))
+- **G34** `vlmkit verify flow index.html --flow flows/palette-issue.json` → exit 0 — verdict: DONE (20/20 steps) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G34))
+- **G35** `vlmkit stress data index.html` → exit 1 — variants 14 · findings 36 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G35))
   - ✗ **D19** defect `.release-name, .ft-age, .avatar`: Long data breaks the layout: a long release name pushes the page 105-140px wide, a long age pokes out of the file table, long avatar text spills out of the circle
 - **F19** fix for D19: Release name wraps (flex-wrap, min-width 0, overflow-wrap anywhere); the age cell truncates with an ellipsis like the message column; the avatar clips its text to the circle; About links may break anywhere.
-- **G36** `vlmkit stress data index.html --variant long-text` → exit 1 — variants 1 · findings 26
-- **G37** `vlmkit stress data index.html --variant long-text` → exit 0 — variants 1 · findings 0
+- **G36** `vlmkit stress data index.html --variant long-text` → exit 1 — variants 1 · findings 26 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G36))
+- **G37** `vlmkit stress data index.html --variant long-text` → exit 0 — variants 1 · findings 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G37))
 - **V19** D19 verified by G37: long-text variant: ok at 1280 and 375 (also took overflow-wrap on the language legend and an ellipsis on the avatar text, found by G36 after F19)
-- **G38** `vlmkit stress data 'index.html#/issues'` → exit 1 — variants 11 · findings 7
+- **G38** `vlmkit stress data 'index.html#/issues'` → exit 1 — variants 11 · findings 7 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G38))
   - ✗ **D20** defect `.chip, .issue-title`: Issue list on a phone: a long label name (nowrap chip) pushes the page about 100px wide
 - **F20** fix for D20: Chips may shrink to the row and truncate with an ellipsis (their full name stays in the accessible name 'Filter by label …'), the chip group may shrink, and titles break anywhere when they must.
-- **G39** `vlmkit stress data 'index.html#/issues' --variant long-text` → exit 0 — variants 1 · findings 0
+- **G39** `vlmkit stress data 'index.html#/issues' --variant long-text` → exit 0 — variants 1 · findings 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G39))
 - **V20** D20 verified by G39: issues long-text variant: ok at 1280 and 375
 - **N9** tool about G38: stress data's page-overflow-x line names elements inside a horizontal scroller as what 'sticks out': on #/issues at 375 it said 'sticking out: nav.repo-tabs > a:nth-of-type(6) (right edge 684px)…' — nav.repo-tabs is overflow-x:auto (scan scroll G29 lists it as an x scroll container), so its tabs cannot widen the page. The real cause, found with a probe that skips elements under a non-visible overflow ancestor, was the nowrap label chips (right edge 478px). On the home page (G36) it likewise named table.md-table inside div.md-table-wrap (overflow-x:auto) while the cause was the language legend. Listing only elements with no clipping/scrolling ancestor would point at the cause.
 - **N10** accepted about G35: empty-collapses on the file table, the About column, the README task list and table (G35) and on the issue list, its filter row and a row's chips (G38): these are script-rendered or authored groups, and 'emptying the markup' is not a state the page can reach. The two that can be empty have their own empty states rendered by the script, which the gate says it cannot see: Go to file with no match shows 'No files match “…”.' (one row), and an issue search with no match shows 'No issues match this search.' with a Clear filters button. The README is fixed content (an empty Markdown list renders no <ul> at all), the About column always has its sections, the filter row is a fixed set of six menus, and an issue with no labels renders no chip group content by design.
-- **G40** `vlmkit check integrity 'index.html#/blob/src/core/build.ts'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 9 exempted)
-- **G41** `vlmkit check integrity 'index.html#/issues'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 6 exempted)
-- **G42** `vlmkit check integrity 'index.html#/issues/new'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 3 exempted)
-- **G43** `vlmkit check integrity 'index.html#/blob/src/plugins/syntax-highlight-with-line-numbers-and-theme-switching.ts'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 9 exempted)
+- **G40** `vlmkit check integrity 'index.html#/blob/src/core/build.ts'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 9 exempted) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G40))
+- **G41** `vlmkit check integrity 'index.html#/issues'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 6 exempted) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G41))
+- **G42** `vlmkit check integrity 'index.html#/issues/new'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 3 exempted) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G42))
+- **G43** `vlmkit check integrity 'index.html#/blob/src/plugins/syntax-highlight-with-line-numbers-and-theme-switching.ts'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 9 exempted) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G43))
 - **S23** index.html#/blob/src/core/build.ts · 375×812 · click .wrap-btn — phone blob, wrap lines on (screens not kept)
   - 👁 **L23**: Phone blob view of build.ts with Wrap lines pressed. Breadcrumb lantern / src / core / build.ts with the copy-path button; the commit strip shows only the avatar, "mira-okafor" and "2 hours ago" — the commit MESSAGE is gone on the phone (the rule that hides the file table's long message also hides the blob's), so the brief's "latest commit for the file" loses its content. File box head wraps to two rows: Code / Blame and the line count, then Raw, copy, download and "Wrap lines" (shown pressed: blue fill and border). With wrapping on, long lines fold under their own number ("stream it to disk." under line 1, "node:fs/promises" under line 2) and nothing scrolls sideways. Numbers stay aligned to the first line of each wrapped line.
     - ✗ **D21** defect `.blob-commit .ft-msg (phone)`: On a phone the blob view's latest-commit strip hides the commit message
@@ -222,9 +222,9 @@ Brief: [`../briefs/code.md`](../briefs/code.md)
   - 👁 **L27**: Phone menu open after F22. Sign up is now a full-width white button centred under the menu items, ending the panel on a clear call to action; the five rows above keep their 44px height and carets. Behind the panel the About section continues; nothing else moved.
 - **V21** D21 verified by L26
 - **V22** D22 verified by L27
-- **G44** `vlmkit check interactions 'index.html#/issues' --max-elements 140` → exit 1 — elements 140 · suspects 2 · warns 44
-- **G45** `vlmkit check interactions 'index.html#/blob/src/core/build.ts' --max-elements 140` → exit 1 — elements 92 · suspects 2 · warns 0
-- **G46** `vlmkit check interactions 'index.html#/issues/new' --max-elements 140` → exit 1 — elements 34 · suspects 2 · warns 0
+- **G44** `vlmkit check interactions 'index.html#/issues' --max-elements 140` → exit 1 — elements 140 · suspects 2 · warns 44 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G44))
+- **G45** `vlmkit check interactions 'index.html#/blob/src/core/build.ts' --max-elements 140` → exit 1 — elements 92 · suspects 2 · warns 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G45))
+- **G46** `vlmkit check interactions 'index.html#/issues/new' --max-elements 140` → exit 1 — elements 34 · suspects 2 · warns 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G46))
 - **S28** index.html#/issues · 1280×800 · focus #btn-nav-teams · press Enter — Teams menu by keyboard on #/issues (screens not kept)
   - 👁 **L28**: Desktop #/issues, Teams focused and Enter pressed (keyboard, not a click). The Teams button shows the white focus ring and its 300px panel is open under it: Small teams / Shared repositories and reviews, Open source / Free for public projects, Enterprise / Single sign-on and audit logs. So the disclosure the interactions gate called dead on this URL opens by keyboard. The issue list behind is unchanged.
 - **N11** tool about G40: check interactions on a hash URL (index.html#/issues, #/blob/…, #/issues/new: G40-G42) reports results that look shifted by one probe: "Developers: Enter: layout change | announces", "Teams: Enter: no response", "Resources: no response", "Fork 312: layout change | Esc closes" (instead of "opens dialog, traps"), "23 Open: open true -> false", "Author: open true -> false", "Projects: pressed false -> true", and two suspects: "[dead-disclosure] button "Teams" … declares aria-expanded but activating it (Enter) changes neither the attribute nor the layout". On index.html without a hash (G17) the same four menus all read "Enter: expanded false -> true" and Fork "opens dialog (focus enters), traps". S28 shows Teams opening by keyboard on #/issues. My guess: the probe resets between elements by navigating to the same URL, and a URL that differs only in its fragment is a same-document navigation, so the page is never reloaded and each probe starts from the state the previous one left (a menu open, a toggle flipped). Treated as false positives; the menus are covered by G17 on index.html and by S28.
@@ -232,58 +232,58 @@ Brief: [`../briefs/code.md`](../briefs/code.md)
 - **N13** false-positive about G44: dead-disclosure on Teams / Resources: the hash-URL probe carries state from one element to the next (see N11 and N8-style tool note); S28 shows Teams opening by Enter on this URL, and G17 on index.html shows all four nav menus toggling aria-expanded. The tabs' second tab reads 'unreachable' because it has tabindex=-1 by the APG roving pattern (ArrowRight reaches it).
 - **N14** false-positive about G45: dead-disclosure on Teams / Resources: the hash-URL probe carries state from one element to the next (see N11 and N8-style tool note); S28 shows Teams opening by Enter on this URL, and G17 on index.html shows all four nav menus toggling aria-expanded. The tabs' second tab reads 'unreachable' because it has tabindex=-1 by the APG roving pattern (ArrowRight reaches it).
 - **N15** false-positive about G46: dead-disclosure on Teams / Resources: the hash-URL probe carries state from one element to the next (see N11 and N8-style tool note); S28 shows Teams opening by Enter on this URL, and G17 on index.html shows all four nav menus toggling aria-expanded. The tabs' second tab reads 'unreachable' because it has tabindex=-1 by the APG roving pattern (ArrowRight reaches it).
-- **G47** `vlmkit verify flow index.html --flow flows/menus-tabs.json` → exit 1 — verdict: FAILED (3/23 steps)
+- **G47** `vlmkit verify flow index.html --flow flows/menus-tabs.json` → exit 1 — verdict: FAILED (3/23 steps) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G47))
   - ✗ **D23** defect `document click handler / copy buttons in popovers`: Clicking the Code menu's copy button closes the menu (focus drops to <body>), so its Copied! tooltip is never seen: the outside-click test uses target.closest() after the button swapped its icon, and a detached icon has no ancestors
 - **F23** fix for D23: The outside-click test reads e.composedPath(), which is fixed when the event is dispatched, instead of target.closest(); an icon the click handler replaced still counts as inside its popover.
-- **G48** `vlmkit verify flow index.html --flow flows/menus-tabs.json` → exit 1 — verdict: FAILED (7/23 steps)
+- **G48** `vlmkit verify flow index.html --flow flows/menus-tabs.json` → exit 1 — verdict: FAILED (7/23 steps) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G48))
   - ✗ **D24** defect `#bt-panel`: Switching the branch selector to Tags leaves the 5 old branch rows beside the 5 tags (10 rows): the keyed re-render and the nested reactive list both react to the tab
 - **F24** fix for D24: The rows inside the keyed block are now rendered once from the current values (static_list), so only the keyed block reacts to the filter and the tab.
-- **G49** `vlmkit verify flow index.html --flow flows/menus-tabs.json` → exit 0 — verdict: DONE (23/23 steps)
+- **G49** `vlmkit verify flow index.html --flow flows/menus-tabs.json` → exit 0 — verdict: DONE (23/23 steps) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G49))
 - **V23** D23 verified by G49: menus-tabs flow: Copy shows Copied!, then Escape closes the menu and focus returns to the Code button
 - **V24** D24 verified by G49: menus-tabs flow: Tags shows 5 rows, Branches 8
 
 ### R3 · final check (builder)
 
-- **G50** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 24 exempted)
-- **G51** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 1 · placeholders 0 · manifestLines 13 · statesExplored 15 · revealedOnly 2
-- **G52** `vlmkit check design index.html` → exit 0 — verdict: DRIFT (1 finding(s))
-- **G53** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (0 finding(s))
-- **G54** `vlmkit check color index.html` → exit 0 — verdict: CONSISTENT (0 finding(s))
-- **G55** `vlmkit check color 'index.html?theme=dark'` → exit 0 — verdict: CONSISTENT (0 finding(s))
-- **G56** `vlmkit check color 'index.html#/issues'` → exit 0 — verdict: CONSISTENT (0 finding(s))
-- **G57** `vlmkit check a11y contrast index.html` → exit 0 — inspected 217 · failures 0
-- **G58** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 217 · failures 0
-- **G59** `vlmkit check a11y contrast 'index.html#/issues'` → exit 0 — inspected 189 · failures 0
-- **G60** `vlmkit check a11y contrast 'index.html?theme=dark#/issues'` → exit 0 — inspected 189 · failures 0
-- **G61** `vlmkit check a11y contrast 'index.html#/blob/src/core/build.ts'` → exit 0 — inspected 272 · failures 0
-- **G62** `vlmkit check a11y contrast 'index.html?theme=dark#/blob/src/core/build.ts'` → exit 0 — inspected 272 · failures 0
-- **G63** `vlmkit check a11y contrast index.html --color-scheme dark` → exit 0 — inspected 217 · failures 0
-- **G64** `vlmkit check a11y focus index.html` → exit 0 — steps 64 · findings 2
-- **G65** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 89 · failures 0 · wcagExempt 34
-- **G66** `vlmkit check a11y touch 'index.html#/issues'` → exit 0 — level AA · inspected 144 · failures 0 · wcagExempt 67
-- **G67** `vlmkit scan scroll index.html` → exit 0 — containers 0 · overflowX 0 · issues 0
-- **G68** `vlmkit scan scroll index.html --viewport 375x812` → exit 0 — containers 2 · overflowX 0 · issues 0
-- **G69** `vlmkit scan handlers index.html` → exit 0 — registrations 76 · elements 59 · suspects 0
-- **G70** `vlmkit check interactions index.html --max-elements 120` → exit 0 — elements 88 · suspects 0 · warns 0
-- **G71** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 6 · issues 0 · sweepRanges 0
-- **G72** `vlmkit check breakpoints 'index.html#/blob/src/core/build.ts' --sweep` → exit 0 — breakpoints 6 · issues 0 · sweepRanges 0
+- **G50** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 24 exempted) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G50))
+- **G51** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 1 · placeholders 0 · manifestLines 13 · statesExplored 15 · revealedOnly 2 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G51))
+- **G52** `vlmkit check design index.html` → exit 0 — verdict: DRIFT (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G52))
+- **G53** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G53))
+- **G54** `vlmkit check color index.html` → exit 0 — verdict: CONSISTENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G54))
+- **G55** `vlmkit check color 'index.html?theme=dark'` → exit 0 — verdict: CONSISTENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G55))
+- **G56** `vlmkit check color 'index.html#/issues'` → exit 0 — verdict: CONSISTENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G56))
+- **G57** `vlmkit check a11y contrast index.html` → exit 0 — inspected 217 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G57))
+- **G58** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 217 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G58))
+- **G59** `vlmkit check a11y contrast 'index.html#/issues'` → exit 0 — inspected 189 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G59))
+- **G60** `vlmkit check a11y contrast 'index.html?theme=dark#/issues'` → exit 0 — inspected 189 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G60))
+- **G61** `vlmkit check a11y contrast 'index.html#/blob/src/core/build.ts'` → exit 0 — inspected 272 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G61))
+- **G62** `vlmkit check a11y contrast 'index.html?theme=dark#/blob/src/core/build.ts'` → exit 0 — inspected 272 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G62))
+- **G63** `vlmkit check a11y contrast index.html --color-scheme dark` → exit 0 — inspected 217 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G63))
+- **G64** `vlmkit check a11y focus index.html` → exit 0 — steps 64 · findings 2 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G64))
+- **G65** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 89 · failures 0 · wcagExempt 34 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G65))
+- **G66** `vlmkit check a11y touch 'index.html#/issues'` → exit 0 — level AA · inspected 144 · failures 0 · wcagExempt 67 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G66))
+- **G67** `vlmkit scan scroll index.html` → exit 0 — containers 0 · overflowX 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G67))
+- **G68** `vlmkit scan scroll index.html --viewport 375x812` → exit 0 — containers 2 · overflowX 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G68))
+- **G69** `vlmkit scan handlers index.html` → exit 0 — registrations 76 · elements 59 · suspects 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G69))
+- **G70** `vlmkit check interactions index.html --max-elements 120` → exit 0 — elements 88 · suspects 0 · warns 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G70))
+- **G71** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 6 · issues 0 · sweepRanges 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G71))
+- **G72** `vlmkit check breakpoints 'index.html#/blob/src/core/build.ts' --sweep` → exit 0 — breakpoints 6 · issues 0 · sweepRanges 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G72))
   - ✗ **D25** defect `#fork-dialog, #palette`: Opening the Fork dialog focuses its Close button first and only moves to the name field a task later (the flow caught focus on the button); passed in G49, failed here
-- **G73** `vlmkit check breakpoints 'index.html#/issues' --sweep` → exit 0 — breakpoints 6 · issues 0 · sweepRanges 0
-- **G74** `vlmkit check scroll 'index.html#/blob/src/core/build.ts'` → exit 0 — pageScrolled 791 · stickyFixed 1 · engagedSticky 1 · snaps 0 · issues 0
-- **G75** `vlmkit verify flow index.html --flow flows/file-lines.json` → exit 0 — verdict: DONE (12/12 steps)
-- **G76** `vlmkit verify flow index.html --flow flows/palette-issue.json` → exit 0 — verdict: DONE (20/20 steps)
-- **G77** `vlmkit verify flow index.html --flow flows/menus-tabs.json` → exit 1 — verdict: FAILED (12/23 steps)
-- **G78** `vlmkit stress data index.html` → exit 0 — variants 14 · findings 8
-- **G79** `vlmkit stress data 'index.html#/issues'` → exit 0 — variants 11 · findings 6
+- **G73** `vlmkit check breakpoints 'index.html#/issues' --sweep` → exit 0 — breakpoints 6 · issues 0 · sweepRanges 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G73))
+- **G74** `vlmkit check scroll 'index.html#/blob/src/core/build.ts'` → exit 0 — pageScrolled 791 · stickyFixed 1 · engagedSticky 1 · snaps 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G74))
+- **G75** `vlmkit verify flow index.html --flow flows/file-lines.json` → exit 0 — verdict: DONE (12/12 steps) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G75))
+- **G76** `vlmkit verify flow index.html --flow flows/palette-issue.json` → exit 0 — verdict: DONE (20/20 steps) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G76))
+- **G77** `vlmkit verify flow index.html --flow flows/menus-tabs.json` → exit 1 — verdict: FAILED (12/23 steps) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G77))
+- **G78** `vlmkit stress data index.html` → exit 0 — variants 14 · findings 8 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G78))
+- **G79** `vlmkit stress data 'index.html#/issues'` → exit 0 — variants 11 · findings 6 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G79))
 - **F25** fix for D25: Both dialogs mark their first field autofocus, so showModal() focuses it in the same task; the setTimeout focus is gone.
-- **G80** `vlmkit verify flow index.html --flow flows/menus-tabs.json` → exit 0 — verdict: DONE (23/23 steps)
-- **G81** `vlmkit verify flow index.html --flow flows/menus-tabs.json` → exit 0 — verdict: DONE (23/23 steps)
-- **G82** `vlmkit verify flow index.html --flow flows/palette-issue.json` → exit 0 — verdict: DONE (20/20 steps)
+- **G80** `vlmkit verify flow index.html --flow flows/menus-tabs.json` → exit 0 — verdict: DONE (23/23 steps) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G80))
+- **G81** `vlmkit verify flow index.html --flow flows/menus-tabs.json` → exit 0 — verdict: DONE (23/23 steps) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G81))
+- **G82** `vlmkit verify flow index.html --flow flows/palette-issue.json` → exit 0 — verdict: DONE (20/20 steps) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G82))
 - **N16** decision about D25: Provenance correction: D25 was found by G77 (verify flow menus-tabs: '✗ step 13: Fork dialog — #fork-name focused (got: button)'); I typed G72, which is a clean breakpoints sweep.
 - **V25** D25 verified by G80: menus-tabs flow DONE 23/23, twice (G80, G81); palette flow DONE (G82)
-- **S29** index.html · 1280×800 · full page, 3 screen(s) — final home
+- **S29** index.html · 1280×800 · full page, 3 screen(s) — final home ([screens](https://mizchi.github.io/vlmkit/sites/code/judgment/#S29))
   - 👁 **L29**: Final desktop home, three screens. S29-1: header, repo header with Code current, title row (lantern, Public, Watch 38 / Fork 312 / Star 4,218), toolbar (main ▾, 8 Branches, 5 Tags, Go to file with its icon inside and a now clearly visible grey border, green Code), the file table with blue folder icons, underlined PR links in the messages (#418, #415, #402, #366, #413) and right-aligned ages, and the About column. S29-2: README box with badges, Install code block + copy, Configuration table; Contributors and Languages in the right column. S29-3: the Roadmap task list now draws its own boxes — two filled blue with white checks, two empty outlined — then Contributing with the underlined "New issue" link, License and the footer. Alignment: the main column's left edge is shared by the toolbar, table and README; the right column's sections share their left edge. Nothing overlaps or truncates badly.
-- **S30** index.html · 375×812 · full page, 5 screen(s) — final home
+- **S30** index.html · 375×812 · full page, 5 screen(s) — final home ([screens](https://mizchi.github.io/vlmkit/sites/code/judgment/#S30))
   - 👁 **L30**: Final phone home, five screens. S30-1: hamburger / mark / search / person header; tabs scroll (Pull requests cut at the edge); title row on one line (icon+38 ▾, icon+312, Star 4,218); About above the toolbar and table, as the brief asks. S30-2: the table without the message column, names whole and ages inside the box's right padding; README starts. S30-3: code block with its copy button beside the scrolling line, the Configuration table fitting the box. S30-4/5: task boxes, Contributing, License, then Releases, Contributors, Languages and the footer. The last screen repeats part of the previous one because the page ends there.
 - **S31** index.html · 1280×800 · click #btn-code · click #pop-code .copy-btn — Code menu open, URL copied (screens not kept)
   - 👁 **L31**: Final: Code menu open and its copy button clicked. The menu STAYS open (D23's bug would have closed it), the copy button shows a green check, and a dark "Copied!" tooltip sits above it. HTTPS selected, the URL field cut at its edge, "Clone using the web URL.", Download ZIP. Layout as in S4.
@@ -326,30 +326,30 @@ Brief: [`../briefs/code.md`](../briefs/code.md)
   - 👁 **L45**: Final dark issue list. The label chips keep their own colours and their ink flips per chip: white on bug (red), windows (violet), documentation (blue), good first issue (purple); dark on needs repro, plugins, enhancement, performance, question — every chip legible on near-black too, matching G60's 0 failures. Open icons in bright green, author links underlined in grey, counts at the right.
 - **S46** index.html?theme=dark#/blob/src/core/build.ts#L16-L19 · 1280×800 — dark blob (screens not kept)
   - 👁 **L46**: Final dark blob view with #L16-L19: the range is a dark amber band with bright amber bold numbers; keywords salmon, strings light blue, comments grey italic, numbers blue, all readable on the dark code surface. Toolbar (Raw, copy, download, Wrap lines) and the Symbols card in dark tokens.
-- **G83** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 24 exempted)
-- **G84** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 1 · placeholders 0 · manifestLines 13 · statesExplored 15 · revealedOnly 2
-- **G85** `vlmkit check design index.html` → exit 0 — verdict: DRIFT (1 finding(s))
-- **G86** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (0 finding(s))
-- **G87** `vlmkit check color index.html` → exit 0 — verdict: CONSISTENT (0 finding(s))
-- **G88** `vlmkit check color 'index.html?theme=dark'` → exit 0 — verdict: CONSISTENT (0 finding(s))
-- **G89** `vlmkit check color 'index.html#/issues'` → exit 0 — verdict: CONSISTENT (0 finding(s))
-- **G90** `vlmkit check a11y contrast index.html` → exit 0 — inspected 217 · failures 0
-- **G91** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 217 · failures 0
-- **G92** `vlmkit check a11y contrast 'index.html#/issues'` → exit 0 — inspected 189 · failures 0
-- **G93** `vlmkit check a11y contrast 'index.html?theme=dark#/issues'` → exit 0 — inspected 189 · failures 0
-- **G94** `vlmkit check a11y contrast index.html --color-scheme dark` → exit 0 — inspected 217 · failures 0
-- **G95** `vlmkit check a11y focus index.html` → exit 0 — steps 64 · findings 2
-- **G96** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 89 · failures 0 · wcagExempt 34
-- **G97** `vlmkit scan scroll index.html` → exit 0 — containers 0 · overflowX 0 · issues 0
-- **G98** `vlmkit scan handlers index.html` → exit 0 — registrations 76 · elements 59 · suspects 0
-- **G99** `vlmkit check interactions index.html --max-elements 120` → exit 0 — elements 88 · suspects 0 · warns 0
-- **G100** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 6 · issues 0 · sweepRanges 0
-- **G101** `vlmkit check scroll 'index.html#/blob/src/core/build.ts'` → exit 0 — pageScrolled 791 · stickyFixed 1 · engagedSticky 1 · snaps 0 · issues 0
-- **G102** `vlmkit verify flow index.html --flow flows/file-lines.json` → exit 0 — verdict: DONE (12/12 steps)
-- **G103** `vlmkit verify flow index.html --flow flows/palette-issue.json` → exit 0 — verdict: DONE (20/20 steps)
-- **G104** `vlmkit verify flow index.html --flow flows/menus-tabs.json` → exit 0 — verdict: DONE (23/23 steps)
-- **G105** `vlmkit stress data index.html` → exit 0 — variants 14 · findings 8
-- **G106** `vlmkit stress data 'index.html#/issues'` → exit 0 — variants 11 · findings 6
+- **G83** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 24 exempted) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G83))
+- **G84** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 1 · placeholders 0 · manifestLines 13 · statesExplored 15 · revealedOnly 2 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G84))
+- **G85** `vlmkit check design index.html` → exit 0 — verdict: DRIFT (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G85))
+- **G86** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G86))
+- **G87** `vlmkit check color index.html` → exit 0 — verdict: CONSISTENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G87))
+- **G88** `vlmkit check color 'index.html?theme=dark'` → exit 0 — verdict: CONSISTENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G88))
+- **G89** `vlmkit check color 'index.html#/issues'` → exit 0 — verdict: CONSISTENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G89))
+- **G90** `vlmkit check a11y contrast index.html` → exit 0 — inspected 217 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G90))
+- **G91** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 217 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G91))
+- **G92** `vlmkit check a11y contrast 'index.html#/issues'` → exit 0 — inspected 189 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G92))
+- **G93** `vlmkit check a11y contrast 'index.html?theme=dark#/issues'` → exit 0 — inspected 189 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G93))
+- **G94** `vlmkit check a11y contrast index.html --color-scheme dark` → exit 0 — inspected 217 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G94))
+- **G95** `vlmkit check a11y focus index.html` → exit 0 — steps 64 · findings 2 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G95))
+- **G96** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 89 · failures 0 · wcagExempt 34 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G96))
+- **G97** `vlmkit scan scroll index.html` → exit 0 — containers 0 · overflowX 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G97))
+- **G98** `vlmkit scan handlers index.html` → exit 0 — registrations 76 · elements 59 · suspects 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G98))
+- **G99** `vlmkit check interactions index.html --max-elements 120` → exit 0 — elements 88 · suspects 0 · warns 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G99))
+- **G100** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 6 · issues 0 · sweepRanges 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G100))
+- **G101** `vlmkit check scroll 'index.html#/blob/src/core/build.ts'` → exit 0 — pageScrolled 791 · stickyFixed 1 · engagedSticky 1 · snaps 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G101))
+- **G102** `vlmkit verify flow index.html --flow flows/file-lines.json` → exit 0 — verdict: DONE (12/12 steps) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G102))
+- **G103** `vlmkit verify flow index.html --flow flows/palette-issue.json` → exit 0 — verdict: DONE (20/20 steps) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G103))
+- **G104** `vlmkit verify flow index.html --flow flows/menus-tabs.json` → exit 0 — verdict: DONE (23/23 steps) ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G104))
+- **G105** `vlmkit stress data index.html` → exit 0 — variants 14 · findings 8 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G105))
+- **G106** `vlmkit stress data 'index.html#/issues'` → exit 0 — variants 11 · findings 6 ([output](https://mizchi.github.io/vlmkit/sites/code/judgment/#G106))
 - **N17** accepted about G84: 'Starred' is the Star button's pressed label, so it exists only after a click; check copy's sweep opens disclosures and tabs, not toggle buttons (aria-pressed), and the page cannot show 'Starred' at rest without being wrong about its own state. Every other required line passes (Clone and Download ZIP as revealed-only from the Code menu). S41 shows 'Starred' rendered visibly after one click, and flows/menus-tabs.json (G104) asserts #btn-star contains 'Starred' with aria-pressed=true. Same result in R1 (G2) and R3 (G51).
 - **N18** superseded about G51: Re-run as G84 after the last source change; see the note on G84.
 - **N19** accepted about G85: Same button drift as G11 (note N5): four deliberate button families — transparent nav disclosures on the black header, the field-shaped header search, the bordered 32px toolbar/form buttons, and the small 28px counter buttons of the title row. The img drift G11 also reported is fixed (D15).

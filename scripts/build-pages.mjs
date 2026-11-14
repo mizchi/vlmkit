@@ -120,6 +120,14 @@ export const siteSections = Object.freeze([
   demoSite("kanban", ["app.js", "index.html", "styles.css"]),
   demoSite("magazine", ["index.html", "main.js", "style.css"]),
   demoSite("shop", ["app.js", "index.html", "styles.css"]),
+  // The six written in MoonBit with mizchi/luna: each serves the app.js built from its src/
+  // (examples/sites/luna-build.mjs), and src/ itself is not published.
+  demoSite("chat", ["app.js", "index.html", "styles.css"]),
+  demoSite("code", ["app.js", "index.html", "styles.css"]),
+  demoSite("maps", ["app.js", "index.html", "styles.css"]),
+  demoSite("search", ["app.js", "index.html", "styles.css"]),
+  demoSite("video", ["app.js", "index.html", "styles.css", "watch.html"]),
+  demoSite("wiki", ["app.js", "index.html", "styles.css"]),
   // One page per feature: a page with a known defect, the command that finds it, its whole
   // output and screenshots from the same run (`examples/demos/capture.mjs`).
   section("demos", "examples/demos", "demos", demoAssets()),

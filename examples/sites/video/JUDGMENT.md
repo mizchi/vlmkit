@@ -1,6 +1,6 @@
 # Reelhouse — judgment log
 
-How this interactive app — video feed and a watch page with a custom player was judged, in order. Rendered from `judgment.sqlite` by `examples/sites/judge.mjs`; `judge.mjs <site> render` writes the page, with the screens the log keeps, to `judgment/`.
+How this interactive app — video feed and a watch page with a custom player was judged, in order. Rendered from `judgment.sqlite` by `examples/sites/judge.mjs`; the published page, with the screens the log keeps and every gate output, is <https://mizchi.github.io/vlmkit/sites/video/judgment/>.
 
 **3** rounds · **114** gate runs (13 failing) · **114** screens in 63 shots (39 kept) · **63** looks · defects: **19** by eye, **15** by a gate · 12 gate false positive(s)
 
@@ -57,13 +57,13 @@ Brief: [`../briefs/video.md`](../briefs/video.md)
   - 👁 **L2**: Desktop full page, 3 screens, taken after the RNG fix. S2-1: positions now vary a little (planet left/right of centre, different glyphs) but every Space thumbnail is still the same composition — a ringed planet in the middle — and every cooking one is the same pot; it reads better than S1 but still repetitive across a 24-card grid. The coffee-cup glyph (S2-1 row 2) and the anchor glyph (S2-3, island and lighthouse cards) render as full-colour emoji while every other glyph is a flat white symbol — inconsistent and the cup looks pasted on. S2-2/S2-3: music cards all disc-right with bars left; travel cards all mountains. Titles clamp at 2 lines with an ellipsis ("The cast-iron care guide nobody wrote..."), meta rows align, 40px row gap reads well, sticky chip bar stays under the header while scrolling. Rail labels centred under icons, Home bold as current.
     - ✗ **D2** defect `.thumb .scene`: Within a topic every thumbnail is the same composition (ringed planet centre, one pot, disc right, mountains) — still repetitive after the RNG fix
     - ✗ **D3** defect `.thumb svg text`: Coffee-cup and anchor glyphs render as colour emoji while the other glyphs are flat white symbols
-- **S3** index.html · 375×812 · full page, 11 screen(s)
+- **S3** index.html · 375×812 · full page, 11 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/video/judgment/#S3))
   - 👁 **L3**: Mobile 375 full page, 11 screens (before the composition change). Header collapses as briefed: hamburger, mark + "Reelhouse", a search icon, kebab and a "Sign in" pill all fit on one row without wrapping. No rail. Chip bar scrolls: Travel is cut at the right edge under a right-arrow button with a fade, no left arrow at scrollLeft 0 — correct. Grid is one column, cards full width, titles wrap to 2 lines cleanly with no orphans that look odd ("A night of meteors over the salt / flats" is the worst). S3-9/S3-10: the mountain thumbnails show a thin vertical seam where the two tiled ridge polygons meet (at ~x 230 on the island card, x 115 on the lighthouse one) — reads as a rendering glitch. Anchor glyph again colour-emoji (S3-9). Steam, discs and LIVE badges all fine. Bottom of the page ends with the last card and 40px padding.
     - ✗ **D4** defect `.thumb polygon`: Mountain thumbnails show a thin vertical seam where the two tiled ridge polygons meet
 - **F2** fix for D2: Per-topic composition variants seeded from the id: planet left or right with a ring or an orbiting moon, pot / frying pan / bowl, disc left or right with 7-9 bars, mountains or sea with a bobbing boat; star count and planet size vary
 - **F3** fix for D3: Added U+FE0E (text presentation) after ☕ and ⚓ so they draw as the same flat white symbols as the rest
 - **F4** fix for D4: The second ridge tile now starts at 159.5 so the two polygons overlap by half a unit instead of touching
-- **S4** index.html · 1280×800 · full page, 3 screen(s)
+- **S4** index.html · 1280×800 · full page, 3 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/video/judgment/#S4))
   - 👁 **L4**: Desktop full page after the composition variants. S4-1: Space cards now differ — planets left or right, ringed or with a small orbiting moon, different sizes and hues (one greenish, one rose). Cooking row shows a frying pan with eggs and a bowl, so the pot is no longer every card. The coffee cup is now a flat white line glyph like the rest (D3 fixed). S4-3: anchor glyphs flat white too; travel alternates mountains and a sea with a sailing boat; no seam visible where ridge tiles meet on the four mountain cards (D4). Remaining: all six music cards still put the disc on the right with bars on the left, and the third cooking row is four pots — the variant choice is correlated with seed%2 / seed%3, which other choices also use.
     - ✗ **D5** defect `.thumb (music, cooking)`: Music thumbnails all put the disc on the right and the last cooking row is four pots: the variant picks are correlated with the other seed%n choices
 - **V1** D3 verified by L4
@@ -95,108 +95,108 @@ Brief: [`../briefs/video.md`](../briefs/video.md)
 - **V6** D8 verified by L10
 - **V7** D6 verified by L10
 - **N1** decision: Gate set, chosen from skills/vlmkit/SKILL.md → markup-assist (+ dynamic-markup for the player's behaviour) and the brief's own list. Every gate runs on both pages (index.html and watch.html?v=far5ide) unless it says otherwise. Base set: check integrity, check copy --manifest copy.txt (both pages share one manifest: the watch-only lines are checked on watch.html, the home-only one, "Video removed", needs a state), check design (one card component), check composition, check color, check a11y contrast in light and with ?theme=dark, check a11y focus, check a11y touch, scan scroll, scan handlers --probe-drag (the scrubber is pointer-driven), check interactions (menus, dialogs, combobox, player keys). Added for the brief's behaviour: check breakpoints --sweep (4/3/2/1 grid columns at 600/900/1200 and the 1000px watch-page stack), check scroll (sticky chip bar and fixed header), check animation and check motion (the controls fade, transitions, reduced motion; the scene only moves while playing, so the default page should read as still), stress data (long titles, many comments). Not chosen: verify flow and check grounding (no flow spec in the brief), stress i18n (English only).
-- **G1** `vlmkit check integrity index.html` → exit 0 — verdict: NO DEFECTS, 4 WARN (0 fail, 4 warn, 12 exempted)
+- **G1** `vlmkit check integrity index.html` → exit 0 — verdict: NO DEFECTS, 4 WARN (0 fail, 4 warn, 12 exempted) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G1))
   - ✗ **D9** defect `.avatar`: Channel avatar initials are white on mid-tone fills (gold, teal, blue): 2.99:1–4.46:1, below AA
 - **F11** fix for D9: Avatar fills (channel and commenter) drop from 42%/40% to 30% lightness, so white initials clear 4.5:1 on every hue
-- **G2** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 12 exempted)
-- **G3** `vlmkit check integrity 'watch.html?v=far5ide'` → exit 0 — verdict: NO DEFECTS, 1 WARN (0 fail, 1 warn, 84 exempted)
+- **G2** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 12 exempted) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G2))
+- **G3** `vlmkit check integrity 'watch.html?v=far5ide'` → exit 0 — verdict: NO DEFECTS, 1 WARN (0 fail, 1 warn, 84 exempted) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G3))
 - **V8** D9 verified by G2
-- **G4** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 7 · placeholders 0 · manifestLines 9 · statesExplored 29 · revealedOnly 0
-- **G5** `vlmkit check copy 'watch.html?v=far5ide' --manifest copy-watch.txt` → exit 1 — missing 1 · placeholders 0 · manifestLines 7 · statesExplored 12 · revealedOnly 0
+- **G4** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 7 · placeholders 0 · manifestLines 9 · statesExplored 29 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G4))
+- **G5** `vlmkit check copy 'watch.html?v=far5ide' --manifest copy-watch.txt` → exit 1 — missing 1 · placeholders 0 · manifestLines 7 · statesExplored 12 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G5))
   - ✗ **D10** defect `#comment-input`: Required copy "Add a comment..." was only a placeholder, which check copy does not count as visible text
 - **F12** fix for D10: The prompt is now a real <label for=comment-input> drawn over the empty field; it hides (visibility) once the field is focused or holds text, and it names the input
-- **G6** `vlmkit check copy 'watch.html?v=far5ide' --manifest copy-watch.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 7 · statesExplored 12 · revealedOnly 0
+- **G6** `vlmkit check copy 'watch.html?v=far5ide' --manifest copy-watch.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 7 · statesExplored 12 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G6))
 - **V9** D10 verified by G6
-- **G7** `vlmkit check copy index.html --manifest copy-home.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 2 · statesExplored 29 · revealedOnly 0
-- **G8** `vlmkit check design index.html` → exit 0 — verdict: COHERENT (0 finding(s))
-- **G9** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (0 finding(s))
-- **G10** `vlmkit check color index.html` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s))
+- **G7** `vlmkit check copy index.html --manifest copy-home.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 2 · statesExplored 29 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G7))
+- **G8** `vlmkit check design index.html` → exit 0 — verdict: COHERENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G8))
+- **G9** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G9))
+- **G10** `vlmkit check color index.html` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G10))
   - ✗ **D11** defect `input#q`: The search field's border is 1.66:1 against the page, below WCAG 1.4.11's 3:1 for a control boundary
 - **F13** fix for D11: New --field-border token (#858585 light, #8c8c90 dark) on the search field and button, the share link field and the comment underline
-- **G11** `vlmkit check color index.html` → exit 0 — verdict: CONSISTENT (0 finding(s))
-- **G12** `vlmkit check color 'watch.html?v=far5ide'` → exit 0 — verdict: CONSISTENT (0 finding(s))
+- **G11** `vlmkit check color index.html` → exit 0 — verdict: CONSISTENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G11))
+- **G12** `vlmkit check color 'watch.html?v=far5ide'` → exit 0 — verdict: CONSISTENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G12))
 - **V10** D11 verified by G11
-- **G13** `vlmkit check design index.html` → exit 0 — verdict: COHERENT (0 finding(s))
+- **G13** `vlmkit check design index.html` → exit 0 — verdict: COHERENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G13))
   - ✗ **D12** defect `button (watch page)`: 35 buttons on the watch page render 12 distinct styles (2.92x reuse): icon buttons keep the UA's 1px/6px padding, and the comment like / replies toggles use near-miss radii and padding
-- **G14** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (0 finding(s))
+- **G14** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G14))
   - ✗ **D13** defect `h2#comments-title`: The h1 video title and the h2 comment count both render 20px/700, so the declared heading step is invisible
-- **G15** `vlmkit check design 'watch.html?v=far5ide'` → exit 0 — verdict: DRIFT (1 finding(s))
-- **G16** `vlmkit check composition 'watch.html?v=far5ide'` → exit 0 — verdict: UNBALANCED (1 finding(s))
+- **G15** `vlmkit check design 'watch.html?v=far5ide'` → exit 0 — verdict: DRIFT (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G15))
+- **G16** `vlmkit check composition 'watch.html?v=far5ide'` → exit 0 — verdict: UNBALANCED (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G16))
 - **F14** fix for D12: padding: 0 on every icon-only button (.icon-btn, .ctrl, .chip-arrow, .big-play); the comment like button and the replies toggle share radius 18px and 12px side padding
 - **F15** fix for D13: Comment count h2 is 18px; the video title h1 stays 20px
-- **G17** `vlmkit check design 'watch.html?v=far5ide'` → exit 0 — verdict: COHERENT (0 finding(s))
-- **G18** `vlmkit check composition 'watch.html?v=far5ide'` → exit 0 — verdict: COMPOSED (0 finding(s))
-- **G19** `vlmkit check a11y contrast index.html` → exit 0 — inspected 159 · failures 0
-- **G20** `vlmkit check a11y contrast 'index.html&theme=dark'` → exit 1
-- **G21** `vlmkit check a11y contrast 'watch.html?v=far5ide'` → exit 0 — inspected 162 · failures 0
-- **G22** `vlmkit check a11y contrast 'watch.html?v=far5ide&theme=dark'` → exit 0 — inspected 162 · failures 0
+- **G17** `vlmkit check design 'watch.html?v=far5ide'` → exit 0 — verdict: COHERENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G17))
+- **G18** `vlmkit check composition 'watch.html?v=far5ide'` → exit 0 — verdict: COMPOSED (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G18))
+- **G19** `vlmkit check a11y contrast index.html` → exit 0 — inspected 159 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G19))
+- **G20** `vlmkit check a11y contrast 'index.html&theme=dark'` → exit 1 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G20))
+- **G21** `vlmkit check a11y contrast 'watch.html?v=far5ide'` → exit 0 — inspected 162 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G21))
+- **G22** `vlmkit check a11y contrast 'watch.html?v=far5ide&theme=dark'` → exit 0 — inspected 162 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G22))
 - **V11** D12 verified by G17
 - **V12** D13 verified by G18
-- **G23** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 159 · failures 0
+- **G23** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 159 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G23))
 - **N2** tool about G20: Mistyped URL on my side (index.html&theme=dark, no '?'), re-run as G23. Recorded only so the failing run is explained: 'error: file not found: examples/sites/video/index.html&theme=dark'.
 - **N3** superseded about G20: Not a vlmkit fault — N2's kind was wrong: my typo, superseded by G23 (index.html?theme=dark, 0 failures).
-- **G24** `vlmkit check a11y focus index.html` → exit 0 — steps 64 · findings 5
-- **G25** `vlmkit check a11y focus 'watch.html?v=far5ide'` → exit 0 — steps 56 · findings 1
+- **G24** `vlmkit check a11y focus index.html` → exit 0 — steps 64 · findings 5 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G24))
+- **G25** `vlmkit check a11y focus 'watch.html?v=far5ide'` → exit 0 — steps 56 · findings 1 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G25))
 - **N4** false-positive about G24: Each skip-row is the move from the last card's ⋮ button in one grid row to the first card's title in the next row (302px = one card row). The thumbnail links are tabindex=-1 duplicates of the title links, so nothing is skipped: this is row-wrap reading order, visible in S4-1 where each row ends with a ⋮ and the next starts with a thumbnail above its title.
 - **N5** false-positive about G25: The 389px jump is from the player region itself (#player, tabindex 0, the keyboard-shortcut target) to the scrubber at the bottom of that same 16:9 box (S6-1): the next control in the player, nothing in between.
-- **G26** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 67 · failures 0 · wcagExempt 0
-- **G27** `vlmkit check a11y touch 'watch.html?v=far5ide'` → exit 1 — level AA · inspected 55 · failures 1 · wcagExempt 0
+- **G26** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 67 · failures 0 · wcagExempt 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G26))
+- **G27** `vlmkit check a11y touch 'watch.html?v=far5ide'` → exit 1 — level AA · inspected 55 · failures 1 · wcagExempt 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G27))
   - ✗ **D14** defect `.scrubber`: The scrubber's hit area is 16px tall, under the 24px AA target size
 - **F16** fix for D14: Scrubber hit area is 24px tall (the drawn bar stays 3-5px); the hover tooltip moved up to match
-- **G28** `vlmkit check a11y touch 'watch.html?v=far5ide'` → exit 0 — level AA · inspected 55 · failures 0 · wcagExempt 0
-- **G29** `vlmkit scan scroll index.html` → exit 0 — containers 0 · overflowX 0 · issues 1
-- **G30** `vlmkit scan scroll 'watch.html?v=far5ide'` → exit 0 — containers 0 · overflowX 0 · issues 0
+- **G28** `vlmkit check a11y touch 'watch.html?v=far5ide'` → exit 0 — level AA · inspected 55 · failures 0 · wcagExempt 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G28))
+- **G29** `vlmkit scan scroll index.html` → exit 0 — containers 0 · overflowX 0 · issues 1 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G29))
+- **G30** `vlmkit scan scroll 'watch.html?v=far5ide'` → exit 0 — containers 0 · overflowX 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G30))
 - **V13** D14 verified by G28
-- **G31** `vlmkit scan scroll index.html --viewport 375x812` → exit 0 — containers 1 · overflowX 0 · issues 0
+- **G31** `vlmkit scan scroll index.html --viewport 375x812` → exit 0 — containers 1 · overflowX 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G31))
 - **N6** false-positive about G29: #t-castir12 is the 2-line title clamp (-webkit-line-clamp: 2) on 'The cast-iron care guide nobody wrote down'; S2-2 shows it ending in an ellipsis as briefed ('title clamped to 2 lines'). check integrity G2 lists the same element under exempted as intentional truncation. The two dead scrollports are #guide (scrolls only when the full guide is taller than the window) and #chips at 1280 (it overflows at 375: G31).
 - **N7** false-positive about G3: #desc-text is the description clamped to 3 lines, as the brief asks ('the description clamped to 3 lines, and ...more to expand'). The 20px it clips is the rest of the paragraph, which '...more' reveals (S6-1 shows the clamp with the button under it).
-- **G32** `vlmkit scan handlers index.html --probe-drag` → exit 0 — registrations 177 · elements 145 · suspects 0
-- **G33** `vlmkit scan handlers 'watch.html?v=far5ide' --probe-drag` → exit 0 — registrations 89 · elements 66 · suspects 0
-- **G34** `vlmkit check interactions index.html --handlers` → exit 1 — elements 30 · suspects 5 · warns 6
+- **G32** `vlmkit scan handlers index.html --probe-drag` → exit 0 — registrations 177 · elements 145 · suspects 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G32))
+- **G33** `vlmkit scan handlers 'watch.html?v=far5ide' --probe-drag` → exit 0 — registrations 89 · elements 66 · suspects 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G33))
+- **G34** `vlmkit check interactions index.html --handlers` → exit 1 — elements 30 · suspects 5 · warns 6 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G34))
   - ✗ **D15** defect `[aria-controls]`: Every menu button and the search combobox point aria-controls at a popup that is only in the DOM while open, so the reference is broken at rest
 - **F17** fix for D15: Menus and the suggestion listbox are always rendered and hidden with an is-closed class (display: none). Not the hidden attribute: luna's attr_dynamic always calls setAttribute, so a dynamic attribute can never be removed
-- **G35** `vlmkit check interactions index.html --handlers` → exit 0 — elements 30 · suspects 0 · warns 6
+- **G35** `vlmkit check interactions index.html --handlers` → exit 0 — elements 30 · suspects 0 · warns 6 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G35))
 - **V14** D15 verified by G35
 - **N8** false-positive about G35: Three warn kinds left, none a defect. (1) popup-no-focus-move on the search combobox: this is the APG editable-combobox pattern — DOM focus stays in the input and the active option is pointed at with aria-activedescendant (q-opt-N), so typing keeps working; moving focus into the listbox would be the wrong pattern for an editable box. (2) inert-control on "All": the probe pressed Enter on the chip that is already selected (aria-pressed=true at load, S4-1), so nothing can change; the other chips are pressed=false and filter the grid. (3) not-tab-reachable on a.thumb: each thumbnail link is a tabindex=-1, aria-hidden duplicate of its card's title link (same href), so keyboard users reach every video once, through the title.
-- **G36** `vlmkit check interactions 'watch.html?v=far5ide' --handlers` → exit 0 — elements 30 · suspects 0 · warns 4
+- **G36** `vlmkit check interactions 'watch.html?v=far5ide' --handlers` → exit 0 — elements 30 · suspects 0 · warns 4 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G36))
   - ✗ **D16** defect `#speed-btn`: The player's Settings menu does not move focus into itself and Escape cannot close it: the focus selector picked :first-child, which is the menu's 'Playback speed' heading, not an item
-- **G37** `vlmkit check interactions 'watch.html?v=far5ide' --handlers` → exit 0 — elements 30 · suspects 0 · warns 2
+- **G37** `vlmkit check interactions 'watch.html?v=far5ide' --handlers` → exit 0 — elements 30 · suspects 0 · warns 2 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G37))
 - **F18** fix for D16: Opening a menu focuses the first (or last) [role^=menuitem] found by querySelectorAll, whatever precedes it; Escape on an open menu's trigger closes it too. The player's trigger is now named 'Playback speed' so it is not a second 'Settings' beside the header's
-- **G38** `vlmkit check interactions 'watch.html?v=far5ide' --handlers` → exit 0 — elements 30 · suspects 0 · warns 2
+- **G38** `vlmkit check interactions 'watch.html?v=far5ide' --handlers` → exit 0 — elements 30 · suspects 0 · warns 2 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G38))
 - **V15** D16 verified by G38
 - **N9** superseded about G37: Run after the code change but before D16 was recorded; G38 is the same command after F18.
 - **N10** false-positive about G38: popup-no-focus-move on the search combobox: see N8 — the editable combobox keeps focus in the input and uses aria-activedescendant. not-tab-reachable on 'Play video': the big centred play disc is a tabindex=-1 pointer convenience shown only before first play; the same action is the 'Play (k)' button in the control row (reached by Tab, G38) and k / Space on the focused player.
-- **G39** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 7 · issues 0 · sweepRanges 0
-- **G40** `vlmkit check breakpoints 'watch.html?v=far5ide' --sweep` → exit 0 — breakpoints 7 · issues 0 · sweepRanges 0
-- **G41** `vlmkit check scroll index.html` → exit 0 — pageScrolled 1080 · stickyFixed 4 · engagedSticky 1 · snaps 0 · issues 0
-- **G42** `vlmkit check scroll 'watch.html?v=far5ide'` → exit 0 — pageScrolled 1080 · stickyFixed 2 · engagedSticky 0 · snaps 0 · issues 0
-- **G43** `vlmkit check animation index.html` → exit 0 — animations 0 · settleMs 0 · issues 0
-- **G44** `vlmkit check motion index.html` → exit 0 — activeAnimations 0 · running 0 · issues 0
-- **G45** `vlmkit check animation 'watch.html?v=far5ide'` → exit 0 — animations 0 · settleMs 0 · issues 0
-- **G46** `vlmkit check motion 'watch.html?v=far5ide'` → exit 0 — activeAnimations 0 · running 0 · issues 0
-- **G47** `vlmkit check animation 'watch.html?v=far5ide' --virtual-time` → exit 0 — animations 0 · settleMs 0 · issues 0
-- **G48** `vlmkit inspect motion 'watch.html?v=far5ide' --selector .controls --click .ctrl-play --end 4s` → exit 0
+- **G39** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 7 · issues 0 · sweepRanges 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G39))
+- **G40** `vlmkit check breakpoints 'watch.html?v=far5ide' --sweep` → exit 0 — breakpoints 7 · issues 0 · sweepRanges 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G40))
+- **G41** `vlmkit check scroll index.html` → exit 0 — pageScrolled 1080 · stickyFixed 4 · engagedSticky 1 · snaps 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G41))
+- **G42** `vlmkit check scroll 'watch.html?v=far5ide'` → exit 0 — pageScrolled 1080 · stickyFixed 2 · engagedSticky 0 · snaps 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G42))
+- **G43** `vlmkit check animation index.html` → exit 0 — animations 0 · settleMs 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G43))
+- **G44** `vlmkit check motion index.html` → exit 0 — activeAnimations 0 · running 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G44))
+- **G45** `vlmkit check animation 'watch.html?v=far5ide'` → exit 0 — animations 0 · settleMs 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G45))
+- **G46** `vlmkit check motion 'watch.html?v=far5ide'` → exit 0 — activeAnimations 0 · running 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G46))
+- **G47** `vlmkit check animation 'watch.html?v=far5ide' --virtual-time` → exit 0 — animations 0 · settleMs 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G47))
+- **G48** `vlmkit inspect motion 'watch.html?v=far5ide' --selector .controls --click .ctrl-play --end 4s` → exit 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G48))
   - ✗ **D17** defect `.player .controls`: Controls never auto-hide for a mouse user: clicking Play (or the picture) focuses something inside the player, and any focus counted as 'focused', so .controls stayed at opacity 1 for 4s of playback
 - **F19** fix for D17: Only keyboard focus (:focus-visible inside the player, re-read on focusin/focusout/keyup) keeps the controls up; a mouse click's focus does not
-- **G49** `vlmkit inspect motion 'watch.html?v=far5ide' --selector .controls --click .ctrl-play --end 4s` → exit 0
+- **G49** `vlmkit inspect motion 'watch.html?v=far5ide' --selector .controls --click .ctrl-play --end 4s` → exit 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G49))
   - ✗ **D18** defect `.ctrl-play`: G49 still showed the controls fully shown for 4s after the Play click. A probe (a throwaway Playwright script reading #player's class) showed why: clicking Play does not play at all. The button's icon is swapped by the click, the bubbling event reaches #player with a detached target, closest('.controls') is null, and the picture's click handler toggles playback straight back
 - **F20** fix for D18: The player's own click handler now toggles only when the target is inside .player-scene or .captions, never 'anything not in the controls'
-- **G50** `vlmkit inspect motion 'watch.html?v=far5ide' --selector .controls --click .ctrl-play --end 4s` → exit 1
+- **G50** `vlmkit inspect motion 'watch.html?v=far5ide' --selector .controls --click .ctrl-play --end 4s` → exit 1 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G50))
 - **V16** D18 verified by G50
 - **V17** D17 verified by G50
-- **G51** `vlmkit inspect motion 'watch.html?v=far5ide' --selector .controls --exit .controls --click .ctrl-play --end 4s` → exit 0
+- **G51** `vlmkit inspect motion 'watch.html?v=far5ide' --selector .controls --exit .controls --click .ctrl-play --end 4s` → exit 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G51))
 - **N11** accepted about G50: absent-at-rest on .controls is the brief's auto-hide: 2.5s after the last pointer move while playing they fade (2400ms shown, 3200ms gone in G50's frames). G51 runs the same with --exit .controls, which tells the gate the target is meant to leave, and passes.
-- **G52** `vlmkit stress data index.html` → exit 1 — variants 7 · findings 26
+- **G52** `vlmkit stress data index.html` → exit 1 — variants 7 · findings 26 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G52))
   - ✗ **D19** defect `.avatar`: Under long-text, avatar text overflows its 36/40px circle by ~190px (the circle has no overflow clip); same on the watch page's comment avatars (G53)
-- **G53** `vlmkit stress data 'watch.html?v=far5ide'` → exit 1 — variants 11 · findings 30
+- **G53** `vlmkit stress data 'watch.html?v=far5ide'` → exit 1 — variants 11 · findings 30 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G53))
   - ✗ **D20** defect `.comment-list, .next-list`: Emptied, the comment list and the up-next list collapse to nothing with no empty-state message
 - **F21** fix for D19: Avatars clip (overflow: hidden); titles, channel names, meta lines and comment heads take overflow-wrap: anywhere so an unbreakable name wraps instead of running out
 - **F22** fix for D20: CSS empty states: a comment list with no <li> says 'No comments yet. Add the first one above.', an empty up-next list 'Nothing here yet.'
-- **G54** `vlmkit stress data index.html` → exit 1 — variants 7 · findings 42
-- **G55** `vlmkit stress data 'watch.html?v=far5ide'` → exit 1 — variants 11 · findings 26
+- **G54** `vlmkit stress data index.html` → exit 1 — variants 7 · findings 42 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G54))
+- **G55** `vlmkit stress data 'watch.html?v=far5ide'` → exit 1 — variants 11 · findings 26 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G55))
 - **F23** fix for D19: Clipping the avatar only turned the overflow into text-clipped (G55): the gate treats the initial as a name slot. The initial is now drawn by .avatar::before from a data-initial attribute — the avatar (aria-hidden) is a picture, and has no text node to overflow
-- **G56** `vlmkit stress data index.html` → exit 0 — variants 7 · findings 2
-- **G57** `vlmkit stress data 'watch.html?v=far5ide'` → exit 0 — variants 11 · findings 2
+- **G56** `vlmkit stress data index.html` → exit 0 — variants 7 · findings 2 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G56))
+- **G57** `vlmkit stress data 'watch.html?v=far5ide'` → exit 0 — variants 11 · findings 2 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G57))
 - **V18** D19 verified by G56
 - **V19** D20 verified by G57
 - **N12** accepted about G57: The two remaining warns (here and in G56) are empty variants of lists the data never empties: #chips is the fixed topic bar (7 chips written in the program, not loaded), and .segs are the scrubber's chapter segments — every video has at least one chapter (default_chapters gives five). An empty state for either would describe a page that cannot exist.
@@ -233,7 +233,7 @@ Brief: [`../briefs/video.md`](../briefs/video.md)
 - **V23** D23 verified by L18
 - **S19** index.html?q=moon · 1280×800 · full page, 3 screen(s) — search moon (screens not kept)
   - 👁 **L19**: Search results for "moon" at 1280, 3 screens. The list layout of the reference study: 500x281 thumbnails with rounded corners and a duration badge at the bottom right (LIVE in red), beside them an 18px title with the query in bold ("How the **Moon** got its far side", "Blue **Moon** on a 1962 upright piano"), "2.4M views · 3 weeks ago" in 12px grey, a channel row with a 24px avatar, a 2-line snippet with "moon" bold, and a ⋮ at the far right. The header search box keeps "moon" with the × clear button showing. "Results for “moon”" heads the page above the chips. Six results (space, cooking, music, travel); the last one ends with 40px of space. Consistent 16px row gaps.
-- **S20** index.html?q=moon · 375×812 · full page, 3 screen(s) — search moon
+- **S20** index.html?q=moon · 375×812 · full page, 3 screen(s) — search moon ([screens](https://mizchi.github.io/vlmkit/sites/video/judgment/#S20))
   - 👁 **L20**: Search results on a 375 phone, 3 screens. Results stack: full-width thumbnail, then title with the bold query and ⋮, views · age, channel row; snippets are dropped below 900px, which keeps each result compact. But the header shows the collapsed search icon, so on the results page the visitor cannot see or edit what they searched for without opening search — the query is only in the "Results for “moon”" heading, which scrolls away (S20-2 shows only the sticky chips).
     - ✗ **D24** defect `.mh (phone, ?q=)`: On a phone the results page hides the query: the header shows the collapsed search icon instead of the search bar holding 'moon'
 - **F27** fix for D24: A results page starts with the search bar open (search_open = q != ""), so phones show back arrow + the field with the query; desktop is unaffected
@@ -277,7 +277,7 @@ Brief: [`../briefs/video.md`](../briefs/video.md)
 - **S32** watch.html?v=far5ide · 1280×800 · click #sub-btn · wait 200 · click #bell-btn — subscribed, bell menu (screens not kept)
   - 👁 **L32**: Bell menu again after F32: the toast "Subscription added" now sits centred at the bottom of the window, clear of the menu, whose four rows (All checked, Personalized, None, Unsubscribe with its icon) are all fully visible. The rest of the page is unchanged.
 - **V29** D29 verified by L32
-- **S33** index.html?theme=dark · 1280×800 · full page, 3 screen(s) — dark home
+- **S33** index.html?theme=dark · 1280×800 · full page, 3 screen(s) — dark home ([screens](https://mizchi.github.io/vlmkit/sites/video/judgment/#S33))
   - 👁 **L33**: Home in dark (?theme=dark), 3 screens. Near-black page (#0f0f10), white titles, grey #b0b0b0 channel and meta lines, chips on #262628 with the selected "All" inverted to a light fill with dark text. The search field border and the search button read clearly against the dark header; the Sign in pill is light blue on dark. Thumbnails keep their own colours, which carry the page; the dark-purple space scenes still separate from the background thanks to the lighter purple at their lower edge. Avatars are darker discs with white initials — "O" and "L" are low-key but legible. Nothing left in light colours by mistake (no white boxes, menus not opened here).
 - **S34** watch.html?v=far5ide&theme=dark · 1280×800 — dark watch (screens not kept)
   - 👁 **L34**: Watch page in dark: the player is unchanged (it is always dark), the Subscribe pill inverts to a light fill with dark text, the rating pair, Share and Save sit on #262628 pills, the description box is a dark grey panel with white text and the "...more" link, the Autoplay switch is the light-blue accent with a white knob. Up next titles white, meta grey. Contrast reads comfortably everywhere I looked; no element kept a light-theme background.
@@ -312,92 +312,92 @@ Brief: [`../briefs/video.md`](../briefs/video.md)
 
 ### R3 · final check (builder)
 
-- **G58** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 12 exempted)
-- **G59** `vlmkit check integrity 'watch.html?v=far5ide'` → exit 0 — verdict: NO DEFECTS, 1 WARN (0 fail, 1 warn, 84 exempted)
-- **G60** `vlmkit check integrity 'index.html?q=moon'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 11 exempted)
-- **G61** `vlmkit check copy index.html --manifest copy-home.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 2 · statesExplored 29 · revealedOnly 0
-- **G62** `vlmkit check copy 'watch.html?v=far5ide' --manifest copy-watch.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 7 · statesExplored 12 · revealedOnly 0
-- **G63** `vlmkit check design index.html` → exit 0 — verdict: COHERENT (0 finding(s))
-- **G64** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (0 finding(s))
-- **G65** `vlmkit check color index.html` → exit 0 — verdict: CONSISTENT (0 finding(s))
-- **G66** `vlmkit check design 'watch.html?v=far5ide'` → exit 0 — verdict: COHERENT (0 finding(s))
-- **G67** `vlmkit check composition 'watch.html?v=far5ide'` → exit 0 — verdict: COMPOSED (0 finding(s))
-- **G68** `vlmkit check color 'watch.html?v=far5ide'` → exit 0 — verdict: CONSISTENT (0 finding(s))
+- **G58** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 12 exempted) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G58))
+- **G59** `vlmkit check integrity 'watch.html?v=far5ide'` → exit 0 — verdict: NO DEFECTS, 1 WARN (0 fail, 1 warn, 84 exempted) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G59))
+- **G60** `vlmkit check integrity 'index.html?q=moon'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 11 exempted) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G60))
+- **G61** `vlmkit check copy index.html --manifest copy-home.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 2 · statesExplored 29 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G61))
+- **G62** `vlmkit check copy 'watch.html?v=far5ide' --manifest copy-watch.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 7 · statesExplored 12 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G62))
+- **G63** `vlmkit check design index.html` → exit 0 — verdict: COHERENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G63))
+- **G64** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G64))
+- **G65** `vlmkit check color index.html` → exit 0 — verdict: CONSISTENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G65))
+- **G66** `vlmkit check design 'watch.html?v=far5ide'` → exit 0 — verdict: COHERENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G66))
+- **G67** `vlmkit check composition 'watch.html?v=far5ide'` → exit 0 — verdict: COMPOSED (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G67))
+- **G68** `vlmkit check color 'watch.html?v=far5ide'` → exit 0 — verdict: CONSISTENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G68))
 - **N17** false-positive about G59: Same #desc-text 3-line clamp as N7 (G3): intentional per the brief, revealed by '...more' (S28 expanded, S35 the phone sheet).
-- **G69** `vlmkit check a11y contrast index.html` → exit 0 — inspected 183 · failures 0
-- **G70** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 183 · failures 0
-- **G71** `vlmkit check a11y contrast 'watch.html?v=far5ide'` → exit 0 — inspected 172 · failures 0
-- **G72** `vlmkit check a11y contrast 'watch.html?v=far5ide&theme=dark'` → exit 0 — inspected 172 · failures 0
-- **G73** `vlmkit check a11y focus index.html` → exit 0 — steps 64 · findings 5
-- **G74** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 67 · failures 0 · wcagExempt 0
-- **G75** `vlmkit check a11y focus 'watch.html?v=far5ide'` → exit 0 — steps 56 · findings 1
-- **G76** `vlmkit check a11y touch 'watch.html?v=far5ide'` → exit 0 — level AA · inspected 55 · failures 0 · wcagExempt 0
+- **G69** `vlmkit check a11y contrast index.html` → exit 0 — inspected 183 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G69))
+- **G70** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 183 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G70))
+- **G71** `vlmkit check a11y contrast 'watch.html?v=far5ide'` → exit 0 — inspected 172 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G71))
+- **G72** `vlmkit check a11y contrast 'watch.html?v=far5ide&theme=dark'` → exit 0 — inspected 172 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G72))
+- **G73** `vlmkit check a11y focus index.html` → exit 0 — steps 64 · findings 5 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G73))
+- **G74** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 67 · failures 0 · wcagExempt 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G74))
+- **G75** `vlmkit check a11y focus 'watch.html?v=far5ide'` → exit 0 — steps 56 · findings 1 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G75))
+- **G76** `vlmkit check a11y touch 'watch.html?v=far5ide'` → exit 0 — level AA · inspected 55 · failures 0 · wcagExempt 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G76))
 - **N18** false-positive about G73: Row-wrap reading order, as N4 (G24): each jump is from the last ⋮ in a grid row to the next row's first title; the thumbnails are tabindex=-1 duplicates of the titles.
 - **N19** false-positive about G75: As N5 (G25): from the player region to its own scrubber at the bottom of the same 16:9 box.
-- **G77** `vlmkit scan scroll index.html` → exit 0 — containers 0 · overflowX 0 · issues 1
-- **G78** `vlmkit scan scroll 'watch.html?v=far5ide'` → exit 0 — containers 0 · overflowX 0 · issues 0
-- **G79** `vlmkit scan scroll index.html --viewport 375x812` → exit 0 — containers 1 · overflowX 0 · issues 0
-- **G80** `vlmkit scan handlers index.html --probe-drag` → exit 0 — registrations 214 · elements 176 · suspects 0
-- **G81** `vlmkit scan handlers 'watch.html?v=far5ide' --probe-drag` → exit 0 — registrations 105 · elements 75 · suspects 0
+- **G77** `vlmkit scan scroll index.html` → exit 0 — containers 0 · overflowX 0 · issues 1 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G77))
+- **G78** `vlmkit scan scroll 'watch.html?v=far5ide'` → exit 0 — containers 0 · overflowX 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G78))
+- **G79** `vlmkit scan scroll index.html --viewport 375x812` → exit 0 — containers 1 · overflowX 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G79))
+- **G80** `vlmkit scan handlers index.html --probe-drag` → exit 0 — registrations 214 · elements 176 · suspects 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G80))
+- **G81** `vlmkit scan handlers 'watch.html?v=far5ide' --probe-drag` → exit 0 — registrations 105 · elements 75 · suspects 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G81))
 - **N20** false-positive about G77: The 2-line title clamp on #t-castir12 again (N6): intentional, shown ending in an ellipsis in S2-2 and S33-2.
-- **G82** `vlmkit check interactions index.html --handlers` → exit 0 — elements 30 · suspects 0 · warns 6
-- **G83** `vlmkit check interactions 'watch.html?v=far5ide' --handlers` → exit 0 — elements 30 · suspects 0 · warns 2
+- **G82** `vlmkit check interactions index.html --handlers` → exit 0 — elements 30 · suspects 0 · warns 6 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G82))
+- **G83** `vlmkit check interactions 'watch.html?v=far5ide' --handlers` → exit 0 — elements 30 · suspects 0 · warns 2 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G83))
 - **N21** false-positive about G82: Same three warn kinds as N8 (G35): the editable combobox keeps focus in the input by design (aria-activedescendant), 'All' is the already-selected chip, and a.thumb links are tabindex=-1 duplicates of the card titles. The unprobed click/keydown handlers are exercised by the state shots of round 2 and this round.
 - **N22** false-positive about G83: As N10 (G38): the editable combobox, and 'Play video', the tabindex=-1 pointer-only duplicate of the 'Play (k)' button.
-- **G84** `vlmkit verify flow 'watch.html?v=far5ide' --flow flow-player.json` → exit 0 — verdict: DONE (18/18 steps)
-- **G85** `vlmkit verify flow index.html --flow flow-home.json` → exit 1 — verdict: FAILED (1/8 steps)
+- **G84** `vlmkit verify flow 'watch.html?v=far5ide' --flow flow-player.json` → exit 0 — verdict: DONE (18/18 steps) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G84))
+- **G85** `vlmkit verify flow index.html --flow flow-home.json` → exit 1 — verdict: FAILED (1/8 steps) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G85))
   - ✗ **D32** defect `#undo-far5ide`: After 'Not interested' focus sits on <body> until a 0ms timer moves it to Undo: the removed card's trigger is gone, so for that moment keyboard focus is lost (the flow asserts right after the click and sees body)
 - **F35** fix for D32: Focus moves to Undo synchronously right after the state change (luna has already rendered the row), and Undo returns focus to the title the same way
-- **G86** `vlmkit verify flow index.html --flow flow-home.json` → exit 0 — verdict: DONE (8/8 steps)
+- **G86** `vlmkit verify flow index.html --flow flow-home.json` → exit 0 — verdict: DONE (8/8 steps) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G86))
 - **V32** D32 verified by G86
 - **N23** decision: Added verify flow to the final gate set: check interactions probes each role's canonical key but never sends the player's shortcuts (k, Space, j/l, arrows, 0-9, c, m, t) or drives the Subscribe → bell, like, comment, Not interested → Undo, chip, guide and combobox flows. flow-player.json (18 steps, G84) and flow-home.json (8 steps, G86) assert each one's ARIA / text post-condition, which also puts the state-only copy ('Subscribed', 'Video removed') under a gate.
-- **G87** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 8 · issues 0 · sweepRanges 0
-- **G88** `vlmkit check scroll index.html` → exit 0 — pageScrolled 1080 · stickyFixed 4 · engagedSticky 1 · snaps 0 · issues 0
-- **G89** `vlmkit check animation index.html` → exit 0 — animations 0 · settleMs 0 · issues 0
-- **G90** `vlmkit check motion index.html` → exit 0 — activeAnimations 0 · running 0 · issues 0
-- **G91** `vlmkit check breakpoints 'watch.html?v=far5ide' --sweep` → exit 0 — breakpoints 8 · issues 0 · sweepRanges 0
-- **G92** `vlmkit check scroll 'watch.html?v=far5ide'` → exit 0 — pageScrolled 1080 · stickyFixed 2 · engagedSticky 0 · snaps 0 · issues 0
-- **G93** `vlmkit check animation 'watch.html?v=far5ide'` → exit 0 — animations 0 · settleMs 0 · issues 0
-- **G94** `vlmkit check motion 'watch.html?v=far5ide'` → exit 0 — activeAnimations 0 · running 0 · issues 0
-- **G95** `vlmkit check animation 'watch.html?v=far5ide' --virtual-time` → exit 0 — animations 0 · settleMs 0 · issues 0
-- **G96** `vlmkit inspect motion 'watch.html?v=far5ide' --selector .controls --exit .controls --click .ctrl-play --end 4s` → exit 0
-- **G97** `vlmkit stress data index.html` → exit 1 — variants 7 · findings 17
+- **G87** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 8 · issues 0 · sweepRanges 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G87))
+- **G88** `vlmkit check scroll index.html` → exit 0 — pageScrolled 1080 · stickyFixed 4 · engagedSticky 1 · snaps 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G88))
+- **G89** `vlmkit check animation index.html` → exit 0 — animations 0 · settleMs 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G89))
+- **G90** `vlmkit check motion index.html` → exit 0 — activeAnimations 0 · running 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G90))
+- **G91** `vlmkit check breakpoints 'watch.html?v=far5ide' --sweep` → exit 0 — breakpoints 8 · issues 0 · sweepRanges 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G91))
+- **G92** `vlmkit check scroll 'watch.html?v=far5ide'` → exit 0 — pageScrolled 1080 · stickyFixed 2 · engagedSticky 0 · snaps 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G92))
+- **G93** `vlmkit check animation 'watch.html?v=far5ide'` → exit 0 — animations 0 · settleMs 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G93))
+- **G94** `vlmkit check motion 'watch.html?v=far5ide'` → exit 0 — activeAnimations 0 · running 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G94))
+- **G95** `vlmkit check animation 'watch.html?v=far5ide' --virtual-time` → exit 0 — animations 0 · settleMs 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G95))
+- **G96** `vlmkit inspect motion 'watch.html?v=far5ide' --selector .controls --exit .controls --click .ctrl-play --end 4s` → exit 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G96))
+- **G97** `vlmkit stress data index.html` → exit 1 — variants 7 · findings 17 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G97))
   - ✗ **D33** defect `.card-meta .meta-part`: Under long-text the meta line's nowrap phrases (D21's fix) cannot wrap, so a long unbreakable name runs into the next card (text-collision, 15 cards)
-- **G98** `vlmkit stress data 'watch.html?v=far5ide'` → exit 1 — variants 11 · findings 4
+- **G98** `vlmkit stress data 'watch.html?v=far5ide'` → exit 1 — variants 11 · findings 4 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G98))
   - ✗ **D34** defect `.scene svg text`: Under long-text the stress gate writes into each thumbnail's SVG glyph text, which runs 140-190px past the page edge (page-overflow-x on the watch page)
-- **G99** `vlmkit check copy 'watch.html?v=far5ide' --manifest copy-watch.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 7 · statesExplored 12 · revealedOnly 0
+- **G99** `vlmkit check copy 'watch.html?v=far5ide' --manifest copy-watch.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 7 · statesExplored 12 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G99))
 - **F36** fix for D33: Dropped white-space: nowrap; each phrase joins its words with U+00A0 instead, so lines still break only at the dot but an unbreakable string wraps through overflow-wrap: anywhere
 - **F37** fix for D34: The big glyph is no longer an SVG <text>: a span.glyph draws it with ::before from data-glyph, sized and placed in container units (29cqh, 7.5cqw) so it matches the old position; the scene is aria-hidden, so the glyph was never page text
-- **G100** `vlmkit stress data index.html` → exit 0 — variants 7 · findings 2
-- **G101** `vlmkit stress data 'watch.html?v=far5ide'` → exit 0 — variants 11 · findings 2
+- **G100** `vlmkit stress data index.html` → exit 0 — variants 7 · findings 2 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G100))
+- **G101** `vlmkit stress data 'watch.html?v=far5ide'` → exit 0 — variants 11 · findings 2 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G101))
 - **S45** index.html · 1280×800 — glyphs after D34 (screens not kept)
   - 👁 **L45**: Home after D33/D34: the glyphs are now CSS-drawn but sit where they did — top-left of each thumbnail, flat white, a touch smaller and higher than the SVG version (the comet and cup read the same). Meta lines are unchanged in normal data: "2.4M views · 3 weeks ago" stays on one line, nothing wraps differently from S4-1. Avatars, titles and badges unchanged.
 - **V33** D34 verified by G100
 - **N24** accepted about G99: Same two warns as N12: the fixed chip bar and the chapter segments, never empty in this site's data.
 - **N25** accepted about G100: Same two warns as N12.
-- **G102** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 9 exempted)
-- **G103** `vlmkit check integrity 'watch.html?v=far5ide'` → exit 0 — verdict: NO DEFECTS, 1 WARN (0 fail, 1 warn, 84 exempted)
-- **G104** `vlmkit check integrity 'index.html?q=moon'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 8 exempted)
-- **G105** `vlmkit check a11y contrast index.html` → exit 0 — inspected 159 · failures 0
-- **G106** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 159 · failures 0
-- **G107** `vlmkit check a11y contrast 'watch.html?v=far5ide'` → exit 0 — inspected 159 · failures 0
-- **G108** `vlmkit check a11y contrast 'watch.html?v=far5ide&theme=dark'` → exit 0 — inspected 159 · failures 0
-- **G109** `vlmkit verify flow 'watch.html?v=far5ide' --flow flow-player.json` → exit 0 — verdict: DONE (18/18 steps)
-- **G110** `vlmkit verify flow index.html --flow flow-home.json` → exit 0 — verdict: DONE (8/8 steps)
-- **G111** `vlmkit check design index.html` → exit 0 — verdict: COHERENT (0 finding(s))
-- **G112** `vlmkit check interactions index.html --handlers` → exit 0 — elements 30 · suspects 0 · warns 6
-- **G113** `vlmkit check design 'watch.html?v=far5ide'` → exit 0 — verdict: COHERENT (0 finding(s))
-- **G114** `vlmkit check interactions 'watch.html?v=far5ide' --handlers` → exit 0 — elements 30 · suspects 0 · warns 2
+- **G102** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 9 exempted) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G102))
+- **G103** `vlmkit check integrity 'watch.html?v=far5ide'` → exit 0 — verdict: NO DEFECTS, 1 WARN (0 fail, 1 warn, 84 exempted) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G103))
+- **G104** `vlmkit check integrity 'index.html?q=moon'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 8 exempted) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G104))
+- **G105** `vlmkit check a11y contrast index.html` → exit 0 — inspected 159 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G105))
+- **G106** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 159 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G106))
+- **G107** `vlmkit check a11y contrast 'watch.html?v=far5ide'` → exit 0 — inspected 159 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G107))
+- **G108** `vlmkit check a11y contrast 'watch.html?v=far5ide&theme=dark'` → exit 0 — inspected 159 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G108))
+- **G109** `vlmkit verify flow 'watch.html?v=far5ide' --flow flow-player.json` → exit 0 — verdict: DONE (18/18 steps) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G109))
+- **G110** `vlmkit verify flow index.html --flow flow-home.json` → exit 0 — verdict: DONE (8/8 steps) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G110))
+- **G111** `vlmkit check design index.html` → exit 0 — verdict: COHERENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G111))
+- **G112** `vlmkit check interactions index.html --handlers` → exit 0 — elements 30 · suspects 0 · warns 6 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G112))
+- **G113** `vlmkit check design 'watch.html?v=far5ide'` → exit 0 — verdict: COHERENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G113))
+- **G114** `vlmkit check interactions 'watch.html?v=far5ide' --handlers` → exit 0 — elements 30 · suspects 0 · warns 2 ([output](https://mizchi.github.io/vlmkit/sites/video/judgment/#G114))
 - **V34** D33 verified by G100: index long-text variant: 0 fail
 - **V35** D34 verified by G101: watch long-text variant: 0 fail
 - **N26** superseded about G99: N24 was attached to G99 by mistake (an ID slip): G99 is the watch-page copy check, which passed. N24's text belongs to G100; N25's to G101 (N26 below).
 - **N27** accepted about G101: Remaining two warns on the watch page's stress run: the fixed chip bar is not on this page; the scrubber's chapter segments and the… as N12 — lists the data never empties.
 - **N28** accepted about G101: Clean wording of N27: the two warns are the empty variants of the scrubber's chapter segments and of one other fixed UI list on the watch page; neither is data that can be empty (every video has chapters), as N12.
-- **S46** index.html · 1280×800 · full page, 3 screen(s)
+- **S46** index.html · 1280×800 · full page, 3 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/video/judgment/#S46))
   - 👁 **L46**: Final desktop home, 3 screens, 1910px. Header, 72px rail, sticky chip bar with All filled, then 6 rows of 4 cards: thumbnails differ within each topic (planets left/right, ringed or mooned; pan / bowl / pot; disc left or right; mountains or sea), flat white glyphs, duration and LIVE badges at the bottom right; avatars with white initials; 2-line titles with one intentional ellipsis ("The cast-iron care guide nobody wrote..."); meta lines whole. 40px between rows, 16px between columns, everything on the same left rail as the chips. The page ends with the last row and its 48px bottom padding. Nothing overlaps or clips.
-- **S47** index.html · 768×1024 · full page, 5 screen(s)
+- **S47** index.html · 768×1024 · full page, 5 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/video/judgment/#S47))
   - 👁 **L47**: Final tablet home (768x1024), 5 screens: the header keeps the full search field (narrower) with mic, kebab and Sign in; the rail stays; 2 columns of ~316px cards. Titles wrap to two lines naturally ("Island hopping on a $20-a- / day budget" breaks at the hyphen, acceptable). Chip bar fits on one line at this width, so no scroll arrows. Badges, avatars and meta lines aligned in every row; the last screen repeats the last rows because the walk reached the end of the page.
-- **S48** index.html · 375×812 · full page, 11 screen(s)
+- **S48** index.html · 375×812 · full page, 11 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/video/judgment/#S48))
   - 👁 **L48**: Final phone home (375x812), 11 screens of 7811px. Compact header (hamburger, mark + word, search icon, kebab, Sign in), no rail, chip bar with a right scroll arrow over a fade (Travel cut), one column of full-width cards with 28px gaps. Every title wraps to at most two lines and none truncates; meta lines stay whole; no horizontal scroll. Thumbnails keep their variety at this size and the glyphs stay in the top-left corner. Last screen ends on "The slowest scenic railway, end to end".
 - **S49** watch.html?v=far5ide · 1280×800 · full page, 3 screen(s) (screens not kept)
   - 👁 **L49**: Final desktop watch page, 3 screens, paused at load: player with the thumbnail's frame, the big play disc, scrubber with chapter gaps and the buffered stretch, full control row; title, channel row with Subscribe, rating pair, Share and Save; description box clamped to 3 lines with "...more"; "19 Comments" with Sort by; the composer's visible "Add a comment..." label; twelve comments with reply toggles; Up next with the Autoplay switch and twelve compact rows. Icons in the rating and Share/Save buttons are the 20px class size. The page ends after the last comment with 48px of padding; nothing overlaps.

@@ -1820,7 +1820,9 @@ population and **total** where it applies.
 
 ## Demo sites and judgment logs (`examples/sites/`)
 
-Six agent-built sites (docs, shop, dashboard, magazine, checkout, kanban), the landing page and the
+Twelve agent-built sites (docs, shop, dashboard, magazine, checkout, kanban, and six written in
+MoonBit with mizchi/luna: chat, search, video, maps, code, wiki — `examples/sites/LUNA.md`,
+`docs/reports/2026-11-14-luna-demo-sites-v1.md`), the landing page and the
 gallery that lists them are published on Pages **beside the log of how each was judged**:
 `/sites/<name>/` and `/sites/<name>/judgment/`, `/judgment/` for the landing page, `/sites/judgment/`
 for the gallery. Solitaire predates the log and its card says so. Every gate run and screenshot goes

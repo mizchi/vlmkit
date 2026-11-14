@@ -1,6 +1,6 @@
 # Wayfarer Maps — judgment log
 
-How this interactive app — a pannable, zoomable map with search and a place panel was judged, in order. Rendered from `judgment.sqlite` by `examples/sites/judge.mjs`; `judge.mjs <site> render` writes the page, with the screens the log keeps, to `judgment/`.
+How this interactive app — a pannable, zoomable map with search and a place panel was judged, in order. Rendered from `judgment.sqlite` by `examples/sites/judge.mjs`; the published page, with the screens the log keeps and every gate output, is <https://mizchi.github.io/vlmkit/sites/maps/judgment/>.
 
 **3** rounds · **95** gate runs (8 failing) · **77** screens in 77 shots (5 kept) · **77** looks · defects: **19** by eye, **10** by a gate · 8 gate false positive(s)
 
@@ -54,32 +54,32 @@ Brief: [`../briefs/maps.md`](../briefs/maps.md)
 - **N2** decision: Taken from the reference screenshots (ref/maps.png, ref/maps-search.png, 1280x800), layout and styling only: a 72px pale grey rail on the left; a ~370x46 fully rounded white search card at top left with the magnifier and a directions diamond at its right end; a 420px white side panel starting under the search card with rounded right corners and a soft shadow; the chips row above "Results" with a Share link; result rows with bold name, rating + stars, a grey "category · area · address" line, a red/grey "Closed · Opens …" line and an 84px rounded photo on the right; the "Update results when map moves" checkbox pinned at the panel's foot; a 24x48 tab on the panel's right edge with a "Collapse side panel" tooltip. Map styling: off-white land, light grey blocks, white streets with grey casings, yellow avenues with route shields, pale blue water, soft green parks, district names in spaced caps. Nothing else: the city (Port Lumen), every name, the logo (a compass disc) and the data are drawn by the program from seeded data in src/main/data.mbt.
 - **N3** decision: luna and FFI. Everything the page shows is MoonBit (data, geometry, UI). Browser APIs luna does not wrap are one-line MoonBit `extern "js"` functions in src/main/ffi.mbt (requestAnimationFrame, matchMedia, history.replaceState, URLSearchParams, setPointerCapture, getBoundingClientRect, dialog.showModal, focus, a non-passive wheel listener), not a hand-written <script>. SVG elements are styled with data-k attributes, never classes: luna's class=/dyn_class= set the `className` property, which is read-only on SVG elements (SVGAnimatedString), so a class given to svg_* would silently do nothing. The native <dialog> is made with @element.create_element("dialog", …) and an "__ref" Handler because the DSL has no dialog/table/tr/td functions.
 - **N4** decision about N3: Checked, not assumed: in Chromium a sloppy-mode assignment to an SVG element's className leaves class=null, and in strict mode it throws 'Cannot set property className of #<SVGElement> which has only a getter'. app.js has no 'use strict', so luna's class= on an svg_* element is a silent no-op.
-- **G1** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 20 exempted)
-- **G2** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 4 · placeholders 0 · manifestLines 8 · invisibleOnly 1 · statesExplored 2 · revealedOnly 0
-- **G3** `vlmkit check copy 'index.html?cat=coffee' --manifest copy.txt` → exit 1 — missing 0 · placeholders 0 · manifestLines 8 · invisibleOnly 1 · statesExplored 2 · revealedOnly 0
+- **G1** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 20 exempted) ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G1))
+- **G2** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 4 · placeholders 0 · manifestLines 8 · invisibleOnly 1 · statesExplored 2 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G2))
+- **G3** `vlmkit check copy 'index.html?cat=coffee' --manifest copy.txt` → exit 1 — missing 0 · placeholders 0 · manifestLines 8 · invisibleOnly 1 · statesExplored 2 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G3))
   - ✗ **D3** defect `input#q placeholder`: "Search Wayfarer Maps" exists only as an sr-only label; the visible placeholder is not counted as rendered text (and a placeholder is not a label either). Make the visible hint a real element that labels the field.
-- **G4** `vlmkit check design 'index.html?cat=coffee'` → exit 0 — verdict: COHERENT (0 finding(s))
-- **G5** `vlmkit check composition 'index.html?cat=coffee'` → exit 0 — verdict: NOT JUDGED (1 finding(s))
-- **G6** `vlmkit check color 'index.html?cat=coffee'` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s))
-- **G7** `vlmkit check a11y contrast index.html` → exit 0 — inspected 28 · failures 0
-- **G8** `vlmkit check a11y contrast 'index.html?cat=coffee'` → exit 1 — inspected 120 · failures 12
+- **G4** `vlmkit check design 'index.html?cat=coffee'` → exit 0 — verdict: COHERENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G4))
+- **G5** `vlmkit check composition 'index.html?cat=coffee'` → exit 0 — verdict: NOT JUDGED (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G5))
+- **G6** `vlmkit check color 'index.html?cat=coffee'` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G6))
+- **G7** `vlmkit check a11y contrast index.html` → exit 0 — inspected 28 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G7))
+- **G8** `vlmkit check a11y contrast 'index.html?cat=coffee'` → exit 1 — inspected 120 · failures 12 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G8))
   - ✗ **D4** defect `.stars .star`: Empty stars #80868b (3.68:1) and filled stars #a86b00 (4.40:1) are under 4.5:1 on white in every result row
-- **G9** `vlmkit check a11y focus index.html` → exit 0 — steps 48 · findings 0
-- **G10** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 52 · failures 0 · wcagExempt 0
-- **G11** `vlmkit scan scroll 'index.html?cat=coffee'` → exit 0 — containers 2 · overflowX 0 · issues 0
-- **G12** `vlmkit scan handlers index.html --probe-drag` → exit 0 — registrations 168 · elements 108 · suspects 0
-- **G13** `vlmkit check interactions index.html` → exit 0 — elements 30 · suspects 0 · warns 0
+- **G9** `vlmkit check a11y focus index.html` → exit 0 — steps 48 · findings 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G9))
+- **G10** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 52 · failures 0 · wcagExempt 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G10))
+- **G11** `vlmkit scan scroll 'index.html?cat=coffee'` → exit 0 — containers 2 · overflowX 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G11))
+- **G12** `vlmkit scan handlers index.html --probe-drag` → exit 0 — registrations 168 · elements 108 · suspects 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G12))
+- **G13** `vlmkit check interactions index.html` → exit 0 — elements 30 · suspects 0 · warns 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G13))
 - **N5** accepted about G2: Results, Update results when map moves, Open and Closed are panel copy: on the default view (no search yet) there is no panel, by design, as in the reference. G3 runs check copy on index.html?cat=coffee, the Coffee results state, where all four are present; only the search label is missing there (D3).
 - **N6** accepted about G6: control-boundary-invisible on input#q: the field is the whole white search card; the input itself is borderless inside it, like the reference's search box. The card's edge against the map is its shadow. I keep the pattern but will look at the card on the map in a close-up before the final round.
 - **N7** tool about G13: check interactions stops at its default cap of 30 elements, and on this page the first 30 in DOM order after the rail are the 40 map pins, so the combobox, chips, tabs, menu, dialog and the map's own keyboard were not probed at all ('interactive elements: 30 (+21 beyond the cap — NOT probed)'). It said so, which is good; re-running with --max-elements.
-- **G14** `vlmkit check grounding index.html` → exit 1 — targets 47 · scale 0.5 · issues 7
+- **G14** `vlmkit check grounding index.html` → exit 1 — targets 47 · scale 0.5 · issues 7 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G14))
   - ✗ **D5** defect `pins under .topbar / .footbar`: Pins whose box lies under the search card, the chips or the attribution bar stay shown and clickable: #pin-31 (Sable Common) is covered at its centre by a chip, #pin-38 by the attribution, and #pin-15 sits 2px from the search field
   - ✗ **D6** defect `search card directions icon vs rail`: Two buttons are named exactly "Directions" (the rail item and the diamond in the search card), so a name alone cannot tell them apart
-- **G15** `vlmkit check motion index.html` → exit 0 — activeAnimations 0 · running 0 · issues 0
-- **G16** `vlmkit check animation index.html` → exit 0 — animations 0 · settleMs 0 · issues 0
-- **G17** `vlmkit check mobile index.html` → exit 0 — findings 0 · carousels 0 · inputs 1 · safeArea false
-- **G18** `vlmkit check mobile 'index.html?cat=coffee'` → exit 0 — findings 0 · carousels 0 · inputs 1 · safeArea false
-- **G19** `vlmkit check scroll 'index.html?cat=coffee'` → exit 0 — pageScrolled 0 · stickyFixed 1 · engagedSticky 0 · snaps 0 · issues 0
+- **G15** `vlmkit check motion index.html` → exit 0 — activeAnimations 0 · running 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G15))
+- **G16** `vlmkit check animation index.html` → exit 0 — animations 0 · settleMs 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G16))
+- **G17** `vlmkit check mobile index.html` → exit 0 — findings 0 · carousels 0 · inputs 1 · safeArea false ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G17))
+- **G18** `vlmkit check mobile 'index.html?cat=coffee'` → exit 0 — findings 0 · carousels 0 · inputs 1 · safeArea false ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G18))
+- **G19** `vlmkit check scroll 'index.html?cat=coffee'` → exit 0 — pageScrolled 0 · stickyFixed 1 · engagedSticky 0 · snaps 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G19))
 - **S3** index.html · 1280×800 — default view after fixes (screens not kept)
   - 👁 **L3**: Desktop default view after the first fixes. HARBOUR QUARTER now sits in a clear block row between the hotel/coffee pins and the restaurant pins, nothing on it; MILLBANK is clear and the Lumen Avenue "1" shield moved off it (now out of this frame to the south-west). The search card shows "Search Wayfarer Maps" in the same grey and position as before, now a real element. Pins near the chips (the Sable Common park pin and the Copper Kettle pin that were under "Coffee"/"Restaurants" in S1) are gone from under the floating UI. Everything else as in S1: grid of white streets, yellow avenues with 7/12/1 shields, river, parks, dashed rail, scale bar "200 m".
 - **S4** index.html · 375×812 — default view after fixes (screens not kept)
@@ -124,16 +124,16 @@ Brief: [`../briefs/maps.md`](../briefs/maps.md)
 - **V4** D9 verified by L14
 - **V5** D7 verified by L15
 - **N8** superseded about L10: L10's last sentence is a slip: the route is fully to the right of the panel, nothing hidden behind it.
-- **G20** `vlmkit check copy 'index.html?cat=coffee' --manifest copy.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 8 · statesExplored 2 · revealedOnly 0
-- **G21** `vlmkit check a11y contrast 'index.html?cat=coffee'` → exit 0 — inspected 119 · failures 0
-- **G22** `vlmkit check grounding index.html` → exit 0 — targets 43 · scale 0.5 · issues 0
+- **G20** `vlmkit check copy 'index.html?cat=coffee' --manifest copy.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 8 · statesExplored 2 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G20))
+- **G21** `vlmkit check a11y contrast 'index.html?cat=coffee'` → exit 0 — inspected 119 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G21))
+- **G22** `vlmkit check grounding index.html` → exit 0 — targets 43 · scale 0.5 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G22))
 - **V6** D3 verified by G20
 - **V7** D4 verified by G21
 - **V8** D5 verified by G22
 - **V9** D6 verified by G22
-- **S16** index.html · 1280×800 · full page, 1 screen(s) — full page, end of first draft
+- **S16** index.html · 1280×800 · full page, 1 screen(s) — full page, end of first draft ([screens](https://mizchi.github.io/vlmkit/sites/maps/judgment/#S16))
   - 👁 **L16**: Full page at desktop is one screen: the app is a fixed 1280x800 shell with no page scroll, as a map app should be. Same picture as S12: rail, search card with the visible hint, six chips, the map with ~40 pins clear of the floating UI, district labels and "Port Lumen", Layers, zoom and the scale/attribution bar. Nothing below the fold.
-- **S17** index.html · 375×812 · full page, 1 screen(s) — full page, end of first draft
+- **S17** index.html · 375×812 · full page, 1 screen(s) — full page, end of first draft ([screens](https://mizchi.github.io/vlmkit/sites/maps/judgment/#S17))
   - 👁 **L17**: Full page at phone width is one screen (812px), no page scroll: search card full width, chips scrolling under it, the zoom-1.5 opening view with clusters, "Port Lumen", the river and the bay; zoom stack and Layers at the bottom; scale bar bottom right. The attribution line is hidden on phones (only the scale stays), which keeps the corner clear.
 
 ### R2 · interactions and states (builder)
@@ -192,13 +192,13 @@ Brief: [`../briefs/maps.md`](../briefs/maps.md)
 - **V13** D12 verified by L32
 - **V14** D13 verified by L33
 - **V15** D14 verified by L34
-- **G23** `vlmkit check interactions 'index.html?place=9' --max-elements 140` → exit 0 — elements 27 · suspects 0 · warns 3
+- **G23** `vlmkit check interactions 'index.html?place=9' --max-elements 140` → exit 0 — elements 27 · suspects 0 · warns 3 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G23))
   - ✗ **D16** defect `.search-btn`: The magnifier button does nothing when the box is empty (inert-control): it should at least put focus in the box and show Recent
 - **N9** false-positive about G23: no-focus-indicator on input#q: the input sits borderless in the search card and the card draws the ring (.search:focus-within adds a 2px blue box-shadow). S24 and S32 show that ring around the whole card on focus. The gate looks only at the input's own outline/box-shadow/border/background.
 - **N10** false-positive about G23: popup-no-focus-move on the search combobox: WAI-ARIA APG's combobox keeps DOM focus on the input and moves aria-activedescendant through the listbox options. The gate's own line shows exactly that ('ArrowDown: expanded false -> true, activedescendant null -> Coffee | opens listbox | Esc closes+returns focus'). Moving focus into the listbox would break typing.
 - **N11** accepted about G23: Reviews and About tabs read 'unreachable' by Tab: that is the APG roving tabindex for a tablist (only the selected tab has tabindex 0; ArrowRight/Left move between tabs, which the same run shows working).
-- **G24** `vlmkit inspect motion index.html --selector '#pin-9' --click .zoom-btn --end 400` → exit 0
-- **G25** `vlmkit inspect motion index.html --selector '#pin-9' --click .zoom-btn --end 400 --reduced-motion` → exit 0
+- **G24** `vlmkit inspect motion index.html --selector '#pin-9' --click .zoom-btn --end 400` → exit 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G24))
+- **G25** `vlmkit inspect motion index.html --selector '#pin-9' --click .zoom-btn --end 400 --reduced-motion` → exit 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G25))
 - **N12** accepted about G24: 'pushed' warn on #pin-9: the pins are placed by the page's own view, eased in requestAnimationFrame over 200ms (cubic ease-out on the zoom level), not by a CSS animation, so the gate sees a box that moves with no animation of its own. The frames show what the brief asks: the move ends by 200ms and holds (40ms→200ms, then still to rest). G25, the same probe under --reduced-motion, shows the pin already at its final place at the first frame: reduced motion makes zoom instant.
 - **S36** index.html · 1280×800 · focus #map · press ArrowRight · press ArrowRight · press + · wait 500 — map keyboard: right twice, plus (screens not kept)
   - 👁 **L36**: Map keyboard: focus on #map, ArrowRight twice, then "+", 500ms wait. The view moved 200px east and zoomed one level (zoom 3): street names are now shown (Harbour Avenue, Lumen Avenue, Quay Street, Lamplighter Way, Crown Avenue, Mill Street, Foundry Street, Beacon Street, Signal Street, Lighthouse Road), HARBOUR QUARTER is lower, scale bar reads 100 m. The keyboard works. But I see no focus indication on the map at all, though it has keyboard focus; and the "Guild Street" label passes under the chip row ("Gui" peeks out between Transit and the Lumen Avenue shield).
@@ -222,8 +222,8 @@ Brief: [`../briefs/maps.md`](../briefs/maps.md)
 - **V16** D16 verified by L42
 - **V17** D17 verified by L40
 - **V18** D18 verified by L41
-- **G26** `vlmkit scan handlers 'index.html?place=9' --probe all` → exit 0 — registrations 150 · elements 122 · suspects 0
-- **G27** `vlmkit verify flow index.html --flow flows/main.json` → exit 0 — verdict: DONE (22/22 steps)
+- **G26** `vlmkit scan handlers 'index.html?place=9' --probe all` → exit 0 — registrations 150 · elements 122 · suspects 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G26))
+- **G27** `vlmkit verify flow index.html --flow flows/main.json` → exit 0 — verdict: DONE (22/22 steps) ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G27))
 - **N13** decision about G27: Added verify flow with flows/main.json (22 steps) because check interactions does not reach the map's keyboard or the multi-step flows: chip toggle + pin filter, row hover highlighting its pin, the follow-map checkbox, row click selecting, Save toggle + toast, the Reviews tab by arrow key, Back, the Saved list, directions fields chosen by typing and Enter, the Approximate route, mode tabs, swap, combobox ArrowDown/Enter, clear, and the map's '+' key showing street names from level 3. All 22 pass.
 - **N14** tool about G26: scan handlers --probe-drag on ?place=9 reported 'feedback while held 0.53%' for #map, against 70.44% on the default view (G12). The map does pan in that state: a Playwright drag from the map's centre in ?place=9 changed the URL to ?at=1362,1049,3&place=9. The probe's gesture result depends on what is under its start point; on this page a pin button there (pins do not start a drag, by design) reads as a near-dead surface. It is reported, not graded, as the help says, but the number alone would mislead.
 - **N15** decision: Wheel and double-click zoom have no shot action and no gate that measures them (scan handlers --probe wheel reports scrolling only: 'a 200px wheel moved 0px (nothing here scrolls anyway)'). Checked with a Playwright script in the scratchpad: on the default view a wheel of -200 changed ?at= from zoom 2 to 2.5 around the pointer, and a double-click to 3.5; reduced motion is covered by G25.
@@ -238,72 +238,72 @@ Brief: [`../briefs/maps.md`](../briefs/maps.md)
 
 ### R3 · final check (builder)
 
-- **G28** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 15 exempted)
-- **G29** `vlmkit check integrity 'index.html?cat=coffee'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 24 exempted)
-- **G30** `vlmkit check copy 'index.html?cat=coffee' --manifest copy.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 8 · statesExplored 2 · revealedOnly 0
-- **G31** `vlmkit check design 'index.html?cat=coffee'` → exit 0 — verdict: COHERENT (0 finding(s))
-- **G32** `vlmkit check composition 'index.html?place=9'` → exit 0 — verdict: NOT JUDGED (1 finding(s))
-- **G33** `vlmkit check color 'index.html?cat=coffee'` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s))
-- **G34** `vlmkit check a11y contrast index.html` → exit 0 — inspected 26 · failures 0
-- **G35** `vlmkit check a11y contrast 'index.html?cat=coffee'` → exit 0 — inspected 118 · failures 0
-- **G36** `vlmkit check a11y contrast 'index.html?place=9&tab=reviews'` → exit 0 — inspected 101 · failures 0
-- **G37** `vlmkit check a11y contrast 'index.html?layer=terrain'` → exit 0 — inspected 26 · failures 0
-- **G38** `vlmkit check a11y focus index.html` → exit 0 — steps 44 · findings 0
-- **G39** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 51 · failures 0 · wcagExempt 0
-- **G40** `vlmkit check a11y touch 'index.html?place=9'` → exit 1 — level AA · inspected 30 · failures 1 · wcagExempt 0
+- **G28** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 15 exempted) ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G28))
+- **G29** `vlmkit check integrity 'index.html?cat=coffee'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 24 exempted) ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G29))
+- **G30** `vlmkit check copy 'index.html?cat=coffee' --manifest copy.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 8 · statesExplored 2 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G30))
+- **G31** `vlmkit check design 'index.html?cat=coffee'` → exit 0 — verdict: COHERENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G31))
+- **G32** `vlmkit check composition 'index.html?place=9'` → exit 0 — verdict: NOT JUDGED (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G32))
+- **G33** `vlmkit check color 'index.html?cat=coffee'` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G33))
+- **G34** `vlmkit check a11y contrast index.html` → exit 0 — inspected 26 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G34))
+- **G35** `vlmkit check a11y contrast 'index.html?cat=coffee'` → exit 0 — inspected 118 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G35))
+- **G36** `vlmkit check a11y contrast 'index.html?place=9&tab=reviews'` → exit 0 — inspected 101 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G36))
+- **G37** `vlmkit check a11y contrast 'index.html?layer=terrain'` → exit 0 — inspected 26 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G37))
+- **G38** `vlmkit check a11y focus index.html` → exit 0 — steps 44 · findings 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G38))
+- **G39** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 51 · failures 0 · wcagExempt 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G39))
+- **G40** `vlmkit check a11y touch 'index.html?place=9'` → exit 1 — level AA · inspected 30 · failures 1 · wcagExempt 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G40))
   - ✗ **D20** defect `a.site-link`: The website link in Overview is a 154x20 target, under 24px tall; it stands alone in its row, so the inline-link exception does not apply
 - **F20** fix for D20: The link is an inline-block with 4px padding above and below (and a matching negative margin, so the row does not grow): 28px tall.
-- **G41** `vlmkit check a11y touch 'index.html?place=9'` → exit 0 — level AA · inspected 30 · failures 0 · wcagExempt 0
+- **G41** `vlmkit check a11y touch 'index.html?place=9'` → exit 0 — level AA · inspected 30 · failures 0 · wcagExempt 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G41))
 - **V20** D20 verified by G41
 - **N17** accepted about G33: Same as N6 (G6): control-boundary-invisible on input#q. The field is the whole white, fully rounded search card with a shadow, the pattern in the reference; the input inside it is borderless on purpose. Its focus ring is on the card (S24/S32).
 - **N18** accepted about G32: check composition is NOT JUDGED here, as on ?cat=coffee in R1 (G5): an app shell with a full-bleed map has no heading-led groups or wide page rails to measure. The panel's own hierarchy (24px/600 place name over 14px body) is reported and is what I designed.
-- **G42** `vlmkit scan scroll 'index.html?cat=coffee'` → exit 0 — containers 2 · overflowX 0 · issues 0
-- **G43** `vlmkit check scroll 'index.html?cat=coffee'` → exit 0 — pageScrolled 0 · stickyFixed 1 · engagedSticky 0 · snaps 0 · issues 0
-- **G44** `vlmkit scan handlers index.html --probe-drag` → exit 0 — registrations 128 · elements 108 · suspects 0
-- **G45** `vlmkit check grounding index.html` → exit 0 — targets 43 · scale 0.5 · issues 0
-- **G46** `vlmkit check grounding 'index.html?cat=coffee'` → exit 0 — targets 25 · scale 0.5 · issues 2
+- **G42** `vlmkit scan scroll 'index.html?cat=coffee'` → exit 0 — containers 2 · overflowX 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G42))
+- **G43** `vlmkit check scroll 'index.html?cat=coffee'` → exit 0 — pageScrolled 0 · stickyFixed 1 · engagedSticky 0 · snaps 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G43))
+- **G44** `vlmkit scan handlers index.html --probe-drag` → exit 0 — registrations 128 · elements 108 · suspects 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G44))
+- **G45** `vlmkit check grounding index.html` → exit 0 — targets 43 · scale 0.5 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G45))
+- **G46** `vlmkit check grounding 'index.html?cat=coffee'` → exit 0 — targets 25 · scale 0.5 · issues 2 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G46))
   - ✗ **D21** defect `#follow`: The 'Update results when map moves' checkbox is 18px (9px in the grounding frame, under its 10px floor) and its centre is 5px from the last visible result row behind the foot
-- **G47** `vlmkit check motion index.html` → exit 0 — activeAnimations 0 · running 0 · issues 0
-- **G48** `vlmkit check animation index.html` → exit 0 — animations 0 · settleMs 0 · issues 0
-- **G49** `vlmkit check mobile index.html` → exit 0 — findings 0 · carousels 0 · inputs 1 · safeArea false
-- **G50** `vlmkit check mobile 'index.html?place=9'` → exit 0 — findings 0 · carousels 0 · inputs 1 · safeArea false
-- **G51** `vlmkit verify flow index.html --flow flows/main.json` → exit 0 — verdict: DONE (22/22 steps)
+- **G47** `vlmkit check motion index.html` → exit 0 — activeAnimations 0 · running 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G47))
+- **G48** `vlmkit check animation index.html` → exit 0 — animations 0 · settleMs 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G48))
+- **G49** `vlmkit check mobile index.html` → exit 0 — findings 0 · carousels 0 · inputs 1 · safeArea false ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G49))
+- **G50** `vlmkit check mobile 'index.html?place=9'` → exit 0 — findings 0 · carousels 0 · inputs 1 · safeArea false ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G50))
+- **G51** `vlmkit verify flow index.html --flow flows/main.json` → exit 0 — verdict: DONE (22/22 steps) ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G51))
 - **F21** fix for D21: The checkbox is 22px and the foot has 16px/18px padding, moving it further from the rows above.
-- **G52** `vlmkit check grounding 'index.html?cat=coffee'` → exit 0 — targets 25 · scale 0.5 · issues 1
+- **G52** `vlmkit check grounding 'index.html?cat=coffee'` → exit 0 — targets 25 · scale 0.5 · issues 1 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G52))
 - **S45** index.html?cat=coffee · 1280×800 · element .panel-foot · @2x — panel foot close-up (screens not kept)
   - 👁 **L45**: Close-up of the panel foot at 2x on the Coffee results: a hairline on top, then a 22px checkbox with a grey border and "Update results when map moves" in 14px grey, vertically centred, 24px from the panel's left edge, with clear white space above and below. The rounded bottom-right corner of the panel shows at the right. No result row shows through or touches it.
 - **V21** D21 verified by G52: imprecise-target is gone at 22px
 - **N19** false-positive about G52: crowded-target '#follow's click point is 2px from #row-12': #row-12's box runs to y=689 under the foot (top 663), but that part is clipped by the panel's scroller and the foot is painted over it. Hit-testing from the checkbox's centre upward (Playwright, 1280x720) returns INPUT#follow at -8/-6/0/+6px and DIV.panel-foot at -12px; no point near the checkbox reaches the row. S45 shows the foot clear. The gate measured the unclipped box.
 - **N20** superseded about G46: Re-measured in G52 after D21's fix.
-- **G53** `vlmkit check interactions 'index.html?place=9' --max-elements 140` → exit 0 — elements 27 · suspects 0 · warns 2
-- **G54** `vlmkit check interactions 'index.html?dir=35-17' --max-elements 140` → exit 1 — elements 42 · suspects 4 · warns 5
+- **G53** `vlmkit check interactions 'index.html?place=9' --max-elements 140` → exit 0 — elements 27 · suspects 0 · warns 2 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G53))
+- **G54** `vlmkit check interactions 'index.html?dir=35-17' --max-elements 140` → exit 1 — elements 42 · suspects 4 · warns 5 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G54))
   - ✗ **D22** defect `#mode-tab-0..3`: The travel-mode tabs point aria-controls at mode-panel-0..3, which do not exist (broken-aria-controls)
   - ✗ **D23** defect `.dir-btn`: 'Get directions' does nothing when Directions is already open (inert-control); it should take focus to the From field
-- **G55** `vlmkit check interactions 'index.html?cat=coffee' --max-elements 140` → exit 0 — elements 31 · suspects 0 · warns 2
+- **G55** `vlmkit check interactions 'index.html?cat=coffee' --max-elements 140` → exit 0 — elements 31 · suspects 0 · warns 2 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G55))
 - **F22** fix for D22: All four mode tabs control one tabpanel, #mode-panel, which wraps the route summary and steps (or the hint) and is labelled by the selected tab.
 - **F23** fix for D23: With Directions already open, the search card's diamond moves focus to the From field; otherwise it opens Directions.
-- **G56** `vlmkit check interactions 'index.html?dir=35-17' --max-elements 140` → exit 0 — elements 42 · suspects 0 · warns 4
+- **G56** `vlmkit check interactions 'index.html?dir=35-17' --max-elements 140` → exit 0 — elements 42 · suspects 0 · warns 4 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G56))
 - **V22** D22 verified by G56
 - **V23** D23 verified by G56
 - **N21** false-positive about G53: Same as N9/N10: no-focus-indicator on input#q (the card draws the ring, S24/S32) and popup-no-focus-move on the comboboxes (APG keeps DOM focus on the input and moves aria-activedescendant; G27 step 17 shows aria-activedescendant=sugg-0 after ArrowDown).
 - **N22** false-positive about G55: Same as N9/N10: no-focus-indicator on input#q (the card draws the ring, S24/S32) and popup-no-focus-move on the comboboxes (APG keeps DOM focus on the input and moves aria-activedescendant; G27 step 17 shows aria-activedescendant=sugg-0 after ArrowDown).
 - **N23** false-positive about G56: Same as N9/N10: no-focus-indicator on input#q (the card draws the ring, S24/S32) and popup-no-focus-move on the comboboxes (APG keeps DOM focus on the input and moves aria-activedescendant; G27 step 17 shows aria-activedescendant=sugg-0 after ArrowDown).
-- **G57** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 15 exempted)
-- **G58** `vlmkit check integrity 'index.html?dir=35-17'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 20 exempted)
-- **G59** `vlmkit check copy 'index.html?cat=coffee' --manifest copy.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 8 · statesExplored 2 · revealedOnly 0
-- **G60** `vlmkit check a11y contrast 'index.html?cat=coffee'` → exit 0 — inspected 118 · failures 0
-- **G61** `vlmkit check a11y touch 'index.html?place=9'` → exit 0 — level AA · inspected 30 · failures 0 · wcagExempt 0
-- **G62** `vlmkit check a11y focus 'index.html?cat=coffee'` → exit 0 — steps 32 · findings 0
-- **G63** `vlmkit scan handlers index.html --probe-drag` → exit 0 — registrations 128 · elements 108 · suspects 0
-- **G64** `vlmkit verify flow index.html --flow flows/main.json` → exit 0 — verdict: DONE (22/22 steps)
-- **G65** `vlmkit check design 'index.html?cat=coffee'` → exit 0 — verdict: COHERENT (1 finding(s))
+- **G57** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 15 exempted) ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G57))
+- **G58** `vlmkit check integrity 'index.html?dir=35-17'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 20 exempted) ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G58))
+- **G59** `vlmkit check copy 'index.html?cat=coffee' --manifest copy.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 8 · statesExplored 2 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G59))
+- **G60** `vlmkit check a11y contrast 'index.html?cat=coffee'` → exit 0 — inspected 118 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G60))
+- **G61** `vlmkit check a11y touch 'index.html?place=9'` → exit 0 — level AA · inspected 30 · failures 0 · wcagExempt 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G61))
+- **G62** `vlmkit check a11y focus 'index.html?cat=coffee'` → exit 0 — steps 32 · findings 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G62))
+- **G63** `vlmkit scan handlers index.html --probe-drag` → exit 0 — registrations 128 · elements 108 · suspects 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G63))
+- **G64** `vlmkit verify flow index.html --flow flows/main.json` → exit 0 — verdict: DONE (22/22 steps) ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G64))
+- **G65** `vlmkit check design 'index.html?cat=coffee'` → exit 0 — verdict: COHERENT (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G65))
   - ✗ **D24** defect `.panel-foot`: scale-outlier (info): the foot's 18px bottom padding sits just off the page's 16px step, a leftover from D21's fix
-- **G66** `vlmkit check color 'index.html?cat=coffee'` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s))
-- **G67** `vlmkit check composition 'index.html?cat=coffee'` → exit 0 — verdict: NOT JUDGED (1 finding(s))
-- **G68** `vlmkit scan scroll 'index.html?cat=coffee'` → exit 0 — containers 2 · overflowX 0 · issues 0
-- **G69** `vlmkit check grounding index.html` → exit 0 — targets 43 · scale 0.5 · issues 0
+- **G66** `vlmkit check color 'index.html?cat=coffee'` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G66))
+- **G67** `vlmkit check composition 'index.html?cat=coffee'` → exit 0 — verdict: NOT JUDGED (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G67))
+- **G68** `vlmkit scan scroll 'index.html?cat=coffee'` → exit 0 — containers 2 · overflowX 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G68))
+- **G69** `vlmkit check grounding index.html` → exit 0 — targets 43 · scale 0.5 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G69))
 - **F24** fix for D24: Foot padding is 16px top and bottom.
-- **G70** `vlmkit check design 'index.html?cat=coffee'` → exit 0 — verdict: COHERENT (0 finding(s))
+- **G70** `vlmkit check design 'index.html?cat=coffee'` → exit 0 — verdict: COHERENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G70))
 - **V24** D24 verified by G70
 - **N24** accepted about G66: As N6/N17: the search card is the field's boundary.
 - **N25** accepted about G67: As N18: nothing composition can measure on a full-bleed map app.
@@ -382,42 +382,42 @@ Brief: [`../briefs/maps.md`](../briefs/maps.md)
 - **S74** index.html?cat=coffee · 768×1024 — final: tablet coffee after label edge fix (screens not kept)
   - 👁 **L70**: Tablet Coffee results after D29's fix: the map strip right of the panel holds three coffee pins, the river and the bay; no label is drawn half under the panel (the "umen" fragment of S70 is gone); the foot bar shows only "200 m" right of Layers. Panel rows down to Night Owl Espresso's red "Closed · Opens 5 PM", foot checkbox at the bottom.
 - **V29** D29 verified by L70
-- **G71** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 15 exempted)
-- **G72** `vlmkit check integrity 'index.html?cat=coffee'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 18 exempted)
-- **G73** `vlmkit check copy 'index.html?cat=coffee' --manifest copy.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 8 · statesExplored 2 · revealedOnly 0
-- **G74** `vlmkit check design 'index.html?cat=coffee'` → exit 0 — verdict: COHERENT (0 finding(s))
-- **G75** `vlmkit check composition 'index.html?cat=coffee'` → exit 0 — verdict: NOT JUDGED (1 finding(s))
-- **G76** `vlmkit check color 'index.html?cat=coffee'` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s))
-- **G77** `vlmkit check a11y contrast index.html` → exit 0 — inspected 26 · failures 0
-- **G78** `vlmkit check a11y contrast 'index.html?cat=coffee'` → exit 0 — inspected 115 · failures 0
-- **G79** `vlmkit check a11y contrast 'index.html?layer=terrain'` → exit 0 — inspected 26 · failures 0
-- **G80** `vlmkit check a11y focus index.html` → exit 0 — steps 44 · findings 0
-- **G81** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 51 · failures 0 · wcagExempt 0
-- **G82** `vlmkit check a11y touch 'index.html?place=9'` → exit 0 — level AA · inspected 30 · failures 0 · wcagExempt 0
-- **G83** `vlmkit scan scroll 'index.html?cat=coffee'` → exit 0 — containers 2 · overflowX 0 · issues 0
-- **G84** `vlmkit check scroll 'index.html?cat=coffee'` → exit 0 — pageScrolled 0 · stickyFixed 1 · engagedSticky 0 · snaps 0 · issues 0
-- **G85** `vlmkit scan handlers index.html --probe-drag` → exit 0 — registrations 128 · elements 108 · suspects 0
-- **G86** `vlmkit check grounding index.html` → exit 0 — targets 43 · scale 0.5 · issues 0
-- **G87** `vlmkit check motion index.html` → exit 0 — activeAnimations 0 · running 0 · issues 0
-- **G88** `vlmkit check animation index.html` → exit 0 — animations 0 · settleMs 0 · issues 0
-- **G89** `vlmkit check mobile index.html` → exit 0 — findings 0 · carousels 0 · inputs 1 · safeArea false
-- **G90** `vlmkit check mobile 'index.html?cat=coffee'` → exit 0 — findings 0 · carousels 0 · inputs 1 · safeArea false
-- **G91** `vlmkit verify flow index.html --flow flows/main.json` → exit 1 — verdict: FAILED (21/22 steps)
+- **G71** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 15 exempted) ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G71))
+- **G72** `vlmkit check integrity 'index.html?cat=coffee'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 18 exempted) ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G72))
+- **G73** `vlmkit check copy 'index.html?cat=coffee' --manifest copy.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 8 · statesExplored 2 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G73))
+- **G74** `vlmkit check design 'index.html?cat=coffee'` → exit 0 — verdict: COHERENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G74))
+- **G75** `vlmkit check composition 'index.html?cat=coffee'` → exit 0 — verdict: NOT JUDGED (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G75))
+- **G76** `vlmkit check color 'index.html?cat=coffee'` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G76))
+- **G77** `vlmkit check a11y contrast index.html` → exit 0 — inspected 26 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G77))
+- **G78** `vlmkit check a11y contrast 'index.html?cat=coffee'` → exit 0 — inspected 115 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G78))
+- **G79** `vlmkit check a11y contrast 'index.html?layer=terrain'` → exit 0 — inspected 26 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G79))
+- **G80** `vlmkit check a11y focus index.html` → exit 0 — steps 44 · findings 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G80))
+- **G81** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 51 · failures 0 · wcagExempt 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G81))
+- **G82** `vlmkit check a11y touch 'index.html?place=9'` → exit 0 — level AA · inspected 30 · failures 0 · wcagExempt 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G82))
+- **G83** `vlmkit scan scroll 'index.html?cat=coffee'` → exit 0 — containers 2 · overflowX 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G83))
+- **G84** `vlmkit check scroll 'index.html?cat=coffee'` → exit 0 — pageScrolled 0 · stickyFixed 1 · engagedSticky 0 · snaps 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G84))
+- **G85** `vlmkit scan handlers index.html --probe-drag` → exit 0 — registrations 128 · elements 108 · suspects 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G85))
+- **G86** `vlmkit check grounding index.html` → exit 0 — targets 43 · scale 0.5 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G86))
+- **G87** `vlmkit check motion index.html` → exit 0 — activeAnimations 0 · running 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G87))
+- **G88** `vlmkit check animation index.html` → exit 0 — animations 0 · settleMs 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G88))
+- **G89** `vlmkit check mobile index.html` → exit 0 — findings 0 · carousels 0 · inputs 1 · safeArea false ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G89))
+- **G90** `vlmkit check mobile 'index.html?cat=coffee'` → exit 0 — findings 0 · carousels 0 · inputs 1 · safeArea false ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G90))
+- **G91** `vlmkit verify flow index.html --flow flows/main.json` → exit 1 — verdict: FAILED (21/22 steps) ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G91))
 - **N28** decision about G91: G91's last step failed because of the flow, not the page: since D27 a Coffee search fits the map to its results (zoom 1), so '+' afterwards lands on zoom 2, where street names are hidden by design. The flow now presses Home first (back to the zoom-2 home view, no street names) and then '+' (zoom 3, 7 names), which tests the Home key as well.
-- **G92** `vlmkit verify flow index.html --flow flows/main.json` → exit 1 — verdict: FAILED (22/23 steps)
+- **G92** `vlmkit verify flow index.html --flow flows/main.json` → exit 1 — verdict: FAILED (22/23 steps) ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G92))
 - **N29** decision about G92: G92: 6 street names instead of the 7 the flow pinned. Which streets are named depends on the exact centre (labels snap to block midpoints near it, and since D18 a name under the floating UI is hidden), so a fixed count was too brittle an expectation; the step now asserts that a street name is shown at zoom 3, which is what the brief asks.
-- **G93** `vlmkit verify flow index.html --flow flows/main.json` → exit 0 — verdict: DONE (23/23 steps)
+- **G93** `vlmkit verify flow index.html --flow flows/main.json` → exit 0 — verdict: DONE (23/23 steps) ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G93))
 - **N30** accepted about G75: As N18/N25: no composition evidence on a full-bleed map app.
 - **N31** accepted about G76: As N6/N17/N24: the search card is the field's boundary.
-- **G94** `vlmkit check interactions 'index.html?cat=coffee' --max-elements 140` → exit 0 — elements 33 · suspects 0 · warns 3
-- **G95** `vlmkit check interactions 'index.html?dir=35-17' --max-elements 140` → exit 0 — elements 42 · suspects 0 · warns 4
+- **G94** `vlmkit check interactions 'index.html?cat=coffee' --max-elements 140` → exit 0 — elements 33 · suspects 0 · warns 3 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G94))
+- **G95** `vlmkit check interactions 'index.html?dir=35-17' --max-elements 140` → exit 0 — elements 42 · suspects 0 · warns 4 ([output](https://mizchi.github.io/vlmkit/sites/maps/judgment/#G95))
 - **N32** false-positive about G94: As N9/N10: the combobox warns (no-focus-indicator on the borderless input whose card draws the ring; popup-no-focus-move where APG keeps focus on the input and uses aria-activedescendant).
 - **N33** false-positive about G95: As N9/N10: the combobox warns (no-focus-indicator on the borderless input whose card draws the ring; popup-no-focus-move where APG keeps focus on the input and uses aria-activedescendant).
-- **S75** index.html · 1280×800 · full page, 1 screen(s) — final: default view, full page, final build
+- **S75** index.html · 1280×800 · full page, 1 screen(s) — final: default view, full page, final build ([screens](https://mizchi.github.io/vlmkit/sites/maps/judgment/#S75))
   - 👁 **L75**: Final build, desktop full page (one screen): the default view exactly as S46 — rail, search card, chips, ~40 pins clear of the UI and of the district labels, "Port Lumen", avenues with shields, river, bay, parks, rail, Layers, zoom and the attribution/scale bar. Nothing overlaps or is cut.
-- **S76** index.html · 768×1024 · full page, 1 screen(s) — final: default view, full page, final build
+- **S76** index.html · 768×1024 · full page, 1 screen(s) — final: default view, full page, final build ([screens](https://mizchi.github.io/vlmkit/sites/maps/judgment/#S76))
   - 👁 **L76**: Final build, tablet full page: as S54 — no half-cut "Port Lumen" (the label is left out where it does not fit whole), RIVERSIDE and HARBOUR QUARTER whole, pins and shields clear, attribution and scale at the foot (no panel open, so the attribution shows).
-- **S77** index.html · 375×812 · full page, 1 screen(s) — final: default view, full page, final build
+- **S77** index.html · 375×812 · full page, 1 screen(s) — final: default view, full page, final build ([screens](https://mizchi.github.io/vlmkit/sites/maps/judgment/#S77))
   - 👁 **L77**: Final build, phone full page: the zoom-1.5 opening view with "Port Lumen" whole, the river and the bay, numbered clusters and lone pins, search card and chips on top, zoom and Layers bottom, scale bar; one screen, no page scroll.
 - **N34** decision: How the luna build went, for the record. moon check --target js caught every type error in seconds. Friction met: (1) class=/dyn_class= on svg_* set the read-only className property, a silent no-op (N3/N4), so SVG is styled by data-k attributes; (2) dyn_attrs always call setAttribute and never remove an attribute, so a boolean like hidden cannot be toggled — visibility is a class instead; (3) the DSL has no dialog/table/tr/th/td/caption, so those are @element.create_element with Static attrs, and the dialog's element comes from an "__ref" Handler; (4) `dyn` is a reserved word in MoonBit (warning 0035), so the attribute helper is `da`; (5) Array has no concat (spread [..a, x] works); (6) derive(...) after a struct is deprecated in favour of #derive. Workarounds for browser APIs are one-line `extern "js"` functions in ffi.mbt. app.js is 630 KB (615.5 KB as the build reports it), unminified, and `luna-build.mjs maps --check` passes.
 - **done**: Wayfarer Maps: a pannable, zoomable SVG map of the fictional Port Lumen, drawn by a MoonBit/luna program from seeded data (coast, river with two bridges, five parks, 33 named streets with three shielded avenues, a five-station railway, building blocks, 40 places), with a search combobox (Recent, category and "near" suggestions), six category chips, a results/place side panel that becomes a three-height bottom sheet on phones, place tabs with seeded reviews and a sort menu, Save/Share/Nearby/Send-to-phone, directions with three street-following routes and an "Approximate" straight line otherwise, Default/Transit/Terrain layers, numbered clusters at low zoom, keyboard, wheel, drag and double-click control with 200ms easing that reduced motion makes instant, and the view kept in ?at=/&place=. 29 defects: 19 found by eye, 10 by gates; all fixed and verified. Final gate set clean except notes: control-boundary-invisible on the search field (accepted, the card is the field), composition NOT JUDGED (no measurable groups on a map app), and check interactions' combobox warnings (false positives against the APG pattern). Every state the brief lists was shot and looked at in R3 (S49-S61, S69, S75-S77).

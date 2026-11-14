@@ -1,6 +1,6 @@
 # Lexipedia — Moon — judgment log
 
-How this content site with reading tools — a long article with a contents rail, previews and appearance settings was judged, in order. Rendered from `judgment.sqlite` by `examples/sites/judge.mjs`; `judge.mjs <site> render` writes the page, with the screens the log keeps, to `judgment/`.
+How this content site with reading tools — a long article with a contents rail, previews and appearance settings was judged, in order. Rendered from `judgment.sqlite` by `examples/sites/judge.mjs`; the published page, with the screens the log keeps and every gate output, is <https://mizchi.github.io/vlmkit/sites/wiki/judgment/>.
 
 **3** rounds · **64** gate runs (15 failing) · **110** screens in 48 shots (61 kept) · **48** looks · defects: **17** by eye, **12** by a gate · 12 gate false positive(s)
 
@@ -54,7 +54,7 @@ Brief: [`../briefs/wiki.md`](../briefs/wiki.md)
     - ✗ **D4** defect `.toc-rail`: Every section scrolled past stays expanded in the contents rail; by the end the rail is taller than the screen.
     - ✗ **D5** defect `.article-body p`: Lines run ~80 characters at Standard width; the brief asks for about 70.
     - ✗ **D6** defect `.external li`: External link lines wrap a lone 'demo)' onto a second line.
-- **S3** index.html · 375×812 · full page, 4 screen(s)
+- **S3** index.html · 375×812 · full page, 4 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#S3))
   - 👁 **L3**: Phone (375 wide) full page, 4 screens. Header collapses as the brief asks: hamburger, logo + "Lexipedia" wordmark (no tagline), search icon, on a grey bar with a bottom border. Title "Moon" with "41 languages" beside it, Article/Talk tabs and the watch star, the from-line, the hatnote in a grey box at 14px, then the first lead paragraph, then the infobox at full width (S3-1/2) and the rest of the lead after it — the reorder works. Rows in the infobox read cleanly; "Satellite of / Earth" etc. align on one column. S3-3/4: every section after the lead is a collapsed accordion row with a chevron and a hairline, including See also / References / External links, then the footer. Nothing overlaps or clips. The drawn moon again reads as a disc with five flat grey lumps stuck on it — the maria have hard edges and too much contrast, more cartoon than lunar.
     - ✗ **D7** defect `.ib-art (moon drawing)`: The drawn moon's maria are hard-edged high-contrast blobs; it reads as a disc with grey lumps, not the Moon.
 - **S4** index.html · 768×1024 (screens not kept)
@@ -66,7 +66,7 @@ Brief: [`../briefs/wiki.md`](../briefs/wiki.md)
 - **F5** fix for D5: Paragraphs are capped at 36em (~70 characters at 16px); floats still sit at the column edge.
 - **F6** fix for D6: Shortened the external link texts; the note under the list already says they are text only.
 - **F7** fix for D7: Maria redrawn as irregular paths at 50% opacity with a lighter second layer, softer rays.
-- **S5** index.html · 1280×800 · full page, 11 screen(s)
+- **S5** index.html · 1280×800 · full page, 11 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#S5))
   - 👁 **L5**: Desktop full page again (11 screens, 8418px) after F1-F7. S5-1: header icons at size; the moon now has soft, irregular translucent maria and fainter rays — reads as a moon. S5-2: "Name and etymology" hairline now stops at the infobox's left edge (ends x≈667); "kept.[4]" wraps together, the citation no longer stands alone. Body paragraphs now end around x≈895, ~70 characters a line ("Any account of the Moon's origin has to explain three facts: its rocks have"), with the headings' hairlines still spanning the 640px column. S5-3..S5-11: the rail opens only the section being read (Formation → Physical → Orbit → Observation → Exploration) and closes the previous one; by S5-11 only (Top)…External links show, the rail fits the screen. External links are one line each. Still off: when the active item turns bold its width grows, so "Physical characteristics" rewraps onto two lines (S5-4) and every item below it in the rail jumps down by a line as you scroll in and out of that section.
     - ✗ **D8** defect `.toc-link.active`: Bold active item is wider than its regular form, so 'Physical characteristics' rewraps and the rail below it jumps a line as the scroll spy moves.
 - **V1** D2 verified by L5
@@ -76,30 +76,30 @@ Brief: [`../briefs/wiki.md`](../briefs/wiki.md)
 - **V5** D6 verified by L5
 - **V6** D7 verified by L5
 - **V7** D1 verified by L5: Header icons, logo, toolbar star at their CSS sizes on S5-1.
-- **G1** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 2 exempted)
-- **G2** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 1 · placeholders 0 · manifestLines 10 · invisibleOnly 1 · statesExplored 10 · revealedOnly 0
+- **G1** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 2 exempted) ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G1))
+- **G2** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 1 · placeholders 0 · manifestLines 10 · invisibleOnly 1 · statesExplored 10 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G2))
   - ✗ **D9** defect `#search-input label`: 'Search Lexipedia' exists only as an sr-only label and a placeholder, so no visible text carries it.
-- **G3** `vlmkit check design index.html` → exit 0 — verdict: DRIFT (2 finding(s))
+- **G3** `vlmkit check design index.html` → exit 0 — verdict: DRIFT (2 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G3))
   - ✗ **D10** defect `button styles`: 14 buttons render 6 distinct styles (component-drift): the contents toggles, icon buttons and image buttons each have their own padding/radius.
-- **G4** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (0 finding(s))
-- **G5** `vlmkit check color index.html` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s))
+- **G4** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G4))
+- **G5** `vlmkit check color index.html` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G5))
   - ✗ **D11** defect `#search-input`: Search field border #a2a9b1 is 2.37:1 against white; WCAG 1.4.11 wants 3:1 for a control boundary.
-- **G6** `vlmkit check a11y contrast index.html` → exit 0 — inspected 355 · failures 0
-- **G7** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 355 · failures 0
-- **G8** `vlmkit check a11y focus index.html` → exit 1 — steps 64 · findings 7
+- **G6** `vlmkit check a11y contrast index.html` → exit 0 — inspected 355 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G6))
+- **G7** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 355 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G7))
+- **G8** `vlmkit check a11y focus index.html` → exit 1 — steps 64 · findings 7 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G8))
   - ✗ **D12** defect `.infobox .ib-image`: Focus goes from the infobox image (y=339) back up to the first lead link (y=301): the infobox sits before the first paragraph in DOM order.
-- **G9** `vlmkit check a11y touch index.html` → exit 1 — level AA · inspected 124 · failures 1 · wcagExempt 87
+- **G9** `vlmkit check a11y touch index.html` → exit 1 — level AA · inspected 124 · failures 1 · wcagExempt 87 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G9))
   - ✗ **D13** defect `.hatnote a`: Hatnote link 'Natural satellite' is 119x20 with the wrapped 'Lunar month' link within 24px, so neither the inline nor the spacing exception applies.
-- **G10** `vlmkit scan scroll index.html` → exit 0 — containers 0 · overflowX 0 · issues 0
-- **G11** `vlmkit scan handlers index.html` → exit 0 — registrations 412 · elements 160 · suspects 0
-- **G12** `vlmkit check interactions index.html` → exit 1 — elements 30 · suspects 2 · warns 1
+- **G10** `vlmkit scan scroll index.html` → exit 0 — containers 0 · overflowX 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G10))
+- **G11** `vlmkit scan handlers index.html` → exit 0 — registrations 412 · elements 160 · suspects 0 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G11))
+- **G12** `vlmkit check interactions index.html` → exit 1 — elements 30 · suspects 2 · warns 1 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G12))
   - ✗ **D14** defect `#menu-btn`: aria-controls='main-menu' points at nothing while the menu is closed: the menu (and the contents and appearance popovers) are only mounted when open.
   - ✗ **D15** defect `#search-input`: ArrowDown in the empty search combobox does nothing although it declares aria-expanded.
   - ✗ **D16** defect `.search-btn`: Search button with an empty field does nothing on Enter.
-- **G13** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 2 · issues 0 · sweepRanges 0
-- **G14** `vlmkit check scroll index.html` → exit 0 — pageScrolled 1080 · stickyFixed 3 · engagedSticky 2 · snaps 0 · issues 0
-- **G15** `vlmkit stress media index.html` → exit 0 — variants 5 · suspects 0 · warns 1
-- **G16** `vlmkit stress i18n index.html` → exit 1 — inflate 1.4 · inspected 417 · overflowing 144
+- **G13** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 2 · issues 0 · sweepRanges 0 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G13))
+- **G14** `vlmkit check scroll index.html` → exit 0 — pageScrolled 1080 · stickyFixed 3 · engagedSticky 2 · snaps 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G14))
+- **G15** `vlmkit stress media index.html` → exit 0 — variants 5 · suspects 0 · warns 1 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G15))
+- **G16** `vlmkit stress i18n index.html` → exit 1 — inflate 1.4 · inspected 417 · overflowing 144 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G16))
   - ✗ **D17** defect `.rail-head`: Under 1.4x text the rail heading row (Appearance + hide) overflows the 176px rail and clips 'hide'.
   - ✗ **D18** defect `.infobox table`: Under 1.4x text the infobox table and its header bars overflow the infobox's right edge.
 - **N1** accepted about G2: 'This article is a stub.' is missing on the article by design: the brief puts it on the stub view (#/wiki/<Title>), which the copy gate does not navigate to. It is checked by a second run on the stub view with copy-stub.txt.
@@ -122,17 +122,17 @@ Brief: [`../briefs/wiki.md`](../briefs/wiki.md)
 - **N4** decision: Gate set, from PROTOCOL.md's floor plus what this brief's behaviour needs (markup-assist routing; dynamic-markup for sticky/scroll behaviour): check integrity (3 widths), check copy --manifest copy.txt on the article plus copy-stub.txt on #/wiki/Earth (the stub line lives only on the stub view), check design, check composition (heading hierarchy, infobox/lead grouping), check color, check a11y contrast on index.html and index.html?theme=dark, check a11y focus (previews open on focus, dialogs), check a11y touch, scan scroll, scan handlers, check interactions (combobox, contents disclosures, radio groups), check breakpoints --sweep (the rails leave at 1000px, the phone layout at 720px), check scroll (sticky rails), stress media (print, zoom 200%, forced colours), stress i18n (longer chrome). No check animation: the only motion is a 0.2s toast fade, chevron turns and a reference highlight, all transitions or a :target animation, all dropped under reduced motion.
 - **N5** decision: What I took from the reference screenshots (layout and proportions only; no logo, name or text): the header order (hamburger, two-line wordmark, ~400px search with an attached Search button, user links at the right); three columns at 1280 with ~165px rails at x≈104 and x≈1000 and the article column between; the rail heading row with a small grey 'hide' button and a hairline under it; the title row with the language button at the right and the two tab groups under a hairline; the italic indented hatnote; the right-floated ~270px infobox with a centred bold title, a dark image square, centred caption and tinted section bars; on the phone, the grey header bar with hamburger, wordmark and search icon, Article/Talk tabs and a toolbar row, and the infobox full width after the first paragraph. Departures on purpose: an own crescent-and-star logo, blue-grey (not pink) infobox bars, and a 640px article column with ~70-character lines (the brief's measure) instead of the reference's ~750px.
 - **N6** decision: Written in MoonBit with mizchi/luna; all data (article, 30 titles, infobox, 41 languages, history, talk) is in src/main/*.mbt. No inline <script>. Browser APIs luna does not wrap (localStorage in try/catch, location.hash, matchMedia, setTimeout, scroll position, getBoundingClientRect, <dialog>.showModal) are small extern "js" functions in src/main/ffi.mbt, compiled into app.js like the rest. Tags luna has no builder for (sup, table, dialog, fieldset, figure, b, i…) go through @element.create_element.
-- **G17** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 1 · placeholders 0 · manifestLines 10 · statesExplored 15 · revealedOnly 0
-- **G18** `vlmkit check copy 'index.html#/wiki/Earth' --manifest copy-stub.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 7 · statesExplored 3 · revealedOnly 0
-- **G19** `vlmkit check design index.html` → exit 0 — verdict: COHERENT (0 finding(s))
-- **G20** `vlmkit check color index.html` → exit 0 — verdict: CONSISTENT (0 finding(s))
-- **G21** `vlmkit check a11y focus index.html` → exit 1 — steps 64 · findings 6
+- **G17** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 1 · placeholders 0 · manifestLines 10 · statesExplored 15 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G17))
+- **G18** `vlmkit check copy 'index.html#/wiki/Earth' --manifest copy-stub.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 7 · statesExplored 3 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G18))
+- **G19** `vlmkit check design index.html` → exit 0 — verdict: COHERENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G19))
+- **G20** `vlmkit check color index.html` → exit 0 — verdict: CONSISTENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G20))
+- **G21** `vlmkit check a11y focus index.html` → exit 1 — steps 64 · findings 6 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G21))
   - ✗ **D19** defect `.infobox .ib-image`: Focus still goes right-to-left: from the infobox image button (x=693) to the next lead link (x=491) beside it, since the image is a focus stop inside a float.
-- **G22** `vlmkit check a11y touch index.html` → exit 1 — level AA · inspected 124 · failures 1 · wcagExempt 86
+- **G22** `vlmkit check a11y touch index.html` → exit 1 — level AA · inspected 124 · failures 1 · wcagExempt 86 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G22))
   - ✗ **D20** defect `.hatnote a`: 'Lunar month' in the hatnote is still a 96x20 target that WCAG's inline exemption does not cover here.
-- **G23** `vlmkit check interactions index.html` → exit 0 — elements 30 · suspects 0 · warns 1
-- **G24** `vlmkit stress i18n index.html` → exit 0 — inflate 1.4 · inspected 407 · overflowing 150
-- **G25** `vlmkit check integrity index.html` → exit 1 — verdict: DEFECTS (7 fail, 0 warn, 0 exempted)
+- **G23** `vlmkit check interactions index.html` → exit 0 — elements 30 · suspects 0 · warns 1 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G23))
+- **G24** `vlmkit stress i18n index.html` → exit 0 — inflate 1.4 · inspected 407 · overflowing 150 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G24))
+- **G25** `vlmkit check integrity index.html` → exit 1 — verdict: DEFECTS (7 fail, 0 warn, 0 exempted) ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G25))
 - **S6** index.html · 1280×800 · scroll-to #Name_and_etymology (screens not kept)
   - 👁 **L6**: Desktop, scrolled to "Name and etymology", after the fix pass. The infobox now starts after the first lead paragraph and floats beside the second and third, then runs down beside "Name and etymology" and its first paragraph; the heading's hairline stops at the infobox (x≈667). The lead paragraphs beside it are ~45 characters a line, the paragraph text never touches the infobox's left border (gap ≈20px). In the rail "(Top)" is bold, which is right for this position (the spy line is a quarter down the screen and no section heading has crossed it). Appearance rail unchanged. Nothing overlaps.
 - **S7** index.html · 1280×800 · element #sec-body-0 · @2x · scroll-to #sec-body-0 > p:nth-of-type(2) (screens not kept)
@@ -150,13 +150,13 @@ Brief: [`../briefs/wiki.md`](../briefs/wiki.md)
 - **V15** D16 verified by G23: No inert-control on the Search button.
 - **V16** D17 verified by G24: No horizontal-overflow rows left under 1.4x; only vertical wraps (warn).
 - **V17** D18 verified by G24: No horizontal-overflow on the infobox or its table.
-- **G26** `vlmkit check a11y focus index.html` → exit 0 — steps 64 · findings 5
-- **G27** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 123 · failures 0 · wcagExempt 86
+- **G26** `vlmkit check a11y focus index.html` → exit 0 — steps 64 · findings 5 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G26))
+- **G27** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 123 · failures 0 · wcagExempt 86 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G27))
 - **F19** fix for D19: The infobox picture is no longer a button (the media viewer still reaches it via Next/Previous from either body figure), so the float has no focus stop.
 - **F20** fix for D20: Hatnote links get 2px block padding: the hit box grows to 24px without changing the line box.
 - **N10** false-positive about G26: The five [skip-row] warns are jumps over prose without links (between citations [3], [4], [7] and links in sections 0-2); the shots of those paragraphs (S5-2, S5-3, S5-4) show plain text there, nothing focusable.
-- **G28** `vlmkit check a11y focus index.html` → exit 0 — steps 64 · findings 5
-- **G29** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 123 · failures 0 · wcagExempt 86
+- **G28** `vlmkit check a11y focus index.html` → exit 0 — steps 64 · findings 5 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G28))
+- **G29** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 123 · failures 0 · wcagExempt 86 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G29))
 - **V18** D19 verified by G28: No reverse step left; only the five skip-row warns over plain prose.
 - **V19** D20 verified by G29: 0 undersized targets.
 - **S8** index.html · 1280×800 · focus #search-input · press ArrowDown — combobox browse (screens not kept)
@@ -165,13 +165,13 @@ Brief: [`../briefs/wiki.md`](../briefs/wiki.md)
   - 👁 **L9**: Desktop, "lun" typed then ArrowDown. The label inside the field is gone once text is typed (no overlap with "lun"); Chromium's own clear "×" shows at the right. Suggestions are prefix matches first — Lunar phase, Lunar eclipse, Lunar mare, Lunar calendar, Lunar south pole, Lunar water, Lunar month — then Anorthosite, which matches through its description ("lunar highlands"). The first option is highlighted. Thumbnails differ per kind (red eclipsed moon, calendar, ice in a crater). Readable, aligned, nothing clipped.
 - **S10** index.html · 1280×800 · hover #Name_and_etymology ~ div a.wl · wait 900 · scroll-to #Name_and_etymology — page preview (screens not kept)
   - 👁 **L10**: Desktop, pointer on the "selenography" link in Name and etymology for 900ms. A preview card opens 6px under the link: white, hairline border, soft shadow, 320px wide; serif title "Selenography", a two-sentence extract in 14px, and the drawn map thumbnail on the right. It sits over the paragraph below the link and stops short of the infobox. The hovered link shows its underline. The rail highlights "Name and etymology" in bold and its width did not change — the item stays on one line. Nothing else moved.
-- **S11** index.html · 1280×800 · full page, 11 screen(s)
+- **S11** index.html · 1280×800 · full page, 11 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#S11))
   - 👁 **L11**: Desktop full page, fix pass (11 screens). S11-1: the hatnote fits on two lines with both links on separate lines; the first lead paragraph runs ~70 characters to x≈885, the infobox starts beside the second paragraph (the reorder from F12) — the top of the page reads a little less like the reference, where the infobox aligns with the lead's first line, but the lead still wraps around it. The infobox picture is no longer a button and has no hover state. S11-2: "Name and etymology" stops at the infobox; the third lead paragraph and the section paragraph sit beside it with an even ~20px gutter. S11-3..S11-11: rail follows the scroll: Formation → Physical → Orbit → Observation → Exploration, then See also / References / External links bold at the end. F8 did NOT work: on S11-4 "Physical characteristics" turns bold and still breaks onto two lines ("Physical / characteristics"), pushing Internal structure…External links down one line; on S11-8 there is an extra gap above "Naked-eye features" that the hidden ::after copy adds. References two columns, back-links, footer all clean.
-- **S12** index.html · 375×812 · full page, 4 screen(s)
+- **S12** index.html · 375×812 · full page, 4 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#S12))
   - 👁 **L12**: Phone full page (375x812, 4 screens), fix pass. Header bar, title with "41 languages", Article/Talk + star, the two-line hatnote in a grey box, first paragraph, then the full-width infobox (moon at 280px, centred) and the rest of the lead; every later section is a closed accordion row with a chevron, then the footer. Two things look off: the title "Moon" starts at x≈24 while the tabs, hatnote and text start at x=16 — the title is indented 8px against everything under it; and the footer's first line breaks "at / 14:12." leaving the time alone on the second line.
     - ✗ **D21** defect `.title-row h1`: The title is indented 8px from the column wherever the contents button is hidden: the empty .toc-pop-wrap still takes the row's 8px gap.
     - ✗ **D22** defect `.site-footer p`: Footer line breaks 'at / 14:12.', leaving the time alone on a line at phone width.
-- **S13** index.html · 768×1024 · full page, 8 screen(s)
+- **S13** index.html · 768×1024 · full page, 8 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#S13))
   - 👁 **L13**: Tablet full page (768x1024, 8 screens), fix pass. Rails gone; the contents icon sits left of the title, the palette icon and star in the toolbar. Lead paragraph 1 runs ~70 characters, the infobox floats beside paragraphs 2-3 and "Name and etymology" with a ~20px gutter; the infobox's last rows end beside "Formation and evolution". Body text holds at 36em (to x≈600) while headings and their hairlines span the full 720px column, so there is a ~140px empty band right of the text below the infobox — calm rather than broken, and the floats (phases strip, Earth-rise) use it. References are in two columns, External links one line each, footer two lines. The "Moon" title again sits 8px right of the text edge (x≈72 after the 40px contents button + 8px gap would be right; here the text column starts at 24 and the button at 28) — fine at this width because the button is present.
 - **F21** fix for D8: Second try (F8's reserved-width copy changed nothing because bold 'Physical characteristics' is wider than the rail itself): the active item keeps its weight and is marked by the body ink colour plus a 0.4px text-shadow faux-bold, which does not change glyph widths; the ::after copy is removed.
 - **F22** fix for D21: Title row has no flex gap; the contents button carries its own 8px right margin and the language button an 8px left margin, so a hidden button leaves no indent.
@@ -217,23 +217,23 @@ Brief: [`../briefs/wiki.md`](../briefs/wiki.md)
 
 ### R3 · final check (builder)
 
-- **G30** `vlmkit check integrity index.html` → exit 1 — verdict: DEFECTS (7 fail, 0 warn, 0 exempted)
-- **G31** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 1 · placeholders 0 · manifestLines 10 · statesExplored 15 · revealedOnly 0
-- **G32** `vlmkit check copy 'index.html#/wiki/Earth' --manifest copy-stub.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 7 · statesExplored 3 · revealedOnly 0
-- **G33** `vlmkit check design index.html` → exit 0 — verdict: COHERENT (0 finding(s))
-- **G34** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (0 finding(s))
-- **G35** `vlmkit check color index.html` → exit 0 — verdict: CONSISTENT (0 finding(s))
-- **G36** `vlmkit check a11y contrast index.html` → exit 0 — inspected 355 · failures 0
-- **G37** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 355 · failures 0
-- **G38** `vlmkit check a11y focus index.html` → exit 0 — steps 64 · findings 5
-- **G39** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 123 · failures 0 · wcagExempt 86
-- **G40** `vlmkit scan scroll index.html` → exit 0 — containers 0 · overflowX 0 · issues 0
-- **G41** `vlmkit scan handlers index.html` → exit 0 — registrations 452 · elements 200 · suspects 0
-- **G42** `vlmkit check interactions index.html --max-elements 130` → exit 0 — elements 123 · suspects 0 · warns 30
-- **G43** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 2 · issues 0 · sweepRanges 0
-- **G44** `vlmkit check scroll index.html` → exit 0 — pageScrolled 1080 · stickyFixed 3 · engagedSticky 2 · snaps 0 · issues 0
-- **G45** `vlmkit stress media index.html` → exit 0 — variants 5 · suspects 0 · warns 1
-- **G46** `vlmkit stress i18n index.html` → exit 0 — inflate 1.4 · inspected 407 · overflowing 150
+- **G30** `vlmkit check integrity index.html` → exit 1 — verdict: DEFECTS (7 fail, 0 warn, 0 exempted) ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G30))
+- **G31** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 1 · placeholders 0 · manifestLines 10 · statesExplored 15 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G31))
+- **G32** `vlmkit check copy 'index.html#/wiki/Earth' --manifest copy-stub.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 7 · statesExplored 3 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G32))
+- **G33** `vlmkit check design index.html` → exit 0 — verdict: COHERENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G33))
+- **G34** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G34))
+- **G35** `vlmkit check color index.html` → exit 0 — verdict: CONSISTENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G35))
+- **G36** `vlmkit check a11y contrast index.html` → exit 0 — inspected 355 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G36))
+- **G37** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 355 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G37))
+- **G38** `vlmkit check a11y focus index.html` → exit 0 — steps 64 · findings 5 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G38))
+- **G39** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 123 · failures 0 · wcagExempt 86 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G39))
+- **G40** `vlmkit scan scroll index.html` → exit 0 — containers 0 · overflowX 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G40))
+- **G41** `vlmkit scan handlers index.html` → exit 0 — registrations 452 · elements 200 · suspects 0 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G41))
+- **G42** `vlmkit check interactions index.html --max-elements 130` → exit 0 — elements 123 · suspects 0 · warns 30 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G42))
+- **G43** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 2 · issues 0 · sweepRanges 0 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G43))
+- **G44** `vlmkit check scroll index.html` → exit 0 — pageScrolled 1080 · stickyFixed 3 · engagedSticky 2 · snaps 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G44))
+- **G45** `vlmkit stress media index.html` → exit 0 — variants 5 · suspects 0 · warns 1 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G45))
+- **G46** `vlmkit stress i18n index.html` → exit 0 — inflate 1.4 · inspected 407 · overflowing 150 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G46))
 - **S28** index.html · 1280×800 · focus .lang-btn · press Enter · wait 300 — Enter on languages button (screens not kept)
   - 👁 **L28**: Desktop: focus on the "41 languages" button, Enter. The language dialog opens (so the button does respond to Enter, contrary to G42's dead-disclosure): heading, search field, Suggested languages (Velorian, Caldish, Ostrene), All languages in a four-column grid. Two things are off: focus lands on the close × (blue ring), not on the search field the dialog is for; and the grid's last row is cut by the dialog's bottom edge — "Zelandic" shows only its top half, with no sign that the list scrolls, because the dialog is capped at 36rem.
     - ✗ **D26** defect `.lang-dialog`: Opening the language dialog focuses the close button instead of the search field.
@@ -244,7 +244,7 @@ Brief: [`../briefs/wiki.md`](../briefs/wiki.md)
   - 👁 **L29**: Same action after F27/F28: Enter on "41 languages" now opens the dialog with focus in "Search for a language" (blue ring on the field, the close × unfocused), and the whole list fits: Suggested languages, then All languages down to "Zelandic" on the last row with white space under it; the dialog is 46rem tall at most and ends at y≈706 here.
 - **V24** D26 verified by L29
 - **V25** D27 verified by L29
-- **G47** `vlmkit check interactions index.html --max-elements 130` → exit 1 — elements 123 · suspects 2 · warns 28
+- **G47** `vlmkit check interactions index.html --max-elements 130` → exit 1 — elements 123 · suspects 2 · warns 28 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G47))
 - **S30** index.html · 1280×800 · focus .tleft .thumb-btn · press Enter · wait 300 — Enter on Earth-rise thumbnail (screens not kept)
   - 👁 **L30**: Desktop: keyboard focus on the Earth-rise thumbnail in Exploration, Enter. The media viewer opens on "Image 2 of 3" with focus on its close button (blue ring), the Earth-rise drawing large (half-lit Earth over the curved grey lunar horizon, a few stars), its caption, Previous and Next. So this button opens its dialog from the keyboard too — G42/G47's "dead-disclosure" on it is the probe's, not the page's.
 - **N11** false-positive about G30: Same 7 text-collision findings as G25: the bounding box of '#sec-body-0 > p:nth-of-type(2)', a paragraph that wraps around the floated infobox (short lines beside it, long lines below it), overlaps the table's value cells. No glyph overlaps — S7 (2x close-up) and S11-2 show a ≥36px gutter between every line and the infobox border. See the tool note N8.
@@ -253,11 +253,11 @@ Brief: [`../briefs/wiki.md`](../briefs/wiki.md)
 - **N14** false-positive about G47: Both suspects are dead-disclosure on dialog openers ('41 languages', the Earth-rise thumbnail): 'declares aria-expanded but activating it (Enter) changes neither the attribute nor the layout'. Pressed by hand they work: S29 (Enter on '41 languages' opens the dialog with focus in its search field) and S30 (Enter on the Earth-rise thumbnail opens the viewer on image 2). In the same run the phases thumbnail probes as 'expanded false -> true | opens dialog (focus enters), traps | Esc closes+returns focus', and the probe had already pressed Enter on the empty Search button, which navigates to the Search results view, before reaching these. The not-tab-reachable warns cover everything after 'Back to citation 1' (references, the appearance rail, the footer): the Tab walk ends there, ~110 stops in; those controls are ordinary <a>/<input> in DOM order.
 - **N15** tool about G47: check interactions --max-elements 130 marks every control after about the 110th Tab stop as 'unreachable' / not-tab-reachable (16 reference back-links, 'Hide appearance', 8 appearance radios, 3 footer links) without saying the Tab walk was capped; and it reports dead-disclosure on '41 languages' and a thumbnail that open their <dialog> on Enter when pressed in isolation (S29, S30). The output does not say which page state each probe ran in, so the earlier Enter on the Search button (which changes the route) may be what the later probes saw.
 - **N16** false-positive about G45: Same as N3: stress media reads no stylesheet linked from file:, so it says 'no @media print rule' and 'no animation / transition declarations'; styles.css has both, and the same gate on a copy with the CSS inlined reports '✓ print … Stylesheet declares @media print'.
-- **S31** index.html · 1280×800 · full page, 11 screen(s)
+- **S31** index.html · 1280×800 · full page, 11 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#S31))
   - 👁 **L31**: Final desktop full page, 11 screens at 1280x800. S31-1: header (hamburger, logo + "Lexipedia / The free encyclopedia", the search field with its visible label and a 4.8:1 edge, Search, user links), three columns, title flush with the text edge, both tab groups, from-line, two-line hatnote, the lead with the infobox from the second paragraph. S31-2: infobox bars and rows aligned, heading rule stops at the float. S31-3..9: the rail tracks the reading position — Giant impact, then "Physical characteristics" marked and staying on ONE line (S31-4: Internal structure/Surface/Atmosphere and water listed below it, no jump), Atmosphere and water, Tidal locking, Effect on Earth, Telescopic study, Crewed landings; one section open at a time. Figures: phases strip right in Orbit and rotation, Earth-rise left in Exploration with the Robotic missions heading beside it. S31-10/11: See also, References in two columns with ^ back-links, External links one line each with the text-only note, footer. Body text ~70 characters per line throughout. Nothing overlaps or clips.
-- **S32** index.html · 768×1024 · full page, 8 screen(s)
+- **S32** index.html · 768×1024 · full page, 8 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#S32))
   - 👁 **L32**: Final tablet full page, 8 screens at 768x1024. Header on one line with full search; no rails; contents button left of the title and the palette/star in the toolbar row. Lead paragraph 1 then the infobox floating beside paragraphs 2-3, Name and etymology and the start of Formation and evolution, gutter even. Body text at the ~70-character measure leaves white space to the right under the infobox; headings span the column. Phases figure right, Earth-rise left with text wrapping it; References in two columns; External links; footer wraps to two lines without orphans. Clean.
-- **S33** index.html · 375×812 · full page, 4 screen(s)
+- **S33** index.html · 375×812 · full page, 4 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#S33))
   - 👁 **L33**: Final phone full page, 4 screens at 375x812. Grey header bar with hamburger, logo + wordmark and search icon; title "Moon" now flush with the 16px text edge; Article/Talk + star; the hatnote box; paragraph 1; full-width infobox (moon picture centred at 280px, then all three tinted sections); the rest of the lead; then eleven closed accordion rows with chevrons and hairlines (eight sections plus See also / References / External links); the footer, whose first line breaks before "at 14:12.". No horizontal scroll, no clipped text.
 - **V26** D8 verified by L31: S31-4: the marked 'Physical characteristics' stays on one line; nothing below it moves.
 - **S34** index.html · 1280×800 · scroll-to #Name_and_etymology · hover #sec-body-0 a.wl · wait 900 — link preview open (screens not kept)
@@ -297,23 +297,23 @@ Brief: [`../briefs/wiki.md`](../briefs/wiki.md)
 - **S48** index.html#/history · 375×812 — view history phone (screens not kept)
   - 👁 **L48**: View history on the phone after F30. The table now keeps its width and scrolls sideways inside its region: Date, Editor and Size are on screen, rows are one or two lines tall (names wrap to two lines), hairlines evenly spaced; the 21 October row is a little taller because its off-screen summary takes three lines. Reads as a table again.
 - **V29** D29 verified by L48
-- **G48** `vlmkit check integrity index.html` → exit 1 — verdict: DEFECTS (7 fail, 0 warn, 0 exempted)
-- **G49** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 1 · placeholders 0 · manifestLines 10 · statesExplored 18 · revealedOnly 0
-- **G50** `vlmkit check copy 'index.html#/wiki/Earth' --manifest copy-stub.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 7 · statesExplored 3 · revealedOnly 0
-- **G51** `vlmkit check design index.html` → exit 0 — verdict: COHERENT (0 finding(s))
-- **G52** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (0 finding(s))
-- **G53** `vlmkit check color index.html` → exit 0 — verdict: CONSISTENT (0 finding(s))
-- **G54** `vlmkit check a11y contrast index.html` → exit 0 — inspected 355 · failures 0
-- **G55** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 355 · failures 0
-- **G56** `vlmkit check a11y focus index.html` → exit 0 — steps 64 · findings 5
-- **G57** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 123 · failures 0 · wcagExempt 86
-- **G58** `vlmkit scan scroll index.html` → exit 0 — containers 0 · overflowX 0 · issues 0
-- **G59** `vlmkit scan handlers index.html` → exit 0 — registrations 454 · elements 201 · suspects 0
-- **G60** `vlmkit check interactions index.html --max-elements 130` → exit 1 — elements 123 · suspects 2 · warns 28
-- **G61** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 2 · issues 0 · sweepRanges 0
-- **G62** `vlmkit check scroll index.html` → exit 0 — pageScrolled 1080 · stickyFixed 3 · engagedSticky 2 · snaps 0 · issues 0
-- **G63** `vlmkit stress media index.html` → exit 0 — variants 5 · suspects 0 · warns 1
-- **G64** `vlmkit stress i18n index.html` → exit 0 — inflate 1.4 · inspected 407 · overflowing 150
+- **G48** `vlmkit check integrity index.html` → exit 1 — verdict: DEFECTS (7 fail, 0 warn, 0 exempted) ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G48))
+- **G49** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 1 · placeholders 0 · manifestLines 10 · statesExplored 18 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G49))
+- **G50** `vlmkit check copy 'index.html#/wiki/Earth' --manifest copy-stub.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 7 · statesExplored 3 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G50))
+- **G51** `vlmkit check design index.html` → exit 0 — verdict: COHERENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G51))
+- **G52** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G52))
+- **G53** `vlmkit check color index.html` → exit 0 — verdict: CONSISTENT (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G53))
+- **G54** `vlmkit check a11y contrast index.html` → exit 0 — inspected 355 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G54))
+- **G55** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 355 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G55))
+- **G56** `vlmkit check a11y focus index.html` → exit 0 — steps 64 · findings 5 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G56))
+- **G57** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 123 · failures 0 · wcagExempt 86 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G57))
+- **G58** `vlmkit scan scroll index.html` → exit 0 — containers 0 · overflowX 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G58))
+- **G59** `vlmkit scan handlers index.html` → exit 0 — registrations 454 · elements 201 · suspects 0 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G59))
+- **G60** `vlmkit check interactions index.html --max-elements 130` → exit 1 — elements 123 · suspects 2 · warns 28 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G60))
+- **G61** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 2 · issues 0 · sweepRanges 0 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G61))
+- **G62** `vlmkit check scroll index.html` → exit 0 — pageScrolled 1080 · stickyFixed 3 · engagedSticky 2 · snaps 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G62))
+- **G63** `vlmkit stress media index.html` → exit 0 — variants 5 · suspects 0 · warns 1 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G63))
+- **G64** `vlmkit stress i18n index.html` → exit 0 — inflate 1.4 · inspected 407 · overflowing 150 ([output](https://mizchi.github.io/vlmkit/sites/wiki/judgment/#G64))
 - **N17** false-positive about G48: Unchanged from G30 (N11): the 7 text-collision findings are the bounding box of '#sec-body-0 > p:nth-of-type(2)', which wraps around the floated infobox; S7 and S31-2 show no glyph near the table.
 - **N18** accepted about G49: As G31 (N12): only the stub line is missing on the article; G50 finds it on #/wiki/Earth.
 - **N19** false-positive about G56: The same five skip-row warns as G26/G38: jumps across prose with no links.

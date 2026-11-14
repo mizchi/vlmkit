@@ -1,6 +1,6 @@
 # Findwell — judgment log
 
-How this interactive app — search home with autocomplete, then a results page was judged, in order. Rendered from `judgment.sqlite` by `examples/sites/judge.mjs`; `judge.mjs <site> render` writes the page, with the screens the log keeps, to `judgment/`.
+How this interactive app — search home with autocomplete, then a results page was judged, in order. Rendered from `judgment.sqlite` by `examples/sites/judge.mjs`; the published page, with the screens the log keeps and every gate output, is <https://mizchi.github.io/vlmkit/sites/search/judgment/>.
 
 **3** rounds · **71** gate runs (8 failing) · **84** screens in 55 shots (11 kept) · **55** looks · defects: **13** by eye, **8** by a gate · 14 gate false positive(s)
 
@@ -65,42 +65,42 @@ Brief: [`../briefs/search.md`](../briefs/search.md)
 - **N1** decision: Reference study (google.png, google-suggest.png at 1280x800, read for layout only): I took the proportions — wordmark top near y=210, a 584x50 pill with one leading icon and two trailing icons, two grey buttons 30px under it, two text links + app grid + pill sign-in at top right, a footer band pinned to the bottom with one link group left and one right — and the idea that the open suggestion list joins the box into one card. Nothing else: the wordmark is "Findwell" set in system bold with my own eight-colour sequence (blue, red, green, blue, amber, purple, green, red), the button labels, link names and all copy are the brief's or mine, and the icons are generic paths. The suggest screenshot did not show a list (the reference capture has the text but no dropdown), so the list layout is from the brief.
 - **N2** decision: Implementation: MoonBit + luna, one app.js built by luna-build.mjs. No inline <script>: browser objects luna does not wrap (location, history.pushState/back, popstate, document-level click/keydown/focusin, focus by id, <dialog>.showModal) go through @js.Any in src/main/js.mbt. index.html keeps a static <main><h1>Findwell</h1> fallback inside #app that render_to replaces. Data (42 pages, 32 suggestions, 4x6 questions, related searches, apps, info pages) lives in src/main/data.mbt. Views are chosen by URL: ?q= results (+ &tab=, &page=), ?go=<id> the "You would now leave Findwell" page, ?info=<slug> the small pages behind footer/top links, ?theme=dark|light.
 - **N3** decision: Gate set (per PROTOCOL plus the brief's list), run on the home view (index.html) and on the "moon landing" results (index.html?q=moon+landing) since they are two different pages in one file: check integrity, check copy (copy-home.txt on home, copy-results.txt on results; copy.txt is the union, because the brief's required lines are split across the two views — "People also ask"/"Related searches"/"Next" exist only on results, "Findwell Search"/"Feeling Lucky"/"Sign in" only on home), check design, check composition, check color, check a11y contrast (light and ?theme=dark, both views), check a11y focus, check a11y touch, scan scroll, scan handlers, check interactions (combobox, menus, apps panel, accordion), plus check breakpoints --sweep (the knowledge panel moves under 1000px, the header restacks under 760px), verify flow (type, choose a suggestion, land on results, go Back), stress data (long titles, many results). No check animation/motion: nothing animates.
-- **G1** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 3 exempted)
-- **G2** `vlmkit check integrity 'index.html?q=moon+landing'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 7 exempted)
-- **G3** `vlmkit check copy index.html --manifest copy-home.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 5 · statesExplored 3 · revealedOnly 0
-- **G4** `vlmkit check copy 'index.html?q=moon+landing' --manifest copy-results.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 4 · statesExplored 8 · revealedOnly 0
-- **G5** `vlmkit check design index.html` → exit 0 — verdict: DRIFT (2 finding(s))
-- **G6** `vlmkit check design 'index.html?q=moon+landing'` → exit 0 — verdict: DRIFT (2 finding(s))
-- **G7** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (0 finding(s))
-- **G8** `vlmkit check composition 'index.html?q=moon+landing'` → exit 0 — verdict: COMPOSED (0 finding(s))
-- **G9** `vlmkit check color index.html` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s))
+- **G1** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 3 exempted) ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G1))
+- **G2** `vlmkit check integrity 'index.html?q=moon+landing'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 7 exempted) ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G2))
+- **G3** `vlmkit check copy index.html --manifest copy-home.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 5 · statesExplored 3 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G3))
+- **G4** `vlmkit check copy 'index.html?q=moon+landing' --manifest copy-results.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 4 · statesExplored 8 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G4))
+- **G5** `vlmkit check design index.html` → exit 0 — verdict: DRIFT (2 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G5))
+- **G6** `vlmkit check design 'index.html?q=moon+landing'` → exit 0 — verdict: DRIFT (2 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G6))
+- **G7** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G7))
+- **G8** `vlmkit check composition 'index.html?q=moon+landing'` → exit 0 — verdict: COMPOSED (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G8))
+- **G9** `vlmkit check color index.html` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G9))
   - ✗ **D8** defect `.sbox (input#q's visible boundary)`: The search pill's 1px border is #c6cad0 on white, about 1.6:1, so the field's boundary fails WCAG 1.4.11's 3:1 (the gate flags the input, whose visible edge is that border).
-- **G10** `vlmkit check color 'index.html?q=moon+landing'` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s))
-- **G11** `vlmkit check a11y contrast index.html` → exit 0 — inspected 21 · failures 0
-- **G12** `vlmkit check a11y contrast 'index.html?q=moon+landing'` → exit 0 — inspected 108 · failures 0
+- **G10** `vlmkit check color 'index.html?q=moon+landing'` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G10))
+- **G11** `vlmkit check a11y contrast index.html` → exit 0 — inspected 21 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G11))
+- **G12** `vlmkit check a11y contrast 'index.html?q=moon+landing'` → exit 0 — inspected 108 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G12))
   - ✗ **D9** defect `.pager .pg-fixed`: The pager's 'Findw' was one span painted with a clipped gradient, so contrast could not be measured on it (the gate skipped it as background-image text).
-- **G13** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 21 · failures 0
-- **G14** `vlmkit check a11y contrast 'index.html?q=moon+landing&theme=dark'` → exit 0 — inspected 108 · failures 0
-- **G15** `vlmkit check a11y focus index.html` → exit 0 — steps 16 · findings 2
-- **G16** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 16 · failures 0 · wcagExempt 0
-- **G17** `vlmkit check a11y focus 'index.html?q=moon+landing'` → exit 0 — steps 51 · findings 0
-- **G18** `vlmkit check a11y touch 'index.html?q=moon+landing'` → exit 1 — level AA · inspected 51 · failures 4 · wcagExempt 0
+- **G13** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 21 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G13))
+- **G14** `vlmkit check a11y contrast 'index.html?q=moon+landing&theme=dark'` → exit 0 — inspected 108 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G14))
+- **G15** `vlmkit check a11y focus index.html` → exit 0 — steps 16 · findings 2 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G15))
+- **G16** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 16 · failures 0 · wcagExempt 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G16))
+- **G17** `vlmkit check a11y focus 'index.html?q=moon+landing'` → exit 0 — steps 51 · findings 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G17))
+- **G18** `vlmkit check a11y touch 'index.html?q=moon+landing'` → exit 1 — level AA · inspected 51 · failures 4 · wcagExempt 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G18))
   - ✗ **D7** defect `nav.pager a.pg`: The page-number links under the e's are 20px wide, below the 24px WCAG 2.5.8 minimum, and sit side by side.
-- **G19** `vlmkit scan scroll index.html` → exit 0 — containers 0 · overflowX 0 · issues 0
-- **G20** `vlmkit scan handlers index.html` → exit 0 — registrations 24 · elements 17 · suspects 0
-- **G21** `vlmkit scan scroll 'index.html?q=moon+landing'` → exit 0 — containers 0 · overflowX 0 · issues 0
-- **G22** `vlmkit scan handlers 'index.html?q=moon+landing'` → exit 0 — registrations 61 · elements 53 · suspects 0
-- **G23** `vlmkit check interactions index.html` → exit 1 — elements 16 · suspects 4 · warns 1
+- **G19** `vlmkit scan scroll index.html` → exit 0 — containers 0 · overflowX 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G19))
+- **G20** `vlmkit scan handlers index.html` → exit 0 — registrations 24 · elements 17 · suspects 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G20))
+- **G21** `vlmkit scan scroll 'index.html?q=moon+landing'` → exit 0 — containers 0 · overflowX 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G21))
+- **G22** `vlmkit scan handlers 'index.html?q=moon+landing'` → exit 0 — registrations 61 · elements 53 · suspects 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G22))
+- **G23** `vlmkit check interactions index.html` → exit 1 — elements 16 · suspects 4 · warns 1 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G23))
   - ✗ **D6** defect `#q`: ArrowDown on the empty search box does nothing although the combobox declares aria-expanded: with no text there were no suggestions to open.
-- **G24** `vlmkit check interactions 'index.html?q=moon+landing'` → exit 1 — elements 30 · suspects 7 · warns 2
+- **G24** `vlmkit check interactions 'index.html?q=moon+landing'` → exit 1 — elements 30 · suspects 7 · warns 2 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G24))
   - ✗ **D5** defect `#q, #more-btn, #settings-btn, #apps-btn, Tools, .paa-btn`: aria-controls points at ids that do not exist while closed: luna's show() unmounts the menus, the apps panel, the suggestion listbox, the tools row and each PAA answer, so the controlled element is gone exactly when a screen reader follows the reference.
 - **F5** fix for D5: Added keep_mounted(cond, render): the popup is always in the DOM inside a wrapper that is display: contents when open and display: none when closed. Used for every menu, the apps panel, the listbox, the tools row and the PAA answers.
 - **F6** fix for D6: With nothing typed, the suggestion list offers the five searches that have full results (all in normal weight), so ArrowDown opens it from an empty box too.
 - **F7** fix for D7: Page cells are at least 28px wide (min-width + 2px padding).
 - **F8** fix for D9: Each pager letter is its own span in a solid wordmark colour, like the big wordmark.
 - **F9** fix for D8: The box border token is now #8d9399 on white (3.1:1) and #767b82 on the dark background (3.9:1).
-- **G25** `vlmkit check interactions index.html` → exit 0 — elements 16 · suspects 0 · warns 2
-- **G26** `vlmkit check interactions 'index.html?q=moon+landing'` → exit 0 — elements 30 · suspects 0 · warns 2
+- **G25** `vlmkit check interactions index.html` → exit 0 — elements 16 · suspects 0 · warns 2 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G25))
+- **G26** `vlmkit check interactions 'index.html?q=moon+landing'` → exit 0 — elements 30 · suspects 0 · warns 2 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G26))
 - **V5** D5 verified by G26: no broken-aria-controls on results
 - **V6** D6 verified by G25: ArrowDown: expanded false -> true, opens listbox
 - **S8** index.html · 1280×800 · element .combo · @2x · focus #q — search box focused, list closed (screens not kept)
@@ -111,20 +111,20 @@ Brief: [`../briefs/search.md`](../briefs/search.md)
 - **N7** accepted about G15: skip-row: focus jumps from Sign in down to the search box (317px) and from Feeling Lucky to the footer (266px) because the home view is a mostly empty page by design — the wordmark and the empty band hold nothing focusable. Order follows the visual order.
 - **N8** accepted about G5: component-drift on button (home): the six buttons are three different controls on purpose — round icon buttons (apps, mic, camera), the two grey action buttons, and the Settings footer link styled as a link. Making them one style would make the footer look like an action bar.
 - **N9** accepted about G6: component-drift on h2 (results): the knowledge panel's title is 26px while 'People also ask' and 'Related searches' are 20px. The panel title names the subject of the search and is meant to read larger than the section labels.
-- **G27** `vlmkit check color index.html` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s))
-- **G28** `vlmkit check color 'index.html?q=moon+landing'` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s))
-- **G29** `vlmkit check a11y touch 'index.html?q=moon+landing'` → exit 0 — level AA · inspected 51 · failures 0 · wcagExempt 0
-- **G30** `vlmkit check a11y contrast 'index.html?q=moon+landing'` → exit 0 — inspected 113 · failures 0
+- **G27** `vlmkit check color index.html` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G27))
+- **G28** `vlmkit check color 'index.html?q=moon+landing'` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G28))
+- **G29** `vlmkit check a11y touch 'index.html?q=moon+landing'` → exit 0 — level AA · inspected 51 · failures 0 · wcagExempt 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G29))
+- **G30** `vlmkit check a11y contrast 'index.html?q=moon+landing'` → exit 0 — inspected 113 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G30))
 - **V7** D7 verified by G29: 0 undersized targets
 - **V8** D9 verified by G30: 113 inspected, none skipped for a gradient
 - **N10** false-positive about G28: control-boundary-invisible on input#q (home G27 and results G28): the input is deliberately unstyled inside the pill; its visible boundary is the pill's 1px border, now #8d9399 on #ffffff = 3.1:1 (D8), plus the shadow on hover/focus. The gate measures the <input> element alone and cannot see the wrapper that draws the field.
 - **N11** false-positive about G27: Same as the note on G28: the boundary is drawn by the .sbox pill around the input, at 3.1:1.
-- **S9** index.html · 1280×800 · full page, 1 screen(s)
+- **S9** index.html · 1280×800 · full page, 1 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/search/judgment/#S9))
   - 👁 **L9**: Desktop home after the border change. The pill's border is now a mid grey that reads clearly as the edge of a field against white, without looking heavy; the rest of the page is unchanged: centred wordmark, box, two grey buttons 30px below, top-right links and Sign in, footer band at the bottom with Settings ▾. Balance is good — the empty space under the buttons matches the reference's proportions.
-- **S10** index.html · 375×812 · full page, 1 screen(s)
+- **S10** index.html · 375×812 · full page, 1 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/search/judgment/#S10))
   - 👁 **L10**: Mobile home, 375 wide. Top bar fits; wordmark at 60px; box full width less 16px each side with the darker border; the two buttons side by side. The footer wraps into three centred rows: "About Advertising Business", then "How search works" alone on its own row, then "Privacy Terms Settings ▾". The lone middle row reads like an orphan, and the band takes 140px of a page that has nothing else below the buttons.
     - ✗ **D12** defect `.site-footer (mobile)`: On phones the footer's first group wraps and leaves 'How search works' alone on a middle row.
-- **S11** index.html?q=moon+landing · 768×1024 · full page, 3 screen(s)
+- **S11** index.html?q=moon+landing · 768×1024 · full page, 3 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/search/judgment/#S11))
   - 👁 **L11**: Results at tablet width (768). The header is wordmark / box / avatar in one row, and the box, tabs and results share x=140. The knowledge panel has moved above the results as a full-width card: drawing, title, subtitle, description and fact table, all legible; the drawing is tall (about 285px) but the card is coherent. Results, People also ask (four rows with carets) and Related searches (two columns of chips) follow. At the bottom the pager reads "Findw e e e e ell": each e now sits in a 28px cell, so the word has gaps between the e's and no longer reads as one word — a side effect of the touch-target fix. Footer fits in one row.
     - ✗ **D10** defect `nav.pager .pg`: The pager word falls apart into 'Findw e e e e ell': the 28px minimum cell (D7) puts gaps between the e's.
 - **S12** index.html?q=moon+landing · 375×812 · full page, 4 screen(s) (screens not kept)
@@ -166,7 +166,7 @@ Brief: [`../briefs/search.md`](../briefs/search.md)
 - **S22** index.html?q=moon+landing · 1280×800 · element .paa · click #paa-b0 · click #paa-b2 — PAA two opened (screens not kept)
   - 👁 **L22**: Close-up of People also ask after opening the first and the third question. Both show their caret flipped up and a grey answer under the question; the unopened rows keep their down caret. The list now has six questions: the two openings each appended one more at the end ("Why did the crewed landings stop in 1972?", "Is the flag still standing on the Moon?"), which is the brief's cap of two extra. Dividers run full width and the spacing between rows is even.
 - **V14** D14 verified by L21: three drawings per topic, no two neighbours alike
-- **S23** index.html?q=moon+landing&theme=dark · 1280×800 · full page, 3 screen(s)
+- **S23** index.html?q=moon+landing&theme=dark · 1280×800 · full page, 3 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/search/judgment/#S23))
   - 👁 **L23**: Results in the dark theme (?theme=dark), desktop, three screens. Background is a near-black grey, text off-white, titles a light periwinkle blue, snippets light grey with bold terms in white; the wordmark letters switch to their lighter tints and stay distinct. The knowledge panel keeps its night-sky drawing (which suits dark), with a thin lighter border; its fact table dividers are visible but quiet. People also ask rows and chips use slightly lighter greys than the page, so they still read as controls. Pager letters in pastel wordmark colours, numbers in blue, the current one in white. Footer band a shade lighter than the page. Nothing disappears or goes muddy.
 - **S24** index.html · 1280×800 · click #settings-btn — settings menu (screens not kept)
   - 👁 **L24**: Home with the footer's Settings menu open. The menu opens upward from Settings, right-aligned to it, as a white card with a shadow over the empty band above the footer: "Search settings" (focused, grey), "Dark theme: Off", "Advanced search". Settings is underlined and its caret flipped up. The menu does not overlap the footer or run off the right edge. Item text is left-aligned with a consistent indent (the space for a check mark).
@@ -186,21 +186,21 @@ Brief: [`../briefs/search.md`](../briefs/search.md)
 - **S29** index.html?info=how · 375×812 — info page on a phone (screens not kept)
   - 👁 **L29**: Phone info page "How search works" (reached from the footer link). The wordmark and the heading now share x=16, and the content starts closer under the header rule. Heading, a five-line paragraph (the last line is a single word, "page.", a small widow but acceptable in body text) and the Back pill. Plain and readable.
 - **V16** D16 verified by L29: header and content share x=16
-- **G31** `vlmkit verify flow index.html --flow flow.json` → exit 1 — verdict: FAILED (1/7 steps)
+- **G31** `vlmkit verify flow index.html --flow flow.json` → exit 1 — verdict: FAILED (1/7 steps) ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G31))
   - ✗ **D17** defect `#suggestions li`: aria-activedescendant names sugg-0 but no option has that id: the first row was rendered as id='sugg-1' (two rows had sugg-1). luna's for_each passed a stale index to rows it kept while the list changed under typing.
 - **F17** fix for D17: The listbox rows are rendered with index_each (a row per position, item read through its getter), so ids are sugg-0…sugg-7 in order and the text and click use the current item.
-- **G32** `vlmkit verify flow index.html --flow flow.json` → exit 1 — verdict: FAILED (6/7 steps)
+- **G32** `vlmkit verify flow index.html --flow flow.json` → exit 1 — verdict: FAILED (6/7 steps) ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G32))
 - **N12** tool about G32: verify flow has no way to go back in history: its actions are click/focus/hover/press/fill/type/wait. I tried {action:'press', key:'Alt+ArrowLeft'} for step 7 and got '✗ .home-buttons visible (got: hidden/absent)' — a browser-chrome shortcut does not reach the page in headless Chromium. Step 6 still covers Back, because the app's Back link calls history.back() and the results come back through popstate; the flow's last step now clicks the wordmark home instead.
-- **G33** `vlmkit verify flow index.html --flow flow.json` → exit 0 — verdict: DONE (7/7 steps)
+- **G33** `vlmkit verify flow index.html --flow flow.json` → exit 0 — verdict: DONE (7/7 steps) ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G33))
 - **V17** D17 verified by G33: aria-activedescendant=sugg-0 and #sugg-0 aria-selected=true
-- **G34** `vlmkit check breakpoints 'index.html?q=moon+landing' --sweep` → exit 0 — breakpoints 3 · issues 0 · sweepRanges 0
-- **G35** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 3 · issues 0 · sweepRanges 0
-- **G36** `vlmkit stress data 'index.html?q=moon+landing'` → exit 1 — variants 14 · findings 19
+- **G34** `vlmkit check breakpoints 'index.html?q=moon+landing' --sweep` → exit 0 — breakpoints 3 · issues 0 · sweepRanges 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G34))
+- **G35** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 3 · issues 0 · sweepRanges 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G35))
+- **G36** `vlmkit stress data 'index.html?q=moon+landing'` → exit 1 — variants 14 · findings 19 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G36))
   - ✗ **D18** defect `.r-site, .r-h, .sitelinks, .kp`: With a 62-character unbreakable name the site name, titles and sitelinks stick out of the column (169px), and at 375px the page scrolls sideways by 116px; the knowledge panel clips 100px of it.
   - ✗ **D19** defect `.pager .pg-word`: With 9,999,999 in place of the page numbers the pager word is 453px wide and the page scrolls sideways at 375px.
 - **F18** fix for D18: Site names are one line with an ellipsis; titles, snippets, sitelinks, PAA questions, chips, the panel and the leave/about text wrap anywhere; the sitelink and chip grids use minmax(0, 1fr) so a long item cannot widen its column.
 - **F19** fix for D19: The pager word may wrap (flex-wrap, max-width 100%), so a wider number moves to the next row instead of out of the page.
-- **G37** `vlmkit stress data 'index.html?q=moon+landing'` → exit 1 — variants 14 · findings 16
+- **G37** `vlmkit stress data 'index.html?q=moon+landing'` → exit 1 — variants 14 · findings 16 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G37))
 - **V18** D19 verified by G37: big-number: ok
 - **V19** D18 verified by G37: no page-overflow-x and no protrusion from titles/sitelinks/panel; what is left is the favicon letter (see note)
 - **N13** false-positive about G37: The ten remaining long-text protrusions are all 'article > div:nth-of-type(1) > span:nth-of-type(1)', which is span.favicon: the stress variant wrote the 62-character name into the favicon circle itself. The page never puts more than one character there — favicon() renders p.site.view(end_offset=1), the first letter of the site name — so a long site name cannot reach that span. The site name's own span (.r-site) is the second span and no longer protrudes.
@@ -225,37 +225,37 @@ Brief: [`../briefs/search.md`](../briefs/search.md)
 
 ### R3 · final check (builder)
 
-- **G38** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 3 exempted)
-- **G39** `vlmkit check integrity 'index.html?q=moon+landing'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 7 exempted)
-- **G40** `vlmkit check copy index.html --manifest copy-home.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 5 · statesExplored 3 · revealedOnly 0
-- **G41** `vlmkit check copy 'index.html?q=moon+landing' --manifest copy-results.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 4 · statesExplored 11 · revealedOnly 0
-- **G42** `vlmkit check design index.html` → exit 0 — verdict: DRIFT (2 finding(s))
-- **G43** `vlmkit check design 'index.html?q=moon+landing'` → exit 0 — verdict: DRIFT (2 finding(s))
-- **G44** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (0 finding(s))
-- **G45** `vlmkit check composition 'index.html?q=moon+landing'` → exit 0 — verdict: COMPOSED (0 finding(s))
-- **G46** `vlmkit check color index.html` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s))
-- **G47** `vlmkit check color 'index.html?q=moon+landing'` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s))
-- **G48** `vlmkit check a11y contrast index.html` → exit 0 — inspected 21 · failures 0
-- **G49** `vlmkit check a11y contrast 'index.html?q=moon+landing'` → exit 0 — inspected 113 · failures 0
-- **G50** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 21 · failures 0
-- **G51** `vlmkit check a11y contrast 'index.html?q=moon+landing&theme=dark'` → exit 0 — inspected 113 · failures 0
-- **G52** `vlmkit check a11y contrast 'index.html?q=moon+landing&tab=images&theme=dark'` → exit 0 — inspected 61 · failures 0
-- **G53** `vlmkit check a11y contrast 'index.html?q=xyzzy&theme=dark'` → exit 0 — inspected 35 · failures 0
-- **G54** `vlmkit check a11y focus index.html` → exit 0 — steps 16 · findings 2
-- **G55** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 16 · failures 0 · wcagExempt 0
-- **G56** `vlmkit scan scroll index.html` → exit 0 — containers 0 · overflowX 0 · issues 0
-- **G57** `vlmkit scan handlers index.html` → exit 0 — registrations 49 · elements 35 · suspects 0
-- **G58** `vlmkit check a11y focus 'index.html?q=moon+landing'` → exit 0 — steps 51 · findings 0
-- **G59** `vlmkit check a11y touch 'index.html?q=moon+landing'` → exit 0 — level AA · inspected 51 · failures 0 · wcagExempt 0
-- **G60** `vlmkit scan scroll 'index.html?q=moon+landing'` → exit 0 — containers 0 · overflowX 0 · issues 0
-- **G61** `vlmkit scan handlers 'index.html?q=moon+landing'` → exit 0 — registrations 95 · elements 77 · suspects 0
-- **G62** `vlmkit check interactions index.html` → exit 0 — elements 16 · suspects 0 · warns 2
-- **G63** `vlmkit check interactions 'index.html?q=moon+landing'` → exit 0 — elements 30 · suspects 0 · warns 2
-- **G64** `vlmkit check interactions 'index.html?q=moon+landing' --handlers` → exit 0 — elements 30 · suspects 0 · warns 2
-- **G65** `vlmkit check breakpoints 'index.html?q=moon+landing' --sweep` → exit 0 — breakpoints 3 · issues 0 · sweepRanges 0
-- **G66** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 3 · issues 0 · sweepRanges 0
-- **G67** `vlmkit verify flow index.html --flow flow.json` → exit 0 — verdict: DONE (7/7 steps)
-- **G68** `vlmkit stress data 'index.html?q=moon+landing'` → exit 1 — variants 14 · findings 16
+- **G38** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 3 exempted) ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G38))
+- **G39** `vlmkit check integrity 'index.html?q=moon+landing'` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 7 exempted) ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G39))
+- **G40** `vlmkit check copy index.html --manifest copy-home.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 5 · statesExplored 3 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G40))
+- **G41** `vlmkit check copy 'index.html?q=moon+landing' --manifest copy-results.txt` → exit 0 — missing 0 · placeholders 0 · manifestLines 4 · statesExplored 11 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G41))
+- **G42** `vlmkit check design index.html` → exit 0 — verdict: DRIFT (2 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G42))
+- **G43** `vlmkit check design 'index.html?q=moon+landing'` → exit 0 — verdict: DRIFT (2 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G43))
+- **G44** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G44))
+- **G45** `vlmkit check composition 'index.html?q=moon+landing'` → exit 0 — verdict: COMPOSED (0 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G45))
+- **G46** `vlmkit check color index.html` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G46))
+- **G47** `vlmkit check color 'index.html?q=moon+landing'` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G47))
+- **G48** `vlmkit check a11y contrast index.html` → exit 0 — inspected 21 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G48))
+- **G49** `vlmkit check a11y contrast 'index.html?q=moon+landing'` → exit 0 — inspected 113 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G49))
+- **G50** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 21 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G50))
+- **G51** `vlmkit check a11y contrast 'index.html?q=moon+landing&theme=dark'` → exit 0 — inspected 113 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G51))
+- **G52** `vlmkit check a11y contrast 'index.html?q=moon+landing&tab=images&theme=dark'` → exit 0 — inspected 61 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G52))
+- **G53** `vlmkit check a11y contrast 'index.html?q=xyzzy&theme=dark'` → exit 0 — inspected 35 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G53))
+- **G54** `vlmkit check a11y focus index.html` → exit 0 — steps 16 · findings 2 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G54))
+- **G55** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 16 · failures 0 · wcagExempt 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G55))
+- **G56** `vlmkit scan scroll index.html` → exit 0 — containers 0 · overflowX 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G56))
+- **G57** `vlmkit scan handlers index.html` → exit 0 — registrations 49 · elements 35 · suspects 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G57))
+- **G58** `vlmkit check a11y focus 'index.html?q=moon+landing'` → exit 0 — steps 51 · findings 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G58))
+- **G59** `vlmkit check a11y touch 'index.html?q=moon+landing'` → exit 0 — level AA · inspected 51 · failures 0 · wcagExempt 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G59))
+- **G60** `vlmkit scan scroll 'index.html?q=moon+landing'` → exit 0 — containers 0 · overflowX 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G60))
+- **G61** `vlmkit scan handlers 'index.html?q=moon+landing'` → exit 0 — registrations 95 · elements 77 · suspects 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G61))
+- **G62** `vlmkit check interactions index.html` → exit 0 — elements 16 · suspects 0 · warns 2 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G62))
+- **G63** `vlmkit check interactions 'index.html?q=moon+landing'` → exit 0 — elements 30 · suspects 0 · warns 2 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G63))
+- **G64** `vlmkit check interactions 'index.html?q=moon+landing' --handlers` → exit 0 — elements 30 · suspects 0 · warns 2 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G64))
+- **G65** `vlmkit check breakpoints 'index.html?q=moon+landing' --sweep` → exit 0 — breakpoints 3 · issues 0 · sweepRanges 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G65))
+- **G66** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 3 · issues 0 · sweepRanges 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G66))
+- **G67** `vlmkit verify flow index.html --flow flow.json` → exit 0 — verdict: DONE (7/7 steps) ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G67))
+- **G68** `vlmkit stress data 'index.html?q=moon+landing'` → exit 1 — variants 14 · findings 16 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G68))
 - **N15** accepted about G42: Same component-drift on home buttons as G5 (N8): icon buttons, grey action buttons and the Settings footer link are different controls on purpose.
 - **N16** accepted about G43: Same h2 drift as G6 (N9): the knowledge panel title is deliberately larger than the section labels.
 - **N17** false-positive about G46: Same as N10/N11: input#q is borderless inside the .sbox pill, whose 1px #8d9399 border is 3.1:1 on white.
@@ -267,11 +267,11 @@ Brief: [`../briefs/search.md`](../briefs/search.md)
 - **N23** accepted about G57: unprobed-handler-types is an inventory warning; the handlers are driven by check interactions (G62/G63) and verify flow (G67).
 - **N24** accepted about G61: Same as the note on G57.
 - **N25** false-positive about G68: Same as N13/N14: every remaining long-text failure is span.favicon, which only ever holds the site's first letter, and the empty variants are states the script replaces with its own empty state (S20).
-- **S37** index.html · 1280×800 · full page, 1 screen(s)
+- **S37** index.html · 1280×800 · full page, 1 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/search/judgment/#S37))
   - 👁 **L37**: Final desktop home. Top-right: Mail, Images, the app grid and the blue Sign in pill. The multicolour Findwell wordmark is centred with its top near y=218, the 584px pill box at y=326-376 with a grey magnifier, a divider, mic and camera, and its mid-grey border reads as a field. Findwell Search and Feeling Lucky sit 30px below in grey. The footer band is pinned to the bottom with About / Advertising / Business / How search works left and Privacy / Terms / Settings ▾ right. Spacing and alignment are even; it is obvious the box is the one thing to use.
-- **S38** index.html · 768×1024 · full page, 1 screen(s)
+- **S38** index.html · 768×1024 · full page, 1 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/search/judgment/#S38))
   - 👁 **L38**: Final tablet home (768x1024). Same structure, scaled: the wordmark at 88px fits with room, the box keeps 584px and is centred, buttons below; top bar right-aligned; the footer band at the bottom holds both groups on one row with a gap between them. The large empty lower half matches the minimal pattern and nothing looks stranded.
-- **S39** index.html · 375×812 · full page, 1 screen(s)
+- **S39** index.html · 375×812 · full page, 1 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/search/judgment/#S39))
   - 👁 **L39**: Final phone home (375). The top bar fits on one line; the wordmark is 60px; the box runs x=16 to x=359 (full width less 16px a side); the two buttons side by side; the footer in two rows (About Advertising Business How search works / Privacy Terms Settings ▾). No overflow, no orphaned row, every target comfortably sized.
 - **S40** index.html?q=moon+landing · 1280×800 · full page, 3 screen(s) (screens not kept)
   - 👁 **L40**: Final desktop results for "moon landing", three screens. Header: wordmark, the query pill starting at x=180 like the tabs and results, avatar. Tabs with All underlined, More ▾ and Tools. Stats, then Lunar Archive with four sitelinks in two columns, Orbit Facts with bold "landings"/"landing", People also ask (four rows), then three more results with grey dates before their snippets, Related searches (eight chips in two columns) and the pager "Findweeeeell" with 1-5 and Next. The knowledge panel sits in the right column from y=156: drawing, title, subtitle, description, five-row fact table. Hierarchy reads right: titles in blue at 20px, source lines small and grey, snippets 14px.
@@ -308,9 +308,9 @@ Brief: [`../briefs/search.md`](../briefs/search.md)
   - 👁 **L54**: Final: dark results on desktop, three screens. Near-black page, off-white text, periwinkle titles and sitelinks, light grey snippets with white bold terms, pastel wordmark. The knowledge panel's night drawing sits naturally on the dark page and its border is a lighter grey line. PAA rows, chips (a lighter grey fill) and the pager read clearly; the footer band is a shade lighter. Same layout as light.
 - **S55** index.html?q=moon+landing&theme=dark · 375×812 · full page, 4 screen(s) — dark results (screens not kept)
   - 👁 **L55**: Final: dark results on a phone, four screens. The compact knowledge card with "More about Moon landing ▾" in light blue, titles wrapping in periwinkle, ellipsised breadcrumbs in grey, PAA dividers visible, eight dark chips in one column, the pastel pager and Next, and the footer. Contrast holds everywhere I looked; the lavender avatar with a dark R stands out without glaring.
-- **G69** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 3 exempted)
-- **G70** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 16 · failures 0 · wcagExempt 0
-- **G71** `vlmkit check interactions index.html` → exit 0 — elements 16 · suspects 0 · warns 2
+- **G69** `vlmkit check integrity index.html` → exit 0 — verdict: CLEAN (0 fail, 0 warn, 3 exempted) ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G69))
+- **G70** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 16 · failures 0 · wcagExempt 0 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G70))
+- **G71** `vlmkit check interactions index.html` → exit 0 — elements 16 · suspects 0 · warns 2 ([output](https://mizchi.github.io/vlmkit/sites/search/judgment/#G71))
 - **N26** false-positive about G71: Same two combobox warnings as G62 (N20): focus painted on the pill, DOM focus kept in the input by the combobox pattern.
 - **N27** decision: Where luna needed working around (all in src/main): (1) svg(class=…) sets className, which SVG ignores, so every svg got its class via ref_ + setAttribute (D1). (2) show() unmounts its content, so aria-controls pointed at ids that did not exist; keep_mounted() keeps popups in the DOM behind a display: contents / display: none wrapper (D5). (3) for_each's index argument went stale while the suggestion list changed under typing (rows came out as sugg-1, sugg-1, sugg-2 …); the listbox uses index_each (D17), and the typed-prefix split reads signals inside text_dyn because for_each keeps rows whose item is unchanged (D3). (4) A dynamic attribute can only set a value, never remove the attribute, so aria-activedescendant is set/removed in an effect on the input's ref. (5) luna_components' combobox/menu/dialog return @core.Node[E, String], not the @element.DomNode the client DOM API composes, so I wrote the APG patterns by hand. (6) No table/tr/th/td/dialog/cite/b helpers: those go through create_element. PAA: "appends one more question below it" is read as appending to the end of the list, as the real pattern does.
 - **done**: Findwell, a fictional search engine in MoonBit + luna: a minimal home (multicolour wordmark, a WAI-ARIA combobox with up to 8 suggestions, typed prefix plain and the rest bold, ArrowUp/Down copying the active option, Escape closing then clearing, ×, voice/camera stubs, Findwell Search and Feeling Lucky, an apps popover, a Settings menu with a dark-theme toggle) and a results page (tabs incl. More and Tools with Any time / All results menus, fixed stats, results with favicon, breadcrumb, visited-purple titles, bold terms, dates, sitelinks and an About this result dialog, People also ask that grows by up to two, a moon-landing knowledge panel that folds above the results under 1000px and behind a button on phones, related-search chips, a Findweeeeell pager with pages 2-3 seeded and 4-5 empty, an Images grid of drawn thumbnails, an empty state), plus a leave interstitial and small info pages, all on pushState/popstate. Final gate set: integrity, copy (split by view), design, composition, color, a11y contrast (light + dark, 6 URLs), focus, touch, scan scroll/handlers, interactions, breakpoints --sweep, verify flow (7/7), stress data; remaining findings are noted as accepted or false positives. 21 defects: 13 by eye, 8 by gate.

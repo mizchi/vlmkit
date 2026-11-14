@@ -29,7 +29,21 @@ import { onTestFinished, test } from "vite-plus/test";
 import { logPaths, publishedFiles, readLog } from "../examples/sites/judge.mjs";
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
-const DEMO_SITES = ["checkout", "dashboard", "docs", "kanban", "magazine", "shop"];
+// The six hand-written sites, then the six written in MoonBit with mizchi/luna, in build-pages order.
+const DEMO_SITES = [
+  "checkout",
+  "dashboard",
+  "docs",
+  "kanban",
+  "magazine",
+  "shop",
+  "chat",
+  "code",
+  "maps",
+  "search",
+  "video",
+  "wiki",
+];
 
 async function buildIntoTempDir() {
   const { buildSite, siteSections } = await import("../scripts/build-pages.mjs");
@@ -51,7 +65,7 @@ async function walk(dir, prefix = "") {
   return out;
 }
 
-test("the site manifest: the landing page at the root, solitaire, the gallery and six demo sites under /sites/, the feature demos under /demos/ and their icons under /icons/", async () => {
+test("the site manifest: the landing page at the root, solitaire, the gallery and twelve demo sites under /sites/, the feature demos under /demos/ and their icons under /icons/", async () => {
   const { siteSections } = await import("../scripts/build-pages.mjs");
 
   assert.deepEqual(

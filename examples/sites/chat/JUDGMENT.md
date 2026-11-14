@@ -1,6 +1,6 @@
 # Parley — AI assistant chat — judgment log
 
-How this interactive app — conversational AI chat UI was judged, in order. Rendered from `judgment.sqlite` by `examples/sites/judge.mjs`; `judge.mjs <site> render` writes the page, with the screens the log keeps, to `judgment/`.
+How this interactive app — conversational AI chat UI was judged, in order. Rendered from `judgment.sqlite` by `examples/sites/judge.mjs`; the published page, with the screens the log keeps and every gate output, is <https://mizchi.github.io/vlmkit/sites/chat/judgment/>.
 
 **4** rounds · **84** gate runs (23 failing) · **70** screens in 64 shots (14 kept) · **64** looks · defects: **11** by eye, **6** by a gate · 4 gate false positive(s)
 
@@ -35,40 +35,40 @@ Brief: [`../briefs/chat.md`](../briefs/chat.md)
 - **S1** index.html · 1280×800 · full page, 1 screen(s) (screens not kept)
   - 👁 **L1**: Desktop 1280x800, one screen (the app is a fixed-height shell, the conversation scrolls inside). Left: a 260px grey sidebar with the "Parley" wordmark, a collapse icon, a bordered "New chat" button, then a search field — but the magnifier icon sits on its own line ABOVE the field, at x≈22 y≈124, instead of inside the field's left padding, which leaves the field looking empty-padded. History groups Today / Previous 7 days / Older read cleanly, 12 titles, the current one ("Planning a lunar observati…") on a darker pill with its ⋯ button showing; long titles ellipsize. The Parley logo next to the wordmark is solid BLACK, not the teal accent the stylesheet asks for, and its two inner lines are invisible — it reads as a generic black speech bubble. Header: "Parley Swift ⌄" at left, the conversation title centred in muted grey, a pill "Share" at right. The thread opened scrolled to its end, as a chat app should: the tail of the comparison table is cut by the header at the top (expected, it is scrolled), then prose, a `stations.py` inline code chip, a python code block on a tinted panel with a "python" label and "Copy" button, monospace text at a readable size, and the closing sentence. The five response actions (copy, regenerate, good, bad, read aloud) sit below in muted grey. The composer is a rounded box with "Message Parley" placeholder, a round + button and a disabled grey send arrow; the small print is centred under it. Nothing overlaps; the bottom of the reply clears the composer.
     - ✗ **D1** defect `.search svg, .brand-logo`: Every SVG drawn through luna lost its class: the search icon is in flow above the field instead of inside it, and the Parley logo is black with no inner lines (.logo-bubble/.logo-lines fills never apply). Probe: the rendered <svg> has no class attribute at all.
-- **S2** index.html · 375×812 · full page, 1 screen(s)
+- **S2** index.html · 375×812 · full page, 1 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/chat/judgment/#S2))
   - 👁 **L2**: Mobile 375x812. The sidebar is gone (drawer closed) and the header holds a hamburger, "Parley Swift ⌄" and the "Share" pill; the conversation title is hidden at this width, as intended. The thread takes the full width with 16px gutters and is scrolled to the end: prose wraps comfortably at 16px/1.6, the `stations.py` chip sits inline, and the python code block keeps its long lines and scrolls sideways inside the panel (lines are clipped at the right edge of the panel — that is the pre's own horizontal scroller, not page overflow). The action row and the composer (placeholder, +, disabled send) sit at the bottom with the small print centred under it on one line. No horizontal page scroll visible, nothing overlapping. The avatar column is dropped at this width so text uses the whole width. Nothing here looks broken; the code block's clipped lines are the one thing a first-time visitor may read as cut off, but the scroller is the standard pattern.
 - **N1** decision: Gate set. Base (PROTOCOL): check integrity, check copy --manifest copy.txt, check design, check composition, check color, check a11y contrast (light, ?theme=dark and --color-scheme dark), check a11y focus, check a11y touch, scan scroll, scan handlers, check interactions. Added for this brief's behaviour: check scroll (the conversation scroller and the sticky composer dock), check animation + check motion (the blinking streaming caret and the drawer slide must honour reduced motion), verify flow (send a message, see the reply stream in, stop one mid-stream: flows written as JSON in the site dir), stress data (long messages, empty history), check breakpoints --sweep (the sidebar becomes a drawer at 768px). check copy on index.html alone cannot see "Stop generating" (only while a reply streams) or "What can I help with?" (only in the New chat state); the page has ?chat=new for the second, and the first is shown by verify flow and shots.
-- **G1** `vlmkit check integrity index.html` → exit 0 — verdict: NO DEFECTS, 2 WARN (0 fail, 2 warn, 20 exempted)
-- **G2** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 4 · placeholders 0 · manifestLines 10 · statesExplored 16 · revealedOnly 0
+- **G1** `vlmkit check integrity index.html` → exit 0 — verdict: NO DEFECTS, 2 WARN (0 fail, 2 warn, 20 exempted) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G1))
+- **G2** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 4 · placeholders 0 · manifestLines 10 · statesExplored 16 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G2))
   - ✗ **D4** defect `#share-btn`: check copy misses 'Copy link': the Share button opens a dialog but does not say so (no aria-haspopup=dialog / aria-expanded), so neither assistive tech nor the gate's disclosure sweep knows a dialog is behind it.
-- **G3** `vlmkit check a11y contrast index.html` → exit 0 — inspected 78 · failures 0
-- **G4** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 78 · failures 0
-- **G5** `vlmkit check a11y focus index.html` → exit 0 — steps 47 · findings 3
-- **G6** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 36 · failures 0 · wcagExempt 0
-- **G7** `vlmkit scan scroll index.html` → exit 0 — containers 2 · overflowX 0 · issues 5
-- **G8** `vlmkit scan handlers index.html` → exit 0 — registrations 55 · elements 50 · suspects 0
-- **G9** `vlmkit check interactions index.html` → exit 0 — elements 30 · suspects 0 · warns 0
-- **G10** `vlmkit check design index.html` → exit 0 — verdict: DRIFT (2 finding(s))
-- **G11** `vlmkit check composition index.html` → exit 0 — verdict: UNBALANCED (2 finding(s))
+- **G3** `vlmkit check a11y contrast index.html` → exit 0 — inspected 78 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G3))
+- **G4** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 78 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G4))
+- **G5** `vlmkit check a11y focus index.html` → exit 0 — steps 47 · findings 3 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G5))
+- **G6** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 36 · failures 0 · wcagExempt 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G6))
+- **G7** `vlmkit scan scroll index.html` → exit 0 — containers 2 · overflowX 0 · issues 5 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G7))
+- **G8** `vlmkit scan handlers index.html` → exit 0 — registrations 55 · elements 50 · suspects 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G8))
+- **G9** `vlmkit check interactions index.html` → exit 0 — elements 30 · suspects 0 · warns 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G9))
+- **G10** `vlmkit check design index.html` → exit 0 — verdict: DRIFT (2 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G10))
+- **G11** `vlmkit check composition index.html` → exit 0 — verdict: UNBALANCED (2 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G11))
   - ✗ **D3** defect `h1.conv-title, .md-h`: check composition no-type-contrast: the largest text is 18px against 16px body and no heading is heavier; the reply headings (h3) are barely bigger than body text, so a long reply has no visible structure.
-- **G12** `vlmkit check color index.html` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s))
-- **G13** `vlmkit check scroll index.html` → exit 0 — pageScrolled 0 · stickyFixed 1 · engagedSticky 0 · snaps 0 · issues 0
-- **G14** `vlmkit check animation index.html` → exit 0 — animations 0 · settleMs 0 · issues 0
-- **G15** `vlmkit check motion index.html` → exit 0 — activeAnimations 0 · running 0 · issues 0
-- **G16** `vlmkit check breakpoints index.html --sweep` → exit 1 — breakpoints 2 · issues 118 · sweepRanges 0
+- **G12** `vlmkit check color index.html` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G12))
+- **G13** `vlmkit check scroll index.html` → exit 0 — pageScrolled 0 · stickyFixed 1 · engagedSticky 0 · snaps 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G13))
+- **G14** `vlmkit check animation index.html` → exit 0 — animations 0 · settleMs 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G14))
+- **G15** `vlmkit check motion index.html` → exit 0 — activeAnimations 0 · running 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G15))
+- **G16** `vlmkit check breakpoints index.html --sweep` → exit 1 — breakpoints 2 · issues 118 · sweepRanges 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G16))
   - ✗ **D2** defect `#sidebar @767px`: check breakpoints: the whole sidebar reads visible at 766px right after a resize from desktop — the drawer's close transition (visibility delayed 0.22s) also runs when the viewport crosses the 767px breakpoint, so the sidebar slides away on resize instead of only when the user closes the drawer.
-- **G17** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 2 · issues 0 · sweepRanges 0
-- **G18** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (1 finding(s))
-- **G19** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 3 · placeholders 0 · manifestLines 10 · statesExplored 17 · revealedOnly 1
-- **S3** index.html · 1280×800 · full page, 1 screen(s)
+- **G17** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 2 · issues 0 · sweepRanges 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G17))
+- **G18** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G18))
+- **G19** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 3 · placeholders 0 · manifestLines 10 · statesExplored 17 · revealedOnly 1 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G19))
+- **S3** index.html · 1280×800 · full page, 1 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/chat/judgment/#S3))
   - 👁 **L3**: Desktop after the SVG class fix. The magnifier now sits inside the search field's left padding, vertically centred, and the field reads as a search box. The Parley logo beside the wordmark is the teal accent with its two white lines, and the history list moved up 28px now that the icon no longer takes its own line (Today starts at y≈187). The ⋯ on the current row is visible; others hide it until hover/focus. Everything else as in S1: thread scrolled to its end, code panel with "python" label and Copy, five muted response actions, composer with placeholder, + and disabled send, small print centred. The response-action icons sit 6px left of the text column (the row has a -6px margin so the icon glyphs, not their 32px hit boxes, line up with the text) — they visually align with the paragraph's first letter, which is what I wanted.
 - **F1** fix for D1: SVG classes are now set as attributes from ref_ (svg_class helper in main.mbt), because luna's className path does nothing on SVG elements.
 - **F2** fix for D2: The drawer transition is behind a .drawer-anim class that set_drawer() adds when the reader opens or closes it and the resize listener removes, so crossing 767px snaps instead of animating.
 - **F3** fix for D3: Reply headings (.md-h, h3) are 21px/700 instead of 18px/650, so a long reply's sections stand out (1.31x body).
 - **F4** fix for D4: Share has aria-haspopup=dialog and aria-expanded following the dialog.
-- **G20** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 2 · issues 0 · sweepRanges 0
-- **G21** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (1 finding(s))
-- **G22** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 3 · placeholders 0 · manifestLines 10 · statesExplored 17 · revealedOnly 1
+- **G20** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 2 · issues 0 · sweepRanges 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G20))
+- **G21** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G21))
+- **G22** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 3 · placeholders 0 · manifestLines 10 · statesExplored 17 · revealedOnly 1 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G22))
 - **S4** index.html · 1280×800 · element .sb-top — sidebar top after svg fix (screens not kept)
   - 👁 **L4**: Close-up of the sidebar's top row after F1: the Parley logo is a teal speech bubble with two white lines, beside the bold "Parley" wordmark; the collapse icon (a panel outline) sits at the right in muted grey. The SVG classes now apply — the logo is no longer the solid black bubble of S1, and the icon has its .icon sizing.
 - **V1** D1 verified by L4
@@ -150,32 +150,32 @@ line ten" (screens not kept)
 - **V8** D8 verified by L25
 - **V9** D9 verified by L25
 - **V10** D10 verified by L26
-- **G23** `vlmkit verify flow index.html --flow flow-send.json` → exit 1 — verdict: FAILED (5/7 steps)
+- **G23** `vlmkit verify flow index.html --flow flow-send.json` → exit 1 — verdict: FAILED (5/7 steps) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G23))
   - ✗ **D11** defect `.msg-assistant:last-of-type .caret`: verify flow: after a reply finishes streaming, its blinking caret stays in the last block (.caret count 1, not 0). The caret was decided when the block rendered, and the block is not re-rendered when streaming ends.
-- **G24** `vlmkit verify flow index.html --flow flow-stop.json` → exit 0 — verdict: DONE (7/7 steps)
+- **G24** `vlmkit verify flow index.html --flow flow-stop.json` → exit 0 — verdict: DONE (7/7 steps) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G24))
 - **F11** fix for D11: The caret is a luna show() bound to the message's own streaming signal (caret_node(live)), so it goes when the reply settles or stops, without re-rendering the block.
-- **G25** `vlmkit verify flow index.html --flow flow-send.json` → exit 0 — verdict: DONE (7/7 steps)
-- **G26** `vlmkit verify flow index.html --flow flow-stop.json` → exit 0 — verdict: DONE (7/7 steps)
+- **G25** `vlmkit verify flow index.html --flow flow-send.json` → exit 0 — verdict: DONE (7/7 steps) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G25))
+- **G26** `vlmkit verify flow index.html --flow flow-stop.json` → exit 0 — verdict: DONE (7/7 steps) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G26))
 - **V11** D11 verified by G25
-- **G27** `vlmkit verify flow index.html --flow flow-traps.json` → exit 1 — verdict: FAILED (1/9 steps)
+- **G27** `vlmkit verify flow index.html --flow flow-traps.json` → exit 1 — verdict: FAILED (1/9 steps) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G27))
 - **N3** superseded about G27: G27 failed on my flow, not on the page: Shift+Tab from New chat correctly lands on the drawer's close button, which comes before it. The flow now steps through it (G28).
-- **G28** `vlmkit verify flow index.html --flow flow-traps.json` → exit 1 — verdict: FAILED (2/10 steps)
+- **G28** `vlmkit verify flow index.html --flow flow-traps.json` → exit 1 — verdict: FAILED (2/10 steps) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G28))
   - ✗ **D12** defect `#sidebar (drawer) focus trap`: verify flow: in the open drawer, Shift+Tab from the first control does not wrap; focus stays on the close button. The trap wraps to the last matching control, which is the collapsed rail's New chat button, display:none on a phone, so focus() does nothing.
 - **F12** fix for D12: focusables() keeps only controls with a layout box (getClientRects().length > 0), so the trap wraps to the last visible row's ⋯.
-- **G29** `vlmkit verify flow index.html --flow flow-traps.json` → exit 1 — verdict: FAILED (0/10 steps)
-- **G30** `vlmkit verify flow index.html --flow flow-traps.json` → exit 1 — verdict: FAILED (2/10 steps)
+- **G29** `vlmkit verify flow index.html --flow flow-traps.json` → exit 1 — verdict: FAILED (0/10 steps) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G29))
+- **G30** `vlmkit verify flow index.html --flow flow-traps.json` → exit 1 — verdict: FAILED (2/10 steps) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G30))
 - **N4** accepted about G29: G29/G30 are runs between fixes. G29's step 1 lost a race: the drawer moved focus in a setTimeout(0), and the flow read focus before it ran (it had passed in G27/G28). Opening now focuses New chat in the same task. G30's 'got #more-38' was my flow's mistake: 38 is the id of the last row (Birthday party playlist); 35 is not the last one.
-- **G31** `vlmkit verify flow index.html --flow flow-traps.json` → exit 1 — verdict: FAILED (4/10 steps)
-- **G32** `vlmkit verify flow index.html --flow flow-traps.json` → exit 1 — verdict: FAILED (4/10 steps)
-- **G33** `vlmkit verify flow index.html --flow flow-traps.json` → exit 1 — verdict: FAILED (6/11 steps)
-- **G34** `vlmkit verify flow index.html --flow flow-traps.json` → exit 1 — verdict: FAILED (6/11 steps)
+- **G31** `vlmkit verify flow index.html --flow flow-traps.json` → exit 1 — verdict: FAILED (4/10 steps) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G31))
+- **G32** `vlmkit verify flow index.html --flow flow-traps.json` → exit 1 — verdict: FAILED (4/10 steps) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G32))
+- **G33** `vlmkit verify flow index.html --flow flow-traps.json` → exit 1 — verdict: FAILED (6/11 steps) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G33))
+- **G34** `vlmkit verify flow index.html --flow flow-traps.json` → exit 1 — verdict: FAILED (6/11 steps) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G34))
   - ✗ **D13** defect `#share-dialog, drawer`: verify flow: focus did not move when a dialog or the drawer opened or closed until a later task (Share left focus on the Share button when read right after the click; Escape on the drawer left it on the close button). Every focus move went through setTimeout(0).
-- **G35** `vlmkit verify flow index.html --flow flow-traps.json` → exit 0 — verdict: DONE (11/11 steps)
+- **G35** `vlmkit verify flow index.html --flow flow-traps.json` → exit 0 — verdict: DONE (11/11 steps) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G35))
 - **F13** fix for D13: later_focus() focuses at once (luna renders a show() synchronously) and only retries after the task when the target is not there yet; the drawer's open/close focus calls are synchronous.
-- **G36** `vlmkit verify flow index.html --flow flow-traps.json` → exit 0 — verdict: DONE (11/11 steps)
+- **G36** `vlmkit verify flow index.html --flow flow-traps.json` → exit 0 — verdict: DONE (11/11 steps) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G36))
 - **V12** D12 verified by G36: Shift+Tab from the first drawer control wraps to the last row's ⋯ (#more-38).
 - **V13** D13 verified by G36: Every focus step of the trap flow passes, read right after each action.
-- **G37** `vlmkit stress data index.html` → exit 1 — variants 13 · findings 17
+- **G37** `vlmkit stress data index.html` → exit 1 — variants 13 · findings 17 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G37))
 - **S27** index.html?history=empty · 1280×800 · element .sidebar (screens not kept)
   - 👁 **L27**: Sidebar with an empty history (?history=empty, the brief's "empty history" stress case, which stress data cannot reach because it skips navigation groups). Logo, New chat and search as usual, then where the groups would be a single muted line: No chats match “”. — the search's no-result message with an empty pair of quotes, which reads like a bug: nothing was searched, there are simply no chats yet. The rest of the column is empty down to the profile footer.
     - ✗ **D14** defect `nav.history .no-match`: With no history at all the sidebar says 'No chats match “”.' — the search miss message with empty quotes — instead of saying there are no chats yet.
@@ -195,32 +195,32 @@ line ten" (screens not kept)
 
 ### R3 · final check (builder)
 
-- **G38** `vlmkit check integrity index.html` → exit 0 — verdict: NO DEFECTS, 2 WARN (0 fail, 2 warn, 21 exempted)
-- **G39** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 3 · placeholders 0 · manifestLines 10 · statesExplored 17 · revealedOnly 1
-- **G40** `vlmkit check copy 'index.html?chat=new' --manifest copy.txt` → exit 1 — missing 3 · placeholders 0 · manifestLines 10 · statesExplored 16 · revealedOnly 0
-- **G41** `vlmkit check design index.html` → exit 0 — verdict: DRIFT (2 finding(s))
-- **G42** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (1 finding(s))
-- **G43** `vlmkit check color index.html` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s))
-- **G44** `vlmkit check a11y contrast index.html` → exit 0 — inspected 78 · failures 0
-- **G45** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 78 · failures 0
-- **G46** `vlmkit check a11y contrast index.html --color-scheme dark` → exit 0 — inspected 78 · failures 0
-- **G47** `vlmkit check a11y contrast 'index.html?chat=new'` → exit 0 — inspected 33 · failures 0
-- **G48** `vlmkit check a11y focus index.html` → exit 1 — steps 47 · findings 4
-- **G49** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 36 · failures 0 · wcagExempt 0
-- **G50** `vlmkit scan scroll index.html` → exit 0 — containers 2 · overflowX 0 · issues 5
-- **G51** `vlmkit scan handlers index.html` → exit 0 — registrations 55 · elements 50 · suspects 0
-- **G52** `vlmkit check scroll index.html` → exit 0 — pageScrolled 0 · stickyFixed 0 · engagedSticky 0 · snaps 0 · issues 0
-- **G53** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 2 · issues 0 · sweepRanges 0
-- **G54** `vlmkit check animation index.html` → exit 0 — animations 0 · settleMs 0 · issues 0
-- **G55** `vlmkit check motion index.html` → exit 0 — activeAnimations 0 · running 0 · issues 0
+- **G38** `vlmkit check integrity index.html` → exit 0 — verdict: NO DEFECTS, 2 WARN (0 fail, 2 warn, 21 exempted) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G38))
+- **G39** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 3 · placeholders 0 · manifestLines 10 · statesExplored 17 · revealedOnly 1 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G39))
+- **G40** `vlmkit check copy 'index.html?chat=new' --manifest copy.txt` → exit 1 — missing 3 · placeholders 0 · manifestLines 10 · statesExplored 16 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G40))
+- **G41** `vlmkit check design index.html` → exit 0 — verdict: DRIFT (2 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G41))
+- **G42** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G42))
+- **G43** `vlmkit check color index.html` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G43))
+- **G44** `vlmkit check a11y contrast index.html` → exit 0 — inspected 78 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G44))
+- **G45** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 78 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G45))
+- **G46** `vlmkit check a11y contrast index.html --color-scheme dark` → exit 0 — inspected 78 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G46))
+- **G47** `vlmkit check a11y contrast 'index.html?chat=new'` → exit 0 — inspected 33 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G47))
+- **G48** `vlmkit check a11y focus index.html` → exit 1 — steps 47 · findings 4 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G48))
+- **G49** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 36 · failures 0 · wcagExempt 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G49))
+- **G50** `vlmkit scan scroll index.html` → exit 0 — containers 2 · overflowX 0 · issues 5 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G50))
+- **G51** `vlmkit scan handlers index.html` → exit 0 — registrations 55 · elements 50 · suspects 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G51))
+- **G52** `vlmkit check scroll index.html` → exit 0 — pageScrolled 0 · stickyFixed 0 · engagedSticky 0 · snaps 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G52))
+- **G53** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 2 · issues 0 · sweepRanges 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G53))
+- **G54** `vlmkit check animation index.html` → exit 0 — animations 0 · settleMs 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G54))
+- **G55** `vlmkit check motion index.html` → exit 0 — activeAnimations 0 · running 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G55))
 - **S31** index.html · 1280×720 · focus .msg-assistant:last-of-type [aria-label='Read aloud'] · press Tab — tab from the last action into the composer (screens not kept)
   - 👁 **L31**: Keyboard check for check a11y focus's "reverse" finding: focus was put on the last reply's Read aloud button and Tab was pressed. The thread is scrolled so that the last reply's action row sits just above the composer (y≈563), and focus is now in the composer — its teal ring is on, directly BELOW the row it came from. On screen the move is downward, the natural end of the reading order: thread, then the box you type in. The gate's "moved up by 1227px" compares the button's position inside the scrolled content (y=1832 unscrolled) with the composer's fixed place (y=606).
-- **G56** `vlmkit check interactions index.html --max-elements 60` → exit 0 — elements 46 · suspects 0 · warns 3
-- **G57** `vlmkit verify flow index.html --flow flow-send.json` → exit 0 — verdict: DONE (7/7 steps)
-- **G58** `vlmkit verify flow index.html --flow flow-stop.json` → exit 0 — verdict: DONE (7/7 steps)
-- **G59** `vlmkit verify flow index.html --flow flow-traps.json` → exit 0 — verdict: DONE (11/11 steps)
-- **G60** `vlmkit stress data index.html` → exit 1 — variants 13 · findings 17
-- **G61** `vlmkit inspect motion 'index.html?chat=new' --selector .caret --click .suggestion` → exit 1
+- **G56** `vlmkit check interactions index.html --max-elements 60` → exit 0 — elements 46 · suspects 0 · warns 3 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G56))
+- **G57** `vlmkit verify flow index.html --flow flow-send.json` → exit 0 — verdict: DONE (7/7 steps) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G57))
+- **G58** `vlmkit verify flow index.html --flow flow-stop.json` → exit 0 — verdict: DONE (7/7 steps) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G58))
+- **G59** `vlmkit verify flow index.html --flow flow-traps.json` → exit 0 — verdict: DONE (11/11 steps) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G59))
+- **G60** `vlmkit stress data index.html` → exit 1 — variants 13 · findings 17 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G60))
+- **G61** `vlmkit inspect motion 'index.html?chat=new' --selector .caret --click .suggestion` → exit 1 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G61))
 - **N7** tool about G61: inspect motion "index.html?chat=new" --selector ".caret" --click ".suggestion" crashed with a stack trace instead of a usage message:   Error: without Jev every target needs the page's measurement: .caret       at checkMotionFrames (file://dist/motion-check-C9CYuKXg.mjs:51:27)       at runMotionOptions (file://dist/motion-cli-kuNzkIJW.mjs:2727:18) My guess is that .caret does not exist until the click starts a reply, and the measurement is set up before the click; the message does not say which. The streaming caret is covered instead by verify flow (caret visible while streaming, count 0 once settled or stopped: G57, G58) and by a reduced-motion shot.
 - **S32** index.html?chat=new · 1280×800 · reduced motion · click .suggestion — reduced motion: reply appears whole (screens not kept)
   - 👁 **L32**: Reduced motion: from the New chat state, a suggestion card was clicked with prefers-reduced-motion: reduce. The reply is there whole at once — intro, five numbered items, the closing sentence — with its action row and no caret; Send is back. The new conversation "Plan a star party for 20 gu…" sits at the top of Today and is marked current, and the header title shows the prompt ellipsized ("Plan a star party for 20 guests and give…"). The suggestion filled and sent in one click, as the brief asks.
@@ -234,12 +234,12 @@ line ten" (screens not kept)
 - **N15** accepted about G51: scan handlers only warns that it presses nothing (unprobed-handler-types); the handlers are exercised by check interactions (G56) and the three verify flows (G57-G59). No pointer-only controls.
 - **N16** accepted about G60: Same three findings as N5 (G37): text passing under the opaque composer dock while scrolled, a 62-character label forced into the code Copy button, and groups that are never empty in the app. Nothing new.
 - **N17** decision about G52: check scroll now reports no sticky element: since D9 the composer is a flex sibling under the conversation scroller, not sticky inside it, so it is stuck to the bottom by layout and check scroll has nothing to drive. The scroller itself is in scan scroll (G50) and the Scroll to bottom button in S17/S36.
-- **S33** index.html · 1280×800 · full page, 1 screen(s)
+- **S33** index.html · 1280×800 · full page, 1 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/chat/judgment/#S33))
   - 👁 **L33**: Final desktop 1280x800 (the shell is one screen; the conversation scrolls inside it). Sidebar: teal logo + "Parley", collapse icon, New chat, search with its icon inside, Today / Previous 7 days / Older with 12 titles, the current one highlighted with its ⋯, profile at the bottom. Header: model picker, centred title, Share pill. Thread at its end: the table's last row, two paragraphs with the `stations.py` chip, the python block with label and Copy, the closing line and the response actions, then the composer (now an opaque dock with a soft fade above it) and the small print. Spacing is even, nothing collides, the hierarchy reads conversation first.
-- **S34** index.html · 768×1024 · full page, 1 screen(s)
+- **S34** index.html · 768×1024 · full page, 1 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/chat/judgment/#S34))
   - 👁 **L34**: Tablet 768x1024. The full 260px sidebar stays (the drawer starts below 768), which leaves the thread only ~410px of text width beside the avatar column. It shows: the comparison table's cells wrap into three lines each ("Sharp, / wide / views", "Kids, / quick / looks"), the header title is cut to "Planning a lunar observation ni…", and the code block's first line is clipped at "Wh". The page is not broken, but it is cramped at a common width — the avatar gutter and the full sidebar together squeeze the reply.
     - ✗ **D16** defect `@768px: .msg-assistant, .sidebar`: At 768px the full 260px sidebar plus the 48px avatar gutter leave the reply ~410px: table cells wrap into three lines, the header title is cut and the code block clips early.
-- **S35** index.html · 375×812 · full page, 1 screen(s)
+- **S35** index.html · 375×812 · full page, 1 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/chat/judgment/#S35))
   - 👁 **L35**: Phone 375x812 final. Hamburger, model picker and Share pill in the header; the thread at full width with 16px gutters, the avatar column dropped, prose wrapping comfortably, the code block scrolling sideways inside its panel, the action row, and the composer with the small print on one line at the bottom. No horizontal page scroll.
 - **S36** index.html · 1280×800 · scroll-to .msg-assistant .md-h — scroll to bottom button (screens not kept)
   - 👁 **L36**: Scrolled up (state: Scroll to bottom). The first user bubble and the start of the first reply with the 21px headings "A plan for the evening" and "What to bring". The round ↓ button floats centred just above the composer, over the fade; it sits on top of the first bullet's words ("the[…]ght vision") while it is there, which is how a floating button behaves over moving content — the reader scrolls or clicks it, and it goes.
@@ -269,43 +269,43 @@ line ten" (screens not kept)
 
 - **S47** index.html · 1280×800 · full page, 1 screen(s) (screens not kept)
   - 👁 **L47**: Final desktop 1280 after F16: unchanged from S33 at this width (the new rules start below 1024): sidebar, header, the thread at its end with table tail, prose, the python block, the closing line, actions and composer. Consistent spacing, nothing overlapping.
-- **S48** index.html · 768×1024 · full page, 1 screen(s)
+- **S48** index.html · 768×1024 · full page, 1 screen(s) ([screens](https://mizchi.github.io/vlmkit/sites/chat/judgment/#S48))
   - 👁 **L48**: Tablet 768 after F16. The sidebar is 232px (titles ellipsize a little earlier, still readable), and the reply now uses the whole column: no avatar gutter at this width. The comparison table's cells wrap at most to two lines ("Crater detail at / 150x", "Sharp, wide / views"), the header title shows in full ("Planning a lunar observation night", left-aligned beside the model picker), the python block's longest line fits to "Whole disc"]", and the prose has a comfortable measure. The cramping of S34 is gone.
 - **S49** index.html · 375×812 · full page, 1 screen(s) (screens not kept)
   - 👁 **L49**: Final phone 375: as S35 — header with hamburger, model picker and Share; full-width thread with 16px gutters; code panel scrolling inside itself; actions; composer and the one-line small print. No overflow, nothing clipped except the code lines inside their scroller.
 - **V16** D16 verified by L48
-- **S50** index.html · 1280×800 · full page, 3 screen(s) — the whole conversation
+- **S50** index.html · 1280×800 · full page, 3 screen(s) — the whole conversation ([screens](https://mizchi.github.io/vlmkit/sites/chat/judgment/#S50))
   - 👁 **L50**: The whole conversation at desktop, walked through the #scroller in 3 screens. Screen 1: the first user bubble (three lines, right-aligned, pencil under it), the Parley avatar and the first reply — paragraph with bold "waxing gibbous", the 21px heading "A plan for the evening", the four-item numbered list with bold lead-ins, "What to bring" starting; the Scroll to bottom ↓ floats above the composer because the walk is not at the end. Screen 2: the bulleted list with bold crater names, the closing paragraph, the first reply's action row, the second user bubble, the second reply's intro and the comparison table (header row with a stronger rule, three rows). Screen 3: the table's last row, two paragraphs, the python block, the closing line and the actions, at the end — no ↓ button. Rhythm is even: 30px between messages, 14px between paragraphs, headings with more space above than below.
-- **S51** index.html · 375×812 · full page, 5 screen(s) — the whole conversation, phone
+- **S51** index.html · 375×812 · full page, 5 screen(s) — the whole conversation, phone ([screens](https://mizchi.github.io/vlmkit/sites/chat/judgment/#S51))
   - 👁 **L51**: The whole conversation on a phone, 5 screens through the scroller. Bubbles take 86% width and wrap well; the avatar sits above each reply; headings and lists read fine. One real problem on screen 3/4: the four-column comparison table is squeezed into 343px — cells wrap to three and four lines ("Crater / detail / at / 150x", "70 mm / travel / scope"), and the last column is cut ("Copernicu", "Whole disc" clipped) because the table is just wider than its scroller. It reads as broken rather than as a table you can swipe. The code block scrolls sideways as intended. The ↓ button floats over the text while the walk is mid-thread, as designed.
     - ✗ **D17** defect `@375px: .md-table`: On a phone the comparison table squeezes four columns into 343px: cells wrap to 3-4 lines and the last column is cut by a few pixels, so it looks broken instead of scrollable.
 - **F17** fix for D17: Under 768px the table is max-content wide with unwrapped cells, so it keeps its columns and scrolls sideways inside its focusable .table-wrap, as the code blocks do.
 - **S52** index.html · 375×812 · scroll-to .md-table — phone table (screens not kept)
   - 👁 **L52**: Phone table after F17: the comparison table keeps its four columns on single lines — "8\" Dobsonian | 203 mm | Crater deta…", "102 mm refractor | 102 mm | Sharp, wide…", "70 mm travel scope | 70 mm | Kids, quick…" — and runs off the right edge of the column exactly like the code block below does, which reads as "swipe sideways" rather than as broken cells. Rows are 40px with hairline rules; the header keeps its stronger rule.
 - **V17** D17 verified by L52
-- **G62** `vlmkit check integrity index.html` → exit 0 — verdict: NO DEFECTS, 2 WARN (0 fail, 2 warn, 22 exempted)
-- **G63** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 3 · placeholders 0 · manifestLines 10 · statesExplored 17 · revealedOnly 1
-- **G64** `vlmkit check copy 'index.html?chat=new' --manifest copy.txt` → exit 1 — missing 3 · placeholders 0 · manifestLines 10 · statesExplored 16 · revealedOnly 0
-- **G65** `vlmkit check design index.html` → exit 0 — verdict: DRIFT (2 finding(s))
-- **G66** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (1 finding(s))
-- **G67** `vlmkit check color index.html` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s))
-- **G68** `vlmkit check a11y contrast index.html` → exit 0 — inspected 78 · failures 0
-- **G69** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 78 · failures 0
-- **G70** `vlmkit check a11y contrast index.html --color-scheme dark` → exit 0 — inspected 78 · failures 0
-- **G71** `vlmkit check a11y contrast 'index.html?chat=new'` → exit 0 — inspected 33 · failures 0
-- **G72** `vlmkit check a11y focus index.html` → exit 1 — steps 47 · findings 4
-- **G73** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 36 · failures 0 · wcagExempt 0
-- **G74** `vlmkit scan scroll index.html` → exit 0 — containers 2 · overflowX 0 · issues 5
-- **G75** `vlmkit scan handlers index.html` → exit 0 — registrations 55 · elements 50 · suspects 0
-- **G76** `vlmkit check scroll index.html` → exit 0 — pageScrolled 0 · stickyFixed 0 · engagedSticky 0 · snaps 0 · issues 0
-- **G77** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 3 · issues 0 · sweepRanges 0
-- **G78** `vlmkit check animation index.html` → exit 0 — animations 0 · settleMs 0 · issues 0
-- **G79** `vlmkit check motion index.html` → exit 0 — activeAnimations 0 · running 0 · issues 0
-- **G80** `vlmkit verify flow index.html --flow flow-send.json` → exit 0 — verdict: DONE (7/7 steps)
-- **G81** `vlmkit verify flow index.html --flow flow-stop.json` → exit 0 — verdict: DONE (7/7 steps)
-- **G82** `vlmkit verify flow index.html --flow flow-traps.json` → exit 0 — verdict: DONE (11/11 steps)
-- **G83** `vlmkit check interactions index.html --max-elements 60` → exit 0 — elements 46 · suspects 0 · warns 3
-- **G84** `vlmkit stress data index.html` → exit 1 — variants 13 · findings 15
+- **G62** `vlmkit check integrity index.html` → exit 0 — verdict: NO DEFECTS, 2 WARN (0 fail, 2 warn, 22 exempted) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G62))
+- **G63** `vlmkit check copy index.html --manifest copy.txt` → exit 1 — missing 3 · placeholders 0 · manifestLines 10 · statesExplored 17 · revealedOnly 1 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G63))
+- **G64** `vlmkit check copy 'index.html?chat=new' --manifest copy.txt` → exit 1 — missing 3 · placeholders 0 · manifestLines 10 · statesExplored 16 · revealedOnly 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G64))
+- **G65** `vlmkit check design index.html` → exit 0 — verdict: DRIFT (2 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G65))
+- **G66** `vlmkit check composition index.html` → exit 0 — verdict: COMPOSED (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G66))
+- **G67** `vlmkit check color index.html` → exit 0 — verdict: COLOR-DEPENDENT (1 finding(s)) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G67))
+- **G68** `vlmkit check a11y contrast index.html` → exit 0 — inspected 78 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G68))
+- **G69** `vlmkit check a11y contrast 'index.html?theme=dark'` → exit 0 — inspected 78 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G69))
+- **G70** `vlmkit check a11y contrast index.html --color-scheme dark` → exit 0 — inspected 78 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G70))
+- **G71** `vlmkit check a11y contrast 'index.html?chat=new'` → exit 0 — inspected 33 · failures 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G71))
+- **G72** `vlmkit check a11y focus index.html` → exit 1 — steps 47 · findings 4 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G72))
+- **G73** `vlmkit check a11y touch index.html` → exit 0 — level AA · inspected 36 · failures 0 · wcagExempt 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G73))
+- **G74** `vlmkit scan scroll index.html` → exit 0 — containers 2 · overflowX 0 · issues 5 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G74))
+- **G75** `vlmkit scan handlers index.html` → exit 0 — registrations 55 · elements 50 · suspects 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G75))
+- **G76** `vlmkit check scroll index.html` → exit 0 — pageScrolled 0 · stickyFixed 0 · engagedSticky 0 · snaps 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G76))
+- **G77** `vlmkit check breakpoints index.html --sweep` → exit 0 — breakpoints 3 · issues 0 · sweepRanges 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G77))
+- **G78** `vlmkit check animation index.html` → exit 0 — animations 0 · settleMs 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G78))
+- **G79** `vlmkit check motion index.html` → exit 0 — activeAnimations 0 · running 0 · issues 0 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G79))
+- **G80** `vlmkit verify flow index.html --flow flow-send.json` → exit 0 — verdict: DONE (7/7 steps) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G80))
+- **G81** `vlmkit verify flow index.html --flow flow-stop.json` → exit 0 — verdict: DONE (7/7 steps) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G81))
+- **G82** `vlmkit verify flow index.html --flow flow-traps.json` → exit 0 — verdict: DONE (11/11 steps) ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G82))
+- **G83** `vlmkit check interactions index.html --max-elements 60` → exit 0 — elements 46 · suspects 0 · warns 3 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G83))
+- **G84** `vlmkit stress data index.html` → exit 1 — variants 13 · findings 15 ([output](https://mizchi.github.io/vlmkit/sites/chat/judgment/#G84))
 - **N18** accepted about G62: Same two nested-scroll warns as N8: the code <pre> and, at 375px, the table wrapper scroll sideways inside the conversation scroller — at phone width the table now does so on purpose (D17), both are keyboard-focusable.
 - **N19** accepted about G63: As N6/N9: placeholder 'Message Parley' (S47), 'Stop generating' only while streaming (S54 below, verify flow G80/G81), 'What can I help with?' only in New chat (G64 finds it).
 - **N20** accepted about G64: As N10: on ?chat=new the greeting is found; there is no Share in an empty chat, so no 'Copy link'.

@@ -72,6 +72,55 @@
       "extraGates": [
         "check a11y contrast --output-dir test-results/a11y-contrast/sites-shop"
       ]
+    },
+    {
+      "id": "chat",
+      "source": "http://127.0.0.1:4190/sites/chat/?animate=0",
+      "extraGates": [
+        "check a11y contrast --output-dir test-results/a11y-contrast/sites-chat"
+      ]
+    },
+    {
+      "id": "code",
+      "source": "http://127.0.0.1:4190/sites/code/",
+      "extraGates": [
+        "check a11y contrast --output-dir test-results/a11y-contrast/sites-code"
+      ]
+    },
+    {
+      "id": "maps",
+      "source": "http://127.0.0.1:4190/sites/maps/",
+      "extraGates": [
+        "check a11y contrast --output-dir test-results/a11y-contrast/sites-maps"
+      ]
+    },
+    {
+      "id": "search",
+      "source": "http://127.0.0.1:4190/sites/search/",
+      "extraGates": [
+        "check a11y contrast --output-dir test-results/a11y-contrast/sites-search"
+      ]
+    },
+    {
+      "id": "video",
+      "source": "http://127.0.0.1:4190/sites/video/?animate=0",
+      "extraGates": [
+        "check a11y contrast --output-dir test-results/a11y-contrast/sites-video"
+      ]
+    },
+    {
+      "id": "video-watch",
+      "source": "http://127.0.0.1:4190/sites/video/watch.html?v=far5ide&animate=0",
+      "extraGates": [
+        "check a11y contrast --output-dir test-results/a11y-contrast/sites-video-watch"
+      ]
+    },
+    {
+      "id": "wiki",
+      "source": "http://127.0.0.1:4190/sites/wiki/",
+      "extraGates": [
+        "check a11y contrast --output-dir test-results/a11y-contrast/sites-wiki"
+      ]
     }
   ]
 }
