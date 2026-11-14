@@ -165,9 +165,9 @@ fn main {
 - **Element access** (focus, scroll, measuring): `ref_=fn(el) { … }` hands you the `@dom.Element`
   once it is mounted. Keep it in a `Ref` and call `focus()` or `scrollIntoView` on it later through
   `@js.Any`.
-- **Input value**: a signal does not write back to the field by itself. To clear or set what is in
-  the field, keep the element from `ref_` and set its `value` property through `@js.Any`. A
-  `dyn_attrs` `value` changes only the attribute.
+- **Input value**: a signal does not write back to the field by itself. Bind it with
+  `dyn_attrs=[("value", attr_dynamic(fn() { query.get() }))]`: for `value`, luna sets the
+  property, not the attribute, so clearing the signal clears the field.
 - **Mount**: `@element.render_to(element, node)` replaces what is inside the element. Get the
   element with `@dom.document().getElementById("app")`.
 
@@ -181,6 +181,36 @@ Reference, readable on this machine (outside the repository; read it, do not edi
 
 The first `moon build` of a module fetches its dependencies from mooncakes into `~/.moon`. That
 takes a minute; later builds take seconds.
+
+## Pitfalls the first sites found
+
+These come from the agents that built the first six luna sites (chat, search, video, maps, code,
+wiki). Each was measured, not guessed:
+
+- **`class=` on SVG elements is dropped without a word.** luna sets classes through `className`, and
+  an SVG element ignores that. Set SVG classes from `ref_` with `setAttribute`, through the
+  typed helper below:
+  `ref_=fn(e) { js(e)._call("setAttribute", [@js.any("class"), @js.any(cls)]) |> ignore }`.
+  Or style the SVG through its HTML parent.
+- **`show()` unmounts what it hides.** An `aria-controls` that points into hidden content then
+  points at nothing. For a popup whose id must exist while it is closed, keep it mounted and toggle
+  `hidden` (or `display: none`) instead.
+- **`for_each` keeps rows by reference and renders each row untracked.** A row's index, and any
+  signal read outside a `text_dyn` / `dyn_*` closure, keeps its first value. Use `index_each` when
+  ids or positions come from the index, and read signals inside closures.
+- **A dynamic attribute cannot remove itself.** `attr_dynamic` always calls `setAttribute`, except
+  for `disabled`. Use `"false"` where ARIA allows it. Otherwise add and remove the attribute in an
+  effect on the element's `ref_`.
+- **`table`, `tr`, `td`, `th`, `dialog`, `cite` and `b` have no helper.** Use
+  `create_element("table", [("class", attr_static("…"))], children)`.
+- **luna_components returns `@core.Node`, not the client DOM's `DomNode`**, so its components
+  do not compose with the `@element` DSL. Write the APG pattern by hand, using its source as a
+  guide.
+- **`@js.identity(e)._call(…)` does not type-check** (`Type _/0 has no method _call`). A typed helper
+  does: `fn[T] js(v : T) -> @js.Any { @js.identity(v) }`.
+- **MoonBit snags**: generic functions are written `fn[T] f(…)`; `typealias @element.DomNode`
+  does not parse, but `using @element {type DomNode}` does; `parse_int` lives in `@string`; slices
+  are written `arr[a:b]`.
 
 ## Things luna will not do for you
 
