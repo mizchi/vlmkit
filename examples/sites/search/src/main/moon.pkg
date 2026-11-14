@@ -1,0 +1,15 @@
+import {
+  "mizchi/luna/dom" @element,
+  "mizchi/luna/js/resource",
+  "mizchi/js_browser/dom",
+  "mizchi/js_core" @js,
+  "moonbitlang/core/string",
+}
+
+supported_targets = "js"
+
+pkgtype(kind: "executable")
+
+options(
+  link: { "js": { "format": "iife" } },
+)

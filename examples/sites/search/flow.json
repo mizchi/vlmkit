@@ -1,0 +1,27 @@
+{
+  "viewport": { "width": 1280, "height": 800 },
+  "steps": [
+    { "label": "type a prefix", "do": { "action": "type", "selector": "#q", "text": "pour" },
+      "expect": [ { "assert": "visible", "selector": "#suggestions" },
+                  { "assert": "attr", "selector": "#q", "name": "aria-expanded", "equals": "true" },
+                  { "assert": "count", "selector": "#suggestions [role=option]", "equals": 8 } ] },
+    { "label": "ArrowDown highlights the first option", "do": { "action": "press", "key": "ArrowDown", "selector": "#q" },
+      "expect": [ { "assert": "attr", "selector": "#q", "name": "aria-activedescendant", "equals": "sugg-0" },
+                  { "assert": "attr", "selector": "#sugg-0", "name": "aria-selected", "equals": "true" } ] },
+    { "label": "ArrowDown again: the second option, copied into the box", "do": { "action": "press", "key": "ArrowDown", "selector": "#q" },
+      "expect": [ { "assert": "attr", "selector": "#q", "name": "aria-activedescendant", "equals": "sugg-1" },
+                  { "assert": "focused", "selector": "#q" } ] },
+    { "label": "Enter searches it", "do": { "action": "press", "key": "Enter", "selector": "#q" },
+      "expect": [ { "assert": "text", "selector": ".r-stats", "contains": "results" },
+                  { "assert": "text", "selector": ".r-list", "contains": "Brew Ratio" },
+                  { "assert": "hidden", "selector": "#suggestions" } ] },
+    { "label": "open a result", "do": { "action": "click", "selector": ".r-title" },
+      "expect": [ { "assert": "text", "selector": ".leave-h", "contains": "You would now leave Findwell" } ] },
+    { "label": "Back returns to the results, the title now visited", "do": { "action": "click", "selector": ".back-link" },
+      "expect": [ { "assert": "text", "selector": ".r-stats", "contains": "results" },
+                  { "assert": "count", "selector": ".r-title.visited", "equals": 1 } ] },
+    { "label": "the small wordmark goes home, with an empty box", "do": { "action": "click", "selector": ".r-header .home-link" },
+      "expect": [ { "assert": "visible", "selector": ".home-buttons" },
+                  { "assert": "attr", "selector": "#q", "name": "aria-expanded", "equals": "false" } ] }
+  ]
+}
