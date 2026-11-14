@@ -3,6 +3,47 @@
 All notable changes to this project will be documented in this file.
 Dates are YYYY-MM-DD.
 
+## 0.27.0 — 2026-11-14
+
+Added:
+
+- `vlmkit record <page>` opens a headed browser and records what a person does there. It writes
+  a session trace (`vlmkit-trace/1`).
+  - Each step records the click, fill, select, checkbox or key (with held modifiers such as
+    `Shift+Tab`), and what that step changed: URL, ARIA state, a `<details>` or `<dialog>`
+    opened, text that appeared or changed, an element shown or gone, and where focus went.
+  - The page is read inside each event's own listener, so a quick next click or key does not lend
+    its effects to the step before it. Focusing a text field starts no step of its own, so a field
+    focused right after a click can show up as that click's focus change. Values that change on
+    their own, such as a clock, are left out.
+  - Multiple selects, contenteditable fields and a field still being typed in at the end are all
+    recorded. Actions lost because the window closed before they were read are counted and
+    reported.
+  - Options: `--out`, `--spec`, `--viewport`, `--color-scheme`, `--reduced-motion`,
+    `--storage-state`, `--headless` and `--for <ms>`. Without a display, `record` refuses and
+    points at `act --trace`.
+- `vlmkit act … --trace <file>` writes the same trace from an agent's run. Only the steps it
+  kept are written; with `--runs`, each run gets its own file.
+- `vlmkit export playwright <trace>` compiles a trace into an `@playwright/test` spec. It asks no
+  model: the same trace gives the same spec.
+  - Each action uses the best locator that resolves to its element alone: test id, role and
+    name, label, placeholder, text, then a CSS path.
+  - Observed changes become `expect`s: at most six per step, and only those a locator resolves to
+    alone (`record` counts the ones dropped for want of one). Review the spec for what it covers.
+  - A URL is matched by its whole path, query and hash, on any origin; a `file:` URL by its file
+    name, query and hash only. Text is matched by `innerText`, as it was recorded.
+  - `--verify [n]` runs the spec n times (2 by default) with Playwright's own runner. It exits 1
+    unless every run passes, and with no `--out` it prints the spec only after the runs pass.
+  - `--out`, `--title` and `--base-url` (URLs under that origin are written as paths).
+- `@mizchi/vlmkit-judge/session-trace.ts` is the trace format and its compiler (pure), and
+  `TraceRecorder` in `@mizchi/vlmkit-markup` is the recorder.
+
+Docs:
+
+- `docs/features.md` lists every command in one line, grouped by the question it answers. A test
+  fails when a command is missing from it or the gate and rule counts drift.
+- `docs/README.md` indexes every document under `docs/`.
+
 ## 0.26.0 — 2026-11-08
 
 Added:
