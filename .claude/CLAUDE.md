@@ -2067,8 +2067,27 @@ Cross-package imports use `@mizchi/vlmkit-<pkg>/<path>.ts` or the curated barrel
 every library build (`vp pack`, tsdown 0.23) and the lint / format settings. Tests import from
 `vite-plus/test`, which re-exports Vitest itself, so it throws on import outside the runner just as
 `vitest` did. Run one file with `pnpm exec vp test run <path>`. `pnpm-workspace.yaml` overrides `vite`
-and `vitest` to the copies Vite+ bundles; bump them together with `vite-plus`. Things to know
-before changing it:
+and `vitest` to the copies Vite+ bundles; bump them together with `vite-plus`: the `vite` alias is
+`npm view vite-plus@<version> dependencies.vite`, the `vitest` pin is `pnpm exec vp toolchain vitest`
+after the install. Things to know before changing it:
+
+- **The toolchain is mise + Vite+, not Nix** (since 2026-11-27). `mise.toml` pins node 24, pnpm 10,
+  pkspec, pkfire (`pkf`), pkl, apm and ast-grep; `mise install` gives all of them. CI gets Node.js and
+  pnpm from `voidzero-dev/setup-vp` (pinned by SHA; `node-version: 24`, pnpm from `packageManager`),
+  except `publish.yml`, which stays on `actions/setup-node` for npm Trusted Publishing, and
+  `spec-gate.yml`, which installs pkspec / pkfire / pkl with `jdx/mise-action`. `moon` and `ffmpeg`
+  are not in mise.toml: MoonBit has no mise backend, and ffmpeg is the user's own on purpose.
+- **`pnpm typecheck` is `vp check --no-fmt --no-lint src packages examples/gate-plugin`**: tsrs, the
+  TypeScript 7 checker Vite+ bundles, 0.35s against tsc's 7s, on the same 743 files tsconfig.json
+  includes. Two things measured moving it: tsrs checks every file the linter visits, not
+  tsconfig's `include` (66 errors in skill templates and example specs), so the paths are passed;
+  and `vp run` does not expand globs (`packages/*/src` read 223 files), so `packages` is passed
+  whole and `packages/vlmkit-heal/smoke/**` (never in tsconfig, stale against `HealDeps`) is in
+  `lint.ignorePatterns`. The `typescript` dependency stays 6.x: `vlmkit-generate` parses with the
+  compiler API, and TypeScript 7's package exports only `version.cjs` and `unstable/*`.
+- **The root justfile is gone; its tasks are `vp run <task>`** (`run.tasks` in vite.config.ts:
+  `jev-plan`, `jev-check`, `verify-skill-package`, `smoke-skill-installers`; `sync-skill-package` was
+  `pnpm sync:skills` already). The bench / demo / migration runners stay in `Taskfile.pkl` (`pkf run`).
 
 - **A `vp pack --filter` string matches a config's `name` or its `cwd` exactly.** A `/regex/` given
   on the command line matched nothing and exited 0 with no `dist/`. So the root build is
@@ -2085,7 +2104,7 @@ before changing it:
   scripts of the judged pages (`examples/sites/*/`, the landing page's `app/content/preferences/scenarios.js`,
   solitaire's `game.js`) and `design-runs/`. Their bytes are compared elsewhere (fresh renders,
   fixture copies, judgment rounds), so formatting them would turn a style change into a behaviour
-  change. `vp lint` is configured but not yet enforced.
+  change. `vp lint`'s rules are configured but not yet enforced (its type-aware path is: typecheck above).
 - **`clearMocks: false` and `deps.resolveDepSubpath: true` keep the Vitest 4 / tsdown 0.21 behaviour**, and
   the comment beside each says how to drop it. With them, `vp pack` emits the same files with the same
   exported names as tsdown 0.21 did. The JavaScript differs only by `/* @__PURE__ */` notes and constant

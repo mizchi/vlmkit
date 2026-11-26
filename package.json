@@ -54,7 +54,7 @@
     "smoke:pack:markup-loop": "node scripts/smoke-packed-markup-loop.mjs",
     "smoke:pack:workspaces": "node scripts/smoke-packed-workspaces.mjs",
     "test": "vp test run",
-    "typecheck": "tsc -p tsconfig.json",
+    "typecheck": "vp check --no-fmt --no-lint src packages examples/gate-plugin",
     "fmt": "vp fmt",
     "fmt:check": "vp fmt --check",
     "test:examples": "vp test run examples",
@@ -93,25 +93,23 @@
     "@mizchi/vlmkit-markup": "workspace:*",
     "@mizchi/vlmkit-mcp": "workspace:*",
     "@mizchi/vlmkit-plan": "workspace:*",
-    "@playwright/test": "1.63.0",
-    "@types/node": "^25.5.2",
+    "@playwright/test": "1.65.1",
+    "@types/node": "^26.6.11",
     "@types/pngjs": "^6.0.5",
-    "@types/ws": "^8.18.1",
-    "@vitest/coverage-v8": "5.0.1",
-    "playwright": "1.63.0",
-    "three": "^0.184.0",
-    "tsx": "^4.22.4",
-    "vite-plus": "1.0.0",
-    "vitest": "5.0.1"
+    "@types/ws": "^8.18.2",
+    "@vitest/coverage-v8": "5.1.1",
+    "playwright": "1.65.1",
+    "three": "^0.187.0",
+    "vite-plus": "1.8.0"
   },
   "dependencies": {
-    "@hono/node-server": "^1.19.12",
-    "cac": "^7.0.0",
-    "hono": "^4.12.10",
-    "pixelmatch": "^7.1.0",
+    "@hono/node-server": "^2.1.11",
+    "cac": "^7.1.1",
+    "hono": "^4.13.22",
+    "pixelmatch": "^8.0.0",
     "pngjs": "^7.0.0",
-    "typescript": "^6.0.2",
-    "ws": "^8.20.0"
+    "typescript": "^6.0.3",
+    "ws": "^8.23.0"
   },
   "peerDependencies": {
     "@jsquash/webp": "^1",
@@ -125,5 +123,6 @@
     "@jsquash/webp": {
       "optional": true
     }
-  }
+  },
+  "packageManager": "pnpm@10.33.0"
 }

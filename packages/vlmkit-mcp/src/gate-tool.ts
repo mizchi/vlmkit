@@ -137,7 +137,7 @@ export function gateToolSummary(
  */
 export function gateTool(gate: AnyGateDefinition, options: GateToolOptions): McpTool {
   const inputs = (gate.inputs ?? []).filter((i) => !options.omit?.includes(i.name));
-  const inputSchema: z.ZodRawShape = {};
+  const inputSchema: Record<string, z.ZodType> = {};
   for (const input of inputs) {
     const inverted = options.invert?.[input.name];
     if (inverted !== undefined) {

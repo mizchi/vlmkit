@@ -257,12 +257,12 @@ const verifyFlowTool: McpTool = {
           z.object({
             label: z.string().optional(),
             do: z
-              .record(z.unknown())
+              .record(z.string(), z.unknown())
               .describe(
                 "Action: {action:'click'|'focus'|'hover', selector} | {action:'press', key, selector?} | {action:'fill'|'type', selector, value|text} | {action:'wait', ms}",
               ),
             expect: z
-              .array(z.record(z.unknown()))
+              .array(z.record(z.string(), z.unknown()))
               .optional()
               .describe(
                 "Post-conditions: {assert:'attr', selector, name, equals} | {assert:'visible'|'hidden'|'focused', selector} | {assert:'text', selector, contains} | {assert:'count', selector, equals}",

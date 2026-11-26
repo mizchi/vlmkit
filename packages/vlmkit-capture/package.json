@@ -43,7 +43,7 @@
   "dependencies": {
     "@mizchi/vlmkit-core": "workspace:*",
     "pngjs": "^7.0.0",
-    "ws": "^8.20.0"
+    "ws": "^8.23.0"
   },
   "peerDependencies": {
     "playwright": ">=1.61 <2"

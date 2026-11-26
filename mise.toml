@@ -1,0 +1,22 @@
+# Development toolchain (replaces flake.nix / apm.nix).
+#
+# `mise install` then `mise exec -- <cmd>` (or activate mise in your shell; `.envrc` does it
+# for direnv users). CI installs Node.js and pnpm through `voidzero-dev/setup-vp`, which reads
+# the same versions from `package.json` (`engines.node`, `packageManager`); this file is for
+# the tools setup-vp does not cover.
+#
+# Not here on purpose:
+#   - `moon` (MoonBit): no mise backend; install with
+#     `curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash` (see .claude/CLAUDE.md).
+#   - `ffmpeg` / `ffprobe`: the user's own decoder is the point (`scan video`), so it comes
+#     from the OS package manager, never pinned by the repository.
+
+[tools]
+node = "24"
+# pnpm stays 10 (.claude/CLAUDE.md, "pnpm stays 10"); keep in step with `packageManager`.
+pnpm = "10.33.0"
+ast-grep = "0.51.3"
+pkl = "0.33.1"
+"github:mizchi/pkspec" = { version = "0.4.2", version_prefix = "pkspec@" }
+"github:mizchi/pkfire" = { version = "0.16.0", version_prefix = "pkfire@", asset_pattern = "pkf-*.tar.gz" }
+"github:microsoft/apm" = "0.39.0"

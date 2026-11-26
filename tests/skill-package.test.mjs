@@ -143,9 +143,9 @@ test("apm.yml carries the release version", async () => {
   assert.match(manifest, new RegExp(`^version: ${version.replaceAll(".", "\\.")}$`, "m"));
 });
 
-test("the local development shell pins the current APM release", async () => {
-  const apmNix = await readFile(join(repoRoot, "apm.nix"), "utf8");
-  assert.match(apmNix, /version \? "0\.27\.0"/);
+test("the local development toolchain pins an exact APM release", async () => {
+  const mise = await readFile(join(repoRoot, "mise.toml"), "utf8");
+  assert.match(mise, /^"github:microsoft\/apm" = "\d+\.\d+\.\d+"$/m);
 });
 
 /**

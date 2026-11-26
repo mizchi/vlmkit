@@ -20,7 +20,7 @@ export interface McpToolResult {
 export interface McpTool {
   name: string;
   description: string;
-  inputSchema: z.ZodRawShape;
+  inputSchema: Record<string, z.ZodType>;
   run: (args: Record<string, unknown>) => Promise<McpToolResult>;
 }
 

@@ -147,7 +147,7 @@ function knownFlags({ skillAssets = true } = {}) {
     // `.claude/skills` is in here because a skill can ship its own scripts, and
     // a skill documenting its OWN flag read as a phantom until this path was
     // swept (the d2 skills, since moved out, had six such flags).
-    ...["src", "packages", "worker", "Taskfile.pkl", "justfile", ".github"]
+    ...["src", "packages", "worker", "Taskfile.pkl", "vite.config.ts", ".github"]
       .concat(skillAssets ? [".claude/skills"] : [])
       .filter((p) => existsSync(join(repoRoot, p))),
   ]);

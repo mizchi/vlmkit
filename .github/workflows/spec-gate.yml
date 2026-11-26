@@ -17,6 +17,7 @@ on:
       - "Test.pkl"
       - "Taskfile.pkl"
       - "pkspec/**"
+      - "mise.toml"
       - ".github/workflows/spec-gate.yml"
   push:
     branches: [main]
@@ -29,14 +30,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Nix
-        uses: cachix/install-nix-action@v30
+      # The versions are mise.toml's, the same ones a local `mise install` gives. Only the three
+      # tools these gates need are installed; `pkf doctor` checks for the `pkl` CLI.
+      - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5.3.0
         with:
-          extra_nix_config: |
-            experimental-features = nix-command flakes
+          install_args: "github:mizchi/pkspec github:mizchi/pkfire pkl"
 
       - name: pkspec check
-        run: nix run git+https://github.com/mizchi/pkspec -- check Spec.pkl Test.pkl
+        run: pkspec check Spec.pkl Test.pkl
 
       - name: pkspec lint
         # The deprecated-without-replacedBy rule emits info for every
@@ -44,7 +45,7 @@ jobs:
         # no successor exists by design — see Spec.pkl A6, D3, E9, …).
         # The deprecatedReason captures the rationale; the lint rule
         # would force noise without a real signal.
-        run: nix run git+https://github.com/mizchi/pkspec -- lint --lint-disable lint.deprecated-without-replacedBy Spec.pkl Test.pkl
+        run: pkspec lint --lint-disable lint.deprecated-without-replacedBy Spec.pkl Test.pkl
 
       - name: pkf doctor
-        run: nix run git+https://github.com/mizchi/pkfire -- doctor
+        run: pkf doctor

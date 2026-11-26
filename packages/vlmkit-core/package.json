@@ -50,12 +50,12 @@
   },
   "dependencies": {
     "@mizchi/vlmkit-judge": "workspace:*",
-    "pixelmatch": "^7.1.0",
+    "pixelmatch": "^8.0.0",
     "pngjs": "^7.0.0"
   },
   "peerDependencies": {
-    "playwright": ">=1.61 <2",
-    "@jsquash/webp": "^1"
+    "@jsquash/webp": "^1",
+    "playwright": ">=1.61 <2"
   },
   "peerDependenciesMeta": {
     "@jsquash/webp": {

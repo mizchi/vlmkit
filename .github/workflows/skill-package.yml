@@ -11,7 +11,7 @@ on:
       - "scripts/sync-skill-package.mjs"
       - "scripts/smoke-skill-installers.mjs"
       - "apm.yml"
-      - "justfile"
+      - "vite.config.ts"
       - ".github/workflows/skill-package.yml"
   pull_request:
     paths:
@@ -22,7 +22,7 @@ on:
       - "scripts/sync-skill-package.mjs"
       - "scripts/smoke-skill-installers.mjs"
       - "apm.yml"
-      - "justfile"
+      - "vite.config.ts"
       - ".github/workflows/skill-package.yml"
   workflow_dispatch:
 
@@ -37,16 +37,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        apm-version: ["0.8.11", "0.27.0"]
+        apm-version: ["0.8.11", "0.39.0"]
     env:
       CI: "true"
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      - uses: voidzero-dev/setup-vp@0072dab61af1caed438a55cb90c8d6dc0dfa09ce # v1.22.0
         with:
           node-version: 24
-          package-manager-cache: false
+          cache: true
+          run-install: false
 
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
@@ -63,10 +64,6 @@ jobs:
       # This needs pnpm and node_modules, which the job did not have — the two files it runs are
       # deliberately browser-free (the live-browser half lives in `site-links.test.mjs`), so
       # dependencies are enough and no Playwright download is needed.
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
       - run: pnpm install --frozen-lockfile
 
       - name: Verify skill package contracts

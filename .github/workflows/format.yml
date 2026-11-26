@@ -27,14 +27,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - uses: actions/setup-node@v4
+      - uses: voidzero-dev/setup-vp@0072dab61af1caed438a55cb90c8d6dc0dfa09ce # v1.22.0
         with:
           node-version: 24
-          cache: pnpm
+          cache: true
+          run-install: false
 
       # `--ignore-scripts`: formatting needs the `vp` binary and its native Oxfmt, nothing that a
       # postinstall builds.
