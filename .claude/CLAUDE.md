@@ -2072,7 +2072,8 @@ and `vitest` to the copies Vite+ bundles; bump them together with `vite-plus`: t
 after the install. Things to know before changing it:
 
 - **The toolchain is mise + Vite+, not Nix** (since 2026-11-27). `mise.toml` pins node 24, pnpm 10,
-  pkspec, pkfire (`pkf`), pkl, apm and ast-grep; `mise install` gives all of them. CI gets Node.js and
+  pkspec, pkfire (`pkf`), pkl, apm and ast-grep; `mise install` gives all of them. There is no
+  `.envrc` / direnv: mise's `[env]` loads `.env.local` (the API keys). CI gets Node.js and
   pnpm from `voidzero-dev/setup-vp` (pinned by SHA; `node-version: 24`, pnpm from `packageManager`),
   except `publish.yml`, which stays on `actions/setup-node` for npm Trusted Publishing, and
   `spec-gate.yml`, which installs pkspec / pkfire / pkl with `jdx/mise-action`. `moon` and `ffmpeg`

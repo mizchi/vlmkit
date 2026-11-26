@@ -64,10 +64,10 @@ only supported entry point.
 
 ## Quickstart
 
-This repo uses direnv; `.envrc` auto-loads `.env.local` (where
-`OPENROUTER_API_KEY` / `ANTHROPIC_API_KEY` live). If you're shelling
-outside the direnv context, run
-`set -a; source .env.local; set +a` first.
+This repo's `mise.toml` loads `.env.local` (where
+`OPENROUTER_API_KEY` / `ANTHROPIC_API_KEY` live) through `[env]`. With
+mise activated in your shell it is already set; otherwise prefix commands
+with `mise exec --`, or run `set -a; source .env.local; set +a` first.
 
 ```bash
 # Property mode (default): delete one CSS property; pipeline proposes restoration
