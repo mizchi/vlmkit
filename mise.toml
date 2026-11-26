@@ -24,3 +24,12 @@ pkl = "0.33.1"
 [env]
 # Local-only secrets (API keys; gitignored). A missing file is skipped.
 _.file = ".env.local"
+
+# `pkf hooks install` on entering the repo (in a shell with `mise activate`; `mise exec` runs no
+# hooks). It writes .git/hooks shims for Taskfile.pkl tasks named after git events, is idempotent,
+# and exits 0 when there are none. Enter hooks are experimental in mise, hence the setting.
+[settings]
+experimental = true
+
+[hooks]
+enter = "pkf hooks install >/dev/null 2>&1 || true"
