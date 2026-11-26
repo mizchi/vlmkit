@@ -1,6 +1,8 @@
 # Development toolchain and environment (replaces flake.nix / apm.nix and .envrc).
 #
-# `mise install` then `mise exec -- <cmd>`, or `mise activate` in your shell: no direnv.
+# `mise install` then `mise exec -- <cmd>`, or activate mise in your shell with
+# `eval "$(mise activate zsh)"` (or `bash`, `fish`; `mise activate` alone only prints that
+# code). No direnv.
 # CI installs Node.js and pnpm through `voidzero-dev/setup-vp`, which reads
 # the same versions from `package.json` (`engines.node`, `packageManager`); this file is for
 # the tools setup-vp does not cover.

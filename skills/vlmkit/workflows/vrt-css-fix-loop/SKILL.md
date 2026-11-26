@@ -66,8 +66,11 @@ only supported entry point.
 
 This repo's `mise.toml` loads `.env.local` (where
 `OPENROUTER_API_KEY` / `ANTHROPIC_API_KEY` live) through `[env]`. With
-mise activated in your shell it is already set; otherwise prefix commands
-with `mise exec --`, or run `set -a; source .env.local; set +a` first.
+mise activated in your shell (`eval "$(mise activate zsh)"`, or `bash`) it
+is already set; otherwise prefix commands with `mise exec --`, or run
+`set -a; source .env.local; set +a` first. `mise exec` runs a command, not
+shell syntax: put an inline variable behind `env`, as in
+`mise exec -- env VLMKIT_VLM_MODEL=… node …` (the last example below).
 
 ```bash
 # Property mode (default): delete one CSS property; pipeline proposes restoration
@@ -82,6 +85,11 @@ node --experimental-strip-types src/experiments/css-challenge/fix-loop.ts \
 # The Stage-2 LLM is held constant across VLM swaps so VLM quality
 # can be compared apples-to-apples.
 VLMKIT_VLM_MODEL="bytedance/ui-tars-1.5-7b" \
+  node --experimental-strip-types src/experiments/css-challenge/fix-loop.ts \
+  --fixture page --seed 11 --mode selector
+
+# The same without an activated shell: `env` sets the variable inside mise exec.
+mise exec -- env VLMKIT_VLM_MODEL="bytedance/ui-tars-1.5-7b" \
   node --experimental-strip-types src/experiments/css-challenge/fix-loop.ts \
   --fixture page --seed 11 --mode selector
 ```
