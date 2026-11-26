@@ -3,6 +3,40 @@
 All notable changes to this project will be documented in this file.
 Dates are YYYY-MM-DD.
 
+## 0.28.0 — 2026-11-27
+
+Changed:
+
+- Dependencies are updated. The ones with major versions:
+  - zod 3 → 4, through `@mizchi/vlmkit-mcp`. MCP tool input schemas are now zod 4 schemas
+    (`Record<string, z.ZodType>`), and the MCP SDK is 1.32.
+  - pixelmatch 7 → 8. Its colour difference is now OKLab/HyAB instead of YIQ, so pixel-diff
+    ratios differ from 0.27.0 on the same images. The `threshold` scale is unchanged.
+  - `@hono/node-server` 1 → 2.
+- The other updates include Playwright 1.65.1, used in development and CI. The peer range stays
+  `>=1.61 <2`.
+- `typescript` stays a 6.x dependency. `vlmkit-generate` parses with its compiler API, which
+  TypeScript 7 no longer exports.
+
+Fixed:
+
+- `verify markup` no longer prints a REGRESSION (and tells the agent to revert) when the only
+  change is the pixel-diff metric. The run ledger now records which metric measured `pixelDiff`
+  (`pixelMetric`), and a previous run's pixel diff is compared only when it was measured with the
+  same one. Before this fix, an unchanged page could read as worse right after the pixelmatch 8
+  upgrade.
+
+Development:
+
+- The toolchain is mise and Vite+, not Nix and direnv. `mise.toml` pins node 24, pnpm 10, pkspec,
+  pkfire, pkl, apm and ast-grep, loads `.env.local`, and runs `pkf hooks install` on entering the
+  repository. `flake.nix`, `apm.nix`, `.envrc` and the root `justfile` are gone. The justfile's
+  tasks are now `vp run` tasks in `vite.config.ts`.
+- vite-plus 1.0 → 1.8. `pnpm typecheck` is `vp check` (tsrs, TypeScript 7's checker) over the same
+  files tsc checked, in 0.35s instead of 7s.
+- CI sets up Node.js and pnpm with `voidzero-dev/setup-vp`. `publish.yml` keeps `actions/setup-node`
+  for npm Trusted Publishing. The spec gate installs pkspec and pkfire with `jdx/mise-action`.
+
 ## 0.27.0 — 2026-11-14
 
 Added:
