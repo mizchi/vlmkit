@@ -171,15 +171,15 @@ pkf run fix-loop --fixture page --seed 42
 
 ### Task runner & spec gates (pkfire / pkspec)
 
-Tasks live in `Taskfile.pkl` (typed; replaces the previous bash
-justfile). Specs live in
+Bench / demo / migration tasks live in `Taskfile.pkl` (typed). Repository chores (jev-lint,
+skill-package checks) are `vp run` tasks in `vite.config.ts`. Specs live in
 `Spec.pkl` (Goals + Scenarios) and `Test.pkl` (smoke implementations).
 
 ```bash
 # List every available task
 pkf list
 
-# Run a task (mirrors any old `just <name>` invocation)
+# Run a task
 pkf run smoke-all
 pkf run vlmkit-test
 
@@ -187,13 +187,18 @@ pkf run vlmkit-test
 pkf run spec-check    # pkspec check Spec.pkl Test.pkl
 pkf run spec-render   # render Spec.pkl → docs/SPEC.md
 pkf run spec-run      # execute every Test.pkl test
+
+# Repository chores (vite.config.ts `run.tasks`)
+pnpm exec vp run verify-skill-package
+pnpm exec vp run smoke-skill-installers
 ```
 
-Install `pkf` / `pkspec` via nix flake:
+`pkf`, `pkspec`, `pkl`, node, pnpm and the other tools are pinned in `mise.toml`:
 
 ```bash
-nix run git+https://github.com/mizchi/pkfire -- list
-nix run git+https://github.com/mizchi/pkspec  -- check Spec.pkl Test.pkl
+mise install
+mise exec -- pkf list
+mise exec -- pkspec check Spec.pkl Test.pkl
 ```
 
 

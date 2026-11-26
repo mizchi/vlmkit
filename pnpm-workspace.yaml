@@ -4,5 +4,5 @@ packages:
 # `vite` or `vitest` gets the copies `vp test` runs, so there is one runner, one
 # `expect` and one mock registry. Bump these together with `vite-plus`.
 overrides:
-  vite: npm:@voidzero-dev/vite-plus-core@1.0.0
-  vitest: 5.0.1
+  vite: npm:@voidzero-dev/vite-plus-core@8.3.8001
+  vitest: 5.1.1

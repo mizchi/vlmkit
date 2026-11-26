@@ -513,7 +513,8 @@ test("the GitHub Pages workflow validates and deploys the composed site", async 
   assert.match(workflow, /pages: write/);
   assert.match(workflow, /id-token: write/);
   assert.match(workflow, /actions\/checkout@v6/);
-  assert.match(workflow, /actions\/setup-node@v6/);
+  // Node.js and pnpm come from Vite+'s setup action (pinned by SHA), not setup-node + pnpm/action-setup.
+  assert.match(workflow, /voidzero-dev\/setup-vp@[0-9a-f]{40}/);
   assert.match(workflow, /node-version: 24/);
   /**
    * `vitest run`, NOT `node --test`. This test asserted `node --test` for as long as

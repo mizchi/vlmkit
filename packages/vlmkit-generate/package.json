@@ -49,6 +49,6 @@
   },
   "dependencies": {
     "@mizchi/vlmkit-ai": "workspace:*",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.3"
   }
 }

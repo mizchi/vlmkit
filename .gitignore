@@ -30,13 +30,13 @@ attempt.html
 /.pkspec/
 .vrt/
 
-# Nix
+# Left behind by the former Nix / direnv shell (removed 2026-11-27)
 .direnv/
 result
 result-*
 .pnpm/
 
-# Local-only env (loaded by direnv via .envrc; holds API keys)
+# Local-only env (loaded by mise.toml's [env]; holds API keys)
 .env.local
 
 # heal flaky-test counter (transient)

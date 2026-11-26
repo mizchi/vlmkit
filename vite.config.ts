@@ -221,10 +221,59 @@ export default defineConfig({
   ],
 
   /**
-   * `vp lint` settings. Nothing runs lint yet: no script, hook or CI job calls it.
+   * `vp run <task>`: the tasks the root justfile held. The bench / demo / migration runners stay
+   * in `Taskfile.pkl` (`pkf run …`); package.json scripts run as `vp run <script>` too.
+   * None of these is cached: each one either reads a sibling checkout (`../jev-lint`) or installs
+   * into a temporary consumer repository, which Vite Task cannot fingerprint.
+   */
+  run: {
+    tasks: {
+      // The dogfood runner uses the patched sibling checkout until its next release.
+      "jev-parser-moonbit": { command: "bash scripts/jev-parser-moonbit.sh", cache: false },
+      "jev-plan": {
+        command: "node --experimental-strip-types ../jev-lint/src/cli.ts check --dry-run --cache none",
+        dependsOn: ["jev-parser-moonbit"],
+        cache: false,
+      },
+      "jev-check": {
+        command: "node --experimental-strip-types ../jev-lint/src/cli.ts check",
+        dependsOn: ["jev-parser-moonbit"],
+        cache: false,
+      },
+      // Deterministic package and intro-page contracts.
+      "verify-skill-package": {
+        command: "vp test run tests/skill-package.test.mjs examples/vlmkit-intro-page/page.test.mjs",
+        cache: false,
+      },
+      // Install into isolated consumer repositories with both supported installers.
+      "smoke-skill-installers": {
+        command: "node scripts/smoke-skill-installers.mjs",
+        dependsOn: ["verify-skill-package"],
+        cache: false,
+      },
+    },
+  },
+
+  /**
+   * `vp lint` settings. Lint rules are not enforced yet: no script, hook or CI job runs them.
+   * The type check is: `pnpm typecheck` is `vp check --no-fmt --no-lint`, which runs tsrs (the
+   * TypeScript 7 checker Vite+ bundles) over tsconfig.json through the type-aware path below.
+   * The `typescript` package stays a 6.x runtime dependency only because `vlmkit-generate`
+   * parses with its compiler API, which TypeScript 7 no longer exports.
    */
   lint: {
-    ignorePatterns: ["**/dist/**", "**/fixtures/**", "**/node_modules/**", "test-results/**", ".pages/**"],
+    options: { typeAware: true, typeCheck: true },
+    ignorePatterns: [
+      "**/dist/**",
+      "**/fixtures/**",
+      "**/node_modules/**",
+      "test-results/**",
+      ".pages/**",
+      // Key-requiring dogfood runners, never in tsconfig.json's `include` and stale against
+      // `HealDeps` (they pass `observe` / `captureActual`). Left out so `pnpm typecheck`, which
+      // passes `packages` whole (`vp run` does not expand globs), checks what tsc checked.
+      "packages/vlmkit-heal/smoke/**",
+    ],
   },
 
   /**
