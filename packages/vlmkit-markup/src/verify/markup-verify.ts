@@ -230,15 +230,29 @@ export interface MarkupVerifyReport {
   kickback: string[];
 }
 
+/**
+ * The metric behind `pixelDiff`, written beside it in the ledger. pixelmatch 8 replaced YIQ with
+ * OKLab/HyAB, so the same pair of images gives a different ratio; a ledger entry measured with
+ * another metric keeps its composition numbers and drops its pixel diff, or an upgrade alone
+ * would print a REGRESSION and tell the agent to revert. Change this when the metric changes.
+ */
+export const PIXEL_DIFF_METRIC = "pixelmatch-8";
+
 /** Last verify-markup ledger entry for this attempt, if any. */
-function previousTrendPoint(attempt: string, cwd = process.cwd()): VerifyTrendPoint | undefined {
+export function previousTrendPoint(attempt: string, cwd = process.cwd()): VerifyTrendPoint | undefined {
   try {
     const raw = readFileSync(join(cwd, ".vlmkit", "run-ledger.jsonl"), "utf8");
     for (const line of raw.trim().split("\n").reverse()) {
       const entry = JSON.parse(line) as {
         tool?: string;
         source?: string;
-        headline?: { targetsPassed?: number; residuals?: number; gateSuspects?: number; pixelDiff?: number };
+        headline?: {
+          targetsPassed?: number;
+          residuals?: number;
+          gateSuspects?: number;
+          pixelDiff?: number;
+          pixelMetric?: string;
+        };
       };
       if (
         entry.tool === "verify-markup" &&
@@ -246,12 +260,12 @@ function previousTrendPoint(attempt: string, cwd = process.cwd()): VerifyTrendPo
         typeof entry.headline?.targetsPassed === "number" &&
         typeof entry.headline?.residuals === "number"
       ) {
-        const { gateSuspects, pixelDiff } = entry.headline;
+        const { gateSuspects, pixelDiff, pixelMetric } = entry.headline;
         return {
           targetsPassed: entry.headline.targetsPassed,
           residuals: entry.headline.residuals,
           ...(typeof gateSuspects === "number" ? { gateSuspects } : {}),
-          ...(typeof pixelDiff === "number" ? { pixelDiff } : {}),
+          ...(typeof pixelDiff === "number" && pixelMetric === PIXEL_DIFF_METRIC ? { pixelDiff } : {}),
         };
       }
     }
@@ -544,6 +558,7 @@ export async function runMarkupVerify(options: MarkupVerifyOptions): Promise<Mar
       residuals: currentPoint.residuals,
       gateSuspects: currentPoint.gateSuspects ?? null,
       pixelDiff: currentPoint.pixelDiff ?? null,
+      pixelMetric: PIXEL_DIFF_METRIC,
     },
   });
   return { attempt: options.attempt, targets, gates, done, ...(trend ? { trend } : {}), kickback };

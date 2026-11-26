@@ -18,5 +18,5 @@ pnpm = "10.33.0"
 ast-grep = "0.51.3"
 pkl = "0.33.1"
 "github:mizchi/pkspec" = { version = "0.4.2", version_prefix = "pkspec@" }
-"github:mizchi/pkfire" = { version = "0.16.0", version_prefix = "pkfire@", asset_pattern = "pkf-*.tar.gz" }
+"github:mizchi/pkfire" = { version = "0.16.0", version_prefix = "pkfire@", matching = "pkf-" }
 "github:microsoft/apm" = "0.39.0"

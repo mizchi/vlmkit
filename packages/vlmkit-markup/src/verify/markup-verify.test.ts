@@ -1,6 +1,16 @@
 import { test } from "vite-plus/test";
 import assert from "node:assert/strict";
-import { computeTrend, heightToleranceFor, pixelPresence, trendNumbers } from "./markup-verify.ts";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  PIXEL_DIFF_METRIC,
+  computeTrend,
+  heightToleranceFor,
+  pixelPresence,
+  previousTrendPoint,
+  trendNumbers,
+} from "./markup-verify.ts";
 import { kickbackForComposition } from "./markup-verify-report.ts";
 import type { PageComposition, PageComponent, PageMatch } from "../component/page-compose.ts";
 
@@ -45,6 +55,28 @@ test("computeTrend: with composition unchanged, gate suspects and then pixel dif
     trendNumbers(computeTrend(before, { ...before, gateSuspects: 0, pixelDiff: 0.0099 })),
     "targets passed 1 -> 1, composition residuals 0 -> 0, gate suspects 1 -> 0, worst pixel diff 1.20% -> 0.99%",
   );
+});
+
+test("previousTrendPoint: a pixel diff measured with another pixelmatch metric is not compared", () => {
+  // pixelmatch 8 replaced YIQ with OKLab/HyAB, so one image pair gives a different ratio. A ledger
+  // line from before the upgrade, compared on pixel diff alone, printed a REGRESSION and "revert".
+  const dir = mkdtempSync(join(tmpdir(), "vlmkit-trend-"));
+  const ledger = (headline: object) =>
+    JSON.stringify({ tool: "verify-markup", source: "attempt.html", headline }) + "\n";
+  const base = { targetsPassed: 1, residuals: 0, gateSuspects: 0, pixelDiff: 0.012 };
+  try {
+    mkdirSync(join(dir, ".vlmkit"));
+    writeFileSync(join(dir, ".vlmkit", "run-ledger.jsonl"), ledger(base));
+    assert.deepEqual(previousTrendPoint("attempt.html", dir), {
+      targetsPassed: 1,
+      residuals: 0,
+      gateSuspects: 0,
+    });
+    writeFileSync(join(dir, ".vlmkit", "run-ledger.jsonl"), ledger({ ...base, pixelMetric: PIXEL_DIFF_METRIC }));
+    assert.equal(previousTrendPoint("attempt.html", dir)?.pixelDiff, 0.012);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 function component(index: number, left: number, top: number, w: number, h: number, hex = "#e2e8f0"): PageComponent {
