@@ -30,9 +30,9 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      # No `version:` here: pnpm's version is package.json's `packageManager`, and the action
+      # refuses to run when both name one ("Multiple versions of pnpm specified" stopped v0.28.0).
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: 24
