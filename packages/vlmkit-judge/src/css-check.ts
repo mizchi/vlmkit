@@ -12,21 +12,28 @@
  *                                usually a fallback written for another engine (info);
  * - `unknown-media-feature`      an `@media` whose feature (or value) the browser does not know:
  *                                it is false for everyone, and so is its negation;
- * - `never-matching-media`       an `@media` conjunction whose width bounds leave no viewport.
+ * - `inert-declaration`          a parsed declaration that does nothing where it is
+ *                                (`./inert-declaration.ts`, and veriss's W_LAYOUT_DECLARATION_INERT);
+ * - `static-css`                 a CSS mistake veriss finds statically over every width
+ *                                (`./css-static.ts`): an `@media` that matches no width is one.
  *
  * Pure: no DOM, no Node built-ins (`purity.test.ts`).
  */
 
 export type CssCheckRule =
+  | "redirected"
   | "dropped-declaration"
   | "vendor-declaration-dropped"
   | "unknown-media-feature"
-  | "never-matching-media";
+  | "inert-declaration"
+  | "static-css";
 
 export interface CssCheckFinding {
   rule: CssCheckRule;
   severity: "suspect" | "warn" | "info";
   selector?: string;
+  /** The declaration's property, when the finding is about one (for merging with veriss's). */
+  property?: string;
   sheet: string;
   line?: number;
   message: string;
@@ -137,11 +144,30 @@ export const nearestMediaFeature = (feature: string): string | null => nearestWo
  */
 export const MEDIA_ATOM_PROBE_JS = `
   const unknownMediaAtom = (cond) => {
-    for (const m of String(cond).matchAll(/\\(([^()]+)\\)/g)) {
-      const atom = "(" + m[1] + ")";
-      if (!window.matchMedia(atom).matches && !window.matchMedia("not " + atom).matches) return m[1].trim();
-    }
-    return null;
+    const text = String(cond);
+    // Each balanced (…) group: a feature, or a nested condition whose own groups are the features. A "(" right after a
+    // name is a function's (calc(), min()), part of the feature's value, never an atom of its own.
+    const groups = (from, to) => {
+      const out = [];
+      for (let i = from, depth = 0, start = -1; i < to; i++) {
+        const ch = text[i];
+        if (ch === "(") { if (depth === 0) start = i; depth++; }
+        else if (ch === ")" && depth > 0 && --depth === 0) out.push([start, i]);
+      }
+      return out;
+    };
+    const fnParen = (i) => /[\\w-]/.test(text[i - 1] || "");
+    const probe = (from, to) => {
+      for (const [a, b] of groups(from, to)) {
+        if (fnParen(a)) continue;
+        const inner = groups(a + 1, b).filter(([c]) => !fnParen(c));
+        if (inner.length) { const hit = probe(a + 1, b); if (hit) return hit; continue; }
+        const atom = text.slice(a, b + 1);
+        if (!window.matchMedia(atom).matches && !window.matchMedia("not " + atom).matches) return atom.slice(1, -1).trim();
+      }
+      return null;
+    };
+    return probe(0, text.length);
   };`;
 
 /** A vendor prefix on the property or in the value: written for an engine, often on purpose for another one. */
@@ -150,85 +176,23 @@ export function isVendorDeclaration(property: string, value: string): boolean {
   return prefix.test(property) || /(?:^|[\s,(])-(?:webkit|moz|ms|o|khtml)-/i.test(value);
 }
 
-const lengthPx = (n: number, unit: string): number | null =>
-  unit === "px" ? n : unit === "em" || unit === "rem" ? n * 16 : null;
-
-/**
- * The viewport widths a media condition allows, when it is a plain conjunction (`and` only, with
- * an optional `screen` / `all` type); null otherwise — a list, `or`, `not`, another media type, or
- * a width in a unit other than px / em / rem. Atoms on other features are ignored: when the
- * width bounds alone leave nothing, the conjunction is empty whatever they say. `em` in a media
- * query is the initial font size (16px), never the page's.
- */
-export function mediaWidthRange(
-  condition: string,
-): { min: number; minOpen: boolean; max: number; maxOpen: boolean; empty: boolean } | null {
-  const text = condition.trim().toLowerCase().replace(/\s+/g, " ");
-  if (!text || text.includes(",") || /\b(?:or|not)\b/.test(text)) return null;
-  let min = 0;
-  let minOpen = false;
-  let max = Infinity;
-  let maxOpen = false;
-  const lower = (v: number, open: boolean) => {
-    if (v > min || (v === min && open)) [min, minOpen] = [v, open];
-  };
-  const upper = (v: number, open: boolean) => {
-    if (v < max || (v === max && open)) [max, maxOpen] = [v, open];
-  };
-  const NUM = String.raw`(-?\d*\.?\d+)\s*(px|em|rem)`;
-  for (const raw of text.split(/ and /)) {
-    const part = raw.trim().replace(/^only /, "");
-    if (part === "screen" || part === "all") continue;
-    const atom = /^\((.*)\)$/.exec(part);
-    if (!atom) return null; // a media type other than screen / all (print, …): not this rule's question
-    const body = atom[1]!.trim();
-    const legacy = new RegExp(`^(min|max)-width\\s*:\\s*${NUM}$`).exec(body);
-    if (legacy) {
-      const px = lengthPx(Number(legacy[2]), legacy[3]!);
-      if (px === null) return null;
-      legacy[1] === "min" ? lower(px, false) : upper(px, false);
-      continue;
-    }
-    const one = new RegExp(`^width\\s*(<=|>=|<|>|=)\\s*${NUM}$`).exec(body);
-    const flipped = new RegExp(`^${NUM}\\s*(<=|>=|<|>|=)\\s*width$`).exec(body);
-    const both = new RegExp(`^${NUM}\\s*(<=|<)\\s*width\\s*(<=|<)\\s*${NUM}$`).exec(body);
-    const apply = (op: string, px: number) => {
-      if (op === ">=") lower(px, false);
-      else if (op === ">") lower(px, true);
-      else if (op === "<=") upper(px, false);
-      else if (op === "<") upper(px, true);
-      else (lower(px, false), upper(px, false));
-    };
-    const flip: Record<string, string> = { "<": ">", ">": "<", "<=": ">=", ">=": "<=", "=": "=" };
-    if (one) {
-      const px = lengthPx(Number(one[2]), one[3]!);
-      if (px === null) return null;
-      apply(one[1]!, px);
-    } else if (flipped) {
-      const px = lengthPx(Number(flipped[1]), flipped[2]!);
-      if (px === null) return null;
-      apply(flip[flipped[3]!]!, px);
-    } else if (both) {
-      const a = lengthPx(Number(both[1]), both[2]!);
-      const b = lengthPx(Number(both[5]), both[6]!);
-      if (a === null || b === null) return null;
-      apply(both[3] === "<" ? ">" : ">=", a);
-      apply(both[4]!, b);
-    } else if (/(^|[^-])\bwidth\b/.test(body) && !/-width/.test(body)) {
-      return null; // a width test this parser does not read: say nothing rather than guess
-    }
-  }
-  const empty = min > max || (min === max && (minOpen || maxOpen));
-  return { min, minOpen, max, maxOpen, empty };
-}
-
 const where = (sheet: string, line?: number) => (line === undefined ? sheet : `${sheet}:${line}`);
 
 export function judgeCssCheck(input: {
   declarations: readonly DeclarationSample[];
   media: readonly MediaSample[];
+  /** The note when the requested URL redirected somewhere meaningful (a login wall), else null. */
+  redirect?: string | null;
 }): CssCheckFinding[] {
   const out: CssCheckFinding[] = [];
+  // First, so a clean result on the login page is never the verdict.
+  if (input.redirect)
+    out.push({
+      rule: "redirected",
+      severity: "suspect",
+      sheet: "page",
+      message: `${input.redirect}: the CSS measured is that page's, not the page asked for`,
+    });
   for (const d of input.declarations) {
     const at = where(d.sheet, d.line);
     const decl = `\`${d.property}: ${d.value}\``;
@@ -237,6 +201,7 @@ export function judgeCssCheck(input: {
         rule: "vendor-declaration-dropped",
         severity: "info",
         selector: d.selector,
+        property: d.property,
         sheet: d.sheet,
         ...(d.line !== undefined ? { line: d.line } : {}),
         message: `${d.selector} ${decl} (${at}) is not understood by this browser and was dropped; a vendor-prefixed fallback for another engine is usually meant that way`,
@@ -250,6 +215,7 @@ export function judgeCssCheck(input: {
       rule: "dropped-declaration",
       severity: "suspect",
       selector: d.selector,
+      property: d.property,
       sheet: d.sheet,
       ...(d.line !== undefined ? { line: d.line } : {}),
       message: `${d.selector} ${decl} (${at}) is ignored: ${why}${d.elements > 1 ? ` (the rule matches ${d.elements} elements)` : ""}`,
@@ -273,14 +239,6 @@ export function judgeCssCheck(input: {
       });
       continue;
     }
-    const range = mediaWidthRange(m.condition);
-    if (range?.empty)
-      out.push({
-        rule: "never-matching-media",
-        severity: "suspect",
-        ...base,
-        message: `@media ${m.condition} (${at}) matches no viewport: its width must be ${range.minOpen ? ">" : ">="} ${range.min}px and ${range.maxOpen ? "<" : "<="} ${range.max}px at once — the bounds are swapped or overlap the wrong way`,
-      });
   }
   return out;
 }

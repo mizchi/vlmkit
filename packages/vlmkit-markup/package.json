@@ -65,6 +65,15 @@
     "pngjs": "^7.0.0"
   },
   "peerDependencies": {
-    "playwright": ">=1.61 <2"
+    "playwright": ">=1.61 <2",
+    "veriss": "*"
+  },
+  "peerDependenciesMeta": {
+    "veriss": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "veriss": "github:mizchi/veriss#ad663b006a1a392b5c662ee796405b234d7dec32&path:packages/veriss"
   }
 }

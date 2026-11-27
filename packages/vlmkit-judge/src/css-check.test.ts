@@ -3,7 +3,7 @@ import { describe, it } from "vite-plus/test";
 import {
   isVendorDeclaration,
   judgeCssCheck,
-  mediaWidthRange,
+  MEDIA_ATOM_PROBE_JS,
   nearestMediaFeature,
   type DeclarationSample,
 } from "./css-check.ts";
@@ -70,23 +70,14 @@ describe("css-check judge", () => {
     assert.equal(nearestMediaFeature("zzzzzzzzzz"), null);
   });
 
-  it("width bounds that leave no viewport is never-matching-media", () => {
-    assert.equal(mediaWidthRange("(min-width: 900px) and (max-width: 600px)")?.empty, true);
-    assert.equal(mediaWidthRange("screen and (min-width: 600px) and (max-width: 900px)")?.empty, false);
-    assert.equal(mediaWidthRange("(width > 600px) and (width < 600px)")?.empty, true);
-    assert.equal(mediaWidthRange("(600px < width <= 600px)")?.empty, true);
-    assert.equal(mediaWidthRange("(min-width: 40em) and (max-width: 639px)")?.empty, true);
-    assert.equal(mediaWidthRange("(min-width: 600px) and (max-width: 600px)")?.empty, false);
-    // Not a plain conjunction: not judged.
-    assert.equal(mediaWidthRange("(min-width: 900px), (max-width: 600px)"), null);
-    assert.equal(mediaWidthRange("not all and (min-width: 900px)"), null);
-    assert.equal(mediaWidthRange("print and (min-width: 900px) and (max-width: 600px)"), null);
-    const [f] = judgeCssCheck({
-      declarations: [],
-      media: [{ condition: "(min-width: 900px) and (max-width: 600px)", sheet: "a.css", unknownAtom: null }],
-    });
-    assert.equal(f!.rule, "never-matching-media");
-    assert.equal(f!.severity, "suspect");
+  it("an @media that matches no width is left to veriss (static-css), not judged here", () => {
+    assert.deepEqual(
+      judgeCssCheck({
+        declarations: [],
+        media: [{ condition: "(min-width: 900px) and (max-width: 600px)", sheet: "a.css", unknownAtom: null }],
+      }),
+      [],
+    );
   });
 
   it("a media query that can match says nothing", () => {
@@ -100,5 +91,53 @@ describe("css-check judge", () => {
       }),
       [],
     );
+  });
+});
+
+describe("MEDIA_ATOM_PROBE_JS: which (…) groups are asked of the browser", () => {
+  // A stand-in for matchMedia: a known feature matches exactly one of (f) and not (f); an unknown one matches neither.
+  const probe = (cond: string) => {
+    const asked: string[] = [];
+    const known = (atom: string) => /^\((?:min-width|max-width|width|prefers-reduced-motion|hover)\b/.test(atom);
+    const window = {
+      matchMedia: (q: string) => {
+        const atom = q.replace(/^not /, "");
+        asked.push(atom);
+        return { matches: known(atom) && !q.startsWith("not ") };
+      },
+    };
+    const found = new Function("window", "cond", `${MEDIA_ATOM_PROBE_JS}; return unknownMediaAtom(cond);`)(
+      window,
+      cond,
+    );
+    return { found, asked: [...new Set(asked)] };
+  };
+  it("a function in a feature's value is part of the feature, not an atom", () => {
+    assert.deepEqual(probe("(min-width: calc(40em + 1px))"), { found: null, asked: ["(min-width: calc(40em + 1px))"] });
+    assert.equal(probe("(max-width: min(50vw, 600px)) and (hover: hover)").found, null);
+  });
+  it("a misspelt feature is still found, also inside a nested condition", () => {
+    assert.equal(probe("(min-widht: 600px)").found, "min-widht: 600px");
+    assert.equal(
+      probe("not ((hover: hover) and (prefers-reduce-motion: reduce))").found,
+      "prefers-reduce-motion: reduce",
+    );
+    assert.equal(probe("screen and (min-widht: calc(1px + 2px))").found, "min-widht: calc(1px + 2px)");
+  });
+});
+
+describe("judgeCssCheck: a redirected page is never a clean result", () => {
+  it("a redirect note is a suspect finding of its own, first", () => {
+    const [f, ...rest] = judgeCssCheck({
+      declarations: [],
+      media: [],
+      redirect: "redirected from https://app.example/settings to https://app.example/login",
+    });
+    assert.equal(rest.length, 0);
+    assert.equal(f!.rule, "redirected");
+    assert.equal(f!.severity, "suspect");
+    assert.match(f!.message, /login/);
+    assert.match(f!.message, /not the page asked for/);
+    assert.deepEqual(judgeCssCheck({ declarations: [], media: [], redirect: null }), []);
   });
 });
