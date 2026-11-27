@@ -33,6 +33,7 @@ describe("markup gate plugin", () => {
         "check color",
         "check composition",
         "check copy",
+        "check css",
         "check design",
         "check drift component",
         "check drift pages",

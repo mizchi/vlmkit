@@ -31,7 +31,7 @@ interface CssProperty {
   disabled?: boolean;
   parsedOk?: boolean;
   /** Present on authored declarations; the expanded longhands carry none. */
-  range?: unknown;
+  range?: { startLine: number; startColumn: number };
 }
 
 interface CssRuleMatch {
@@ -61,7 +61,7 @@ export interface TaggedNode {
 const normalise = (text: string) => text.toLowerCase().replace(/\s+/g, "");
 
 export class CssInspector {
-  private readonly sheets = new Map<string, { url: string; inline: boolean }>();
+  private readonly sheets = new Map<string, { url: string; inline: boolean; startLine: number }>();
   private moved: { styleSheetId: string; range: CssMedia["range"]; text: string; to: string }[] = [];
 
   private constructor(
@@ -70,10 +70,11 @@ export class CssInspector {
   ) {
     session.on(
       "CSS.styleSheetAdded",
-      (event: { header: { styleSheetId: string; sourceURL: string; isInline?: boolean } }) => {
+      (event: { header: { styleSheetId: string; sourceURL: string; isInline?: boolean; startLine?: number } }) => {
         this.sheets.set(event.header.styleSheetId, {
           url: event.header.sourceURL,
           inline: event.header.isInline === true,
+          startLine: event.header.startLine ?? 0,
         });
       },
     );
@@ -102,6 +103,99 @@ export class CssInspector {
   async mediaConditions(): Promise<string[]> {
     const { medias } = (await this.session.send("CSS.getMediaQueries")) as { medias: CssMedia[] };
     return [...new Set(medias.map((m) => m.text.trim()).filter((t) => t && t !== "all" && t !== "screen"))];
+  }
+
+  /** How many stylesheets the protocol has reported (linked, `<style>`, imported). */
+  get sheetCount(): number {
+    return this.sheets.size;
+  }
+
+  /** A 1-based line in the file the sheet lives in (an inline `<style>` is offset by where it starts). */
+  private fileLine(styleSheetId: string | undefined, line: number | undefined): number | undefined {
+    if (line === undefined) return undefined;
+    return (styleSheetId ? (this.sheets.get(styleSheetId)?.startLine ?? 0) : 0) + line + 1;
+  }
+
+  /**
+   * Every authored declaration the browser did not parse (`parsedOk: false`) in an author rule
+   * matching one of the first `limit` elements (or their pseudo-elements), once per declaration
+   * however many elements its rule matches. Rules under a media query that does not match now
+   * are not seen: the protocol lists the rules that apply.
+   */
+  async unparsedDeclarations(limit: number): Promise<{
+    elements: number;
+    declarations: {
+      selector: string;
+      property: string;
+      value: string;
+      sheet: string;
+      line?: number;
+      elements: number;
+    }[];
+  }> {
+    const { root } = (await this.session.send("DOM.getDocument", { depth: 0 })) as { root: { nodeId: number } };
+    const { nodeIds } = (await this.session.send("DOM.querySelectorAll", {
+      nodeId: root.nodeId,
+      selector: "*",
+    })) as { nodeIds: number[] };
+    const found = new Map<
+      string,
+      { selector: string; property: string; value: string; sheet: string; line?: number; elements: number }
+    >();
+    const inspected = nodeIds.slice(0, limit);
+    for (const nodeId of inspected) {
+      const matched = (await this.session.send("CSS.getMatchedStylesForNode", { nodeId }).catch(() => ({}))) as {
+        matchedCSSRules?: CssRuleMatch[];
+        pseudoElements?: { matches: CssRuleMatch[] }[];
+      };
+      const counted = new Set<string>();
+      for (const match of [
+        ...(matched.matchedCSSRules ?? []),
+        ...(matched.pseudoElements ?? []).flatMap((p) => p.matches),
+      ]) {
+        if (match.rule.origin !== "regular") continue;
+        for (const p of match.rule.style.cssProperties) {
+          if (p.parsedOk !== false || p.range === undefined || p.disabled) continue;
+          const key = `${match.rule.styleSheetId}\u0000${p.range.startLine}:${p.range.startColumn}`;
+          const prev = found.get(key);
+          if (prev) {
+            if (!counted.has(key)) prev.elements++;
+          } else {
+            const line = this.fileLine(match.rule.styleSheetId, p.range.startLine);
+            found.set(key, {
+              selector: match.rule.selectorList.text,
+              property: p.name,
+              value: p.value.trim(),
+              sheet: this.sheetName(match.rule.styleSheetId),
+              ...(line !== undefined ? { line } : {}),
+              elements: 1,
+            });
+          }
+          counted.add(key);
+        }
+      }
+    }
+    return { elements: inspected.length, declarations: [...found.values()] };
+  }
+
+  /** Every `@media` rule's condition in the page's stylesheets, with where it is written. */
+  async mediaRules(): Promise<{ condition: string; sheet: string; line?: number }[]> {
+    const { medias } = (await this.session.send("CSS.getMediaQueries")) as { medias: CssMedia[] };
+    const out: { condition: string; sheet: string; line?: number }[] = [];
+    const seen = new Set<string>();
+    for (const m of medias) {
+      if (m.source !== "mediaRule") continue;
+      const key = `${m.styleSheetId}\u0000${m.range?.startLine}:${m.range?.startColumn}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const line = this.fileLine(m.styleSheetId, m.range?.startLine);
+      out.push({
+        condition: m.text.trim(),
+        sheet: this.sheetName(m.styleSheetId),
+        ...(line !== undefined ? { line } : {}),
+      });
+    }
+    return out;
   }
 
   /**
