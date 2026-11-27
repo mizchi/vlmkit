@@ -1547,7 +1547,7 @@ not to re-learn:
 ## CSS the browser silently ignores (`check css`)
 
 ```bash
-vlmkit check css page.html                 # declarations Chromium dropped or that do nothing; @media it cannot evaluate; with veriss, every static CSS mistake over all widths
+vlmkit check css page.html                 # declarations Chromium dropped or that do nothing; @media it cannot evaluate; with veriss, its static W_CSS_* / W_HTML_* checks at widths 320-1920 (what veriss can decide; Unknown is left out)
 vlmkit check css page.html --viewport 375x812   # rules under a query that matches only there
 ```
 
@@ -1608,6 +1608,17 @@ browser's rules run alone. Measured building it, not to re-learn:
   and `border: 5px solid var(--c)` + `border-width: 0 0 5px` verified at 20px where browsers draw 25px. The
   devDependency pins a veriss commit: bump it when veriss changes.
 - veriss's `W_CSS_STATE_SHADOWED` prints a var() value as `initial` (its message, not its decision).
+- **What veriss is given has to be the page the browser laid out**, or it judges another page. Measured after the
+  first review, each was a false or lost finding: the viewport height (without it veriss leaves every explicit block
+  size Unknown, so it decided almost nothing), the sheets in document order (the protocol reports them as they load:
+  a body `<style>` came before the head's and its rule lost the cascade), each sheet's `media` attribute (read from its
+  owner element; `CSS.getMediaQueries` does not say which sheet it is), and the body's `<style>` / `<script>` /
+  `<link>` kept as an empty `<template>` where they were (removed, `:first-child` moved; left empty, veriss cannot lay
+  them out). A sheet with no owner element (an `@import`, a constructed sheet) has no known place in the cascade, so
+  the static half is skipped there and says so.
+- `regimeWidths` gives no widths when a width query is not a px / em / rem number (a `calc()`, a `vw`): inert is then
+  not judged across widths (the output says so; `--viewport` judges one), and a width a query matches exactly
+  (`(width: 600px)`) is always one of the samples.
 
 ## Data the page was not built with (`stress data`)
 

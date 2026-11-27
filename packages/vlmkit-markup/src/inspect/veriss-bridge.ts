@@ -54,39 +54,56 @@ export function loadVeriss(): Promise<AnalyzeHTML | null> {
   return loaded;
 }
 
-/** The rendered DOM as veriss reads it: the document, with the head cut to its meta and title. */
+/**
+ * The rendered DOM as veriss reads it: the document, with the head cut to its meta and title. In the
+ * body, the sheets (given to veriss as CSS), scripts and the like are never removed: each is replaced
+ * by an empty <template> where it is, so :first-child and :nth-child count the siblings the browser
+ * counted. (An empty <style>, <script>, <link> or <noscript> is an element veriss cannot lay out;
+ * <template> is never rendered and still a child. Only :nth-of-type over those tags reads otherwise.)
+ */
 const RENDERED_HTML_JS = `(() => {
   const root = document.documentElement.cloneNode(true);
   const head = root.querySelector("head");
   if (head) for (const el of [...head.children]) if (el.localName !== "meta" && el.localName !== "title") el.remove();
-  for (const el of root.querySelectorAll("body style, body link[rel~=stylesheet], body script, body noscript, body template")) el.remove();
+  for (const el of root.querySelectorAll("body style, body link, body script, body noscript, body template"))
+    el.replaceWith(document.createElement("template"));
   return "<!doctype html>" + root.outerHTML;
 })()`;
 
 export async function runStatic(
   page: Page,
   inspector: CssInspector,
-  viewport = { min: 320, max: 1920 },
+  /** The viewport height the browser measured at: without one, veriss leaves every explicit block size Unknown. */
+  height: number,
+  widths = { min: 320, max: 1920 },
 ): Promise<StaticReport | { skipped: string }> {
   const analyzeHTML = await loadVeriss();
   if (!analyzeHTML)
     return {
       skipped: `${VERISS_PACKAGE} is not installed (an optional peer): install it for the static checks over every width`,
     };
-  const sheetTexts = await inspector.sheetTexts();
+  const { texts: sheetTexts, unordered } = await inspector.sheetTexts();
+  // The cascade reads sheets in document order; one whose place is not known (an @import, a constructed
+  // sheet) could be put anywhere, and a later rule decides what wins: not analysed, never guessed.
+  if (unordered)
+    return {
+      skipped: `${unordered} stylesheet(s) have no owner element (an @import or a constructed sheet), so their place in the cascade is not known: static analysis skipped`,
+    };
   const html = (await page.evaluate(RENDERED_HTML_JS)) as string;
-  const sheets: SheetSpan[] = sheetTexts.map((s) => ({
+  // A sheet with a media condition goes in under it, one line before its own first line.
+  const texts = sheetTexts.map((s) => (s.media ? `@media ${s.media} {\n${s.text}\n}` : s.text));
+  const sheets: SheetSpan[] = sheetTexts.map((s, i) => ({
     sheet: s.sheet,
-    firstFileLine: s.firstFileLine,
-    lines: s.text.split("\n").length,
+    firstFileLine: s.media ? s.firstFileLine - 1 : s.firstFileLine,
+    lines: texts[i]!.split("\n").length,
   }));
   const started = performance.now();
   let r: ReturnType<AnalyzeHTML>;
   try {
     r = analyzeHTML(html, {
       name: "page",
-      css: sheetTexts.map((s) => s.text).join("\n"),
-      viewport,
+      css: texts.join("\n"),
+      viewport: { ...widths, height: { min: height, max: height } },
       // A shorthand beside its own longhand is how hand-written CSS overrides one side: a warning, and laid out.
       shorthandConflicts: "warning",
     });

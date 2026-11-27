@@ -55,6 +55,20 @@ describe("css-static: veriss's findings in check css", () => {
     assert.match(out[0]!.message, /veriss agrees \(W_CSS_COLOR_INVALID\)/);
   });
 
+  it("two rules on one (minified) line are two declarations: neither absorbs the other", () => {
+    const inert = (selector: string) =>
+      w({ code: "W_LAYOUT_DECLARATION_INERT", selector, property: "top", message: `${selector}: top has no effect` });
+    assert.equal(mergeStaticFindings([], [inert(".a"), inert(".b")], sheets).length, 2);
+    // A browser finding on .a does not take .b's warning as agreement.
+    const out = mergeStaticFindings(
+      [own({ rule: "inert-declaration", selector: ".a", property: "top" })],
+      [inert(".b")],
+      sheets,
+    );
+    assert.equal(out.length, 2);
+    assert.doesNotMatch(out[0]!.message, /veriss agrees/);
+  });
+
   it("a veriss finding of its own is static-css (warn), located in its sheet, with its code", () => {
     const [f] = mergeStaticFindings(
       [],

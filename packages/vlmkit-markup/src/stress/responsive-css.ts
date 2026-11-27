@@ -45,6 +45,15 @@ interface CssRuleMatch {
   };
 }
 
+/** A node of `DOM.getDocument`, as far as the sheet order needs it. */
+interface DomNode {
+  backendNodeId: number;
+  /** Name, value, name, value… */
+  attributes?: string[];
+  children?: DomNode[];
+  contentDocument?: DomNode;
+}
+
 interface CssMedia {
   text: string;
   source: string;
@@ -61,7 +70,10 @@ export interface TaggedNode {
 const normalise = (text: string) => text.toLowerCase().replace(/\s+/g, "");
 
 export class CssInspector {
-  private readonly sheets = new Map<string, { url: string; inline: boolean; startLine: number; origin: string }>();
+  private readonly sheets = new Map<
+    string,
+    { url: string; inline: boolean; startLine: number; origin: string; ownerNode?: number; disabled: boolean }
+  >();
   private moved: { styleSheetId: string; range: CssMedia["range"]; text: string; to: string }[] = [];
 
   private constructor(
@@ -71,13 +83,23 @@ export class CssInspector {
     session.on(
       "CSS.styleSheetAdded",
       (event: {
-        header: { styleSheetId: string; sourceURL: string; isInline?: boolean; startLine?: number; origin?: string };
+        header: {
+          styleSheetId: string;
+          sourceURL: string;
+          isInline?: boolean;
+          startLine?: number;
+          origin?: string;
+          ownerNode?: number;
+          disabled?: boolean;
+        };
       }) => {
         this.sheets.set(event.header.styleSheetId, {
           url: event.header.sourceURL,
           inline: event.header.isInline === true,
           startLine: event.header.startLine ?? 0,
           origin: event.header.origin ?? "regular",
+          ...(event.header.ownerNode !== undefined ? { ownerNode: event.header.ownerNode } : {}),
+          disabled: event.header.disabled === true,
         });
       },
     );
@@ -303,16 +325,49 @@ export class CssInspector {
    * The text of every author stylesheet the protocol has reported, in the order it reported them,
    * with the 1-based file line its first line sits at (an inline `<style>` is offset).
    */
-  async sheetTexts(): Promise<{ sheet: string; text: string; firstFileLine: number }[]> {
-    const out: { sheet: string; text: string; firstFileLine: number }[] = [];
-    for (const [id, header] of this.sheets) {
-      if (header.origin !== "regular") continue;
+  /**
+   * The text of every author sheet, in document order (the order the cascade reads them; the protocol
+   * reports them as they load). `unordered` counts the sheets with no owner element (an @import, a
+   * constructed sheet), whose place in that order is not known here.
+   */
+  async sheetTexts(): Promise<{
+    texts: { sheet: string; text: string; firstFileLine: number; media?: string }[];
+    unordered: number;
+  }> {
+    // Each owner element's place in the document (preorder over the whole tree).
+    const { root } = (await this.session.send("DOM.getDocument", { depth: -1 })) as { root: DomNode };
+    const order = new Map<number, number>();
+    // The media condition a sheet's owner gives it (<link media>, <style media>): its rules apply only there.
+    const ownerMedia = new Map<number, string>();
+    const walk = (n: DomNode) => {
+      order.set(n.backendNodeId, order.size);
+      const attrs = n.attributes ?? [];
+      for (let i = 0; i + 1 < attrs.length; i += 2)
+        if (attrs[i]!.toLowerCase() === "media" && attrs[i + 1]!.trim())
+          ownerMedia.set(n.backendNodeId, attrs[i + 1]!.trim());
+      for (const c of [...(n.children ?? []), ...(n.contentDocument ? [n.contentDocument] : [])]) walk(c);
+    };
+    walk(root);
+    const regular = [...this.sheets].filter(([, h]) => h.origin === "regular" && !h.disabled);
+    const unordered = regular.filter(([, h]) => h.ownerNode === undefined || !order.has(h.ownerNode)).length;
+    regular.sort(
+      ([, a], [, b]) => (order.get(a.ownerNode ?? -1) ?? Infinity) - (order.get(b.ownerNode ?? -1) ?? Infinity),
+    );
+    const out: { sheet: string; text: string; firstFileLine: number; media?: string }[] = [];
+    for (const [id, header] of regular) {
       const got = (await this.session.send("CSS.getStyleSheetText", { styleSheetId: id }).catch(() => null)) as {
         text: string;
       } | null;
-      if (got) out.push({ sheet: this.sheetName(id), text: got.text, firstFileLine: header.startLine + 1 });
+      const media = header.ownerNode !== undefined ? ownerMedia.get(header.ownerNode) : undefined;
+      if (got)
+        out.push({
+          sheet: this.sheetName(id),
+          text: got.text,
+          firstFileLine: header.startLine + 1,
+          ...(media && media.toLowerCase() !== "all" ? { media } : {}),
+        });
     }
-    return out;
+    return { texts: out, unordered };
   }
 
   /** Every `@media` rule's condition in the page's stylesheets, with where it is written. */

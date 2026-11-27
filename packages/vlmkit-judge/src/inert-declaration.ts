@@ -348,24 +348,64 @@ export const INERT_CONTEXT_FN = `
 `;
 
 /**
+ * The width features of a media condition, each as its text inside its own parentheses: a "("
+ * right after a name is a function's (calc(), min()), part of the feature's value.
+ */
+function widthFeatures(cond: string): string[] {
+  const out: string[] = [];
+  const fnParen = (i: number) => /[\w-]/.test(cond[i - 1] ?? "");
+  const walk = (from: number, to: number) => {
+    for (let i = from, depth = 0, start = -1; i < to; i++) {
+      if (cond[i] === "(") {
+        if (depth === 0) start = i;
+        depth++;
+      } else if (cond[i] === ")" && depth > 0 && --depth === 0) {
+        if (fnParen(start)) continue;
+        const inner = cond.slice(start + 1, i);
+        const nested = [...inner.matchAll(/\(/g)].some((m) => !/[\w-]/.test(inner[m.index! - 1] ?? ""));
+        if (nested) walk(start + 1, i);
+        else if (/(?:^|[\s:<>=(-])(?:min-|max-)?(?:device-)?width\b/i.test(inner)) out.push(inner);
+      }
+    }
+  };
+  walk(0, cond.length);
+  return out;
+}
+
+/**
  * One width inside each regime the page's width media queries make, between `min` and `max`:
- * the ends, and the middle of each span between two breakpoints. A declaration written for one
- * regime and made inert in another by a query (a desktop grid placement under a mobile
- * `display: block`) is then seen to work somewhere. With no width query, one desktop width.
+ * the ends, and the middle of each span between two breakpoints, plus each width a query matches
+ * exactly (`(width: 600px)`), which no middle shows. A declaration written for one regime and
+ * made inert in another by a query (a desktop grid placement under a mobile `display: block`) is
+ * then seen to work somewhere. With no width query, one desktop width.
+ *
+ * A width feature whose value is not a px / em / rem number (a calc(), a vw) cannot be placed
+ * here: then no widths at all, so nothing is judged across widths rather than from too few.
  */
 export function regimeWidths(conditions: readonly string[], min = 320, max = 1920, cap = 8): number[] {
   const edges = new Set<number>();
+  const exact = new Set<number>();
   for (const cond of conditions)
-    for (const feature of cond.matchAll(/\(([^()]*\bwidth\b[^()]*)\)/gi))
-      for (const m of feature[1]!.matchAll(/(-?[\d.]+)\s*(px|r?em)\b/gi)) {
-        const px = Math.round(parseFloat(m[1]!) * (m[2]!.toLowerCase() === "px" ? 1 : 16));
-        if (px > min && px < max) edges.add(px);
+    for (const feature of widthFeatures(cond)) {
+      const value = feature.replace(/(?:min-|max-)?(?:device-)?width/gi, "");
+      if (value.includes("(")) return [];
+      const numbers = [...value.matchAll(/(-?(?:\d+\.?\d*|\.\d+))\s*([a-z%]*)/gi)];
+      if (!numbers.length || numbers.some((m) => !/^(?:px|r?em)$/i.test(m[2]!) && parseFloat(m[1]!) !== 0)) return [];
+      const isExact = /^\s*(?:width|device-width)\s*(?::|=)/i.test(feature) || /^[^<>]*=[^<>]*$/.test(feature);
+      for (const m of numbers) {
+        const px = Math.round(parseFloat(m[1]!) * (m[2]!.toLowerCase() === "px" || !m[2] ? 1 : 16));
+        if (px > min && px < max) (isExact ? exact : edges).add(px);
       }
+    }
+  for (const e of exact) edges.add(e);
   if (edges.size === 0) return [1280];
   const sorted = [...edges].sort((a, b) => a - b);
-  const widths = [min, ...sorted.slice(1).map((b, i) => Math.round((sorted[i]! + b) / 2)), max];
-  if (widths.length <= cap) return widths;
-  return Array.from({ length: cap }, (_, i) => widths[Math.round((i * (widths.length - 1)) / (cap - 1))]!);
+  let widths = [min, ...sorted.slice(1).map((b, i) => Math.round((sorted[i]! + b) / 2)), max];
+  if (widths.length > cap) {
+    const keep = Math.max(2, cap - exact.size);
+    widths = Array.from({ length: keep }, (_, i) => widths[Math.round((i * (widths.length - 1)) / (keep - 1))]!);
+  }
+  return [...new Set([...widths, ...exact])].sort((a, b) => a - b);
 }
 
 /**

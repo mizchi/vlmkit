@@ -4,6 +4,8 @@
  * (`build.mjs`) is named by the one rule its defect is about.
  */
 import assert from "node:assert/strict";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "vite-plus/test";
 import { runCssCheck } from "./css-check.ts";
@@ -74,5 +76,51 @@ describe("check css on fixtures/css-check", () => {
   it("a typo in a media feature is named with the feature it meant", T, async () => {
     const r = await run("unknown-media-feature");
     assert.match(r.findings[0]!.message, /did you mean `prefers-reduced-motion`/);
+  });
+
+  // What veriss is given must be the page the browser laid out: an element left out moves its siblings' positions, and
+  // a sheet's media condition left out applies its rules everywhere.
+  it("veriss reads the rendered page as it is: sibling positions and each sheet's media kept", T, async () => {
+    const dir = mkdtempSync(join(tmpdir(), "css-check-veriss-"));
+    const page = (name: string, html: string) => {
+      const file = join(dir, `${name}.html`);
+      writeFileSync(
+        file,
+        `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${name}</title><style>*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}.box{position:relative;top:4px;height:20px}</style></head><body>${html}</body></html>`,
+      );
+      return file;
+    };
+    const inertTop = async (file: string) =>
+      (await runCssCheck({ source: file })).findings
+        .filter((f) => f.rule === "inert-declaration")
+        .map((f) => f.message);
+    // The script stays the first child: .box is not :first-child, so it stays relative and top works. (veriss also
+    // says, rightly, that .box:first-child never matches for that reason: static-css, not asserted here.)
+    assert.deepEqual(
+      await inertTop(
+        page(
+          "first-child",
+          `<script>void 0</script><div class="box"></div><style>.box:first-child{position:static}</style>`,
+        ),
+      ),
+      [],
+    );
+    // A sheet for a width no viewport has never applies.
+    assert.deepEqual(
+      await inertTop(
+        page("sheet-media", `<div class="box"></div><style media="(max-width: 1px)">.box{position:static}</style>`),
+      ),
+      [],
+    );
+    // The control: the same static rule with no condition is inert, and veriss says so too (it was given the height).
+    const control = (
+      await runCssCheck({ source: page("control", `<div class="box"></div><style>.box{position:static}</style>`) })
+    ).findings;
+    assert.ok(
+      control.some(
+        (f) => f.rule === "inert-declaration" && /veriss agrees \(W_LAYOUT_DECLARATION_INERT\)/.test(f.message),
+      ),
+      JSON.stringify(control),
+    );
   });
 });

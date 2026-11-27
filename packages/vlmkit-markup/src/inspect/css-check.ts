@@ -117,7 +117,7 @@ export async function runCssCheck(options: CssCheckOptions): Promise<CssCheckRep
         viewport.height,
       );
       if (widths.length > 1) await page.setViewportSize(viewport);
-      const staticReport = await runStatic(page, inspector);
+      const staticReport = await runStatic(page, inspector, viewport.height);
       const own = [...judgeCssCheck({ declarations, media, redirect }), ...judgeInertDeclarations(inert.samples)];
       return {
         source: options.source,
@@ -255,7 +255,9 @@ export function formatCssCheckReport(report: CssCheckReport, rules?: RuleView): 
                 .join(", ")}`
             : ""
         }${RESET}`,
-    `${DIM}inert declarations, judged at ${report.inert.widths.join(", ")}px: ${report.inert.candidates} candidate(s) from the context table, ${report.inert.confirmed} inert at every width where their rule matches and confirmed by removing them (every box and pixel unchanged)${report.inert.unstable.length ? `; at ${report.inert.unstable.join(", ")}px the page changed between captures, so nothing was confirmed there` : ""}${RESET}`,
+    report.inert.widths.length
+      ? `${DIM}inert declarations, judged at ${report.inert.widths.join(", ")}px: ${report.inert.candidates} candidate(s) from the context table, ${report.inert.confirmed} inert at every width where their rule matches and confirmed by removing them (every box and pixel unchanged)${report.inert.unstable.length ? `; at ${report.inert.unstable.join(", ")}px the page changed between captures, so nothing was confirmed there` : ""}${RESET}`
+      : `${DIM}inert declarations: not judged — a width media query whose value is not a px / em / rem number (a calc(), a vw) leaves the width regimes unknown, so no declaration is called inert across them. Pass --viewport to judge one width${RESET}`,
     "",
   ];
   if (shown.length === 0)

@@ -23,7 +23,7 @@ export const cssGate = defineGate<CssCheckReport, CssCheckOptions>({
   command: ["check", "css"],
   title: "CSS the browser ignores",
   summary:
-    "Declarations the browser dropped or that do nothing, @media it cannot evaluate, and (with veriss) every static CSS mistake over all widths",
+    "Declarations the browser dropped or that do nothing, @media it cannot evaluate, and (with veriss) its static CSS checks at widths 320-1920 where it can decide them",
   category: "correctness",
   usage: `Loads the page in Chromium and reads, through the DevTools protocol, every author
 declaration in the rules that match its elements: one the browser's parser rejected

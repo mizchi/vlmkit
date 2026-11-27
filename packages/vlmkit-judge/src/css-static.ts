@@ -55,7 +55,7 @@ const where = (f: { sheet: string; line?: number }) => `${f.sheet}${f.line !== u
 
 /**
  * The browser's findings and veriss's, one per declaration. A veriss warning on a declaration
- * the browser also reported (same sheet, line and property) adds "veriss agrees (CODE)" to the
+ * the browser also reported (same sheet, line, selector and property) adds "veriss agrees (CODE)" to the
  * browser's finding; one of its own is `static-css` or, for an inert declaration,
  * `inert-declaration` — once per declaration however many boxes veriss named.
  */
@@ -64,10 +64,11 @@ export function mergeStaticFindings(
   warnings: readonly StaticWarning[],
   sheets: readonly SheetSpan[],
 ): CssCheckFinding[] {
-  const key = (sheet: string, line: number | undefined, property: string | undefined) =>
-    `${sheet}\u0000${line ?? ""}\u0000${property ?? ""}`;
+  // One declaration: its sheet, line, selector and property (a minified sheet holds many rules on one line).
+  const key = (sheet: string, line: number | undefined, selector: string | undefined, property: string | undefined) =>
+    `${sheet}\u0000${line ?? ""}\u0000${selector ?? ""}\u0000${property ?? ""}`;
   const out = own.map((f) => ({ ...f }));
-  const byKey = new Map(out.map((f) => [key(f.sheet, f.line, f.property), f]));
+  const byKey = new Map(out.map((f) => [key(f.sheet, f.line, f.selector, f.property), f]));
   const agreed = new Map<CssCheckFinding, Set<string>>();
   const seen = new Set<string>();
   for (const w of warnings) {
@@ -75,7 +76,7 @@ export function mergeStaticFindings(
     if (!rule) continue;
     const at = w.line !== undefined ? locateLine(w.line, sheets) : null;
     const sheet = at?.sheet ?? "stylesheet";
-    const k = key(sheet, at?.line, w.property);
+    const k = key(sheet, at?.line, w.selector, w.property);
     const mine = byKey.get(k);
     if (mine) {
       agreed.set(mine, (agreed.get(mine) ?? new Set()).add(w.code));

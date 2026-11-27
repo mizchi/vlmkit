@@ -201,6 +201,27 @@ describe("inert across widths", () => {
     assert.equal(many[0], 320);
     assert.equal(many.at(-1), 1920);
   });
+  it("a width the query matches exactly is a sample of its own", () => {
+    // (width: 600px) matches at 600 only: neither side's middle shows it.
+    assert.ok(regimeWidths(["(width: 600px)"]).includes(600));
+    assert.ok(regimeWidths(["(width = 600px)", "(min-width: 900px)"]).includes(600));
+    // Kept when the cap thins the rest.
+    const many = regimeWidths(
+      ["(width: 777px)", ...Array.from({ length: 20 }, (_, i) => `(min-width: ${400 + i * 70}px)`)],
+      320,
+      1920,
+      5,
+    );
+    assert.ok(many.includes(777), String(many));
+  });
+  it("a width query it cannot place in px partitions nothing: no widths, so nothing is judged across them", () => {
+    assert.deepEqual(regimeWidths(["(max-width: calc(600px + 1px))"]), []);
+    assert.deepEqual(regimeWidths(["(min-width: 600px)", "(max-width: 50vw)"]), []);
+    assert.deepEqual(regimeWidths(["(min-width: min(40em, 700px))"]), []);
+    // Range syntax and em stay readable; a function elsewhere in the query does not matter.
+    assert.deepEqual(regimeWidths(["(400px <= width <= 700px)"]), [320, 550, 1920]);
+    assert.deepEqual(regimeWidths(["(min-width: 40em) and (min-resolution: calc(1dppx * 2))"]), [320, 1920]);
+  });
 
   const s = (width: number, over: Partial<InertSample> = {}) => ({
     key: "k",
