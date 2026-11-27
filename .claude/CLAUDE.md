@@ -1544,6 +1544,82 @@ not to re-learn:
   carousel, snaps. It is Chromium's phone: iOS ignores `user-scalable=no`, and Safari's keyboard and
   fixed elements behave differently.
 
+## CSS the browser silently ignores (`check css`)
+
+```bash
+vlmkit check css page.html                 # declarations Chromium dropped or that do nothing; @media it cannot evaluate; with veriss, its static W_CSS_* / W_HTML_* checks at widths 320-1920 (what veriss can decide; Unknown is left out)
+vlmkit check css page.html --viewport 375x812   # rules under a query that matches only there
+```
+
+veriss's static §1/§2 rules (mizchi/veriss rule catalog), decided by the rendering browser instead of a
+grammar: each declaration in a rule matching one of the first 3000 elements carries CDP's `parsedOk`
+(`CssInspector.unparsedDeclarations`, `stress/responsive-css.ts`), each `@media` atom is evaluated as `(f)`
+and `not (f)` (`MEDIA_ATOM_PROBE_JS` in `@mizchi/vlmkit-judge/css-check.ts`, shared with `check animation`'s
+`unknown-media-feature`). Rules `dropped-declaration`, `unknown-media-feature` (suspect) and
+`vendor-declaration-dropped` (info: `-moz-*` fallbacks are written for another engine on purpose). Known
+answers: `fixtures/css-check/` (`build.mjs`), held by `inspect/css-check.test.ts`; the six demo sites are
+silent. Not to re-learn:
+
+- **The protocol, not the CSSOM**: a linked `file:` sheet is cross-origin and `cssRules` throws; CDP reads
+  it (the intact fixture links one), and an inline `<style>`'s ranges are offset by its header's `startLine`.
+- **An unknown property is `parsedOk: false` too**; `CSS.supports(p, "initial")` tells it from a bad value,
+  and the nearest computed-style property name is the "did you mean".
+- **Only rules that match now are read**: a dropped declaration under a media query that does not match
+  at the viewport is not seen. `--viewport` moves it.
+
+**`inert-declaration` (warn)** is veriss's §3 (`W_LAYOUT_DECLARATION_INERT`): a declaration parsed and applied
+that does nothing where it is — an offset or `z-index` on a static box, `flex` / `order` / grid placement
+under the wrong parent, container properties on a block, size / vertical margin / transform on a plain
+inline box, `background-size` with no image, `border-width` with no style, `text-overflow` with nothing
+clipped, `object-fit` on a non-replaced box, scroll-snap / overscroll on a non-scroller. The table is
+`inertReason` in `@mizchi/vlmkit-judge/inert-declaration.ts`, the context each element's computed style
+(`INERT_CONTEXT_FN`). Measured building it, not to re-learn:
+
+- **One width calls responsive CSS a mistake.** At 375px the landing page had 16 "inert" grid placements
+  and templates: desktop declarations a mobile query turns off with `display: block`. So it is judged at
+  one width per regime of the page's width queries (`regimeWidths`) and kept only when inert at EVERY width
+  where its rule matches (`mergeInertWidths`); `--viewport` judges that width alone. Left: 1 real one
+  (`.header-link { justify-self: end }` under a flex parent).
+- **Inert on every element the rule matches, then removed and measured.** A shared class that works on some
+  elements is not a mistake. Each candidate is blanked in its sheet (`CssInspector.withoutRanges`: spaces
+  keep every other range in place, `CSS.setStyleSheetText`, then the text put back) and every box and every
+  full-page pixel must stay the same; a table entry the browser disagrees with is dropped, not reported.
+- **Two captures must agree first** (at most five): the first capture after the protocol pass landed before
+  the landing page settled and made the whole page "unstable" — nothing could be confirmed.
+- On the six demo sites and the nine css-challenge fixtures: no candidate at all.
+
+**With veriss** (mizchi/veriss, npm `veriss`: an optional peer `^0.1.0`, and a devDependency here; the name is
+`VERISS_PACKAGE` in `inspect/veriss-bridge.ts`). veriss decides from HTML and CSS, at every width at once and
+without rendering; vlmkit gives it what it cannot get on its own — the DOM after the page's scripts ran (head cut
+to meta and title) and the text of every sheet the protocol reports, joined — and keeps only what needs the
+browser: `parsedOk`, `matchMedia`, and removing a declaration and comparing pixels. `static-css` (warn) is
+veriss's `W_CSS_*` / `W_HTML_*` (not `W_CSS_SHORTHAND_CONFLICT`: hand-written CSS overrides one side that way;
+veriss runs with `shorthandConflicts: 'warning'`), its `W_LAYOUT_DECLARATION_INERT` joins `inert-declaration`, and
+one declaration both judged is one finding ending "veriss agrees (CODE)" (`mergeStaticFindings`,
+`@mizchi/vlmkit-judge/css-static.ts`; joined-CSS lines put back with `locateLine`). `never-matching-media` was
+removed: veriss's `W_CSS_MEDIA_NEVER` decides it over all widths. Without veriss the header says so and the
+browser's rules run alone. Measured building it, not to re-learn:
+
+- **Neither covers the other.** On the inert fixture veriss found 1 of the 4 (the page is Unknown for it at
+  `(width >= 40em)`, range syntax it does not read); on kanban it found an over-constrained inset and `color` on a
+  native radio that vlmkit's table has no row for; `colr` (a misspelt property) only the browser sees.
+- **Running veriss on rendered pages found three veriss bugs** (fixed in veriss): a bare `:focus-visible` reported
+  on every non-focusable element (350 on kanban), `:focus` on a scroll container (Chromium and Firefox Tab to it),
+  and `border: 5px solid var(--c)` + `border-width: 0 0 5px` verified at 20px where browsers draw 25px. The
+  devDependency follows npm (`^0.1.0`): bump it when veriss publishes a fix check css needs.
+- veriss's `W_CSS_STATE_SHADOWED` prints a var() value as `initial` (its message, not its decision).
+- **What veriss is given has to be the page the browser laid out**, or it judges another page. Measured after the
+  first review, each was a false or lost finding: the viewport height (without it veriss leaves every explicit block
+  size Unknown, so it decided almost nothing), the sheets in document order (the protocol reports them as they load:
+  a body `<style>` came before the head's and its rule lost the cascade), each sheet's `media` attribute (read from its
+  owner element; `CSS.getMediaQueries` does not say which sheet it is), and the body's `<style>` / `<script>` /
+  `<link>` kept as an empty `<template>` where they were (removed, `:first-child` moved; left empty, veriss cannot lay
+  them out). A sheet with no owner element (an `@import`, a constructed sheet) has no known place in the cascade, so
+  the static half is skipped there and says so.
+- `regimeWidths` gives no widths when a width query is not a px / em / rem number (a `calc()`, a `vw`): inert is then
+  not judged across widths (the output says so; `--viewport` judges one), nor when the queries make more than 16 regimes (a thinned set could leave out the one where the declaration works), and a width a query matches exactly
+  (`(width: 600px)`) is always one of the samples.
+
 ## Data the page was not built with (`stress data`)
 
 ```bash
@@ -2048,7 +2124,7 @@ This repository is a pnpm workspace.
 | `packages/vlmkit-judge/` | **Pure judges** (`judgeComposition`, `judgeColorRoles`, `judgeDesignPolicy`, the 15 `check integrity` judges, both `--allow` parsers, `UsageError`): snapshot in, findings out. Zero deps, no DOM / Playwright / `node:*` — `purity.test.ts` enforces it, `scene-graph.test.ts` judges a non-DOM game menu. The bottom layer (`judge ← core ← capture ← markup`); markup re-exports every moved symbol from its old path. `scene.ts` is the **scene contract** — the image-mode `--elements` JSON as `SceneElement`, plus `sceneFromTree` (engine-style local coordinates) and adapters to integrity, composition, colour and design — each reachable as `--elements` on its gate (`check color` reads `role: field | link | button`; `check design` groups by any `role`; `check composition` reads boxes, `heading`, font, and background / border / radius as a group's painted edge; `check copy` sorts drawn strings with the page's invisible-reason classes from `opacity` / `color` / `background`, the judgement itself in `copy.ts`); `integrity-image.ts` is only its file-reading half. `a11y-tree.ts` is the second contract, for what a platform *announces* rather than paints — `vlmkit-a11y/1`, judged by `check a11y tree` with contrast read from the frame's pixels. `color.ts` is the page's colour arithmetic as pure functions, and `vlmkit-markup/src/contrast-parity.test.ts` holds the two to each other (functions over a grid, and the real `COLLECT_TEXT_CONTRAST` vs the scene adapter on one page). Rule: the collector resolves colours, the judge composites and measures. Both DOM contrast collectors follow it: `COLLECT_TEXT_CONTRAST` ships `TextContrastSample`s (colour, background layers, opacity, font) to `textContrastCandidates`, and `COLLECT_COLOR_ROLES` ships `ControlSample` / `LinkSample` to `controlBoundary` / `linkCue`; each move was proven by byte-identical `--json` on 15-16 pages. `pbt.ts` is the property-based search (seeded generator, greedy shrink, failing-interval bisection, ddmin) and `responsive.ts` the viewport space it searches for `check responsive` — both pure, both usable for any property with an async oracle. `frames.ts` is the `vlmkit-frames/1` contract and its time grammar, and `storyboard.ts` segments such a sequence into states and events over any `FramePixels` (`snapshot storyboard`); `flash.ts` and `flash-motion.ts` are WCAG 2.3.1's arithmetic over one (`check flash`). Plan for the rest of the split: `docs/design/package-decomposition.md`. |
 | `packages/vlmkit-core/` | Image / CSS / DOM / a11y diff engine + shared types and CLI helpers. No Playwright or AI deps required to import core types. |
 | `packages/vlmkit-core/src/plugin/` | **Gate plugin runtime**: the contract (`defineGate` / `definePlugin`), rule tables and settings, the registry, and the core runner that owns `--help` / `--json` / `--advisory` / the run ledger / the exit code. Core never imports a gate — definitions are handed to it. |
-| `packages/vlmkit-markup/src/gates/` | Gate definitions (`*.gate.ts`) + the main built-in plugin (`index.ts`) — 35 of the 37 gates. Wraps existing measurement code; adding a gate is `defineGate` + one line in `index.ts`. |
+| `packages/vlmkit-markup/src/gates/` | Gate definitions (`*.gate.ts`) + the main built-in plugin (`index.ts`) — 36 of the 38 gates. Wraps existing measurement code; adding a gate is `defineGate` + one line in `index.ts`. |
 | `packages/vlmkit-capture/src/gates/`, `src/gates/` | The other two built-in plugins: `check crater` (capture) and `check perf` (app-side). Composed by `src/cli/gate-registry.ts` alongside any `vlmkit.config.json` `"plugins"`. |
 | `packages/vlmkit-capture/` | Playwright / Crater capture infrastructure, viewport discovery, prescanner. |
 | `packages/vlmkit-ai/` | VLM / LLM clients, reasoning pipeline, NLP helpers. |
@@ -2151,7 +2227,7 @@ case at 0.23.0.
 | `docs/reports/2026-08-06-gate-rule-cost-bench.md` | Measured gate/rule execution cost: where a ruleset's time goes, why per-rule cost is attributed rather than isolated, why suppression saves nothing |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
 | `docs/design/package-decomposition.md` | **Splitting vlmkit by layer** (collector / pure judge / driver / loop / diagrams): what was measured, phase 1 (`vlmkit-judge`) and the proposed phases 2-5 |
-| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 37 gates + 248 rules, behavior changes, what is deliberately not a gate |
+| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 38 gates + 254 rules, behavior changes, what is deliberately not a gate |
 | `docs/design/moonbit-boundary.md` | **TS ↔ MoonBit boundary**: what the positional FFI costs (61 commands, 233 args, 2 duplicated dispatch tables), the JSON boundary that replaces it for new logic, how to add a command, and which pure logic belongs in MoonBit versus which deliberately does not |
 | `docs/crater-css-status.md` | Crater CSS rendering verification status |
 | `docs/reset-css-comparison.md` | Reset CSS domain knowledge |

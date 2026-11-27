@@ -39,6 +39,7 @@ import { retuneNote, tierIssues } from "@mizchi/vlmkit-core/plugin/rule-prose.ts
 import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { MEDIA_ATOM_PROBE_JS, nearestMediaFeature } from "@mizchi/vlmkit-judge/css-check.ts";
 import { composeFilmstrip, scalePngData } from "@mizchi/vlmkit-core/filmstrip.ts";
 import { encodeApng } from "@mizchi/vlmkit-core/apng.ts";
 import { cropRegion, encodePng } from "@mizchi/vlmkit-core/png-utils.ts";
@@ -566,7 +567,7 @@ export interface DeriveIssuesInput {
     inertSize?: string[];
     tag?: string;
     /** An @media header the browser reads as "not all" (an unknown feature) around motion. */
-    unknownMedia?: { header: string; feature: string; suggest: string | null };
+    unknownMedia?: { header: string; feature: string };
   }[];
   /** CSS animations with no duration: they end as they begin. */
   zeroDuration?: { selector: string; name: string }[];
@@ -755,7 +756,10 @@ export function deriveAnimationIssues(
       continue;
     }
     if (u.unknownMedia) {
-      const m = u.unknownMedia;
+      const m = {
+        ...u.unknownMedia,
+        suggest: u.unknownMedia.feature ? nearestMediaFeature(u.unknownMedia.feature) : null,
+      };
       issues.push({
         kind: "unknown-media-feature",
         severity: "suspect",
@@ -1534,34 +1538,17 @@ ${ANIMATION_HELPERS_JS}
   // entrance behind @media (prefers-reduce-motion: no-preference) never played for anyone, and
   // the page read "animations: 0 … No animation issues detected" (round 17).
   {
-    const KNOWN = ["prefers-reduced-motion", "prefers-color-scheme", "prefers-contrast", "prefers-reduced-transparency", "forced-colors", "hover", "any-hover", "pointer", "any-pointer", "orientation", "min-width", "max-width", "width", "min-height", "max-height", "height", "aspect-ratio", "resolution", "min-resolution", "max-resolution", "color-gamut", "display-mode", "scripting", "inverted-colors"];
-    const near = (f) => {
-      let best = null, bd = Infinity;
-      for (const k of KNOWN) {
-        const d = (() => { const m = []; for (let i = 0; i <= f.length; i++) { m[i] = [i]; for (let j = 1; j <= k.length; j++) m[i][j] = i === 0 ? j : Math.min(m[i - 1][j] + 1, m[i][j - 1] + 1, m[i - 1][j - 1] + (f[i - 1] === k[j - 1] ? 0 : 1)); } return m[f.length][k.length]; })();
-        if (d < bd) { bd = d; best = k; }
-      }
-      return bd <= 3 ? best : null;
-    };
     const moves = (rules) => [...rules].some((r) => (r.style && (/\\S/.test(r.style.animationName || "") && r.style.animationName !== "none" || /\\S/.test(r.style.transitionProperty || "") && (r.style.transitionDuration || "0s") !== "0s")) || (r.cssRules && moves(r.cssRules)));
-    // Chromium keeps an unknown feature's text and evaluates it as false; so does its negation. A
-    // known feature (and value) matches exactly one of (f) and not (f).
-    const unknownAtom = (cond) => {
-      for (const m of String(cond).matchAll(/\\(([^()]+)\\)/g)) {
-        const atom = "(" + m[1] + ")";
-        if (!window.matchMedia(atom).matches && !window.matchMedia("not " + atom).matches) return m[1].trim();
-      }
-      return null;
-    };
+${MEDIA_ATOM_PROBE_JS}
     const walkMedia = (rules) => {
       for (const r of rules) {
         if (typeof CSSMediaRule !== "undefined" && r instanceof CSSMediaRule && moves(r.cssRules)) {
           const header = r.conditionText || r.media.mediaText;
-          const atom = unknownAtom(header);
+          const atom = unknownMediaAtom(header);
           if (atom && !seen.has("med\\u0000" + header) && out.length < 8) {
             seen.add("med\\u0000" + header);
             const feature = (/^\\s*([a-z-]+)/i.exec(atom) || [])[1] || "";
-            out.push({ selector: "@media " + header, name: "@media", unknownMedia: { header, feature, suggest: feature ? near(feature) : null } });
+            out.push({ selector: "@media " + header, name: "@media", unknownMedia: { header, feature } });
           }
         } else if (r.cssRules) walkMedia(r.cssRules);
       }

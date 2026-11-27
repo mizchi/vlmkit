@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dropped-declaration</title>
+<link rel="stylesheet" href="intact.css">
+<style>
+  :root { --space: 12px; --accent: #1d4ed8; }
+  body { margin: 0; padding: var(--space); color: #111827; background: #fff; font-family: system-ui, sans-serif; }
+  .button { display: inline-flex; padding: calc(var(--space) / 2) var(--space); width: calc(100% - 10px); max-width: 12rem; color: #fff; background: var(--accent); border-radius: 6px; }
+  .button:hover { background: color-mix(in srgb, var(--accent), black 15%); }
+  .note::before { content: "Note: "; font-weight: 600; }
+  @media (prefers-reduced-motion: reduce) { .button { transition: none; } }
+  @media (prefers-color-scheme: dark) { body { color: #f9fafb; background: #111827; } }
+  @supports (display: grid) { .card { align-items: start; } }
+  .button { width: calc(100%-10px); color: #12345; } .card h2 { margin-top: 4; } .note { colr: #374151; }
+</style>
+</head>
+<body>
+  <main>
+    <h1>Plans</h1>
+    <section class="card">
+      <h2>Free</h2>
+      <p class="note">Up to three projects.</p>
+      <a class="button" href="#free">Choose Free</a>
+    </section>
+  </main>
+</body>
+</html>

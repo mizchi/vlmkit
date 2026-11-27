@@ -100,7 +100,8 @@
     "@vitest/coverage-v8": "5.1.1",
     "playwright": "1.65.1",
     "three": "^0.187.0",
-    "vite-plus": "1.8.0"
+    "vite-plus": "1.8.0",
+    "veriss": "^0.1.0"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.11",
@@ -114,13 +115,17 @@
   "peerDependencies": {
     "@jsquash/webp": "^1",
     "@playwright/test": ">=1.61 <2",
-    "playwright": ">=1.61 <2"
+    "playwright": ">=1.61 <2",
+    "veriss": "^0.1.0"
   },
   "peerDependenciesMeta": {
     "@playwright/test": {
       "optional": true
     },
     "@jsquash/webp": {
+      "optional": true
+    },
+    "veriss": {
       "optional": true
     }
   },

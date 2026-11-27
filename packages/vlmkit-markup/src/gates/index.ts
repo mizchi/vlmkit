@@ -32,6 +32,7 @@ import { breakpointsGate } from "./breakpoints.gate.ts";
 import { colorGate } from "./color.gate.ts";
 import { compositionGate } from "./composition.gate.ts";
 import { copyGate } from "./copy.gate.ts";
+import { cssGate } from "./css.gate.ts";
 import { designGate } from "./design.gate.ts";
 import { driftComponentGate, driftPagesGate } from "./drift.gate.ts";
 import { equivalenceGate } from "./equivalence.gate.ts";
@@ -65,6 +66,7 @@ export {
   colorGate,
   compositionGate,
   copyGate,
+  cssGate,
   designGate,
   driftComponentGate,
   driftPagesGate,
@@ -99,6 +101,7 @@ export const markupGatesPlugin = definePlugin({
     integrityGate,
     layoutGate,
     copyGate,
+    cssGate,
     interactionsGate,
     a11yContrastGate,
     a11yTouchGate,

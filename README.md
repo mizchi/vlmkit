@@ -148,7 +148,7 @@ Everything is key-free unless marked `[key]`. Every command, one line each:
 
 | You want to… | Reach for |
 |---|---|
-| <img src="docs/assets/icons/page-check.webp" width="20" height="20" alt="" /> Check the page you just wrote/edited, no reference | `check auto` (picks the gates that apply and runs them) · `check integrity` (broken-page scan, 3 viewports) · `check copy --manifest` (copy present, visibly, verbatim) · `check layout --contract` · `scan scroll` / `scan handlers` |
+| <img src="docs/assets/icons/page-check.webp" width="20" height="20" alt="" /> Check the page you just wrote/edited, no reference | `check auto` (picks the gates that apply and runs them) · `check integrity` (broken-page scan, 3 viewports) · `check copy --manifest` (copy present, visibly, verbatim) · `check css` (declarations the browser dropped, @media that never match) · `check layout --contract` · `scan scroll` / `scan handlers` |
 | <img src="docs/assets/icons/responsive.webp" width="20" height="20" alt="" /> Verify behavior, not pixels | `check breakpoints --sweep` · `check responsive` (every width, shrunk to breakpoint + declaration) · `check interactions` · `check scroll` · `check mobile` (touch phone: zoom, swipe, keyboard, notch) · `stress i18n\|data\|media` · `verify flow --flow` · `act` (a goal run as verified steps) |
 | <img src="docs/assets/icons/gallery.webp" width="20" height="20" alt="" /> Check that it moves right | `check animation` (held clock) · `inspect motion` (jumps, easing, origin, timing against a brief; `--track` for canvas) · `check flash` (WCAG 2.3.1) · `snapshot storyboard` |
 | <img src="docs/assets/icons/contrast.webp" width="20" height="20" alt="" /> Check an app with no DOM (Flutter web, Android, macOS) | `scan a11y` → `check a11y tree` |

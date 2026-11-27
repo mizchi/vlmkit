@@ -65,6 +65,15 @@
     "pngjs": "^7.0.0"
   },
   "peerDependencies": {
-    "playwright": ">=1.61 <2"
+    "playwright": ">=1.61 <2",
+    "veriss": "^0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "veriss": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "veriss": "^0.1.0"
   }
 }
