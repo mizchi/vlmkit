@@ -40,7 +40,7 @@ inline span, background-size with no image) is inert-declaration when the comput
 every element its rule matches says so AND removing it from the sheet leaves every box and
 every pixel of the page unchanged.
 
-With @mizchi/veriss installed (an optional peer), the rendered DOM and every stylesheet are
+With veriss installed (an optional peer), the rendered DOM and every stylesheet are
 also handed to veriss, which decides statically over every width from 320 to 1920px what the
 browser ignores: an @media that matches no width, a :focus rule on what cannot take focus,
 an over-constrained inset, HTML the parser restructures (static-css, and its inert findings
@@ -74,7 +74,7 @@ under inert-declaration). A declaration both judged is one finding that says ver
       id: "static-css",
       title: "A CSS mistake veriss finds statically, over every viewport width",
       severity: "warn",
-      docs: "Needs @mizchi/veriss installed (an optional peer). veriss reads the rendered DOM and every stylesheet and reports what the browser ignores at any width from 320 to 1920px: an @media that matches no width (W_CSS_MEDIA_NEVER), an animation with no @keyframes, a :focus rule on what cannot take focus, HTML the parser restructures, and the rest of its rule catalog §1–§5. The message carries veriss's code.",
+      docs: "Needs veriss installed (an optional peer). veriss reads the rendered DOM and every stylesheet and reports what the browser ignores at any width from 320 to 1920px: an @media that matches no width (W_CSS_MEDIA_NEVER), an animation with no @keyframes, a :focus rule on what cannot take focus, HTML the parser restructures, and the rest of its rule catalog §1–§5. The message carries veriss's code.",
     },
   ],
   inputs: [

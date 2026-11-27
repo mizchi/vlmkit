@@ -37,9 +37,6 @@ importers:
       '@jsquash/webp':
         specifier: ^1.5.0
         version: 1.5.0
-      '@mizchi/veriss':
-        specifier: github:mizchi/veriss#ad663b006a1a392b5c662ee796405b234d7dec32&path:packages/veriss
-        version: https://codeload.github.com/mizchi/veriss/tar.gz/ad663b006a1a392b5c662ee796405b234d7dec32#path:packages/veriss
       '@mizchi/vlmkit-ai':
         specifier: workspace:*
         version: link:packages/vlmkit-ai
@@ -91,6 +88,9 @@ importers:
       three:
         specifier: ^0.187.0
         version: 0.187.0
+      veriss:
+        specifier: github:mizchi/veriss#ad663b006a1a392b5c662ee796405b234d7dec32&path:packages/veriss
+        version: '@mizchi/veriss@https://codeload.github.com/mizchi/veriss/tar.gz/ad663b006a1a392b5c662ee796405b234d7dec32#path:packages/veriss'
       vite-plus:
         specifier: 1.8.0
         version: 1.8.0(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1(@vitest/browser@5.1.1)(vitest@5.1.1))(@vitest/ui@5.1.1(vitest@5.1.1))(esbuild@0.28.2)(playwright@1.65.1)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.34(@emnapi/core@2.0.0-beta.2)(@emnapi/runtime@2.0.0-beta.2))
@@ -211,9 +211,9 @@ importers:
         specifier: ^7.0.0
         version: 7.0.0
     devDependencies:
-      '@mizchi/veriss':
+      veriss:
         specifier: github:mizchi/veriss#ad663b006a1a392b5c662ee796405b234d7dec32&path:packages/veriss
-        version: https://codeload.github.com/mizchi/veriss/tar.gz/ad663b006a1a392b5c662ee796405b234d7dec32#path:packages/veriss
+        version: '@mizchi/veriss@https://codeload.github.com/mizchi/veriss/tar.gz/ad663b006a1a392b5c662ee796405b234d7dec32#path:packages/veriss'
 
   packages/vlmkit-mcp:
     dependencies:

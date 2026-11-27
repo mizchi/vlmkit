@@ -16,8 +16,8 @@ import type { Page } from "playwright";
 import type { SheetSpan, StaticWarning } from "@mizchi/vlmkit-judge/css-static.ts";
 import type { CssInspector } from "../stress/responsive-css.ts";
 
-/** The package name, in one place: changing it (an unscoped `veriss`) is this line. */
-export const VERISS_PACKAGE = "@mizchi/veriss";
+/** The package name, in one place: changing it (it was `veriss` before npm) is this line. */
+export const VERISS_PACKAGE = "veriss";
 
 export interface StaticReport {
   /** What veriss said about the page as a whole: verified, or unknown with its reasons. */

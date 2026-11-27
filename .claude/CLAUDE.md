@@ -1588,7 +1588,7 @@ clipped, `object-fit` on a non-replaced box, scroll-snap / overscroll on a non-s
   the landing page settled and made the whole page "unstable" — nothing could be confirmed.
 - On the six demo sites and the nine css-challenge fixtures: no candidate at all.
 
-**With veriss** (mizchi/veriss, `@mizchi/veriss`: an optional peer, a git devDependency here; the name is
+**With veriss** (mizchi/veriss, npm `veriss`: an optional peer, a git devDependency here pinned to a commit; the name is
 `VERISS_PACKAGE` in `inspect/veriss-bridge.ts`). veriss decides from HTML and CSS, at every width at once and
 without rendering; vlmkit gives it what it cannot get on its own — the DOM after the page's scripts ran (head cut
 to meta and title) and the text of every sheet the protocol reports, joined — and keeps only what needs the
