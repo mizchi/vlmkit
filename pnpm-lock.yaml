@@ -89,8 +89,8 @@ importers:
         specifier: ^0.187.0
         version: 0.187.0
       veriss:
-        specifier: github:mizchi/veriss#ad663b006a1a392b5c662ee796405b234d7dec32&path:packages/veriss
-        version: '@mizchi/veriss@https://codeload.github.com/mizchi/veriss/tar.gz/ad663b006a1a392b5c662ee796405b234d7dec32#path:packages/veriss'
+        specifier: ^0.1.0
+        version: 0.1.0
       vite-plus:
         specifier: 1.8.0
         version: 1.8.0(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1(@vitest/browser@5.1.1)(vitest@5.1.1))(@vitest/ui@5.1.1(vitest@5.1.1))(esbuild@0.28.2)(playwright@1.65.1)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.34(@emnapi/core@2.0.0-beta.2)(@emnapi/runtime@2.0.0-beta.2))
@@ -212,8 +212,8 @@ importers:
         version: 7.0.0
     devDependencies:
       veriss:
-        specifier: github:mizchi/veriss#ad663b006a1a392b5c662ee796405b234d7dec32&path:packages/veriss
-        version: '@mizchi/veriss@https://codeload.github.com/mizchi/veriss/tar.gz/ad663b006a1a392b5c662ee796405b234d7dec32#path:packages/veriss'
+        specifier: ^0.1.0
+        version: 0.1.0
 
   packages/vlmkit-mcp:
     dependencies:
@@ -457,11 +457,6 @@ packages:
 
   '@jsquash/webp@1.5.0':
     resolution: {integrity: sha512-KggLoj2MnRSfIqTeKe1EmbljTX2vuV7mh79k89PCL1pyqiDULcPM1L47twxXt0hkb68F70bXiL31MxsuoZtKFw==}
-
-  '@mizchi/veriss@https://codeload.github.com/mizchi/veriss/tar.gz/ad663b006a1a392b5c662ee796405b234d7dec32#path:packages/veriss':
-    resolution: {path: packages/veriss, tarball: https://codeload.github.com/mizchi/veriss/tar.gz/ad663b006a1a392b5c662ee796405b234d7dec32}
-    version: 0.0.1
-    engines: {node: '>=24'}
 
   '@modelcontextprotocol/sdk@1.32.2':
     resolution: {integrity: sha512-SWsVtH/0vULSQStoZ6xxH2K09Li8fXYTMC64ZeogCdpZ3XSi1eCPOByV1OpuJxuI3OcmHhosDWYyii07tpPsLw==}
@@ -1854,6 +1849,10 @@ packages:
     resolution: {integrity: sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg==}
     engines: {node: '>= 0.8'}
 
+  veriss@0.1.0:
+    resolution: {integrity: sha512-q1zLdj1bD1EnFOAnlp3dfCZts3ZsJOjYasvJD4/lrmBQTFxSf312phUkywYoLl/pQDFQYLMQipf72pp7alI8hw==}
+    engines: {node: '>=24'}
+
   vite-plus@1.8.0:
     resolution: {integrity: sha512-jrnrMuVNnWDLMNZ3j8z6Ck4bS9+ml3vx7rj6SdSEJryw03IVEChdGMBtIUebK69UTtE4WkMvFHUR021aZ0Azdw==}
     engines: {node: ^22.18.0 || ^24.11.0 || >=26.0.0}
@@ -2100,13 +2099,6 @@ snapshots:
   '@jsquash/webp@1.5.0':
     dependencies:
       wasm-feature-detect: 1.10.1
-
-  '@mizchi/veriss@https://codeload.github.com/mizchi/veriss/tar.gz/ad663b006a1a392b5c662ee796405b234d7dec32#path:packages/veriss':
-    dependencies:
-      css-tree: 3.2.1
-      parse5: 8.0.1
-      postcss: 8.5.32
-      z3-solver: 5.3.3
 
   '@modelcontextprotocol/sdk@1.32.2(zod@4.6.7)':
     dependencies:
@@ -3254,6 +3246,13 @@ snapshots:
     optional: true
 
   vary@1.1.2: {}
+
+  veriss@0.1.0:
+    dependencies:
+      css-tree: 3.2.1
+      parse5: 8.0.1
+      postcss: 8.5.32
+      z3-solver: 5.3.3
 
   vite-plus@1.8.0(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1(@vitest/browser@5.1.1)(vitest@5.1.1))(@vitest/ui@5.1.1(vitest@5.1.1))(esbuild@0.28.2)(playwright@1.65.1)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.34(@emnapi/core@2.0.0-beta.2)(@emnapi/runtime@2.0.0-beta.2)):
     dependencies:

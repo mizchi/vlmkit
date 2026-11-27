@@ -1588,7 +1588,7 @@ clipped, `object-fit` on a non-replaced box, scroll-snap / overscroll on a non-s
   the landing page settled and made the whole page "unstable" — nothing could be confirmed.
 - On the six demo sites and the nine css-challenge fixtures: no candidate at all.
 
-**With veriss** (mizchi/veriss, npm `veriss`: an optional peer, a git devDependency here pinned to a commit; the name is
+**With veriss** (mizchi/veriss, npm `veriss`: an optional peer `^0.1.0`, and a devDependency here; the name is
 `VERISS_PACKAGE` in `inspect/veriss-bridge.ts`). veriss decides from HTML and CSS, at every width at once and
 without rendering; vlmkit gives it what it cannot get on its own — the DOM after the page's scripts ran (head cut
 to meta and title) and the text of every sheet the protocol reports, joined — and keeps only what needs the
@@ -1606,7 +1606,7 @@ browser's rules run alone. Measured building it, not to re-learn:
 - **Running veriss on rendered pages found three veriss bugs** (fixed in veriss): a bare `:focus-visible` reported
   on every non-focusable element (350 on kanban), `:focus` on a scroll container (Chromium and Firefox Tab to it),
   and `border: 5px solid var(--c)` + `border-width: 0 0 5px` verified at 20px where browsers draw 25px. The
-  devDependency pins a veriss commit: bump it when veriss changes.
+  devDependency follows npm (`^0.1.0`): bump it when veriss publishes a fix check css needs.
 - veriss's `W_CSS_STATE_SHADOWED` prints a var() value as `initial` (its message, not its decision).
 - **What veriss is given has to be the page the browser laid out**, or it judges another page. Measured after the
   first review, each was a false or lost finding: the viewport height (without it veriss leaves every explicit block
