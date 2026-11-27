@@ -12,7 +12,9 @@
  *                                usually a fallback written for another engine (info);
  * - `unknown-media-feature`      an `@media` whose feature (or value) the browser does not know:
  *                                it is false for everyone, and so is its negation;
- * - `never-matching-media`       an `@media` conjunction whose width bounds leave no viewport.
+ * - `never-matching-media`       an `@media` conjunction whose width bounds leave no viewport;
+ * - `inert-declaration`          a parsed declaration that does nothing where it is
+ *                                (`./inert-declaration.ts`).
  *
  * Pure: no DOM, no Node built-ins (`purity.test.ts`).
  */
@@ -21,7 +23,8 @@ export type CssCheckRule =
   | "dropped-declaration"
   | "vendor-declaration-dropped"
   | "unknown-media-feature"
-  | "never-matching-media";
+  | "never-matching-media"
+  | "inert-declaration";
 
 export interface CssCheckFinding {
   rule: CssCheckRule;

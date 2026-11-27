@@ -31,7 +31,7 @@ interface CssProperty {
   disabled?: boolean;
   parsedOk?: boolean;
   /** Present on authored declarations; the expanded longhands carry none. */
-  range?: { startLine: number; startColumn: number };
+  range?: { startLine: number; startColumn: number; endLine?: number; endColumn?: number };
 }
 
 interface CssRuleMatch {
@@ -176,6 +176,124 @@ export class CssInspector {
       }
     }
     return { elements: inspected.length, declarations: [...found.values()] };
+  }
+
+  /**
+   * Every authored, parsed declaration of an author rule matching one of the first `limit`
+   * elements (pseudo-elements left out), with the elements it matches as protocol node ids.
+   * `accept` filters by property name before anything is kept.
+   */
+  async matchedDeclarations(
+    limit: number,
+    accept: (property: string) => boolean,
+  ): Promise<{
+    elements: number;
+    declarations: {
+      selector: string;
+      property: string;
+      value: string;
+      key: string;
+      sheet: string;
+      line?: number;
+      styleSheetId: string;
+      range: { startLine: number; startColumn: number; endLine: number; endColumn: number };
+      nodes: number[];
+    }[];
+  }> {
+    const { root } = (await this.session.send("DOM.getDocument", { depth: 0 })) as { root: { nodeId: number } };
+    const { nodeIds } = (await this.session.send("DOM.querySelectorAll", {
+      nodeId: root.nodeId,
+      selector: "*",
+    })) as { nodeIds: number[] };
+    const found = new Map<string, Awaited<ReturnType<CssInspector["matchedDeclarations"]>>["declarations"][number]>();
+    const inspected = nodeIds.slice(0, limit);
+    for (const nodeId of inspected) {
+      const matched = (await this.session.send("CSS.getMatchedStylesForNode", { nodeId }).catch(() => ({}))) as {
+        matchedCSSRules?: CssRuleMatch[];
+      };
+      for (const match of matched.matchedCSSRules ?? []) {
+        if (match.rule.origin !== "regular" || !match.rule.styleSheetId) continue;
+        for (const p of match.rule.style.cssProperties) {
+          const r = p.range;
+          if (!r || r.endLine === undefined || r.endColumn === undefined || p.disabled || p.parsedOk === false)
+            continue;
+          if (!accept(p.name.toLowerCase())) continue;
+          const key = `${match.rule.styleSheetId}\u0000${r.startLine}:${r.startColumn}`;
+          const prev = found.get(key);
+          if (prev) {
+            if (!prev.nodes.includes(nodeId)) prev.nodes.push(nodeId);
+            continue;
+          }
+          const line = this.fileLine(match.rule.styleSheetId, r.startLine);
+          found.set(key, {
+            selector: match.rule.selectorList.text,
+            property: p.name.toLowerCase(),
+            value: p.value.trim() + (p.important ? " !important" : ""),
+            key,
+            sheet: this.sheetName(match.rule.styleSheetId),
+            ...(line !== undefined ? { line } : {}),
+            styleSheetId: match.rule.styleSheetId,
+            range: { startLine: r.startLine, startColumn: r.startColumn, endLine: r.endLine, endColumn: r.endColumn },
+            nodes: [nodeId],
+          });
+        }
+      }
+    }
+    return { elements: inspected.length, declarations: [...found.values()] };
+  }
+
+  /** Run `fn` on the element a protocol node id names (`this` is the element), and return its JSON value. */
+  async onNode<T>(nodeId: number, fn: string): Promise<T | null> {
+    try {
+      const { object } = (await this.session.send("DOM.resolveNode", { nodeId })) as { object: { objectId?: string } };
+      if (!object.objectId) return null;
+      const { result } = (await this.session.send("Runtime.callFunctionOn", {
+        objectId: object.objectId,
+        functionDeclaration: fn,
+        returnByValue: true,
+      })) as { result: { value?: T } };
+      return result.value ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Blank the given ranges of their sheets (each character turned into a space, line breaks
+   * kept, so every other range stays where it was), run `fn`, then put every sheet's text back.
+   */
+  async withoutRanges<T>(
+    edits: readonly {
+      styleSheetId: string;
+      range: { startLine: number; startColumn: number; endLine: number; endColumn: number };
+    }[],
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    const original = new Map<string, string>();
+    for (const e of edits)
+      if (!original.has(e.styleSheetId)) {
+        const { text } = (await this.session.send("CSS.getStyleSheetText", { styleSheetId: e.styleSheetId })) as {
+          text: string;
+        };
+        original.set(e.styleSheetId, text);
+      }
+    try {
+      for (const [id, text] of original) {
+        const lines = text.split("\n");
+        for (const e of edits.filter((x) => x.styleSheetId === id))
+          for (let l = e.range.startLine; l <= e.range.endLine; l++) {
+            const line = lines[l] ?? "";
+            const from = l === e.range.startLine ? e.range.startColumn : 0;
+            const to = l === e.range.endLine ? e.range.endColumn : line.length;
+            lines[l] = line.slice(0, from) + " ".repeat(Math.max(0, to - from)) + line.slice(to);
+          }
+        await this.session.send("CSS.setStyleSheetText", { styleSheetId: id, text: lines.join("\n") });
+      }
+      return await fn();
+    } finally {
+      for (const [id, text] of original)
+        await this.session.send("CSS.setStyleSheetText", { styleSheetId: id, text }).catch(() => {});
+    }
   }
 
   /** Every `@media` rule's condition in the page's stylesheets, with where it is written. */

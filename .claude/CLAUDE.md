@@ -1547,7 +1547,7 @@ not to re-learn:
 ## CSS the browser silently ignores (`check css`)
 
 ```bash
-vlmkit check css page.html                 # declarations Chromium dropped; @media it cannot evaluate or that match no width
+vlmkit check css page.html                 # declarations Chromium dropped or that do nothing where they are; @media it cannot evaluate or that match no width
 vlmkit check css page.html --viewport 375x812   # rules under a query that matches only there
 ```
 
@@ -1567,6 +1567,27 @@ silent. Not to re-learn:
   and the nearest computed-style property name is the "did you mean".
 - **Only rules that match now are read**: a dropped declaration under a media query that does not match
   at the viewport is not seen. `--viewport` moves it.
+
+**`inert-declaration` (warn)** is veriss's §3 (`W_LAYOUT_DECLARATION_INERT`): a declaration parsed and applied
+that does nothing where it is — an offset or `z-index` on a static box, `flex` / `order` / grid placement
+under the wrong parent, container properties on a block, size / vertical margin / transform on a plain
+inline box, `background-size` with no image, `border-width` with no style, `text-overflow` with nothing
+clipped, `object-fit` on a non-replaced box, scroll-snap / overscroll on a non-scroller. The table is
+`inertReason` in `@mizchi/vlmkit-judge/inert-declaration.ts`, the context each element's computed style
+(`INERT_CONTEXT_FN`). Measured building it, not to re-learn:
+
+- **One width calls responsive CSS a mistake.** At 375px the landing page had 16 "inert" grid placements
+  and templates: desktop declarations a mobile query turns off with `display: block`. So it is judged at
+  one width per regime of the page's width queries (`regimeWidths`) and kept only when inert at EVERY width
+  where its rule matches (`mergeInertWidths`); `--viewport` judges that width alone. Left: 1 real one
+  (`.header-link { justify-self: end }` under a flex parent).
+- **Inert on every element the rule matches, then removed and measured.** A shared class that works on some
+  elements is not a mistake. Each candidate is blanked in its sheet (`CssInspector.withoutRanges`: spaces
+  keep every other range in place, `CSS.setStyleSheetText`, then the text put back) and every box and every
+  full-page pixel must stay the same; a table entry the browser disagrees with is dropped, not reported.
+- **Two captures must agree first** (at most five): the first capture after the protocol pass landed before
+  the landing page settled and made the whole page "unstable" — nothing could be confirmed.
+- On the six demo sites and the nine css-challenge fixtures: no candidate at all.
 
 ## Data the page was not built with (`stress data`)
 
@@ -2175,7 +2196,7 @@ case at 0.23.0.
 | `docs/reports/2026-08-06-gate-rule-cost-bench.md` | Measured gate/rule execution cost: where a ruleset's time goes, why per-rule cost is attributed rather than isolated, why suppression saves nothing |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
 | `docs/design/package-decomposition.md` | **Splitting vlmkit by layer** (collector / pure judge / driver / loop / diagrams): what was measured, phase 1 (`vlmkit-judge`) and the proposed phases 2-5 |
-| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 38 gates + 252 rules, behavior changes, what is deliberately not a gate |
+| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 38 gates + 253 rules, behavior changes, what is deliberately not a gate |
 | `docs/design/moonbit-boundary.md` | **TS ↔ MoonBit boundary**: what the positional FFI costs (61 commands, 233 args, 2 duplicated dispatch tables), the JSON boundary that replaces it for new logic, how to add a command, and which pure logic belongs in MoonBit versus which deliberately does not |
 | `docs/crater-css-status.md` | Crater CSS rendering verification status |
 | `docs/reset-css-comparison.md` | Reset CSS domain knowledge |

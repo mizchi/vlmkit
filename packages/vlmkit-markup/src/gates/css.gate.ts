@@ -34,7 +34,11 @@ other (min-width: 900px and max-width: 600px) matches no viewport. Linked and CD
 read too (the CSSOM cannot read them from a file: page). Declarations under a media query
 that does not match at the viewport are not read: pass --viewport for another width.
 Vendor-prefixed declarations Chromium does not know are listed as info, not defects: they are
-usually fallbacks written for another engine.`,
+usually fallbacks written for another engine. A declaration that is parsed and applied but
+does nothing where it is (top on a static box, flex: 1 under a block parent, width on an
+inline span, background-size with no image) is inert-declaration when the computed context of
+every element its rule matches says so AND removing it from the sheet leaves every box and
+every pixel of the page unchanged.`,
   rules: [
     {
       id: "dropped-declaration",
@@ -53,6 +57,12 @@ usually fallbacks written for another engine.`,
       title: "An @media whose feature or value the browser does not know: it never matches",
       severity: "suspect",
       docs: "Both (f) and not (f) evaluate false. Usually a typo (prefers-reduce-motion).",
+    },
+    {
+      id: "inert-declaration",
+      title: "A declaration the browser applies that does nothing where it is",
+      severity: "warn",
+      docs: "top on a static box, flex under a block parent, width on an inline span, background-size with no image. Inert on every element the rule matches, and removing it leaves every box and pixel the same. veriss calls these W_LAYOUT_DECLARATION_INERT.",
     },
     {
       id: "never-matching-media",
@@ -121,7 +131,7 @@ usually fallbacks written for another engine.`,
     })),
   format: formatCssCheckReport,
   headline: (report) =>
-    `${report.findings.length} finding(s): ${report.declarations.length} dropped declaration(s), ${report.media.length} @media read, ${report.inspected.elements} element(s)`,
+    `${report.findings.length} finding(s): ${report.declarations.length} dropped declaration(s), ${report.inert.confirmed} inert, ${report.media.length} @media read, ${report.inspected.elements} element(s)`,
   ledger: (report, options) => ({
     tool: "check-css",
     source: options.source,

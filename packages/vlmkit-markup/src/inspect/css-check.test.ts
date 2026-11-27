@@ -32,12 +32,32 @@ describe("check css on fixtures/css-check", () => {
     for (const f of r.findings) assert.ok(f.line !== undefined && f.line > 10, JSON.stringify(f));
   });
 
-  for (const rule of ["unknown-media-feature", "never-matching-media", "vendor-declaration-dropped"] as const)
+  for (const rule of [
+    "unknown-media-feature",
+    "never-matching-media",
+    "vendor-declaration-dropped",
+    "inert-declaration",
+  ] as const)
     it(`${rule}: that rule and nothing else`, T, async () => {
       const r = await run(rule);
       assert.ok(r.findings.length > 0, JSON.stringify(r, null, 2));
       assert.deepEqual([...new Set(r.findings.map((f) => f.rule))], [rule], JSON.stringify(r.findings, null, 2));
     });
+
+  it("inert-declaration: each declaration that does nothing where it is, confirmed by removing it", T, async () => {
+    const r = await run("inert-declaration");
+    assert.deepEqual(
+      [...new Set(r.findings.map((f) => f.rule))],
+      ["inert-declaration"],
+      JSON.stringify(r.findings, null, 2),
+    );
+    const said = r.findings.map((f) => f.message).join("\n");
+    for (const d of ["top: 4px", "flex: 1", "background-size: cover", "justify-content: center"])
+      assert.ok(said.includes(d), `${d} in\n${said}`);
+    assert.equal(r.findings.length, 4, said);
+    assert.match(said, /position: static/);
+    assert.match(said, /not a flex item/);
+  });
 
   it("a typo in a media feature is named with the feature it meant", T, async () => {
     const r = await run("unknown-media-feature");
