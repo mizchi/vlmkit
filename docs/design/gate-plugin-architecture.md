@@ -376,14 +376,14 @@ The built-ins load through the same `createGateRegistry([...])` call. If the
 contract were not sufficient for them it would not be sufficient for anyone
 else, and making them its first consumer is the only way to keep that honest.
 
-## The 38 gates (253 tunable rules)
+## The 38 gates (254 tunable rules)
 
 | Gate | Rules | Plugin |
 |---|---|---|
 | `check integrity` | 19 | markup |
 | `check layout` | 12 | markup |
 | `check copy` | 7 | markup |
-| `check css` | 5 | markup |
+| `check css` | 6 | markup |
 | `check interactions` | 39 | markup |<!-- 15 of its own + the 24 shared HANDLER_SURFACE_RULES it emits under --handlers -->
 | `check a11y contrast` | 1 | markup |
 | `check a11y touch` | 1 | markup |

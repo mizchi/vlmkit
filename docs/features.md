@@ -5,7 +5,7 @@ measures it, and says what is wrong and where. Nothing here needs an API key unl
 **[key]**. Optional AI assists are marked **[opt key]**: they add something on top of a
 deterministic result and are never needed for it.
 
-There are **38 gates** with **253 tunable rules** (`vlmkit rules` lists them). A gate is a command
+There are **38 gates** with **254 tunable rules** (`vlmkit rules` lists them). A gate is a command
 with a verdict and an exit code: 0 clean, 1 a finding, 2 a usage error. The other commands
 produce artifacts, run loops or wire vlmkit into other tools. `tests/features-doc.test.mjs` fails
 when a command exists that this page does not name, or when the counts above drift.

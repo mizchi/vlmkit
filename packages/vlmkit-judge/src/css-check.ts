@@ -21,6 +21,7 @@
  */
 
 export type CssCheckRule =
+  | "redirected"
   | "dropped-declaration"
   | "vendor-declaration-dropped"
   | "unknown-media-feature"
@@ -143,11 +144,30 @@ export const nearestMediaFeature = (feature: string): string | null => nearestWo
  */
 export const MEDIA_ATOM_PROBE_JS = `
   const unknownMediaAtom = (cond) => {
-    for (const m of String(cond).matchAll(/\\(([^()]+)\\)/g)) {
-      const atom = "(" + m[1] + ")";
-      if (!window.matchMedia(atom).matches && !window.matchMedia("not " + atom).matches) return m[1].trim();
-    }
-    return null;
+    const text = String(cond);
+    // Each balanced (…) group: a feature, or a nested condition whose own groups are the features. A "(" right after a
+    // name is a function's (calc(), min()), part of the feature's value, never an atom of its own.
+    const groups = (from, to) => {
+      const out = [];
+      for (let i = from, depth = 0, start = -1; i < to; i++) {
+        const ch = text[i];
+        if (ch === "(") { if (depth === 0) start = i; depth++; }
+        else if (ch === ")" && depth > 0 && --depth === 0) out.push([start, i]);
+      }
+      return out;
+    };
+    const fnParen = (i) => /[\\w-]/.test(text[i - 1] || "");
+    const probe = (from, to) => {
+      for (const [a, b] of groups(from, to)) {
+        if (fnParen(a)) continue;
+        const inner = groups(a + 1, b).filter(([c]) => !fnParen(c));
+        if (inner.length) { const hit = probe(a + 1, b); if (hit) return hit; continue; }
+        const atom = text.slice(a, b + 1);
+        if (!window.matchMedia(atom).matches && !window.matchMedia("not " + atom).matches) return atom.slice(1, -1).trim();
+      }
+      return null;
+    };
+    return probe(0, text.length);
   };`;
 
 /** A vendor prefix on the property or in the value: written for an engine, often on purpose for another one. */
@@ -161,8 +181,18 @@ const where = (sheet: string, line?: number) => (line === undefined ? sheet : `$
 export function judgeCssCheck(input: {
   declarations: readonly DeclarationSample[];
   media: readonly MediaSample[];
+  /** The note when the requested URL redirected somewhere meaningful (a login wall), else null. */
+  redirect?: string | null;
 }): CssCheckFinding[] {
   const out: CssCheckFinding[] = [];
+  // First, so a clean result on the login page is never the verdict.
+  if (input.redirect)
+    out.push({
+      rule: "redirected",
+      severity: "suspect",
+      sheet: "page",
+      message: `${input.redirect}: the CSS measured is that page's, not the page asked for`,
+    });
   for (const d of input.declarations) {
     const at = where(d.sheet, d.line);
     const decl = `\`${d.property}: ${d.value}\``;

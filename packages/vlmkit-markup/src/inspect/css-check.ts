@@ -76,7 +76,7 @@ export async function runCssCheck(options: CssCheckOptions): Promise<CssCheckRep
   const viewport = options.viewport ?? DEFAULT_VIEWPORT;
   const limit = options.maxElements ?? DEFAULT_MAX_ELEMENTS;
   return withBrowser(async (browser) => {
-    const { page } = await openSource(browser, options.source, {
+    const { page, redirect } = await openSource(browser, options.source, {
       ...pickPageLoad(options),
       ...(options.storageState ? { storageState: options.storageState } : {}),
       viewport,
@@ -118,7 +118,7 @@ export async function runCssCheck(options: CssCheckOptions): Promise<CssCheckRep
       );
       if (widths.length > 1) await page.setViewportSize(viewport);
       const staticReport = await runStatic(page, inspector);
-      const own = [...judgeCssCheck({ declarations, media }), ...judgeInertDeclarations(inert.samples)];
+      const own = [...judgeCssCheck({ declarations, media, redirect }), ...judgeInertDeclarations(inert.samples)];
       return {
         source: options.source,
         viewport,

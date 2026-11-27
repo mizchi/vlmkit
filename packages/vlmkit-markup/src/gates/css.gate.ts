@@ -47,6 +47,12 @@ an over-constrained inset, HTML the parser restructures (static-css, and its ine
 under inert-declaration). A declaration both judged is one finding that says veriss agrees.`,
   rules: [
     {
+      id: "redirected",
+      title: "Requested URL redirected elsewhere",
+      severity: "suspect",
+      docs: "Almost always a login wall (an expired --storage-state). Reported so a pass on the login page cannot be silent.",
+    },
+    {
       id: "dropped-declaration",
       title: "A declaration the browser dropped: an unknown property, or a value that does not parse",
       severity: "suspect",
