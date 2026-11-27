@@ -190,29 +190,19 @@ describe("inert across widths", () => {
       regimeWidths(["(min-width: 600px)", "(min-width: 64em)", "(prefers-color-scheme: dark)"]),
       [320, 812, 1920],
     );
-    // At most `cap`, evenly picked, the two ends kept.
-    const many = regimeWidths(
-      Array.from({ length: 20 }, (_, i) => `(min-width: ${400 + i * 70}px)`),
-      320,
-      1920,
-      5,
-    );
-    assert.equal(many.length, 5);
-    assert.equal(many[0], 320);
-    assert.equal(many.at(-1), 1920);
+    // More regimes than `cap`: a regime left out could be the one where the declaration works, so no widths (not
+    // judged) rather than a thinned set. 20 breakpoints are 21 regimes.
+    const breakpoints = Array.from({ length: 20 }, (_, i) => `(min-width: ${400 + i * 70}px)`);
+    assert.deepEqual(regimeWidths(breakpoints, 320, 1920, 5), []);
+    assert.equal(regimeWidths(breakpoints, 320, 1920, 21).length, 21);
   });
   it("a width the query matches exactly is a sample of its own", () => {
     // (width: 600px) matches at 600 only: neither side's middle shows it.
     assert.ok(regimeWidths(["(width: 600px)"]).includes(600));
     assert.ok(regimeWidths(["(width = 600px)", "(min-width: 900px)"]).includes(600));
-    // Kept when the cap thins the rest.
-    const many = regimeWidths(
-      ["(width: 777px)", ...Array.from({ length: 20 }, (_, i) => `(min-width: ${400 + i * 70}px)`)],
-      320,
-      1920,
-      5,
-    );
-    assert.ok(many.includes(777), String(many));
+    // It counts toward the cap like a regime.
+    assert.deepEqual(regimeWidths(["(width: 777px)", "(min-width: 600px)"], 320, 1920, 3), []);
+    assert.ok(regimeWidths(["(width: 777px)", "(min-width: 600px)"], 320, 1920, 4).includes(777));
   });
   it("a width query it cannot place in px partitions nothing: no widths, so nothing is judged across them", () => {
     assert.deepEqual(regimeWidths(["(max-width: calc(600px + 1px))"]), []);

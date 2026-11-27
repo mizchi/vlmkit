@@ -257,7 +257,7 @@ export function formatCssCheckReport(report: CssCheckReport, rules?: RuleView): 
         }${RESET}`,
     report.inert.widths.length
       ? `${DIM}inert declarations, judged at ${report.inert.widths.join(", ")}px: ${report.inert.candidates} candidate(s) from the context table, ${report.inert.confirmed} inert at every width where their rule matches and confirmed by removing them (every box and pixel unchanged)${report.inert.unstable.length ? `; at ${report.inert.unstable.join(", ")}px the page changed between captures, so nothing was confirmed there` : ""}${RESET}`
-      : `${DIM}inert declarations: not judged — a width media query whose value is not a px / em / rem number (a calc(), a vw) leaves the width regimes unknown, so no declaration is called inert across them. Pass --viewport to judge one width${RESET}`,
+      : `${DIM}inert declarations: not judged — the page's width queries either use a value that is not a px / em / rem number (a calc(), a vw) or make more than 16 width regimes, so not every regime would be measured and no declaration is called inert across them. Pass --viewport to judge one width${RESET}`,
     "",
   ];
   if (shown.length === 0)

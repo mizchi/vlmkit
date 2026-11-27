@@ -1617,7 +1617,7 @@ browser's rules run alone. Measured building it, not to re-learn:
   them out). A sheet with no owner element (an `@import`, a constructed sheet) has no known place in the cascade, so
   the static half is skipped there and says so.
 - `regimeWidths` gives no widths when a width query is not a px / em / rem number (a `calc()`, a `vw`): inert is then
-  not judged across widths (the output says so; `--viewport` judges one), and a width a query matches exactly
+  not judged across widths (the output says so; `--viewport` judges one), nor when the queries make more than 16 regimes (a thinned set could leave out the one where the declaration works), and a width a query matches exactly
   (`(width: 600px)`) is always one of the samples.
 
 ## Data the page was not built with (`stress data`)

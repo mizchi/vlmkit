@@ -380,9 +380,11 @@ function widthFeatures(cond: string): string[] {
  * then seen to work somewhere. With no width query, one desktop width.
  *
  * A width feature whose value is not a px / em / rem number (a calc(), a vw) cannot be placed
- * here: then no widths at all, so nothing is judged across widths rather than from too few.
+ * here, and more regimes than `cap` would leave some out (the one where the declaration works
+ * could be among them): then no widths at all, so nothing is judged across widths rather than
+ * from too few.
  */
-export function regimeWidths(conditions: readonly string[], min = 320, max = 1920, cap = 8): number[] {
+export function regimeWidths(conditions: readonly string[], min = 320, max = 1920, cap = 16): number[] {
   const edges = new Set<number>();
   const exact = new Set<number>();
   for (const cond of conditions)
@@ -400,12 +402,10 @@ export function regimeWidths(conditions: readonly string[], min = 320, max = 192
   for (const e of exact) edges.add(e);
   if (edges.size === 0) return [1280];
   const sorted = [...edges].sort((a, b) => a - b);
-  let widths = [min, ...sorted.slice(1).map((b, i) => Math.round((sorted[i]! + b) / 2)), max];
-  if (widths.length > cap) {
-    const keep = Math.max(2, cap - exact.size);
-    widths = Array.from({ length: keep }, (_, i) => widths[Math.round((i * (widths.length - 1)) / (keep - 1))]!);
-  }
-  return [...new Set([...widths, ...exact])].sort((a, b) => a - b);
+  const widths = [
+    ...new Set([min, ...sorted.slice(1).map((b, i) => Math.round((sorted[i]! + b) / 2)), max, ...exact]),
+  ].sort((a, b) => a - b);
+  return widths.length > cap ? [] : widths;
 }
 
 /**
