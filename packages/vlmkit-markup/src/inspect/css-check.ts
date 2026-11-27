@@ -39,7 +39,9 @@ import {
   type InertSample,
 } from "@mizchi/vlmkit-judge/inert-declaration.ts";
 import type { Page } from "playwright";
+import { mergeStaticFindings } from "@mizchi/vlmkit-judge/css-static.ts";
 import { CssInspector } from "../stress/responsive-css.ts";
+import { runStatic, type StaticReport } from "./veriss-bridge.ts";
 
 export interface CssCheckOptions extends PageLoadOptions {
   source: string;
@@ -58,6 +60,8 @@ export interface CssCheckReport {
   declarations: DeclarationSample[];
   /** Declarations the context table calls inert on every element they match, with whether removing them changed nothing. */
   inert: { widths: number[]; candidates: number; confirmed: number; unstable: number[]; samples: InertSample[] };
+  /** veriss's static analysis of the rendered page, or why it did not run. */
+  static: StaticReport | { skipped: string };
   media: MediaSample[];
   findings: CssCheckFinding[];
 }
@@ -112,6 +116,9 @@ export async function runCssCheck(options: CssCheckOptions): Promise<CssCheckRep
         widths,
         viewport.height,
       );
+      if (widths.length > 1) await page.setViewportSize(viewport);
+      const staticReport = await runStatic(page, inspector);
+      const own = [...judgeCssCheck({ declarations, media }), ...judgeInertDeclarations(inert.samples)];
       return {
         source: options.source,
         viewport,
@@ -125,7 +132,9 @@ export async function runCssCheck(options: CssCheckOptions): Promise<CssCheckRep
           unstable: inert.unstable,
           samples: inert.samples,
         },
-        findings: [...judgeCssCheck({ declarations, media }), ...judgeInertDeclarations(inert.samples)],
+        static: staticReport,
+        findings:
+          "skipped" in staticReport ? own : mergeStaticFindings(own, staticReport.warnings, staticReport.sheets),
       };
     } finally {
       await inspector.close();
@@ -237,12 +246,21 @@ export function formatCssCheckReport(report: CssCheckReport, rules?: RuleView): 
     `${DIM}source: ${report.source}${RESET}`,
     `${DIM}read through the DevTools protocol at ${report.viewport.width}x${report.viewport.height}: ${i.sheets} stylesheet(s), ${i.media} @media rule(s), the matched rules of ${i.elements}${i.elements < i.totalElements ? ` of ${i.totalElements}` : ""} element(s)${RESET}`,
     `${DIM}declarations are judged where a rule matches now; rules under a media query that does not match at this viewport are not read${RESET}`,
+    "skipped" in report.static
+      ? `${YELLOW}static analysis skipped:${RESET} ${report.static.skipped}`
+      : `${DIM}veriss (static, every width 320-1920px): ${report.static.status} in ${report.static.ms}ms, ${report.static.warnings.length} warning(s) read${
+          Object.keys(report.static.unknown).length
+            ? `; could not decide: ${Object.entries(report.static.unknown)
+                .map(([c, n]) => `${c} x${n}`)
+                .join(", ")}`
+            : ""
+        }${RESET}`,
     `${DIM}inert declarations, judged at ${report.inert.widths.join(", ")}px: ${report.inert.candidates} candidate(s) from the context table, ${report.inert.confirmed} inert at every width where their rule matches and confirmed by removing them (every box and pixel unchanged)${report.inert.unstable.length ? `; at ${report.inert.unstable.join(", ")}px the page changed between captures, so nothing was confirmed there` : ""}${RESET}`,
     "",
   ];
   if (shown.length === 0)
     lines.push(
-      `${GREEN}ok${RESET} the browser kept every declaration, can evaluate every @media, and no declaration the context table checks is inert`,
+      `${GREEN}ok${RESET} the browser kept every declaration, can evaluate every @media, no declaration the context table checks is inert${"skipped" in report.static ? "" : ", and veriss found nothing"}`,
     );
   for (const f of shown)
     lines.push(

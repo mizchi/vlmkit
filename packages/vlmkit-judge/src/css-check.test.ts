@@ -1,12 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "vite-plus/test";
-import {
-  isVendorDeclaration,
-  judgeCssCheck,
-  mediaWidthRange,
-  nearestMediaFeature,
-  type DeclarationSample,
-} from "./css-check.ts";
+import { isVendorDeclaration, judgeCssCheck, nearestMediaFeature, type DeclarationSample } from "./css-check.ts";
 
 const decl = (over: Partial<DeclarationSample>): DeclarationSample => ({
   selector: ".a",
@@ -70,23 +64,14 @@ describe("css-check judge", () => {
     assert.equal(nearestMediaFeature("zzzzzzzzzz"), null);
   });
 
-  it("width bounds that leave no viewport is never-matching-media", () => {
-    assert.equal(mediaWidthRange("(min-width: 900px) and (max-width: 600px)")?.empty, true);
-    assert.equal(mediaWidthRange("screen and (min-width: 600px) and (max-width: 900px)")?.empty, false);
-    assert.equal(mediaWidthRange("(width > 600px) and (width < 600px)")?.empty, true);
-    assert.equal(mediaWidthRange("(600px < width <= 600px)")?.empty, true);
-    assert.equal(mediaWidthRange("(min-width: 40em) and (max-width: 639px)")?.empty, true);
-    assert.equal(mediaWidthRange("(min-width: 600px) and (max-width: 600px)")?.empty, false);
-    // Not a plain conjunction: not judged.
-    assert.equal(mediaWidthRange("(min-width: 900px), (max-width: 600px)"), null);
-    assert.equal(mediaWidthRange("not all and (min-width: 900px)"), null);
-    assert.equal(mediaWidthRange("print and (min-width: 900px) and (max-width: 600px)"), null);
-    const [f] = judgeCssCheck({
-      declarations: [],
-      media: [{ condition: "(min-width: 900px) and (max-width: 600px)", sheet: "a.css", unknownAtom: null }],
-    });
-    assert.equal(f!.rule, "never-matching-media");
-    assert.equal(f!.severity, "suspect");
+  it("an @media that matches no width is left to veriss (static-css), not judged here", () => {
+    assert.deepEqual(
+      judgeCssCheck({
+        declarations: [],
+        media: [{ condition: "(min-width: 900px) and (max-width: 600px)", sheet: "a.css", unknownAtom: null }],
+      }),
+      [],
+    );
   });
 
   it("a media query that can match says nothing", () => {

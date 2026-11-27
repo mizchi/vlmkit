@@ -100,7 +100,8 @@
     "@vitest/coverage-v8": "5.1.1",
     "playwright": "1.65.1",
     "three": "^0.187.0",
-    "vite-plus": "1.8.0"
+    "vite-plus": "1.8.0",
+    "@mizchi/veriss": "github:mizchi/veriss#ad663b006a1a392b5c662ee796405b234d7dec32&path:packages/veriss"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.11",
@@ -114,13 +115,17 @@
   "peerDependencies": {
     "@jsquash/webp": "^1",
     "@playwright/test": ">=1.61 <2",
-    "playwright": ">=1.61 <2"
+    "playwright": ">=1.61 <2",
+    "@mizchi/veriss": "*"
   },
   "peerDependenciesMeta": {
     "@playwright/test": {
       "optional": true
     },
     "@jsquash/webp": {
+      "optional": true
+    },
+    "@mizchi/veriss": {
       "optional": true
     }
   },

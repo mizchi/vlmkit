@@ -22,7 +22,7 @@ every flag, read [`cli-reference.md`](./cli-reference.md).
 | `vlmkit check copy <page> --manifest copy.txt` | The copy is present, visible and verbatim; placeholder text. `--target` compares with an image **[opt key]** |
 | `vlmkit check layout <page> --contract c.json` | A brief's structure per viewport: widths, items per row, stacking order |
 | `vlmkit check a11y contrast` · `check a11y touch` · `check a11y focus` | WCAG AA contrast, touch-target size, focus order and traps |
-| `vlmkit check css <page>` | CSS the browser silently ignores, decided by Chromium itself: declarations it dropped as invalid (`calc(100%-10px)`, `width: 100`, a misspelt property), `@media` it cannot evaluate (an unknown feature) or that matches no width, and declarations it applies that do nothing where they are (`top` on a static box, `flex` under a grid), confirmed by removing them |
+| `vlmkit check css <page>` | CSS the browser silently ignores, decided by Chromium itself: declarations it dropped as invalid (`calc(100%-10px)`, `width: 100`, a misspelt property), `@media` it cannot evaluate (an unknown feature), and declarations it applies that do nothing where they are (`top` on a static box, `flex` under a grid), confirmed by removing them. With [veriss](https://github.com/mizchi/veriss) installed (optional), its static checks over every width too (`static-css`) |
 | `vlmkit check perf <page>` | Web Vitals thresholds (CLS, LCP, FCP) |
 | `vlmkit check crater` | Whether the Crater BiDi rendering backend answers (only when you render through Crater) |
 

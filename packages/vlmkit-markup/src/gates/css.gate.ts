@@ -22,15 +22,15 @@ export const cssGate = defineGate<CssCheckReport, CssCheckOptions>({
   id: "check.css",
   command: ["check", "css"],
   title: "CSS the browser ignores",
-  summary: "Declarations the browser dropped as invalid, and @media rules it cannot evaluate or that match no width",
+  summary:
+    "Declarations the browser dropped or that do nothing, @media it cannot evaluate, and (with veriss) every static CSS mistake over all widths",
   category: "correctness",
   usage: `Loads the page in Chromium and reads, through the DevTools protocol, every author
 declaration in the rules that match its elements: one the browser's parser rejected
 (parsedOk: false) is dropped whole, and the value before it stays — calc(100%-10px),
 width: 100, color: #12345, a misspelt property. Every @media rule's atoms are evaluated
 with matchMedia as (f) and not (f): a feature or value the browser does not know is false
-both ways, so the query never matches for anyone. An @media whose width bounds exclude each
-other (min-width: 900px and max-width: 600px) matches no viewport. Linked and CDN sheets are
+both ways, so the query never matches for anyone. Linked and CDN sheets are
 read too (the CSSOM cannot read them from a file: page). Declarations under a media query
 that does not match at the viewport are not read: pass --viewport for another width.
 Vendor-prefixed declarations Chromium does not know are listed as info, not defects: they are
@@ -38,7 +38,13 @@ usually fallbacks written for another engine. A declaration that is parsed and a
 does nothing where it is (top on a static box, flex: 1 under a block parent, width on an
 inline span, background-size with no image) is inert-declaration when the computed context of
 every element its rule matches says so AND removing it from the sheet leaves every box and
-every pixel of the page unchanged.`,
+every pixel of the page unchanged.
+
+With @mizchi/veriss installed (an optional peer), the rendered DOM and every stylesheet are
+also handed to veriss, which decides statically over every width from 320 to 1920px what the
+browser ignores: an @media that matches no width, a :focus rule on what cannot take focus,
+an over-constrained inset, HTML the parser restructures (static-css, and its inert findings
+under inert-declaration). A declaration both judged is one finding that says veriss agrees.`,
   rules: [
     {
       id: "dropped-declaration",
@@ -65,10 +71,10 @@ every pixel of the page unchanged.`,
       docs: "top on a static box, flex under a block parent, width on an inline span, background-size with no image. Inert on every element the rule matches, and removing it leaves every box and pixel the same. veriss calls these W_LAYOUT_DECLARATION_INERT.",
     },
     {
-      id: "never-matching-media",
-      title: "An @media whose width bounds leave no viewport",
-      severity: "suspect",
-      docs: "Judged on plain `and` conjunctions of width tests in px / em / rem only.",
+      id: "static-css",
+      title: "A CSS mistake veriss finds statically, over every viewport width",
+      severity: "warn",
+      docs: "Needs @mizchi/veriss installed (an optional peer). veriss reads the rendered DOM and every stylesheet and reports what the browser ignores at any width from 320 to 1920px: an @media that matches no width (W_CSS_MEDIA_NEVER), an animation with no @keyframes, a :focus rule on what cannot take focus, HTML the parser restructures, and the rest of its rule catalog §1–§5. The message carries veriss's code.",
     },
   ],
   inputs: [

@@ -1547,7 +1547,7 @@ not to re-learn:
 ## CSS the browser silently ignores (`check css`)
 
 ```bash
-vlmkit check css page.html                 # declarations Chromium dropped or that do nothing where they are; @media it cannot evaluate or that match no width
+vlmkit check css page.html                 # declarations Chromium dropped or that do nothing; @media it cannot evaluate; with veriss, every static CSS mistake over all widths
 vlmkit check css page.html --viewport 375x812   # rules under a query that matches only there
 ```
 
@@ -1555,8 +1555,7 @@ veriss's static §1/§2 rules (mizchi/veriss rule catalog), decided by the rende
 grammar: each declaration in a rule matching one of the first 3000 elements carries CDP's `parsedOk`
 (`CssInspector.unparsedDeclarations`, `stress/responsive-css.ts`), each `@media` atom is evaluated as `(f)`
 and `not (f)` (`MEDIA_ATOM_PROBE_JS` in `@mizchi/vlmkit-judge/css-check.ts`, shared with `check animation`'s
-`unknown-media-feature`). Rules `dropped-declaration`, `unknown-media-feature`, `never-matching-media`
-(suspect; the last only on plain `and` conjunctions of px / em / rem width tests) and
+`unknown-media-feature`). Rules `dropped-declaration`, `unknown-media-feature` (suspect) and
 `vendor-declaration-dropped` (info: `-moz-*` fallbacks are written for another engine on purpose). Known
 answers: `fixtures/css-check/` (`build.mjs`), held by `inspect/css-check.test.ts`; the six demo sites are
 silent. Not to re-learn:
@@ -1588,6 +1587,27 @@ clipped, `object-fit` on a non-replaced box, scroll-snap / overscroll on a non-s
 - **Two captures must agree first** (at most five): the first capture after the protocol pass landed before
   the landing page settled and made the whole page "unstable" — nothing could be confirmed.
 - On the six demo sites and the nine css-challenge fixtures: no candidate at all.
+
+**With veriss** (mizchi/veriss, `@mizchi/veriss`: an optional peer, a git devDependency here; the name is
+`VERISS_PACKAGE` in `inspect/veriss-bridge.ts`). veriss decides from HTML and CSS, at every width at once and
+without rendering; vlmkit gives it what it cannot get on its own — the DOM after the page's scripts ran (head cut
+to meta and title) and the text of every sheet the protocol reports, joined — and keeps only what needs the
+browser: `parsedOk`, `matchMedia`, and removing a declaration and comparing pixels. `static-css` (warn) is
+veriss's `W_CSS_*` / `W_HTML_*` (not `W_CSS_SHORTHAND_CONFLICT`: hand-written CSS overrides one side that way;
+veriss runs with `shorthandConflicts: 'warning'`), its `W_LAYOUT_DECLARATION_INERT` joins `inert-declaration`, and
+one declaration both judged is one finding ending "veriss agrees (CODE)" (`mergeStaticFindings`,
+`@mizchi/vlmkit-judge/css-static.ts`; joined-CSS lines put back with `locateLine`). `never-matching-media` was
+removed: veriss's `W_CSS_MEDIA_NEVER` decides it over all widths. Without veriss the header says so and the
+browser's rules run alone. Measured building it, not to re-learn:
+
+- **Neither covers the other.** On the inert fixture veriss found 1 of the 4 (the page is Unknown for it at
+  `(width >= 40em)`, range syntax it does not read); on kanban it found an over-constrained inset and `color` on a
+  native radio that vlmkit's table has no row for; `colr` (a misspelt property) only the browser sees.
+- **Running veriss on rendered pages found three veriss bugs** (fixed in veriss): a bare `:focus-visible` reported
+  on every non-focusable element (350 on kanban), `:focus` on a scroll container (Chromium and Firefox Tab to it),
+  and `border: 5px solid var(--c)` + `border-width: 0 0 5px` verified at 20px where browsers draw 25px. The
+  devDependency pins a veriss commit: bump it when veriss changes.
+- veriss's `W_CSS_STATE_SHADOWED` prints a var() value as `initial` (its message, not its decision).
 
 ## Data the page was not built with (`stress data`)
 

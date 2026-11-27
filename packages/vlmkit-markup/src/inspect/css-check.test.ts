@@ -32,12 +32,7 @@ describe("check css on fixtures/css-check", () => {
     for (const f of r.findings) assert.ok(f.line !== undefined && f.line > 10, JSON.stringify(f));
   });
 
-  for (const rule of [
-    "unknown-media-feature",
-    "never-matching-media",
-    "vendor-declaration-dropped",
-    "inert-declaration",
-  ] as const)
+  for (const rule of ["unknown-media-feature", "vendor-declaration-dropped", "inert-declaration"] as const)
     it(`${rule}: that rule and nothing else`, T, async () => {
       const r = await run(rule);
       assert.ok(r.findings.length > 0, JSON.stringify(r, null, 2));
@@ -57,6 +52,23 @@ describe("check css on fixtures/css-check", () => {
     assert.equal(r.findings.length, 4, said);
     assert.match(said, /position: static/);
     assert.match(said, /not a flex item/);
+  });
+
+  it("never-matching-media is veriss's now: static-css, W_CSS_MEDIA_NEVER, in its sheet", T, async () => {
+    const r = await run("never-matching-media");
+    assert.ok(!("skipped" in r.static), JSON.stringify(r.static));
+    assert.deepEqual([...new Set(r.findings.map((f) => f.rule))], ["static-css"], JSON.stringify(r.findings, null, 2));
+    assert.match(r.findings[0]!.message, /^\[W_CSS_MEDIA_NEVER\]/);
+    assert.match(r.findings[0]!.message, /never-matching-media\.html:\d+/);
+  });
+
+  it("where veriss and the browser judged one declaration, it is one finding saying both agree", T, async () => {
+    const r = await run("dropped-declaration");
+    const said = r.findings.map((f) => f.message).join("\n");
+    assert.equal(r.findings.length, 4, said);
+    // calc(), the hex colour and the unitless length: veriss knows those grammars. The misspelt property: only the browser.
+    assert.equal(r.findings.filter((f) => /veriss agrees/.test(f.message)).length, 3, said);
+    assert.doesNotMatch(r.findings.find((f) => f.message.includes("colr"))!.message, /veriss agrees/);
   });
 
   it("a typo in a media feature is named with the feature it meant", T, async () => {

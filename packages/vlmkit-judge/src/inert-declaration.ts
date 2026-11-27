@@ -284,6 +284,7 @@ export interface InertFinding {
   rule: "inert-declaration";
   severity: "warn";
   selector: string;
+  property: string;
   sheet: string;
   line?: number;
   message: string;
@@ -304,6 +305,7 @@ export function judgeInertDeclarations(samples: readonly InertSample[]): InertFi
       rule: "inert-declaration",
       severity: "warn",
       selector: s.selector,
+      property: s.property,
       sheet: s.sheet,
       ...(s.line !== undefined ? { line: s.line } : {}),
       message: `${s.selector} \`${s.property}: ${s.value}\` (${where}) does nothing on the ${n === 1 ? "element" : `${n} elements`} it matches${at}: ${why}. Removing it leaves the page pixel for pixel the same`,

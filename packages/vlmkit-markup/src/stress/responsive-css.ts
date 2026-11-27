@@ -61,7 +61,7 @@ export interface TaggedNode {
 const normalise = (text: string) => text.toLowerCase().replace(/\s+/g, "");
 
 export class CssInspector {
-  private readonly sheets = new Map<string, { url: string; inline: boolean; startLine: number }>();
+  private readonly sheets = new Map<string, { url: string; inline: boolean; startLine: number; origin: string }>();
   private moved: { styleSheetId: string; range: CssMedia["range"]; text: string; to: string }[] = [];
 
   private constructor(
@@ -70,11 +70,14 @@ export class CssInspector {
   ) {
     session.on(
       "CSS.styleSheetAdded",
-      (event: { header: { styleSheetId: string; sourceURL: string; isInline?: boolean; startLine?: number } }) => {
+      (event: {
+        header: { styleSheetId: string; sourceURL: string; isInline?: boolean; startLine?: number; origin?: string };
+      }) => {
         this.sheets.set(event.header.styleSheetId, {
           url: event.header.sourceURL,
           inline: event.header.isInline === true,
           startLine: event.header.startLine ?? 0,
+          origin: event.header.origin ?? "regular",
         });
       },
     );
@@ -294,6 +297,22 @@ export class CssInspector {
       for (const [id, text] of original)
         await this.session.send("CSS.setStyleSheetText", { styleSheetId: id, text }).catch(() => {});
     }
+  }
+
+  /**
+   * The text of every author stylesheet the protocol has reported, in the order it reported them,
+   * with the 1-based file line its first line sits at (an inline `<style>` is offset).
+   */
+  async sheetTexts(): Promise<{ sheet: string; text: string; firstFileLine: number }[]> {
+    const out: { sheet: string; text: string; firstFileLine: number }[] = [];
+    for (const [id, header] of this.sheets) {
+      if (header.origin !== "regular") continue;
+      const got = (await this.session.send("CSS.getStyleSheetText", { styleSheetId: id }).catch(() => null)) as {
+        text: string;
+      } | null;
+      if (got) out.push({ sheet: this.sheetName(id), text: got.text, firstFileLine: header.startLine + 1 });
+    }
+    return out;
   }
 
   /** Every `@media` rule's condition in the page's stylesheets, with where it is written. */
