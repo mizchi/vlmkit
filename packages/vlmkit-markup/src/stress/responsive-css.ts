@@ -245,14 +245,14 @@ export class CssInspector {
     return { elements: inspected.length, declarations: [...found.values()] };
   }
 
-  /** Run `fn` on the element a protocol node id names (`this` is the element), and return its JSON value. */
-  async onNode<T>(nodeId: number, fn: string): Promise<T | null> {
+  /** Run a function body on the element a protocol node id names (`this` is the element), and return its JSON value. */
+  async onNode<T>(nodeId: number, body: string): Promise<T | null> {
     try {
       const { object } = (await this.session.send("DOM.resolveNode", { nodeId })) as { object: { objectId?: string } };
       if (!object.objectId) return null;
       const { result } = (await this.session.send("Runtime.callFunctionOn", {
         objectId: object.objectId,
-        functionDeclaration: fn,
+        functionDeclaration: `function () {${body}\n}`,
         returnByValue: true,
       })) as { result: { value?: T } };
       return result.value ?? null;

@@ -325,8 +325,11 @@ export function inertCandidateProperty(property: string): boolean {
   );
 }
 
-/** The function the collector runs on each element (`this`) to read its `InertContext`. */
-export const INERT_CONTEXT_FN = `function () {
+/**
+ * The body of the function the collector runs on each element (`this`) to read its `InertContext`
+ * (a function body, as every `*_FN` script is: `onNode` wraps it).
+ */
+export const INERT_CONTEXT_FN = `
   const s = getComputedStyle(this);
   let parent = this.parentElement;
   while (parent && getComputedStyle(parent).display === "contents") parent = parent.parentElement;
@@ -342,7 +345,7 @@ export const INERT_CONTEXT_FN = `function () {
     borderStyle: { top: s.borderTopStyle, right: s.borderRightStyle, bottom: s.borderBottomStyle, left: s.borderLeftStyle },
     flexWrap: s.flexWrap,
   };
-}`;
+`;
 
 /**
  * One width inside each regime the page's width media queries make, between `min` and `max`:
