@@ -1642,7 +1642,8 @@ widths `regimeWidths` gives (read in a Chromium probe with no reset). Pure half 
 `packages/vlmkit-markup/src/inspect/reset-matrix.ts`. Rules: `every-branch`, `branch-defect` (suspect when a `none` branch
 has it, warn when only resets the page does not ship bring it), `branch-unmeasured`, `veriss-disagrees` (warn), `redirected`.
 Known answers: `fixtures/reset-matrix/` (list padding, a textarea's UA border, heading margins, a clean page), held by
-`inspect/reset-matrix.test.ts`. CI installs firefox and webkit for it. Not to re-learn:
+`inspect/reset-matrix.test.ts`, which CI runs in its own `reset-matrix` job (the only one with firefox and
+webkit). Not to re-learn:
 
 - **veriss's box paths are rooted at its `name` option**, not at a fixed `Document`: with `name: "page"` every claim read
   `page/0/0/0/0`, matched no browser box, and veriss looked wrong on the one branch it was right about. The analysis is
@@ -1656,6 +1657,10 @@ Known answers: `fixtures/reset-matrix/` (list padding, a textarea's UA border, h
 - **macOS WebKit is not veriss's WebKit**: its textarea has padding 2px 5px, so the textarea fixture overflows in
   webkit × none, normalize on a Mac and `veriss-disagrees` names webkit:none (veriss's profile was measured on Linux;
   its e2e skips controls on macOS WebKit for the same reason). The test holds that fixture on Chromium and Firefox.
+- **Firefox and WebKit stay out of the main `test` job.** Their `--with-deps` install extra system fonts, and with them
+  `motion-baseline-cli.test.ts`'s system-ui label read 45px and 54px in two runs of one job (2 of 3 CI attempts failed,
+  0 of 15 on main without them). That job's `pnpm test` sets `VLMKIT_TEST_EXCLUDE` (comma globs, read by
+  `vite.config.ts`) to leave out the three-engine file.
 - **A package's own devDependency wins resolution**: `vlmkit-markup` had `veriss ^0.1.1` from npm, so the manifest
   resolved from `packages/vlmkit-markup/src` was the release without resets and only `none` ran under vitest while the CLI
   (resolved from the root) ran all seven. Both devDependencies and both peer ranges are `^0.1.2`, the first release with

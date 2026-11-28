@@ -40,7 +40,15 @@ export default defineConfig({
       "tests/**/*.test.mjs",
       "examples/**/*.test.mjs",
     ],
-    exclude: ["**/node_modules/**", "**/dist/**", "**/.claude/**", "**/fixtures/**"],
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/.claude/**",
+      "**/fixtures/**",
+      // Comma-separated globs a CI job runs elsewhere (unit-tests.yml: check reset's three-engine test runs in
+      // its own job, so the main job keeps chromium alone). Empty by default: locally `pnpm test` runs everything.
+      ...(process.env.VLMKIT_TEST_EXCLUDE ?? "").split(",").filter(Boolean),
+    ],
 
     // Vitest 5 clears mock call history before each test. No test here relies on calls recorded
     // by setup or by an earlier test, but this keeps v4's behaviour until that has been checked.
