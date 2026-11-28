@@ -105,18 +105,18 @@ const LOADED_IMAGES_JS = `(() => {
   return { ...out };
 })()`;
 
-export async function runStatic(
-  page: Page,
-  inspector: CssInspector,
-  /** The viewport height the browser measured at: without one, veriss leaves every explicit block size Unknown. */
-  height: number,
-  widths = { min: 320, max: 1920 },
-): Promise<StaticReport | { skipped: string }> {
-  const analyzeHTML = await loadVeriss();
-  if (!analyzeHTML)
-    return {
-      skipped: `${VERISS_PACKAGE} is not installed (an optional peer): install it for the static checks over every width`,
-    };
+/** The rendered page as veriss reads it: the DOM after scripts, every sheet's text joined, the image sizes. */
+export interface RenderedInput {
+  html: string;
+  css: string;
+  sheets: SheetSpan[];
+  images: Record<string, { width: number; height: number }>;
+}
+
+/**
+ * What veriss is handed for a rendered page (shared by `check css` and `check reset`), or why it cannot be.
+ */
+export async function renderedInput(page: Page, inspector: CssInspector): Promise<RenderedInput | { skipped: string }> {
   const { texts: sheetTexts, unordered } = await inspector.sheetTexts();
   // The cascade reads sheets in document order; one whose place is not known (an @import, a constructed
   // sheet) could be put anywhere, and a later rule decides what wins: not analysed, never guessed.
@@ -137,12 +137,30 @@ export async function runStatic(
     firstFileLine: s.media ? s.firstFileLine - 1 : s.firstFileLine,
     lines: texts[i]!.split("\n").length,
   }));
+  return { html, css: texts.join("\n"), sheets, images };
+}
+
+export async function runStatic(
+  page: Page,
+  inspector: CssInspector,
+  /** The viewport height the browser measured at: without one, veriss leaves every explicit block size Unknown. */
+  height: number,
+  widths = { min: 320, max: 1920 },
+): Promise<StaticReport | { skipped: string }> {
+  const analyzeHTML = await loadVeriss();
+  if (!analyzeHTML)
+    return {
+      skipped: `${VERISS_PACKAGE} is not installed (an optional peer): install it for the static checks over every width`,
+    };
+  const input = await renderedInput(page, inspector);
+  if ("skipped" in input) return input;
+  const { html, images, sheets } = input;
   const started = performance.now();
   let r: ReturnType<AnalyzeHTML>;
   try {
     r = analyzeHTML(html, {
       name: "page",
-      css: texts.join("\n"),
+      css: input.css,
       viewport: { ...widths, height: { min: height, max: height } },
       // The files the browser loaded: veriss sizes an img by its file, never by its attributes alone.
       ...(Object.keys(images).length ? { images } : {}),

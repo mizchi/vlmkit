@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>A list that relies on the UA padding being gone</title>
+<style>
+  body { margin: 0; }
+  .card { width: 200px; background: #eef; }
+  .list { margin: 0; }
+  .item { display: block; height: 24px; background: #dde; }
+  .chip { width: 180px; height: 20px; background: #88c; }
+  /* On a phone the card is the whole width, and the chip fits whatever the list's padding. */
+  @media (max-width: 600px) { .card { width: 100%; } }
+</style>
+</head>
+<body>
+<main class="card"><ul class="list"><li class="item"><div class="chip"></div></li></ul></main>
+</body>
+</html>

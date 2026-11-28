@@ -1625,6 +1625,42 @@ browser's rules run alone. Measured building it, not to re-learn:
   not judged across widths (the output says so; `--viewport` judges one), nor when the queries make more than 16 regimes (a thinned set could leave out the one where the declaration works), and a width a query matches exactly
   (`(width: 600px)`) is always one of the samples.
 
+## Every UA × reset branch (`check reset`)
+
+```bash
+vlmkit check reset page.html                          # chromium, firefox, webkit × veriss's 7 resets = 21 branches
+vlmkit check reset page.html --uas firefox --resets none,destyle --viewports 1280,375
+```
+
+The browser-measured counterpart of veriss's static `analyzeResetMatrix` (`veriss/reset-matrix`). Each branch is one
+UA and one reset from veriss's `veriss-resets/1` manifest (`veriss/resets/manifest.json`), put in front of the page's
+sheets by an init script (`resetInitScript`: a `<style data-vlmkit-reset>` prepended to `<html>`, checked to be
+`document.styleSheets[0]` in every branch), judged by `check integrity`'s layout judges (`judgeIntegrityInstant`) at the
+widths `regimeWidths` gives (read in a Chromium probe with no reset). Pure half `@mizchi/vlmkit-judge/reset-matrix.ts`
+(`describeBranchSet` — a port of veriss's, held equal to it on all 511 subsets of a 3 × 3 space —
+`summarizeResetMatrix`, `compareVerissClaims`, `judgeResetMatrix`); browser half
+`packages/vlmkit-markup/src/inspect/reset-matrix.ts`. Rules: `every-branch`, `branch-defect` (suspect when a `none` branch
+has it, warn when only resets the page does not ship bring it), `branch-unmeasured`, `veriss-disagrees` (warn), `redirected`.
+Known answers: `fixtures/reset-matrix/` (list padding, a textarea's UA border, heading margins, a clean page), held by
+`inspect/reset-matrix.test.ts`. CI installs firefox and webkit for it. Not to re-learn:
+
+- **veriss's box paths are rooted at its `name` option**, not at a fixed `Document`: with `name: "page"` every claim read
+  `page/0/0/0/0`, matched no browser box, and veriss looked wrong on the one branch it was right about. The analysis is
+  run with `name: "Document"`; under `<html>` head and the injected reset are not boxes, below it every element counts
+  (a `<template>` too).
+- **The comparison is veriss's own e2e contract and no more**: `E_LAYOUT_ITEM_SIZE` on the inline axis against "the
+  border box sticks out past the parent's content box". veriss's silence is compared only in a branch with no Unknown;
+  a branch it left Unknown is counted, not compared. On pages with text veriss is Unknown nearly everywhere (heading
+  margins, automatic text height), so agreement is measured on box fixtures (list-padding: 42 of 42 pairs decided and
+  agreeing, 15 claims).
+- **macOS WebKit is not veriss's WebKit**: its textarea has padding 2px 5px, so the textarea fixture overflows in
+  webkit × none, normalize on a Mac and `veriss-disagrees` names webkit:none (veriss's profile was measured on Linux;
+  its e2e skips controls on macOS WebKit for the same reason). The test holds that fixture on Chromium and Firefox.
+- **A package's own devDependency wins resolution**: `vlmkit-markup` had `veriss ^0.1.1` from npm, so the manifest
+  resolved from `packages/vlmkit-markup/src` was the release without resets and only `none` ran under vitest while the CLI
+  (resolved from the root) ran all seven. Both devDependencies and both peer ranges are `^0.1.2`, the first release with
+  `veriss/reset-matrix`; with an older veriss the gate runs reset `none` alone and says so.
+
 ## Data the page was not built with (`stress data`)
 
 ```bash
@@ -2129,7 +2165,7 @@ This repository is a pnpm workspace.
 | `packages/vlmkit-judge/` | **Pure judges** (`judgeComposition`, `judgeColorRoles`, `judgeDesignPolicy`, the 15 `check integrity` judges, both `--allow` parsers, `UsageError`): snapshot in, findings out. Zero deps, no DOM / Playwright / `node:*` — `purity.test.ts` enforces it, `scene-graph.test.ts` judges a non-DOM game menu. The bottom layer (`judge ← core ← capture ← markup`); markup re-exports every moved symbol from its old path. `scene.ts` is the **scene contract** — the image-mode `--elements` JSON as `SceneElement`, plus `sceneFromTree` (engine-style local coordinates) and adapters to integrity, composition, colour and design — each reachable as `--elements` on its gate (`check color` reads `role: field | link | button`; `check design` groups by any `role`; `check composition` reads boxes, `heading`, font, and background / border / radius as a group's painted edge; `check copy` sorts drawn strings with the page's invisible-reason classes from `opacity` / `color` / `background`, the judgement itself in `copy.ts`); `integrity-image.ts` is only its file-reading half. `a11y-tree.ts` is the second contract, for what a platform *announces* rather than paints — `vlmkit-a11y/1`, judged by `check a11y tree` with contrast read from the frame's pixels. `color.ts` is the page's colour arithmetic as pure functions, and `vlmkit-markup/src/contrast-parity.test.ts` holds the two to each other (functions over a grid, and the real `COLLECT_TEXT_CONTRAST` vs the scene adapter on one page). Rule: the collector resolves colours, the judge composites and measures. Both DOM contrast collectors follow it: `COLLECT_TEXT_CONTRAST` ships `TextContrastSample`s (colour, background layers, opacity, font) to `textContrastCandidates`, and `COLLECT_COLOR_ROLES` ships `ControlSample` / `LinkSample` to `controlBoundary` / `linkCue`; each move was proven by byte-identical `--json` on 15-16 pages. `pbt.ts` is the property-based search (seeded generator, greedy shrink, failing-interval bisection, ddmin) and `responsive.ts` the viewport space it searches for `check responsive` — both pure, both usable for any property with an async oracle. `frames.ts` is the `vlmkit-frames/1` contract and its time grammar, and `storyboard.ts` segments such a sequence into states and events over any `FramePixels` (`snapshot storyboard`); `flash.ts` and `flash-motion.ts` are WCAG 2.3.1's arithmetic over one (`check flash`). Plan for the rest of the split: `docs/design/package-decomposition.md`. |
 | `packages/vlmkit-core/` | Image / CSS / DOM / a11y diff engine + shared types and CLI helpers. No Playwright or AI deps required to import core types. |
 | `packages/vlmkit-core/src/plugin/` | **Gate plugin runtime**: the contract (`defineGate` / `definePlugin`), rule tables and settings, the registry, and the core runner that owns `--help` / `--json` / `--advisory` / the run ledger / the exit code. Core never imports a gate — definitions are handed to it. |
-| `packages/vlmkit-markup/src/gates/` | Gate definitions (`*.gate.ts`) + the main built-in plugin (`index.ts`) — 36 of the 38 gates. Wraps existing measurement code; adding a gate is `defineGate` + one line in `index.ts`. |
+| `packages/vlmkit-markup/src/gates/` | Gate definitions (`*.gate.ts`) + the main built-in plugin (`index.ts`) — 37 of the 39 gates. Wraps existing measurement code; adding a gate is `defineGate` + one line in `index.ts`. |
 | `packages/vlmkit-capture/src/gates/`, `src/gates/` | The other two built-in plugins: `check crater` (capture) and `check perf` (app-side). Composed by `src/cli/gate-registry.ts` alongside any `vlmkit.config.json` `"plugins"`. |
 | `packages/vlmkit-capture/` | Playwright / Crater capture infrastructure, viewport discovery, prescanner. |
 | `packages/vlmkit-ai/` | VLM / LLM clients, reasoning pipeline, NLP helpers. |
@@ -2232,7 +2268,7 @@ case at 0.23.0.
 | `docs/reports/2026-08-06-gate-rule-cost-bench.md` | Measured gate/rule execution cost: where a ruleset's time goes, why per-rule cost is attributed rather than isolated, why suppression saves nothing |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
 | `docs/design/package-decomposition.md` | **Splitting vlmkit by layer** (collector / pure judge / driver / loop / diagrams): what was measured, phase 1 (`vlmkit-judge`) and the proposed phases 2-5 |
-| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 38 gates + 254 rules, behavior changes, what is deliberately not a gate |
+| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 39 gates + 259 rules, behavior changes, what is deliberately not a gate |
 | `docs/design/moonbit-boundary.md` | **TS ↔ MoonBit boundary**: what the positional FFI costs (61 commands, 233 args, 2 duplicated dispatch tables), the JSON boundary that replaces it for new logic, how to add a command, and which pure logic belongs in MoonBit versus which deliberately does not |
 | `docs/crater-css-status.md` | Crater CSS rendering verification status |
 | `docs/reset-css-comparison.md` | Reset CSS domain knowledge |

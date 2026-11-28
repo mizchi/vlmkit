@@ -69,7 +69,8 @@ jobs:
       # `markup-core-dispatch` and `markup-core-injection` need the MoonBit
       # build specifically, so `moon` has to be on PATH before `build:packages`
       # (otherwise: `spawnSync moon ENOENT`).
-      - run: pnpm exec playwright install --with-deps chromium
+      # firefox and webkit: check reset renders every UA × reset branch (reset-matrix.test.ts).
+      - run: pnpm exec playwright install --with-deps chromium firefox webkit
 
       - name: Install MoonBit
         run: |

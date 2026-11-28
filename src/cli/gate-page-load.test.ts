@@ -143,8 +143,8 @@ describe("page-load options on the gates that navigate", () => {
     // 24 → 25 `check composition`, 25 → 26 `check color`, 26 → 27 `scan style`,
     // 27 → 28 `scan a11y`, whose source is a page or a uiautomator dump,
     // 28 → 29 `check responsive`, 29 → 30 `check flash`, 30 → 31 `stress data`, 31 → 32 `check mobile`,
-    // 32 → 33 `check css`.)
-    assert.equal(gates.length, 33, gates.map(command).join(", "));
+    // 32 → 33 `check css`, 33 → 34 `check reset`.)
+    assert.equal(gates.length, 34, gates.map(command).join(", "));
 
     const missing: string[] = [];
     for (const gate of gates) {

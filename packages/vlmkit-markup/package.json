@@ -66,7 +66,7 @@
   },
   "peerDependencies": {
     "playwright": ">=1.61 <2",
-    "veriss": "^0.1.1"
+    "veriss": "^0.1.2"
   },
   "peerDependenciesMeta": {
     "veriss": {
@@ -74,6 +74,6 @@
     }
   },
   "devDependencies": {
-    "veriss": "^0.1.1"
+    "veriss": "^0.1.2"
   }
 }

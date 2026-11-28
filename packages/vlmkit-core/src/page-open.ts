@@ -373,6 +373,11 @@ export interface OpenPageOptions {
   animationCapMs?: number;
   /** Skip settling entirely (a gate that measures load timing does its own). */
   skipSettle?: boolean;
+  /**
+   * Scripts run in every document before the page's own (`page.addInitScript`). `check reset` puts a reset
+   * stylesheet in front of the page's sheets with one.
+   */
+  initScripts?: readonly string[];
 }
 
 export interface OpenedPage {
@@ -403,6 +408,7 @@ function pageOptions(options: OpenPageOptions) {
  */
 export async function openSource(browser: Browser, source: string, options: OpenPageOptions = {}): Promise<OpenedPage> {
   const page = await browser.newPage(pageOptions(options));
+  for (const script of options.initScripts ?? []) await page.addInitScript(script);
   await applyHar(page, options.har);
   await page.goto(sourceToUrl(source), {
     waitUntil: options.waitUntil ?? "networkidle",

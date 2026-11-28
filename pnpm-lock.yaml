@@ -89,8 +89,8 @@ importers:
         specifier: ^0.187.0
         version: 0.187.0
       veriss:
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.1.2
+        version: 0.1.2
       vite-plus:
         specifier: 1.8.0
         version: 1.8.0(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1(@vitest/browser@5.1.1)(vitest@5.1.1))(@vitest/ui@5.1.1(vitest@5.1.1))(esbuild@0.28.2)(playwright@1.65.1)(tsx@4.23.15)(typescript@6.0.3)(unrun@0.2.34(@emnapi/core@2.0.0-beta.2)(@emnapi/runtime@2.0.0-beta.2))
@@ -212,8 +212,8 @@ importers:
         version: 7.0.0
     devDependencies:
       veriss:
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.1.2
+        version: 0.1.2
 
   packages/vlmkit-mcp:
     dependencies:
@@ -1849,8 +1849,8 @@ packages:
     resolution: {integrity: sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg==}
     engines: {node: '>= 0.8'}
 
-  veriss@0.1.1:
-    resolution: {integrity: sha512-0+l9gIwknv2oICItq41zEovv7BaxWVvTVIPgheC5yzqPsXYgw9IXrZTHCK1OH4Mr4kHiDY4kyHs2ZYEbP5kebg==}
+  veriss@0.1.2:
+    resolution: {integrity: sha512-+frbTaqQvUMWds5cx9fddwHcWqs1zxUtWOf6yKjRE7I7SCZ1u47PbO47aaJ68JcvUM7rODsiaA8IEa5yTs8xAg==}
     engines: {node: '>=24'}
 
   vite-plus@1.8.0:
@@ -3247,7 +3247,7 @@ snapshots:
 
   vary@1.1.2: {}
 
-  veriss@0.1.1:
+  veriss@0.1.2:
     dependencies:
       css-tree: 3.2.1
       parse5: 8.0.1

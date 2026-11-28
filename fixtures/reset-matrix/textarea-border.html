@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>A content-box textarea in a 106px column at the page's right edge</title>
+<style>
+  body { margin: 0; }
+  .row { display: flex; justify-content: flex-end; }
+  .col { width: 106px; }
+  /* 100px of content: Chromium's UA padding 2px and border 1px make it 106px wide. */
+  .note { display: block; inline-size: 100px; block-size: 40px; resize: none; }
+</style>
+</head>
+<body>
+<main class="row"><div class="col"><textarea class="note" aria-label="Note"></textarea></div></main>
+</body>
+</html>
