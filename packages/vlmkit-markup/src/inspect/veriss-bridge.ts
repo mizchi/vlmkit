@@ -77,22 +77,32 @@ const RENDERED_HTML_JS = `(() => {
  * candidate that loaded) as written in the attribute. An image still loading, broken, or lazy and not yet requested
  * is left out, so veriss keeps a size that depends on it Unknown rather than trusting the width/height attributes.
  */
+/** The most image sizes veriss 0.1 accepts in `images` (more is an invalid option, and the whole report is lost). */
+const MAX_IMAGES = 1024;
 const LOADED_IMAGES_JS = `(() => {
-  const out = {};
-  const put = (key, img) => { if (key && !(key in out)) out[key] = { width: img.naturalWidth, height: img.naturalHeight }; };
+  // A null-prototype map: an image named "constructor" is a key like any other.
+  const out = Object.create(null);
+  let count = 0;
+  const put = (key, img) => {
+    if (!key || Object.prototype.hasOwnProperty.call(out, key) || count >= ${MAX_IMAGES}) return;
+    out[key] = { width: img.naturalWidth, height: img.naturalHeight }; count++;
+  };
+  // An unused candidate may hold a URL the browser never parsed (it skipped that source): ignore it alone.
+  const href = url => { try { return new URL(url, document.baseURI).href; } catch { return null; } };
   for (const img of document.images) {
     if (!img.complete || !(img.naturalWidth > 0) || !(img.naturalHeight > 0)) continue;
     const src = img.getAttribute("src");
-    if (src !== null && !img.getAttribute("srcset") && !(img.parentElement && img.parentElement.localName === "picture")) { put(src, img); continue; }
+    const picture = img.parentElement && img.parentElement.localName === "picture";
+    if (src !== null && !img.getAttribute("srcset") && !picture) { put(src, img); continue; }
     // A srcset (or a <picture> source): only the candidate that loaded is known.
-    const lists = [img.getAttribute("srcset"), ...(img.parentElement && img.parentElement.localName === "picture" ? [...img.parentElement.querySelectorAll("source")].map(s => s.getAttribute("srcset")) : [])];
+    const lists = [img.getAttribute("srcset"), ...(picture ? [...img.parentElement.querySelectorAll("source")].map(s => s.getAttribute("srcset")) : [])];
     for (const list of lists) for (const candidate of String(list || "").split(",")) {
       const url = candidate.trim().split(/\\s+/)[0];
-      if (url && new URL(url, document.baseURI).href === img.currentSrc) put(url, img);
+      if (url && href(url) === img.currentSrc) put(url, img);
     }
-    if (src !== null && new URL(src, document.baseURI).href === img.currentSrc) put(src, img);
+    if (src !== null && href(src) === img.currentSrc) put(src, img);
   }
-  return out;
+  return { ...out };
 })()`;
 
 export async function runStatic(
@@ -115,7 +125,11 @@ export async function runStatic(
       skipped: `${unordered} stylesheet(s) have no owner element (an @import or a constructed sheet), so their place in the cascade is not known: static analysis skipped`,
     };
   const html = (await page.evaluate(RENDERED_HTML_JS)) as string;
-  const images = (await page.evaluate(LOADED_IMAGES_JS)) as Record<string, { width: number; height: number }>;
+  // Without the sizes every img sized by its file stays Unknown: a failure here costs precision, never the report.
+  const images = ((await page.evaluate(LOADED_IMAGES_JS).catch(() => ({}))) ?? {}) as Record<
+    string,
+    { width: number; height: number }
+  >;
   // A sheet with a media condition goes in under it, one line before its own first line.
   const texts = sheetTexts.map((s) => (s.media ? `@media ${s.media} {\n${s.text}\n}` : s.text));
   const sheets: SheetSpan[] = sheetTexts.map((s, i) => ({
