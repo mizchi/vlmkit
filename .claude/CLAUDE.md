@@ -1616,6 +1616,11 @@ browser's rules run alone. Measured building it, not to re-learn:
   `<link>` kept as an empty `<template>` where they were (removed, `:first-child` moved; left empty, veriss cannot lay
   them out). A sheet with no owner element (an `@import`, a constructed sheet) has no known place in the cascade, so
   the static half is skipped there and says so.
+- **veriss is given the natural size of every image the page loaded** (`images`, keyed by the `src` or the `srcset`
+  candidate as written). veriss 0.1.1 trusts an img's `width` / `height` attributes only under `trustImageAttributes`
+  (the attribute ratio holds until the file loads), so without the sizes an img sized by its ratio is `U_LAYOUT_IMAGE`;
+  with them it is decided from the file, and a file whose ratio differs from the attributes is `E_LAYOUT_IMAGE_RATIO`.
+  An image still loading, broken or lazy and not yet requested is left out (Unknown, never the attributes).
 - `regimeWidths` gives no widths when a width query is not a px / em / rem number (a `calc()`, a `vw`): inert is then
   not judged across widths (the output says so; `--viewport` judges one), nor when the queries make more than 16 regimes (a thinned set could leave out the one where the declaration works), and a width a query matches exactly
   (`(width: 600px)`) is always one of the samples.

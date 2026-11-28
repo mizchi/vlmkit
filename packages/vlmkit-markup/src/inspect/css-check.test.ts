@@ -123,4 +123,22 @@ describe("check css on fixtures/css-check", () => {
       JSON.stringify(control),
     );
   });
+
+  // The browser knows each loaded image's natural size; veriss is given it (`images`), so an img sized by its file's
+  // ratio is decided instead of Unknown (veriss trusts width/height attributes only under trustImageAttributes).
+  it("veriss gets the natural size of every image the page loaded", T, async () => {
+    const dir = mkdtempSync(join(tmpdir(), "css-check-images-"));
+    const square =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+    const file = join(dir, "img.html");
+    writeFileSync(
+      file,
+      `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>img</title><style>*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}img{display:block;width:120px;height:auto}</style></head><body><img src="${square}" width="120" height="30" alt="a square"></body></html>`,
+    );
+    const r = await runCssCheck({ source: file });
+    assert.ok(!("skipped" in r.static), JSON.stringify(r.static));
+    const s = r.static as { unknown: Record<string, number>; images: number };
+    assert.equal(s.unknown.U_LAYOUT_IMAGE, undefined, JSON.stringify(s.unknown));
+    assert.equal(s.images, 1);
+  });
 });

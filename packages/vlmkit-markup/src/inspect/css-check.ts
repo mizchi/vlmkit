@@ -248,7 +248,7 @@ export function formatCssCheckReport(report: CssCheckReport, rules?: RuleView): 
     `${DIM}declarations are judged where a rule matches now; rules under a media query that does not match at this viewport are not read${RESET}`,
     "skipped" in report.static
       ? `${YELLOW}static analysis skipped:${RESET} ${report.static.skipped}`
-      : `${DIM}veriss (static, every width 320-1920px): ${report.static.status} in ${report.static.ms}ms, ${report.static.warnings.length} warning(s) read${
+      : `${DIM}veriss (static, every width 320-1920px): ${report.static.status} in ${report.static.ms}ms, ${report.static.warnings.length} warning(s) read${report.static.images ? `, ${report.static.images} image size(s) from the files the page loaded` : ""}${
           Object.keys(report.static.unknown).length
             ? `; could not decide: ${Object.entries(report.static.unknown)
                 .map(([c, n]) => `${c} x${n}`)
