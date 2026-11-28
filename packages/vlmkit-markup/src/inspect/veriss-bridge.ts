@@ -26,6 +26,8 @@ export interface StaticReport {
   sheets: SheetSpan[];
   /** veriss's Unknown reasons, by code, with a count: what it could not decide. */
   unknown: Record<string, number>;
+  /** How many image files the page loaded and veriss was given the natural size of. */
+  images: number;
   ms: number;
 }
 
@@ -70,6 +72,39 @@ const RENDERED_HTML_JS = `(() => {
   return "<!doctype html>" + root.outerHTML;
 })()`;
 
+/**
+ * The natural size of every image file the page has loaded, keyed as veriss reads it: the `src` (or the `srcset`
+ * candidate that loaded) as written in the attribute. An image still loading, broken, or lazy and not yet requested
+ * is left out, so veriss keeps a size that depends on it Unknown rather than trusting the width/height attributes.
+ */
+/** The most image sizes veriss 0.1 accepts in `images` (more is an invalid option, and the whole report is lost). */
+const MAX_IMAGES = 1024;
+const LOADED_IMAGES_JS = `(() => {
+  // A null-prototype map: an image named "constructor" is a key like any other.
+  const out = Object.create(null);
+  let count = 0;
+  const put = (key, img) => {
+    if (!key || Object.prototype.hasOwnProperty.call(out, key) || count >= ${MAX_IMAGES}) return;
+    out[key] = { width: img.naturalWidth, height: img.naturalHeight }; count++;
+  };
+  // An unused candidate may hold a URL the browser never parsed (it skipped that source): ignore it alone.
+  const href = url => { try { return new URL(url, document.baseURI).href; } catch { return null; } };
+  for (const img of document.images) {
+    if (!img.complete || !(img.naturalWidth > 0) || !(img.naturalHeight > 0)) continue;
+    const src = img.getAttribute("src");
+    const picture = img.parentElement && img.parentElement.localName === "picture";
+    if (src !== null && !img.getAttribute("srcset") && !picture) { put(src, img); continue; }
+    // A srcset (or a <picture> source): only the candidate that loaded is known.
+    const lists = [img.getAttribute("srcset"), ...(picture ? [...img.parentElement.querySelectorAll("source")].map(s => s.getAttribute("srcset")) : [])];
+    for (const list of lists) for (const candidate of String(list || "").split(",")) {
+      const url = candidate.trim().split(/\\s+/)[0];
+      if (url && href(url) === img.currentSrc) put(url, img);
+    }
+    if (src !== null && href(src) === img.currentSrc) put(src, img);
+  }
+  return { ...out };
+})()`;
+
 export async function runStatic(
   page: Page,
   inspector: CssInspector,
@@ -90,6 +125,11 @@ export async function runStatic(
       skipped: `${unordered} stylesheet(s) have no owner element (an @import or a constructed sheet), so their place in the cascade is not known: static analysis skipped`,
     };
   const html = (await page.evaluate(RENDERED_HTML_JS)) as string;
+  // Without the sizes every img sized by its file stays Unknown: a failure here costs precision, never the report.
+  const images = ((await page.evaluate(LOADED_IMAGES_JS).catch(() => ({}))) ?? {}) as Record<
+    string,
+    { width: number; height: number }
+  >;
   // A sheet with a media condition goes in under it, one line before its own first line.
   const texts = sheetTexts.map((s) => (s.media ? `@media ${s.media} {\n${s.text}\n}` : s.text));
   const sheets: SheetSpan[] = sheetTexts.map((s, i) => ({
@@ -104,6 +144,8 @@ export async function runStatic(
       name: "page",
       css: texts.join("\n"),
       viewport: { ...widths, height: { min: height, max: height } },
+      // The files the browser loaded: veriss sizes an img by its file, never by its attributes alone.
+      ...(Object.keys(images).length ? { images } : {}),
       // A shorthand beside its own longhand is how hand-written CSS overrides one side: a warning, and laid out.
       shorthandConflicts: "warning",
     });
@@ -133,6 +175,7 @@ export async function runStatic(
     ),
     sheets,
     unknown,
+    images: Object.keys(images).length,
     ms: Math.round(performance.now() - started),
   };
 }

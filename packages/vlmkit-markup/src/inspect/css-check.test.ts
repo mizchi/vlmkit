@@ -123,4 +123,61 @@ describe("check css on fixtures/css-check", () => {
       JSON.stringify(control),
     );
   });
+
+  // The browser knows each loaded image's natural size; veriss is given it (`images`), so an img sized by its file's
+  // ratio is decided instead of Unknown (veriss trusts width/height attributes only under trustImageAttributes).
+  it("veriss gets the natural size of every image the page loaded", T, async () => {
+    const dir = mkdtempSync(join(tmpdir(), "css-check-images-"));
+    const square =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+    const file = join(dir, "img.html");
+    writeFileSync(
+      file,
+      `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>img</title><style>*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}img{display:block;width:120px;height:auto}</style></head><body><img src="${square}" width="120" height="30" alt="a square"></body></html>`,
+    );
+    const r = await runCssCheck({ source: file });
+    assert.ok(!("skipped" in r.static), JSON.stringify(r.static));
+    const s = r.static as { unknown: Record<string, number>; images: number };
+    assert.equal(s.unknown.U_LAYOUT_IMAGE, undefined, JSON.stringify(s.unknown));
+    assert.equal(s.images, 1);
+  });
+
+  it("image sizes: own keys only, invalid candidate URLs skipped, at most what veriss accepts", T, async () => {
+    const dir = mkdtempSync(join(tmpdir(), "css-check-images-edge-"));
+    const png = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+      "base64",
+    );
+    writeFileSync(join(dir, "constructor"), png);
+    const page = (name: string, body: string) => {
+      const file = join(dir, `${name}.html`);
+      writeFileSync(
+        file,
+        `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${name}</title><style>*{margin:0}html,body{display:grid;grid-template-columns:minmax(0,1fr)}img{display:block;width:10px;height:10px}</style></head><body>${body}</body></html>`,
+      );
+      return file;
+    };
+    const statics = async (file: string) => {
+      const r = await runCssCheck({ source: file });
+      assert.ok(!("skipped" in r.static), JSON.stringify(r.static));
+      return r.static as { images: number; status: string };
+    };
+    // A file named like an Object.prototype member is still an image.
+    assert.equal((await statics(page("proto", `<img src="constructor" alt="x">`))).images, 1);
+    // An unused <picture> source with an invalid URL does not stop the check.
+    assert.equal(
+      (
+        await statics(
+          page(
+            "bad-url",
+            `<picture><source media="(min-width: 99999px)" srcset="http://[ 1x"><img src="constructor" alt="x"></picture>`,
+          ),
+        )
+      ).images,
+      1,
+    );
+    // More loaded images than veriss accepts (1024): the first 1024 are given, the rest stay Unknown, the report stays.
+    const many = Array.from({ length: 1030 }, (_, i) => `<img src="constructor?${i}" alt="x">`).join("");
+    assert.equal((await statics(page("many", many))).images, 1024);
+  });
 });
