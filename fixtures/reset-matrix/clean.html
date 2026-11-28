@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>A card that sets what it depends on</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.4 sans-serif; color: #111; background: #fff; }
+  .card { max-width: 360px; margin: 16px; padding: 12px; border: 2px solid #335; background: #fff; }
+  .title { margin: 0 0 8px; font-size: 20px; line-height: 1.2; }
+  .list { margin: 0 0 8px; padding: 0 0 0 20px; }
+  .note { display: block; width: 100%; height: 48px; margin: 0; padding: 4px; border: 1px solid #335; font: inherit; resize: none; }
+</style>
+</head>
+<body>
+<main class="card">
+  <h2 class="title">Shopping list</h2>
+  <ul class="list"><li>Milk</li><li>Bread</li></ul>
+  <textarea class="note" aria-label="Note"></textarea>
+</main>
+</body>
+</html>

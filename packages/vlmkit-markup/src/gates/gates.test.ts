@@ -45,6 +45,7 @@ describe("markup gate plugin", () => {
         "check layout",
         "check mobile",
         "check motion",
+        "check reset",
         "check responsive",
         "check scroll",
         "check story",

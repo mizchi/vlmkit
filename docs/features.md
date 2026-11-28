@@ -5,7 +5,7 @@ measures it, and says what is wrong and where. Nothing here needs an API key unl
 **[key]**. Optional AI assists are marked **[opt key]**: they add something on top of a
 deterministic result and are never needed for it.
 
-There are **38 gates** with **254 tunable rules** (`vlmkit rules` lists them). A gate is a command
+There are **39 gates** with **259 tunable rules** (`vlmkit rules` lists them). A gate is a command
 with a verdict and an exit code: 0 clean, 1 a finding, 2 a usage error. The other commands
 produce artifacts, run loops or wire vlmkit into other tools. `tests/features-doc.test.mjs` fails
 when a command exists that this page does not name, or when the counts above drift.
@@ -23,6 +23,7 @@ every flag, read [`cli-reference.md`](./cli-reference.md).
 | `vlmkit check layout <page> --contract c.json` | A brief's structure per viewport: widths, items per row, stacking order |
 | `vlmkit check a11y contrast` · `check a11y touch` · `check a11y focus` | WCAG AA contrast, touch-target size, focus order and traps |
 | `vlmkit check css <page>` | CSS the browser silently ignores, decided by Chromium itself: declarations it dropped as invalid (`calc(100%-10px)`, `width: 100`, a misspelt property), `@media` it cannot evaluate (an unknown feature), and declarations it applies that do nothing where they are (`top` on a static box, `flex` under a grid), confirmed by removing them. With [veriss](https://github.com/mizchi/veriss) installed (optional), its static checks over every width too (`static-css`) |
+| `vlmkit check reset <page>` | The page under every initial state a browser and a reset stylesheet give it: Chromium, Firefox and WebKit × the resets in veriss's manifest (none, modern-normalize, normalize, sanitize, josh-comeau, tailwind-preflight, destyle; with veriss 0.1.2 or later installed — without it, or when its manifest cannot be read, only `none` runs), each put before the page's own sheets, judged by `check integrity`'s layout judges at each width regime. A defect only in some branches is named by the smallest UA × reset product (`firefox × none`); with veriss installed, its `analyzeResetMatrix` on the same branches is held against the drawn boxes (`veriss-disagrees`) |
 | `vlmkit check perf <page>` | Web Vitals thresholds (CLS, LCP, FCP) |
 | `vlmkit check crater` | Whether the Crater BiDi rendering backend answers (only when you render through Crater) |
 

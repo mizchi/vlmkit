@@ -100,7 +100,7 @@
     "@vitest/coverage-v8": "5.1.1",
     "playwright": "1.65.1",
     "three": "^0.187.0",
-    "veriss": "^0.1.1",
+    "veriss": "^0.1.2",
     "vite-plus": "1.8.0"
   },
   "dependencies": {
@@ -116,7 +116,7 @@
     "@jsquash/webp": "^1",
     "@playwright/test": ">=1.61 <2",
     "playwright": ">=1.61 <2",
-    "veriss": "^0.1.1"
+    "veriss": "^0.1.2"
   },
   "peerDependenciesMeta": {
     "@playwright/test": {

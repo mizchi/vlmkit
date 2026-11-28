@@ -34,7 +34,7 @@ describe("composed built-in registry", () => {
     // createGateRegistry throws on a conflict, so reaching this line is the
     // assertion; the count guards against a plugin silently dropping out.
     const r = await registry();
-    assert.equal(r.list().length, 38);
+    assert.equal(r.list().length, 39);
   });
 
   it("keeps each gate id in step with its command path", async () => {
@@ -286,7 +286,9 @@ describe("composed built-in registry", () => {
     //       `keyboard-covers-input`, `safe-area-overlap`.
     // 248 → 253: `check css`: `dropped-declaration`, `unknown-media-feature`, `vendor-declaration-dropped`,
     //       `inert-declaration`, `static-css` (veriss's findings, when it is installed), and `redirected`.
-    assert.equal(total, 254);
+    // 254 → 259: `check reset` (every UA × reset branch): `every-branch`, `branch-defect`,
+    //       `branch-unmeasured`, `veriss-disagrees`, and `redirected`.
+    assert.equal(total, 259);
   });
 
   it("tracks which gates render their own rule settings, and which still cannot", async () => {
@@ -335,6 +337,7 @@ describe("composed built-in registry", () => {
       "check.mobile",
       "check.motion",
       "check.perf",
+      "check.reset",
       "check.responsive",
       "check.scroll",
       "check.story",

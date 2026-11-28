@@ -548,6 +548,7 @@ vlmkit check auto          <html|url>          # load once, see what the page ha
 vlmkit check a11y contrast <html|url>          # WCAG AA contrast scan
 vlmkit check a11y touch    <html|url>          # Touch target size (WCAG 2.5.8 AA default, 2.5.5 AAA via --level)
 vlmkit check css           <html|url>          # Declarations Chromium dropped or that do nothing; @media with an unknown feature; with veriss, static CSS mistakes over all widths
+vlmkit check reset         <html|url>          # Every UA (chromium/firefox/webkit) × reset (veriss manifest) branch, judged by integrity; branch-only defects named by UA × reset; with veriss, its reset matrix vs the drawn boxes
 vlmkit check mobile        <html|url>          # As a touch phone: zoom allowed, carousels snap, keyboard leaves the field visible, safe-area insets
 vlmkit check a11y focus    <html|url>          # Tab order vs visual order
 vlmkit check a11y tree     <a11y.json>         # No DOM: names, reach, pixel contrast, target size from a platform's

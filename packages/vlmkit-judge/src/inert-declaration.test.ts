@@ -196,6 +196,11 @@ describe("inert across widths", () => {
     assert.deepEqual(regimeWidths(breakpoints, 320, 1920, 5), []);
     assert.equal(regimeWidths(breakpoints, 320, 1920, 21).length, 21);
   });
+  it("a query at the range's own edge still splits it: 320 and 1920 are kept as regime boundaries", () => {
+    // (max-width: 320px) matches at 320 and nowhere above: one desktop width (the no-query answer) never sees it.
+    assert.deepEqual(regimeWidths(["(max-width: 320px)"]), [320, 1920]);
+    assert.deepEqual(regimeWidths(["(min-width: 1920px)"]), [320, 1920]);
+  });
   it("a width the query matches exactly is a sample of its own", () => {
     // (width: 600px) matches at 600 only: neither side's middle shows it.
     assert.ok(regimeWidths(["(width: 600px)"]).includes(600));
