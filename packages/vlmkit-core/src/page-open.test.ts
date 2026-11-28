@@ -180,3 +180,16 @@ describe("settlePage waits for finite animations", () => {
     await page.close();
   });
 });
+
+describe("openSource on a failed navigation", () => {
+  it("closes the page it opened and rethrows, so a reused browser does not collect dead pages", async () => {
+    const browser = await launchBrowser();
+    try {
+      const missing = join(mkdtempSync(join(tmpdir(), "open-fail-")), "missing.html");
+      await assert.rejects(openSource(browser, missing, { timeout: 10_000 }));
+      assert.equal(browser.contexts().length, 0);
+    } finally {
+      await browser.close();
+    }
+  });
+});

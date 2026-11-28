@@ -154,6 +154,8 @@ export interface MatrixFinding {
   summary: string;
   /** Found in a `none` branch: the page as it ships breaks in that browser, whatever reset a host adds. */
   withoutReset: boolean;
+  /** Some `none` branch was measured, so "not without a reset" is shown rather than assumed. */
+  noneMeasured: boolean;
 }
 
 export interface ResetMatrixSummary {
@@ -168,7 +170,10 @@ export interface ResetMatrixSummary {
 export function summarizeResetMatrix(runs: readonly BranchRun[], space: BranchSpace): ResetMatrixSummary {
   const measured = runs.filter((r) => r.status === "measured");
   const unmeasured = runs.filter((r) => r.status !== "measured");
-  const byKey = new Map<string, Omit<MatrixFinding, "absent" | "unmeasured" | "where" | "summary" | "withoutReset">>();
+  const byKey = new Map<
+    string,
+    Omit<MatrixFinding, "absent" | "unmeasured" | "where" | "summary" | "withoutReset" | "noneMeasured">
+  >();
   for (const run of measured)
     for (const f of run.findings) {
       const key = findingKey(f);
@@ -207,6 +212,7 @@ export function summarizeResetMatrix(runs: readonly BranchRun[], space: BranchSp
       unmeasured: unmeasured.map((r) => r.id),
       ...describeBranchSet(e.in, analysed),
       withoutReset: e.in.some((id) => id.endsWith(":none")),
+      noneMeasured: measured.some((r) => r.reset === "none"),
     };
     (e.in.length === measured.length ? holdsEverywhere : onlyIn).push(out);
   }
@@ -318,6 +324,8 @@ export function compareVerissClaims(
       row.decided++;
     }
     const unmapped = new Set(drawn.unmapped);
+    // A claim whose box could not be found in the browser leaves the pair unchecked there: never "agrees on every box".
+    const incomplete = c.overflows.some((o) => unmapped.has(o.path));
     const said = new Map(c.overflows.map((o) => [o.path, o]));
     const seen = new Map(drawn.overflows.map((o) => [o.path, o]));
     const paths = [...new Set([...said.keys(), ...(c.decided ? seen.keys() : [])])].filter((p) => !unmapped.has(p));
@@ -343,7 +351,7 @@ export function compareVerissClaims(
           : `the browser draws ${b!.label} ${b!.amount}px past its parent's content box; veriss decided the branch and reports no E_LAYOUT_ITEM_SIZE for it`,
       });
     }
-    if (c.decided && out.disagreements.length === before) {
+    if (c.decided && !incomplete && out.disagreements.length === before) {
       out.agreedPairs++;
       row.agreedPairs++;
     }
@@ -383,10 +391,24 @@ const widthsText = (w: Record<string, number[]>) => {
 export function judgeResetMatrix(input: {
   summary: ResetMatrixSummary;
   veriss?: VerissComparison | null;
+  /** The probe's redirect (Chromium, no reset). */
   redirect?: string | null;
+  /** Redirects the measured branches saw, by branch. */
+  redirects?: readonly { id: string; message: string }[];
 }): ResetMatrixFinding[] {
   const out: ResetMatrixFinding[] = [];
   if (input.redirect) out.push({ rule: "redirected", severity: "suspect", message: input.redirect });
+  // A redirect a measured branch saw: that branch judged another page (a login wall in one engine only).
+  const byMessage = new Map<string, string[]>();
+  for (const r of input.redirects ?? []) byMessage.set(r.message, [...(byMessage.get(r.message) ?? []), r.id]);
+  for (const [message, ids] of byMessage)
+    if (message !== input.redirect)
+      out.push({
+        rule: "redirected",
+        severity: "suspect",
+        message: `${ids.join(", ")}: ${message}`,
+        evidence: { in: ids },
+      });
   const { summary } = input;
   for (const f of summary.holdsEverywhere)
     out.push({
@@ -400,8 +422,9 @@ export function judgeResetMatrix(input: {
     const first = f.in[0]!;
     out.push({
       rule: "branch-defect",
-      severity: f.severity === "fail" && f.withoutReset ? "suspect" : "warn",
-      message: `[${f.kind}] only in ${f.summary} (${f.in.length} of ${summary.space.measured} branches) at ${widthsText(f.widths)}: ${f.messages[first]}${f.withoutReset ? "" : " — not in any branch without a reset: it breaks where a host page adds one of these resets"}`,
+      // Without a measured `none` branch the page as it ships is unknown: the finding is not downgraded.
+      severity: f.severity === "fail" && (f.withoutReset || !f.noneMeasured) ? "suspect" : "warn",
+      message: `[${f.kind}] only in ${f.summary} (${f.in.length} of ${summary.space.measured} branches) at ${widthsText(f.widths)}: ${f.messages[first]}${f.withoutReset ? "" : f.noneMeasured ? " — not in any branch without a reset: it breaks where a host page adds one of these resets" : " — no branch without a reset was measured, so whether the page breaks as it ships is not known"}`,
       ...(f.selector ? { selector: f.selector } : {}),
       evidence: {
         kind: f.kind,
@@ -412,6 +435,7 @@ export function judgeResetMatrix(input: {
         unmeasured: f.unmeasured,
         widths: f.widths,
         withoutReset: f.withoutReset,
+        noneMeasured: f.noneMeasured,
       },
     });
   }

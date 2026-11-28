@@ -214,6 +214,14 @@ async function judgeBranch(page: Page, width: number) {
   });
 }
 
+/**
+ * How a failed launch counts: `skipped` only for an engine Playwright says is not installed (the diagnosed
+ * `BrowserLaunchError`); anything else (an engine that cannot load its libraries, a crash) fails the branches.
+ */
+export function launchFailureStatus(error: unknown): "skipped" | "failed" {
+  return error instanceof Error && error.name === "BrowserLaunchError" ? "skipped" : "failed";
+}
+
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e)).split("\n")[0]!.slice(0, 300);
 
 export async function runResetMatrix(options: ResetMatrixOptions): Promise<ResetMatrixReport> {
@@ -330,20 +338,23 @@ export async function runResetMatrix(options: ResetMatrixOptions): Promise<Reset
   // The branches.
   const branches: ResetMatrixReport["branches"] = [];
   const boxes: BrowserBranchBoxes[] = [];
+  const redirects: { id: string; message: string }[] = [];
   for (const ua of uas) {
     let browser: Browser | undefined;
     let launchError: string | undefined;
+    let launchStatus: "skipped" | "failed" = "skipped";
     try {
       browser = await launchBrowser({ engine: ua });
     } catch (e) {
       launchError = message(e);
+      launchStatus = launchFailureStatus(e);
     }
     try {
       for (const reset of resets) {
         const id = branchId(ua, reset.id);
         const started = performance.now();
         if (!browser) {
-          branches.push({ id, ua, reset: reset.id, status: "skipped", error: launchError, findings: [], ms: 0 });
+          branches.push({ id, ua, reset: reset.id, status: launchStatus, error: launchError, findings: [], ms: 0 });
           continue;
         }
         let page: Page | undefined;
@@ -354,24 +365,31 @@ export async function runResetMatrix(options: ResetMatrixOptions): Promise<Reset
             ...(reset.css ? { initScripts: [resetInitScript(reset.css)] } : {}),
           });
           page = opened.page;
-          if (reset.css && !(await page.evaluate(RESET_FIRST_JS)))
-            throw new Error("the reset stylesheet is not the document's first sheet (the page moved or removed it)");
+          if (opened.redirect) redirects.push({ id, message: opened.redirect });
           const found = [];
-          const branchClaims = claims.filter((c) => c.id === id).flatMap((c) => c.overflows);
+          // Kept here until the branch has run at every width: a failed branch publishes no sample.
+          const mine: BrowserBranchBoxes[] = [];
           for (const width of widths) {
             if (width !== widths[0]) {
               await page.setViewportSize({ width, height });
               await settle(page);
             }
+            // At every width, next to the measurement: a page can move or remove the sheet when it resizes.
+            if (reset.css && !(await page.evaluate(RESET_FIRST_JS)))
+              throw new Error(
+                `the reset stylesheet is not the document's first sheet at ${width}px (the page moved or removed it)`,
+              );
             found.push(...(await judgeBranch(page, width)));
             if (claims.length) {
-              const drawn = (await page.evaluate(`(${BOX_OVERFLOW_JS})(${JSON.stringify(branchClaims)})`)) as Omit<
+              const here = claims.filter((c) => c.id === id && c.width === width).flatMap((c) => c.overflows);
+              const drawn = (await page.evaluate(`(${BOX_OVERFLOW_JS})(${JSON.stringify(here)})`)) as Omit<
                 BrowserBranchBoxes,
                 "id" | "width"
               >;
-              boxes.push({ id, width, ...drawn });
+              mine.push({ id, width, ...drawn });
             }
           }
+          boxes.push(...mine);
           branches.push({
             id,
             ua,
@@ -411,7 +429,12 @@ export async function runResetMatrix(options: ResetMatrixOptions): Promise<Reset
     summary,
     veriss,
     redirect,
-    findings: judgeResetMatrix({ summary, veriss: "skipped" in veriss ? null : veriss.comparison, redirect }),
+    findings: judgeResetMatrix({
+      summary,
+      veriss: "skipped" in veriss ? null : veriss.comparison,
+      redirect,
+      redirects,
+    }),
   };
 }
 

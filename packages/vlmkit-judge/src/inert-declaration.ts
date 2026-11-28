@@ -396,7 +396,9 @@ export function regimeWidths(conditions: readonly string[], min = 320, max = 192
       const isExact = /^\s*(?:width|device-width)\s*(?::|=)/i.test(feature) || /^[^<>]*=[^<>]*$/.test(feature);
       for (const m of numbers) {
         const px = Math.round(parseFloat(m[1]!) * (m[2]!.toLowerCase() === "px" || !m[2] ? 1 : 16));
-        if (px > min && px < max) (isExact ? exact : edges).add(px);
+        // The range's own ends count: (max-width: 320px) splits 320 from 321, and without it the page read as
+        // having no width query at all (one desktop width, the narrow regime never judged).
+        if (px >= min && px <= max) (isExact ? exact : edges).add(px);
       }
     }
   for (const e of exact) edges.add(e);

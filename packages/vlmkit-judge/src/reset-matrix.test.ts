@@ -121,6 +121,29 @@ describe("judgeResetMatrix", () => {
     assert.match(f[1]!.message, /only in firefox × none \(1 of 4 branches\)/);
   });
 
+  it("with no branch without a reset measured, a reset-only defect is not called absent without one", () => {
+    const summary = summarizeResetMatrix(
+      [run("chromium:normalize", [finding("page-overflow-x", "t")]), run("chromium:destyle", [])],
+      { uas: ["chromium"], resets: ["normalize", "destyle"] },
+    );
+    const [f] = judgeResetMatrix({ summary });
+    assert.equal(f!.severity, "suspect", f!.message);
+    assert.match(f!.message, /no branch without a reset was measured/);
+    assert.doesNotMatch(f!.message, /not in any branch without a reset/);
+  });
+
+  it("a redirect in any measured branch is reported with the branches it happened in", () => {
+    const summary = summarizeResetMatrix([run("chromium:none", []), run("firefox:none", [])], {
+      uas: ["chromium", "firefox"],
+      resets: ["none"],
+    });
+    const f = judgeResetMatrix({ summary, redirects: [{ id: "firefox:none", message: "went to /login" }] });
+    assert.deepEqual(
+      f.map((x) => [x.rule, x.severity, x.message]),
+      [["redirected", "suspect", "firefox:none: went to /login"]],
+    );
+  });
+
   it("a failed branch is a suspect, a missing engine a warn", () => {
     const f = judge([
       run("chromium:none", []),
@@ -185,5 +208,13 @@ describe("compareVerissClaims", () => {
       [drawn("firefox:normalize", ["Document/0/0"]), drawn("firefox:none", [], ["Document/0/1"])],
     );
     assert.deepEqual([c.decided, c.compared, c.disagreements.length], [1, 0, 0]);
+  });
+
+  it("a decided pair with a claim that could not be mapped is incomplete, not agreeing", () => {
+    const c = compareVerissClaims(
+      [claim("firefox:none", true, ["Document/0/1"])],
+      [drawn("firefox:none", [], ["Document/0/1"])],
+    );
+    assert.deepEqual([c.decided, c.agreedPairs, c.perBranch["firefox:none"]!.agreedPairs], [1, 0, 0]);
   });
 });

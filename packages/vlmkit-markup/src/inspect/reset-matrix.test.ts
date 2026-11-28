@@ -8,9 +8,12 @@
  * WebKit branches are a property of the machine, not of the page.
  */
 import assert from "node:assert/strict";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "vite-plus/test";
-import { resetInitScript, runResetMatrix, type ResetMatrixReport } from "./reset-matrix.ts";
+import { BrowserLaunchError } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { launchFailureStatus, resetInitScript, runResetMatrix, type ResetMatrixReport } from "./reset-matrix.ts";
 
 const dir = join(import.meta.dirname, "../../../../fixtures/reset-matrix");
 const T = { timeout: 300_000 };
@@ -85,5 +88,36 @@ describe("check reset on fixtures/reset-matrix", () => {
         await browser.close();
       }
     }
+  });
+
+  it("a page that removes the reset at a later width fails that branch; one that keeps it is measured", T, async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "reset-removed-"));
+    const page = (name: string, script: string) => {
+      const file = join(tmp, name);
+      writeFileSync(
+        file,
+        `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>t</title><style>body{margin:0}</style></head><body><main>x</main><script>${script}</script></body></html>`,
+      );
+      return file;
+    };
+    const removes = page(
+      "removes.html",
+      `addEventListener("resize", () => document.querySelector("[data-vlmkit-reset]")?.remove());`,
+    );
+    const keeps = page("keeps.html", `addEventListener("resize", () => document.body.dataset.w = String(innerWidth));`);
+    const opts = { uas: ["chromium" as const], resets: ["destyle"], viewports: [1280, 375], noVeriss: true };
+    const bad = await runResetMatrix({ source: removes, ...opts });
+    assert.equal(bad.branches[0]!.status, "failed", JSON.stringify(bad.branches[0]));
+    assert.match(bad.branches[0]!.error!, /375px/);
+    const good = await runResetMatrix({ source: keeps, ...opts });
+    assert.equal(good.branches[0]!.status, "measured", JSON.stringify(good.branches[0]));
+  });
+
+  it("only an engine that is not installed is skipped; any other launch failure fails the branch", () => {
+    assert.equal(
+      launchFailureStatus(new BrowserLaunchError("error: Playwright's firefox is not installed")),
+      "skipped",
+    );
+    assert.equal(launchFailureStatus(new Error("libgtk-3.so.0: cannot open shared object file")), "failed");
   });
 });
